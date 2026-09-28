@@ -20,3 +20,7 @@ The core sensor feature uses the phone's camera and on-device text recognition (
 
 ## ===== OFFLINE MODE =====
 The app works fully offline for its essential functions: logging and viewing symptoms, checking the medication schedule and reminders, and reaching emergency contacts. Data is stored locally and synced to Firebase automatically once a connection returns. The Ligue directory is cached on the phone so it stays available offline. Updates from the care circle and staff appear once back online, and entries a caregiver makes offline sync the same way. Text recognition runs fully offline. Voice journaling uses on-device speech recognition where the device supports it, and otherwise records the audio locally and transcribes it once connectivity returns.
+
+## ===== FIGMA =====
+[Figma design file](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion?t=XIxG9NcnbbcxOcOR-1)
+
