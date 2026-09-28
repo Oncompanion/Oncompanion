@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "782199763007",
+    "project_id": "oncompanion-c4144",
+    "storage_bucket": "oncompanion-c4144.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:782199763007:android:48269a68de9ec7c134888a",
+        "android_client_info": {
+          "package_name": "com.github.se.oncompanion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgveVpywtZ5z0qwCdxiS4CPoGPng_Sz8U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

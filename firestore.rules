@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // ---------- Users ----------
+    // Each user has one document: /users/{uid}. Only they can read or write it.
+    match /users/{uid} {
+      allow read, update, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt']);
+
+      // Everything personal (entries, records, reminders...) goes under the user:
+      // /users/{uid}/<anything>/{docId}
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // ---------- Everything else ----------
+    // No rule matches = denied. Add one explicit `match` per new collection.
+  }
+}
