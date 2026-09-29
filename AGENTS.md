@@ -47,6 +47,7 @@ Run these before every commit and make sure they pass:
 
 - Unit and Robolectric tests go in `app/src/test`, instrumented Kaspresso/Compose tests in `app/src/androidTest`.
 - New code needs tests: SonarCloud's quality gate requires **≥ 80% coverage on new code**. Compose adds hidden branches, so test the different states of a screen (loading, empty, error, filled), not only that it renders.
+- Dependency versions are locked (`app/gradle.lockfile`, `settings-gradle.lockfile`). After adding or updating a dependency in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated lock files with your change.
 - Don't add coverage exclusions to `app/build.gradle.kts` to make the gate pass. Ask the team first.
 
 ## Git workflow
