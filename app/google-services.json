@@ -12,7 +12,68 @@
           "package_name": "com.github.se.oncompanion"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "782199763007-5bsb0g174jvlb78nk0q0rhmqif69n71e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "c8dc27705ce325038f3b7e7e1f156f58539a6ed7"
+          }
+        },
+        {
+          "client_id": "782199763007-5gu5ejqcj35uc6rot6lurr1eg3c4qenm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "b058e4cbcb4fdc94ced96f4766ed4115734d7bfe"
+          }
+        },
+        {
+          "client_id": "782199763007-7urrddtbbguuocsttetnb1pn2ruo8m5g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "9a3d296944dd848cf11232c47dd331d98a94dad1"
+          }
+        },
+        {
+          "client_id": "782199763007-fkqgkdvb948p2f3oni5md47jet5a271m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "2741a6bf77a2b499447d5725dd5e4dccae2885e1"
+          }
+        },
+        {
+          "client_id": "782199763007-jgkpm21clnffm2nad364bq3gkofjh7mr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "4aff91c112e022ca8e922ebbb0f5bf8e18e5731d"
+          }
+        },
+        {
+          "client_id": "782199763007-l4j7l41tnrds8lfocvmve3m1rl1u5obd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "3e1c683bd7bfd43794e4bc6bb6d5015bd5f54d73"
+          }
+        },
+        {
+          "client_id": "782199763007-lbqceneei6sjpuc3s90357u6s4ftmag8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "986e876406a6821557a79c6554aebe9aa950caf5"
+          }
+        },
+        {
+          "client_id": "782199763007-tk88ffkf45d0eelj9rjh2tj49arniu3t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAgveVpywtZ5z0qwCdxiS4CPoGPng_Sz8U"
@@ -20,7 +81,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "782199763007-tk88ffkf45d0eelj9rjh2tj49arniu3t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
