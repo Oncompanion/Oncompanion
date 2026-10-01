@@ -1,0 +1,30 @@
+name: Sprint task
+description: A concrete task that implements part of a user story
+labels: ["task"]
+body:
+  - type: input
+    id: user-story
+    attributes:
+      label: Parent user story
+      description: Link the user story this task belongs to.
+      placeholder: "#123"
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task description
+      description: What needs to be done, concretely.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      placeholder: "- [ ] ..."
+  - type: input
+    id: estimate
+    attributes:
+      label: Estimated time
+      description: Best guess in person-hours.
+      placeholder: "4h"

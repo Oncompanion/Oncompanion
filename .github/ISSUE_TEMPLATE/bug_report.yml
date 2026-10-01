@@ -16,3 +16,9 @@ body:
     id: expected
     attributes:
       label: Expected behavior
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Device or emulator, Android version, app version or commit.
+      placeholder: "Pixel 7 emulator, Android 14, main @ a4bd13e"
