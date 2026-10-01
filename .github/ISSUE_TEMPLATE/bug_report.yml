@@ -1,0 +1,24 @@
+name: Bug report
+description: Report something that doesn't work
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Device or emulator, Android version, app version or commit.
+      placeholder: "Pixel 7 emulator, Android 14, main @ a4bd13e"
