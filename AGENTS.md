@@ -12,11 +12,13 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 
 ## Architecture
 
-Follow MVVM, one feature per package:
+Follow MVVM, one feature per package. The layers, use cases and Firestore layout are described in [docs/architecture.md](docs/architecture.md); update its diagram in the same PR when you change the architecture.
 
 ```
 com.github.se.oncompanion/
   model/<feature>/   data classes + repository interface + Firestore implementation
+  model/device/      device service interfaces + implementations (ML Kit, speech, reminders, PDF)
+  domain/<feature>/  use cases (optional layer)
   ui/<feature>/      @Composable screens + their ViewModel
   ui/navigation/     navigation graph and routes
   ui/theme/          colors, typography, theme
@@ -24,7 +26,9 @@ com.github.se.oncompanion/
 ```
 
 - **Model**: plain data classes. Repositories hide Firebase behind an interface (e.g. `SymptomRepository` / `SymptomRepositoryFirestore`) so ViewModels can be tested with a fake.
-- **ViewModel**: exposes UI state as `StateFlow`, takes its repository in the constructor, no Android `Context` and no Compose imports.
+- **Device services**: Android and ML Kit APIs (text recognition, speech, reminders, PDF export) are wrapped behind interfaces in the same way, so use cases and ViewModels never call them directly.
+- **Use case** (optional): one class per use case with a single `operator fun invoke(...)`, taking repositories and device services in its constructor. Add one only when the logic combines several repositories or services, or is shared by several screens (e.g. `ManageMedicationSchedule` keeps reminders in sync with saved medications). Plain reads and writes go straight from the ViewModel to the repository.
+- **ViewModel**: exposes UI state as `StateFlow`, takes its repositories and use cases in the constructor, no Android `Context` and no Compose imports.
 - **View**: composables are stateless where possible, get state from the ViewModel and send events back. No Firebase calls from composables.
 - Every element that a test needs to find gets a test tag declared in `resources/C.kt`.
 - Offline mode is a requirement: rely on Firestore's local cache and never block the UI waiting for the network.

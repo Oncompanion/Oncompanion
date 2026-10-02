@@ -1,0 +1,41 @@
+# Architecture
+
+Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
+
+![Oncompanion architecture](architecture.svg)
+
+Green = screens and repositories, blue = use cases, yellow = device service interfaces (wrapping ML Kit and Android APIs), grey = backend and SDKs, red dashed = P2 stretch goals.
+
+To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite `architecture.svg`. Commit both files in the same PR as the code change.
+
+## Layers
+
+**UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes. No Firebase or Android `Context` here.
+
+**Domain layer** (`domain/<feature>/`, optional). One class per use case with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (questions, directory, appointments list) go straight from the ViewModel to the repository.
+
+- `LogSymptom` turns a one-tap entry or a voice transcript into a symptom entry for the right patient, so Home and the symptom tracker share the same logic.
+- `ManageMedicationSchedule` saves a confirmed medication and keeps its reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule.
+- `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
+- `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
+
+**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
+
+## Offline mode
+
+Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
+
+## Firestore layout
+
+```
+/users/{uid}                          profile (owner only)
+/users/{uid}/symptoms/{id}
+/users/{uid}/medications/{id}
+/users/{uid}/appointments/{id}
+/users/{uid}/questions/{id}
+/users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
+/invites/{code}                       pending care-circle invites
+/directory/{contacts|programs|events}/items/{id}   read: signed in, write: staff
+```
+
+Care-circle members read a patient's data through rules that check `/users/{uid}/circle/{request.auth.uid}`. Staff status comes from a custom claim set by the team, never from a field users can write.
