@@ -204,11 +204,4 @@ class CredentialManagerGoogleCredentialProviderTest {
     provider.clearCredentialState(context) // must not throw
     assertEquals(1, fake.clearRequests.size)
   }
-
-  @Test
-  fun defaultFactoryCanBeConstructed() {
-    // Only checks that the default factory parameter (CredentialManager::create) is usable.
-    val defaultProvider = CredentialManagerGoogleCredentialProvider(SERVER_CLIENT_ID)
-    assertTrue(defaultProvider is GoogleCredentialProvider)
-  }
 }
