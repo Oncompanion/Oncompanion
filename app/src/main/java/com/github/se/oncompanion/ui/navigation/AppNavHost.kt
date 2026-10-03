@@ -1,8 +1,11 @@
 package com.github.se.oncompanion.ui.navigation
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -58,13 +61,8 @@ fun AppNavHost(
     }
 
     // Bottom bar tabs, next to Overview
-    placeholderGraph(
-        Route.PLANNING,
-        Screen.PLANNING,
-        R.string.planning_title,
-        C.Tag.planning_screen,
-    )
-    placeholderGraph(Route.EVENTS, Screen.EVENTS, R.string.events_title, C.Tag.events_screen)
+    tabPlaceholderGraph(Tab.PLANNING, Screen.PLANNING, C.Tag.planning_screen, navigationActions)
+    tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
 
     // Features opened from the Overview shortcuts
     placeholderGraph(
@@ -86,6 +84,36 @@ fun AppNavHost(
         C.Tag.care_circle_screen,
     )
     placeholderGraph(Route.PROFILE, Screen.PROFILE, R.string.profile_title, C.Tag.profile_screen)
+  }
+}
+
+/**
+ * Like [placeholderGraph], for a bottom-bar [tab]: the placeholder is shown with the bottom bar,
+ * and its title is the tab's label.
+ */
+private fun NavGraphBuilder.tabPlaceholderGraph(
+    tab: Tab,
+    screen: String,
+    testTag: String,
+    navigationActions: NavigationActions,
+) {
+  navigation(startDestination = screen, route = tab.route) {
+    composable(screen) {
+      Scaffold(
+          bottomBar = {
+            BottomNavigationBar(
+                selectedTab = tab,
+                onTabSelected = { selected -> navigationActions.navigateToTab(selected.route) },
+            )
+          }
+      ) { innerPadding ->
+        PlaceholderScreen(
+            title = stringResource(tab.label),
+            testTag = testTag,
+            modifier = Modifier.padding(innerPadding),
+        )
+      }
+    }
   }
 }
 

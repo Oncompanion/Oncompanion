@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -20,6 +21,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Tab
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -43,9 +45,14 @@ class OverviewScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     val openedRoutes = mutableListOf<String>()
+    val openedTabs = mutableListOf<String>()
 
     override fun navigateTo(screen: String) {
       openedRoutes += screen
+    }
+
+    override fun navigateToTab(route: String) {
+      openedTabs += route
     }
   }
 
@@ -141,5 +148,31 @@ class OverviewScreenTest {
         .performClick()
 
     composeTestRule.runOnIdle { assertEquals(listOf(OverviewShortcut.CARE_CIRCLE), clicked) }
+  }
+
+  @Test
+  fun overviewScreen_showsBottomBarWithOverviewSelected() {
+    setOverviewScreen()
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).assertIsSelected()
+  }
+
+  @Test
+  fun clickingATab_opensItWithTabNavigation() {
+    val navigationActions = setOverviewScreen()
+
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Route.PLANNING, Route.EVENTS), navigationActions.openedTabs)
+      assertEquals(emptyList<String>(), navigationActions.openedRoutes)
+    }
+  }
+
+  @Test
+  fun overviewContent_hasNoBottomBarByDefault() {
+    composeTestRule.setContent { OverviewContent(firstName = null, onShortcutClick = {}) }
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
   }
 }
