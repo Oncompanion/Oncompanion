@@ -16,15 +16,17 @@ interface UserProfileRepository {
 
   /**
    * Creates the profile at the end of onboarding. [UserProfile.createdAt] is ignored and set by the
-   * server.
+   * server. Returns as soon as the profile is saved on the device (also offline); it reaches the
+   * server when there is a connection.
    *
    * @throws IllegalArgumentException if the profile is not [UserProfile.isValid]
    */
   suspend fun createProfile(profile: UserProfile)
 
   /**
-   * Updates role, names and cancer type of an existing profile. [UserProfile.createdAt] is never
-   * changed.
+   * Updates the names and cancer type of an existing profile. The role and [UserProfile.createdAt]
+   * can't change after onboarding: [UserProfile.role] is ignored. Returns as soon as the change is
+   * saved on the device (also offline).
    *
    * @throws IllegalArgumentException if the profile is not [UserProfile.isValid]
    */

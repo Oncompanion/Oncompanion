@@ -36,7 +36,10 @@ service cloud.firestore {
                     && request.resource.data.createdAt == request.time;
       allow update: if isOwner(uid)
                     && isValidProfile(request.resource.data)
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // The role is chosen during onboarding and can't change afterwards (care-circle
+                    // access will depend on it)
+                    && request.resource.data.role == resource.data.role;
 
       // Everything personal (entries, records, reminders...) goes under the user:
       // /users/{uid}/<anything>/{docId}

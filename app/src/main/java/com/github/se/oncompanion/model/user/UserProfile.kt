@@ -13,6 +13,7 @@ enum class Role {
  * without a profile hasn't finished onboarding yet.
  *
  * @property uid the Firebase Auth user ID, also the document ID
+ * @property role chosen during onboarding; it can't change afterwards
  * @property firstName required, see [isValid]
  * @property familyName optional
  * @property cancerType optional free text (picked from suggestions or typed by the user)

@@ -6,24 +6,21 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * [UserProfileRepository] backed by Cloud Firestore, documents at `/users/{uid}`.
  *
- * Writes are applied to the local cache immediately. A write then waits up to [writeTimeoutMillis]
- * for the server: if the device is offline, it returns anyway and Firestore syncs the change when
- * the connection comes back. Errors the server reports in time (e.g. rejected by the security
- * rules) are thrown.
+ * Writes return as soon as they are applied to the local cache, without waiting for the server, so
+ * they never block the UI (offline, Firestore syncs them when the connection comes back). If the
+ * server later rejects a write (security rules), Firestore rolls the local change back and the
+ * rejection is logged; [UserProfile.isValid] mirrors the rules so this shouldn't happen.
  */
 class UserProfileRepositoryFirestore(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val writeTimeoutMillis: Long = DEFAULT_WRITE_TIMEOUT_MILLIS,
 ) : UserProfileRepository {
 
   override suspend fun getProfile(uid: String): UserProfile? =
@@ -43,30 +40,34 @@ class UserProfileRepositoryFirestore(
 
   override suspend fun createProfile(profile: UserProfile) {
     require(profile.isValid()) { "Invalid profile" }
-    write(profile.uid) {
-      document(profile.uid)
-          .set(toFields(profile) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
-    }
+    document(profile.uid)
+        .set(
+            editableFields(profile) +
+                mapOf(
+                    FIELD_ROLE to profile.role.name,
+                    FIELD_CREATED_AT to FieldValue.serverTimestamp(),
+                )
+        )
+        .logServerRejection(profile.uid)
   }
 
   override suspend fun updateProfile(profile: UserProfile) {
     require(profile.isValid()) { "Invalid profile" }
-    write(profile.uid) { document(profile.uid).set(toFields(profile), SetOptions.merge()) }
+    // update() (not a merge set) so a missing profile is never created half-filled
+    document(profile.uid).update(editableFields(profile)).logServerRejection(profile.uid)
   }
 
   private fun document(uid: String) = db.collection(COLLECTION).document(uid)
 
-  private suspend fun write(uid: String, start: () -> Task<Void>) {
-    val task = start()
-    val confirmed = withTimeoutOrNull(writeTimeoutMillis) { task.await().let { true } } ?: false
-    if (!confirmed) {
-      Log.i(TAG, "Profile $uid saved locally, it will sync when the device is back online")
+  private fun Task<Void>.logServerRejection(uid: String) {
+    addOnFailureListener { e ->
+      Log.e(TAG, "The server rejected the profile $uid; the local change was rolled back", e)
     }
   }
 
-  private fun toFields(profile: UserProfile): Map<String, Any?> =
+  /** The fields a user can change after onboarding (not the role nor createdAt). */
+  private fun editableFields(profile: UserProfile): Map<String, Any?> =
       mapOf(
-          FIELD_ROLE to profile.role.name,
           FIELD_FIRST_NAME to profile.firstName,
           FIELD_FAMILY_NAME to profile.familyName,
           FIELD_CANCER_TYPE to profile.cancerType,
@@ -97,7 +98,6 @@ class UserProfileRepositoryFirestore(
     const val FIELD_FAMILY_NAME = "familyName"
     const val FIELD_CANCER_TYPE = "cancerType"
     const val FIELD_CREATED_AT = "createdAt"
-    const val DEFAULT_WRITE_TIMEOUT_MILLIS = 5_000L
     private const val TAG = "UserProfileRepository"
   }
 }
