@@ -73,7 +73,7 @@ class AppNavHostTest {
   fun overviewStartRoute_displaysOverviewScreen() {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())

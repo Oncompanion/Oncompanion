@@ -39,6 +39,6 @@ class OverviewScreenTest {
 
   @Test
   fun overviewScreen_displaysOverviewTitle() {
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
   }
 }
