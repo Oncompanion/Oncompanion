@@ -2,4 +2,17 @@
     <string name="app_name">oncompanion</string>
     <string name="title_activity_main">MainActivity</string>
     <string name="title_activity_second">SecondActivity</string>
+    <string name="planning_title">Planning</string>
+    <string name="planning_today">Today</string>
+    <string name="planning_today_date">Today — %1$s</string>
+    <string name="planning_previous_week">Previous week</string>
+    <string name="planning_next_week">Next week</string>
+    <string name="planning_go_today">Go to today</string>
+    <string name="planning_add">Add appointment</string>
+    <string name="planning_empty">No appointments on this day</string>
+    <string name="planning_empty_hint">Tap + to add a doctor appointment.</string>
+    <string name="planning_loading">Loading appointments</string>
+    <string name="planning_error">We couldn’t load your appointments.</string>
+    <string name="planning_retry">Retry</string>
+    <string name="planning_date_unavailable">Date outside supported range</string>
 </resources>
