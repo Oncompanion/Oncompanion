@@ -20,7 +20,8 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // Connects instrumented tests to the Firebase emulators (never the production project)
+    testInstrumentationRunner = "com.github.se.oncompanion.utils.OncompanionTestRunner"
     vectorDrawables { useSupportLibrary = true }
   }
 

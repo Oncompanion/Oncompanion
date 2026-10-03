@@ -12,6 +12,10 @@ object FirebaseEmulator {
 
   @Volatile private var connected = false
 
+  /** Whether [ensureConnected] has run (it runs before every test, see [OncompanionTestRunner]). */
+  val isConnected: Boolean
+    get() = connected
+
   val auth: FirebaseAuth
     get() {
       ensureConnected()

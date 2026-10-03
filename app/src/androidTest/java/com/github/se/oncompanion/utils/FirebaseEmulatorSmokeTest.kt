@@ -25,6 +25,12 @@ class FirebaseEmulatorSmokeTest {
   }
 
   @Test
+  fun testRunnerConnectsToTheEmulatorsBeforeAnyTest() {
+    // Nothing in this test calls ensureConnected(): OncompanionTestRunner already did
+    assertTrue(FirebaseEmulator.isConnected)
+  }
+
+  @Test
   fun authEmulatorCreatesAndSignsInAccounts(): Unit = runBlocking {
     val uid = EmulatorTestData.createUser("smoke")
 
