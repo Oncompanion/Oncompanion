@@ -20,7 +20,8 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // Connects instrumented tests to the Firebase emulators (never the production project)
+    testInstrumentationRunner = "com.github.se.oncompanion.utils.OncompanionTestRunner"
     vectorDrawables { useSupportLibrary = true }
   }
 
@@ -112,6 +113,10 @@ sonar {
   }
 }
 
+// Some test libraries (Espresso/Kaspresso) bring the old `protobuf-lite`, which clashes with the
+// `protobuf-javalite` Firestore needs (NoSuchMethodError when Firestore runs in tests).
+configurations.configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
+
 // When a library is used both by robolectric and connected tests, use this function
 fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
   androidTestImplementation(dep)
@@ -130,6 +135,9 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.auth)
   implementation(libs.firebase.firestore)
+  // Kotlin coroutines: await() on Firebase tasks, and test utilities
+  implementation(libs.kotlinx.coroutines.play.services)
+  globalTestImplementation(libs.kotlinx.coroutines.test)
 
   // ------------- Jetpack Compose ------------------
   val composeBom = platform(libs.compose.bom)

@@ -91,6 +91,19 @@ jobs:
           # To run the CI with debug information, add --info
           ./gradlew check --parallel --build-cache
 
+      # Firebase emulators (Auth + Firestore) used by the connected tests, see firebase.json.
+      # The Android emulator reaches them on the host at 10.0.2.2.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Start Firebase emulators
+        run: |
+          npm install -g firebase-tools
+          firebase emulators:start --only auth,firestore --project oncompanion-c4144 > firebase-emulators.log 2>&1 &
+          timeout 180 bash -c 'until curl -s localhost:8080 > /dev/null && curl -s localhost:9099 > /dev/null; do sleep 2; done'
+
       # Run connected tests on the emulator
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
