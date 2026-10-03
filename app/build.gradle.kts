@@ -141,6 +141,10 @@ dependencies {
   // Kotlin coroutines: await() on Firebase tasks, and test utilities
   implementation(libs.kotlinx.coroutines.play.services)
   globalTestImplementation(libs.kotlinx.coroutines.test)
+  // Sign in with Google through Android's Credential Manager
+  implementation(libs.credentials)
+  implementation(libs.credentials.play.services.auth)
+  implementation(libs.googleid)
 
   // ------------- Jetpack Compose ------------------
   val composeBom = platform(libs.compose.bom)
