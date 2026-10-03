@@ -12,4 +12,8 @@
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
     <string name="profile_title">Profile</string>
+
+    <!-- Onboarding -->
+    <string name="cancer_type_label">Cancer type</string>
+    <string name="cancer_type_hint">Start typing to see suggestions</string>
 </resources>
