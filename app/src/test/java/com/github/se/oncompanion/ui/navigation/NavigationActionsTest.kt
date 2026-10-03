@@ -114,9 +114,9 @@ class NavigationActionsTest {
   }
 
   @Test
-  fun navigateToTopLevel_displaysStartScreenOfGraph() {
+  fun navigateAndClearBackStack_displaysStartScreenOfGraph() {
     setNavHost(Route.AUTH)
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.ONBOARDING) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.ONBOARDING) }
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
@@ -125,9 +125,9 @@ class NavigationActionsTest {
   }
 
   @Test
-  fun navigateToTopLevel_removesPreviousFlowFromBackStack() {
+  fun navigateAndClearBackStack_removesPreviousFlowFromBackStack() {
     setNavHost(Route.AUTH)
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.ONBOARDING) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.ONBOARDING) }
     composeTestRule.runOnIdle {
       val routes = routesInBackStack()
       assertFalse("back stack still contains sign-in: $routes", routes.contains(Screen.SIGN_IN))
@@ -138,9 +138,9 @@ class NavigationActionsTest {
   }
 
   @Test
-  fun navigateToTopLevel_leavesNoScreenBelowNewStartScreen() {
+  fun navigateAndClearBackStack_leavesNoScreenBelowNewStartScreen() {
     setNavHost(Route.AUTH)
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.ONBOARDING) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.ONBOARDING) }
     composeTestRule.runOnIdle {
       // Only navigation graphs (no screen) may remain below the new start screen.
       val screensBelow =
@@ -152,7 +152,7 @@ class NavigationActionsTest {
   @Test
   fun popBackStack_afterNavigateToTopLevel_doesNotShowPreviousScreen() {
     setNavHost(Route.AUTH)
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.ONBOARDING) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.ONBOARDING) }
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
     composeTestRule.runOnIdle { navController.popBackStack() }
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
@@ -162,18 +162,32 @@ class NavigationActionsTest {
   fun goBack_afterNavigateToTopLevel_doesNotShowPreviousFlow() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.runOnIdle { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) }
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.OVERVIEW) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) }
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     composeTestRule.runOnIdle { navigationActions.goBack() }
     composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertDoesNotExist()
+    // The new flow's screen stays: the NavHost is never emptied
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(Screen.OVERVIEW, navigationActions.currentRoute()) }
   }
 
   @Test
-  fun navigateToTopLevel_fromOnboardingToOverview_showsOverviewWithCleanBackStack() {
+  fun goBack_onStartScreen_keepsItDisplayed() {
+    setNavHost(Route.AUTH)
+    composeTestRule.runOnIdle { navigationActions.goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, navigationActions.currentRoute())
+      assertEquals(1, routesInBackStack().count { it == Screen.SIGN_IN })
+    }
+  }
+
+  @Test
+  fun navigateAndClearBackStack_fromOnboardingToOverview_showsOverviewWithCleanBackStack() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.runOnIdle { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) }
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.OVERVIEW) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) }
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
@@ -186,11 +200,11 @@ class NavigationActionsTest {
   }
 
   @Test
-  fun navigateToTopLevel_sameRouteTwice_doesNotDuplicateStartScreen() {
+  fun navigateAndClearBackStack_sameRouteTwice_doesNotDuplicateStartScreen() {
     setNavHost(Route.AUTH)
     composeTestRule.runOnIdle {
-      navigationActions.navigateToTopLevel(Route.OVERVIEW)
-      navigationActions.navigateToTopLevel(Route.OVERVIEW)
+      navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
+      navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
     }
     composeTestRule.runOnIdle {
       assertEquals(1, routesInBackStack().count { it == Screen.OVERVIEW })
@@ -199,9 +213,9 @@ class NavigationActionsTest {
   }
 
   @Test
-  fun navigateToTopLevel_fromOverviewToAuth_showsSignInAndDropsOverview() {
+  fun navigateAndClearBackStack_fromOverviewToAuth_showsSignInAndDropsOverview() {
     setNavHost(Route.OVERVIEW)
-    composeTestRule.runOnIdle { navigationActions.navigateToTopLevel(Route.AUTH) }
+    composeTestRule.runOnIdle { navigationActions.navigateAndClearBackStack(Route.AUTH) }
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {

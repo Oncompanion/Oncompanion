@@ -36,19 +36,23 @@ open class NavigationActions(private val navController: NavHostController) {
   }
 
   /**
-   * Opens the top-level [route] and clears the whole back stack, so Back can't return to the
-   * previous flow (e.g. after signing in or finishing onboarding).
+   * Opens [route] and clears the whole back stack, so Back can't return to the previous flow (e.g.
+   * after signing in or finishing onboarding). Not for switching between bottom-bar tabs, which
+   * should keep each tab's state.
    */
-  open fun navigateToTopLevel(route: String) {
+  open fun navigateAndClearBackStack(route: String) {
     navController.navigate(route) {
       popUpTo(navController.graph.id) { inclusive = true }
       launchSingleTop = true
     }
   }
 
-  /** Returns to the previous screen. */
+  /**
+   * Returns to the previous screen. Does nothing on the first screen of the back stack, so the
+   * NavHost is never left empty (blank screen).
+   */
   open fun goBack() {
-    navController.popBackStack()
+    if (navController.previousBackStackEntry != null) navController.popBackStack()
   }
 
   /** The current screen's [Screen] constant, or an empty string before the graph is set. */

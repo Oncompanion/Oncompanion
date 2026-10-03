@@ -27,7 +27,7 @@ com.github.se.oncompanion/
 - **ViewModel**: exposes UI state as `StateFlow`, takes its repository in the constructor, no Android `Context` and no Compose imports.
 - **View**: composables are stateless where possible, get state from the ViewModel and send events back. No Firebase calls from composables.
 - Every element that a test needs to find gets a test tag declared in `resources/C.kt`.
-- **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`. Screens receive a `NavigationActions` and never use the `NavController` directly; use `navigateToTopLevel` when Back must not return to the previous flow (e.g. after sign-in).
+- **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`. Screens receive a `NavigationActions` and never use the `NavController` directly; use `navigateAndClearBackStack` when Back must not return to the previous flow (e.g. after sign-in).
 - **Dependency injection** is manual: ViewModels take their repositories as constructor parameters with the Firebase implementation as default, so tests can pass fakes. No Hilt.
 - Offline mode is a requirement: rely on Firestore's local cache and never block the UI waiting for the network.
 
