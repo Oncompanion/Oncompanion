@@ -42,7 +42,7 @@ private fun PlanningPreviewContent(
                   "Clinic",
               ),
           )
-  OncompanionTheme(dynamicColor = false) {
+  OncompanionTheme {
     PlanningScreen(
         PlanningUiState(
             selected,

@@ -20,7 +20,8 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // Connects instrumented tests to the Firebase emulators (never the production project)
+    testInstrumentationRunner = "com.github.se.oncompanion.utils.OncompanionTestRunner"
     vectorDrawables { useSupportLibrary = true }
   }
 
@@ -108,13 +109,13 @@ sonar {
         "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml",
     )
     property("sonar.exclusions", "**/google-services.json")
-    // TODO: remove the MainActivity.kt exclusion once real code replaces the sample greeting
-    property(
-        "sonar.coverage.exclusions",
-        "**/ui/theme/**,**/SecondActivity.kt,**/MainActivity.kt",
-    )
+    property("sonar.coverage.exclusions", "**/ui/theme/**")
   }
 }
+
+// Some test libraries (Espresso/Kaspresso) bring the old `protobuf-lite`, which clashes with the
+// `protobuf-javalite` Firestore needs (NoSuchMethodError when Firestore runs in tests).
+configurations.configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
 
 // When a library is used both by robolectric and connected tests, use this function
 fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
@@ -134,6 +135,13 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.auth)
   implementation(libs.firebase.firestore)
+  // Kotlin coroutines: await() on Firebase tasks, and test utilities
+  implementation(libs.kotlinx.coroutines.play.services)
+  globalTestImplementation(libs.kotlinx.coroutines.test)
+  // Sign in with Google through Android's Credential Manager
+  implementation(libs.credentials)
+  implementation(libs.credentials.play.services.auth)
+  implementation(libs.googleid)
 
   // ------------- Jetpack Compose ------------------
   val composeBom = platform(libs.compose.bom)
@@ -148,6 +156,9 @@ dependencies {
   implementation(libs.compose.activity)
   // Integration with ViewModels
   implementation(libs.compose.viewmodel)
+  // Navigation
+  implementation(libs.navigation.compose)
+  globalTestImplementation(libs.navigation.testing)
   // Android Studio Preview support
   implementation(libs.compose.preview)
   debugImplementation(libs.compose.tooling)

@@ -41,7 +41,7 @@ class PlanningScreenTest {
       today: () -> Unit = {},
   ) {
     compose.setContent {
-      OncompanionTheme(dynamicColor = false) {
+      OncompanionTheme {
         PlanningScreen(state, date, zone, onDate, previous, next, today, onRetry, onAdd, onItem)
       }
     }
