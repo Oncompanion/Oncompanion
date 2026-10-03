@@ -217,7 +217,58 @@ class UserProfileSecurityRulesTest {
     createAliceProfile()
     allowed(
         userDoc(aliceUid)
-            .update(mapOf("firstName" to "Alicia", "role" to "CAREGIVER", "familyName" to null))
+            .update(
+                mapOf(
+                    "firstName" to "Alicia",
+                    "familyName" to null,
+                    "cancerType" to "Lymphoma",
+                )
+            )
+    )
+    val stored = allowed(userDoc(aliceUid).get(Source.SERVER))
+    assertEquals("Alicia", stored.getString("firstName"))
+    assertEquals("PATIENT", stored.getString("role"))
+  }
+
+  @Test
+  fun ownerUpdateKeepingSameRoleIsAllowed(): Unit = runBlocking {
+    createAliceProfile()
+    allowed(userDoc(aliceUid).update(mapOf("role" to "PATIENT", "firstName" to "Alicia")))
+  }
+
+  @Test
+  fun ownerUpdateChangingRoleFromPatientToCaregiverIsDenied(): Unit = runBlocking {
+    createAliceProfile()
+    denied(userDoc(aliceUid).update("role", "CAREGIVER"))
+    denied(userDoc(aliceUid).update(mapOf("role" to "CAREGIVER", "firstName" to "Alicia")))
+    assertEquals("PATIENT", allowed(userDoc(aliceUid).get(Source.SERVER)).getString("role"))
+  }
+
+  @Test
+  fun ownerUpdateChangingRoleFromCaregiverToPatientIsDenied(): Unit = runBlocking {
+    allowed(userDoc(aliceUid).set(validProfile().apply { put("role", "CAREGIVER") }))
+    denied(userDoc(aliceUid).update("role", "PATIENT"))
+    assertEquals("CAREGIVER", allowed(userDoc(aliceUid).get(Source.SERVER)).getString("role"))
+  }
+
+  @Test
+  fun ownerUpdateRemovingRoleIsDenied(): Unit = runBlocking {
+    createAliceProfile()
+    denied(userDoc(aliceUid).update("role", FieldValue.delete()))
+  }
+
+  @Test
+  fun ownerOverwriteWithDifferentRoleIsDenied(): Unit = runBlocking {
+    createAliceProfile()
+    val createdAt = allowed(userDoc(aliceUid).get(Source.SERVER)).getTimestamp("createdAt")
+    denied(
+        userDoc(aliceUid)
+            .set(
+                validProfile().apply {
+                  put("role", "CAREGIVER")
+                  put("createdAt", createdAt)
+                }
+            )
     )
   }
 
