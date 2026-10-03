@@ -12,6 +12,12 @@ object Route {
   const val AUTH = "auth"
   const val ONBOARDING = "onboarding"
   const val OVERVIEW = "overview"
+  const val PLANNING = "planning"
+  const val EVENTS = "events"
+  const val SYMPTOMS = "symptoms"
+  const val PRESCRIPTIONS = "prescriptions"
+  const val CARE_CIRCLE = "care_circle"
+  const val PROFILE = "profile"
 }
 
 /** Individual screens, grouped by the [Route] they belong to. */
@@ -25,6 +31,24 @@ object Screen {
 
   // Route.OVERVIEW
   const val OVERVIEW = "overview_home"
+
+  // Route.PLANNING
+  const val PLANNING = "planning_home"
+
+  // Route.EVENTS
+  const val EVENTS = "events_home"
+
+  // Route.SYMPTOMS
+  const val SYMPTOMS = "symptoms_home"
+
+  // Route.PRESCRIPTIONS
+  const val PRESCRIPTIONS = "prescriptions_home"
+
+  // Route.CARE_CIRCLE
+  const val CARE_CIRCLE = "care_circle_home"
+
+  // Route.PROFILE
+  const val PROFILE = "profile_home"
 }
 
 /** Navigation helpers shared by all screens, so screens never use the NavController directly. */
