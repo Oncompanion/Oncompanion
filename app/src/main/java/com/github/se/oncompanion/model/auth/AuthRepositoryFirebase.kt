@@ -8,9 +8,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-/** [AuthRepository] backed by Firebase Authentication. */
-class AuthRepositoryFirebase(private val auth: FirebaseAuth = FirebaseAuth.getInstance()) :
+/**
+ * [AuthRepository] backed by Firebase Authentication.
+ *
+ * Firebase is only accessed when first used, not when the repository is created: screens can create
+ * it (e.g. as a ViewModel default) even where Firebase isn't initialized, like unit tests.
+ */
+class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.getInstance() }) :
     AuthRepository {
+
+  /** Uses the given [FirebaseAuth] instance, e.g. one connected to the emulator. */
+  constructor(auth: FirebaseAuth) : this({ auth })
+
+  private val auth: FirebaseAuth by lazy(authProvider)
 
   override val currentUser: AuthUser?
     get() = auth.currentUser?.toAuthUser()
