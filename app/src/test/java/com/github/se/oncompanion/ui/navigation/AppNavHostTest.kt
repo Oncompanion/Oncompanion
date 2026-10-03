@@ -6,12 +6,15 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -73,7 +76,7 @@ class AppNavHostTest {
   fun overviewStartRoute_displaysOverviewScreen() {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
@@ -145,6 +148,27 @@ class AppNavHostTest {
       composeTestRule.runOnIdle { navigationActions.goBack() }
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
       composeTestRule.onNodeWithTag(destination.testTag).assertDoesNotExist()
+    }
+  }
+
+  @Test
+  fun overviewShortcuts_openTheirSection_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+
+    OverviewShortcut.entries.forEach { shortcut ->
+      val section = featureDestinations.single { it.route == shortcut.route }
+
+      val button = composeTestRule.onNodeWithTag(shortcut.testTag)
+      // The profile button is in the top bar, which doesn't scroll
+      if (shortcut != OverviewShortcut.PROFILE) button.performScrollTo()
+      button.performClick()
+      composeTestRule.onNodeWithTag(section.testTag).assertIsDisplayed()
+      composeTestRule.runOnIdle {
+        assertEquals(section.screen, NavigationActions(navController).currentRoute())
+      }
+
+      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+      composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     }
   }
 

@@ -5,13 +5,18 @@
     <string name="sign_in_title">Sign in</string>
     <string name="onboarding_role_title">Who are you?</string>
     <string name="onboarding_information_title">Tell us about yourself</string>
-    <string name="overview_title">Overview</string>
     <string name="planning_title">Planning</string>
     <string name="events_title">Events</string>
     <string name="symptoms_title">Symptoms</string>
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
     <string name="profile_title">Profile</string>
+
+    <!-- Overview -->
+    <string name="overview_welcome">Welcome</string>
+    <string name="overview_welcome_name">Welcome, %1$s</string>
+    <string name="overview_subtitle">How do you feel today?</string>
+    <string name="overview_scan_prescription">Scan prescription</string>
 
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
