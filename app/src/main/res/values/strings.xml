@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">oncompanion</string>
-    <string name="title_activity_main">MainActivity</string>
-    <string name="title_activity_second">SecondActivity</string>
+
+    <!-- Placeholder titles, replaced when each screen is implemented -->
+    <string name="sign_in_title">Sign in</string>
+    <string name="onboarding_role_title">Who are you?</string>
+    <string name="onboarding_information_title">Tell us about yourself</string>
+    <string name="overview_title">Overview</string>
 </resources>

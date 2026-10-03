@@ -108,11 +108,7 @@ sonar {
         "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml",
     )
     property("sonar.exclusions", "**/google-services.json")
-    // TODO: remove the MainActivity.kt exclusion once real code replaces the sample greeting
-    property(
-        "sonar.coverage.exclusions",
-        "**/ui/theme/**,**/SecondActivity.kt,**/MainActivity.kt",
-    )
+    property("sonar.coverage.exclusions", "**/ui/theme/**")
   }
 }
 
@@ -155,6 +151,9 @@ dependencies {
   implementation(libs.compose.activity)
   // Integration with ViewModels
   implementation(libs.compose.viewmodel)
+  // Navigation
+  implementation(libs.navigation.compose)
+  globalTestImplementation(libs.navigation.testing)
   // Android Studio Preview support
   implementation(libs.compose.preview)
   debugImplementation(libs.compose.tooling)
