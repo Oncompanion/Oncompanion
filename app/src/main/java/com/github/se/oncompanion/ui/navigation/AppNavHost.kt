@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 
 /**
@@ -62,7 +63,9 @@ fun AppNavHost(
 
     // Bottom bar tabs, next to Overview
     tabPlaceholderGraph(Tab.PLANNING, Screen.PLANNING, C.Tag.planning_screen, navigationActions)
-    tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
+    navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
+      composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+    }
 
     // Features opened from the Overview shortcuts
     placeholderGraph(

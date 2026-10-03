@@ -114,7 +114,12 @@ class AppNavHostTest {
               C.Tag.planning_screen,
               R.string.planning_title,
           ),
-          Destination(Route.EVENTS, Screen.EVENTS, C.Tag.events_screen, R.string.events_title),
+          Destination(
+              Route.EVENTS,
+              Screen.EVENTS,
+              C.Tag.events_screen,
+              R.string.events_screen_title,
+          ),
           Destination(
               Route.SYMPTOMS,
               Screen.SYMPTOMS,
