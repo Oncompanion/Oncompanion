@@ -29,8 +29,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Tab
 
 /** A section the patient can open from the Overview with a single tap. */
 enum class OverviewShortcut(
@@ -74,7 +76,7 @@ private val mainShortcuts =
  * The home screen after signing in (US-23), following the "US-17 / Overview" Figma mockup: a
  * welcome bar with the profile button, and one large button per main section.
  *
- * The user's first name, the next appointment and the bottom bar come in later PRs.
+ * The user's first name and the next appointment come in a later PR.
  */
 @Composable
 fun OverviewScreen(navigationActions: NavigationActions, modifier: Modifier = Modifier) {
@@ -82,6 +84,12 @@ fun OverviewScreen(navigationActions: NavigationActions, modifier: Modifier = Mo
       firstName = null,
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
       modifier = modifier,
+      bottomBar = {
+        BottomNavigationBar(
+            selectedTab = Tab.OVERVIEW,
+            onTabSelected = { tab -> navigationActions.navigateToTab(tab.route) },
+        )
+      },
   )
 }
 
@@ -89,6 +97,7 @@ fun OverviewScreen(navigationActions: NavigationActions, modifier: Modifier = Mo
  * Stateless content of the Overview, so it can be tested without navigation.
  *
  * @param firstName shown in the welcome title, or `null` for a plain "Welcome"
+ * @param bottomBar the bottom navigation bar, empty by default
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,9 +105,11 @@ fun OverviewContent(
     firstName: String?,
     onShortcutClick: (OverviewShortcut) -> Unit,
     modifier: Modifier = Modifier,
+    bottomBar: @Composable () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.overview_screen),
+      bottomBar = bottomBar,
       topBar = {
         MediumTopAppBar(
             title = {

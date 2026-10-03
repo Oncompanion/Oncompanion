@@ -13,6 +13,11 @@ object C {
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
     const val overview_shortcut_care_circle = "overview_shortcut_care_circle"
     const val overview_shortcut_profile = "overview_shortcut_profile"
+
+    const val bottom_navigation_bar = "bottom_navigation_bar"
+    const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
+    const val bottom_navigation_tab_planning = "bottom_navigation_tab_planning"
+    const val bottom_navigation_tab_events = "bottom_navigation_tab_events"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"
