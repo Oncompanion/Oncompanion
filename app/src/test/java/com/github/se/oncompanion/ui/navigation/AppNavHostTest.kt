@@ -90,6 +90,64 @@ class AppNavHostTest {
         .assertIsDisplayed()
   }
 
+  /** A top-level feature destination and what its placeholder displays. */
+  private data class Destination(
+      val route: String,
+      val screen: String,
+      val testTag: String,
+      val titleRes: Int,
+  )
+
+  private val featureDestinations =
+      listOf(
+          Destination(
+              Route.PLANNING,
+              Screen.PLANNING,
+              C.Tag.planning_screen,
+              R.string.planning_title,
+          ),
+          Destination(Route.EVENTS, Screen.EVENTS, C.Tag.events_screen, R.string.events_title),
+          Destination(
+              Route.SYMPTOMS,
+              Screen.SYMPTOMS,
+              C.Tag.symptoms_screen,
+              R.string.symptoms_title,
+          ),
+          Destination(
+              Route.PRESCRIPTIONS,
+              Screen.PRESCRIPTIONS,
+              C.Tag.prescriptions_screen,
+              R.string.prescriptions_title,
+          ),
+          Destination(
+              Route.CARE_CIRCLE,
+              Screen.CARE_CIRCLE,
+              C.Tag.care_circle_screen,
+              R.string.care_circle_title,
+          ),
+          Destination(Route.PROFILE, Screen.PROFILE, C.Tag.profile_screen, R.string.profile_title),
+      )
+
+  @Test
+  fun everyFeatureRoute_opensItsPlaceholderFromOverview_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    val navigationActions = NavigationActions(navController)
+
+    featureDestinations.forEach { destination ->
+      composeTestRule.runOnIdle { navigationActions.navigateTo(destination.route) }
+      composeTestRule.onNodeWithTag(destination.testTag).assertIsDisplayed()
+      composeTestRule.onNodeWithText(context.getString(destination.titleRes)).assertIsDisplayed()
+      composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+      composeTestRule.runOnIdle {
+        assertEquals(destination.screen, navigationActions.currentRoute())
+      }
+
+      composeTestRule.runOnIdle { navigationActions.goBack() }
+      composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+      composeTestRule.onNodeWithTag(destination.testTag).assertDoesNotExist()
+    }
+  }
+
   @Test
   fun routeAndScreenConstants_haveExpectedValues() {
     assertEquals("auth", Route.AUTH)
