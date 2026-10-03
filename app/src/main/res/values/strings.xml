@@ -17,4 +17,7 @@
     <string name="overview_welcome_name">Welcome, %1$s</string>
     <string name="overview_subtitle">How do you feel today?</string>
     <string name="overview_scan_prescription">Scan prescription</string>
+
+    <!-- Sign-in -->
+    <string name="sign_in_with_google">Continue with Google</string>
 </resources>
