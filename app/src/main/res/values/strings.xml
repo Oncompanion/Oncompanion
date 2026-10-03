@@ -2,7 +2,6 @@
     <string name="app_name">oncompanion</string>
 
     <!-- Placeholder titles, replaced when each screen is implemented -->
-    <string name="sign_in_title">Sign in</string>
     <string name="onboarding_role_title">Who are you?</string>
     <string name="onboarding_information_title">Tell us about yourself</string>
     <string name="planning_title">Planning</string>
@@ -19,5 +18,11 @@
     <string name="overview_scan_prescription">Scan prescription</string>
 
     <!-- Sign-in -->
+    <string name="sign_in_welcome">Welcome to Oncompanion</string>
+    <string name="sign_in_subtitle">Sign in with your Google account to continue. New here? Your account is created automatically.</string>
     <string name="sign_in_with_google">Continue with Google</string>
+    <string name="sign_in_retry">Retry</string>
+    <string name="sign_in_error_no_connection">No internet connection. Check your connection and try again.</string>
+    <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
+    <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
 </resources>
