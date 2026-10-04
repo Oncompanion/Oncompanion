@@ -18,6 +18,9 @@
     <string name="overview_subtitle">How do you feel today?</string>
     <string name="overview_scan_prescription">Scan prescription</string>
 
+    <!-- Sign-in -->
+    <string name="sign_in_with_google">Continue with Google</string>
+
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
     <string name="cancer_type_hint">Start typing to see suggestions</string>
