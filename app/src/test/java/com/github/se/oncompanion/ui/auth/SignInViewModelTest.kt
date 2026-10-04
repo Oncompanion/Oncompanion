@@ -1,12 +1,19 @@
 package com.github.se.oncompanion.ui.auth
 
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import java.io.IOException
 import java.net.UnknownHostException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -26,7 +33,11 @@ class SignInViewModelTest {
   private val dispatcher = StandardTestDispatcher()
   private val user = AuthUser(uid = "uid-1", email = "a@b.c", displayName = "Alex Doe")
 
+  private val returningProfile =
+      UserProfile(uid = user.uid, role = Role.PATIENT, firstName = "Alex")
+
   private lateinit var repository: FakeAuthRepository
+  private lateinit var profiles: FakeUserProfileRepository
   private lateinit var viewModel: SignInViewModel
 
   /** Number of times the token lambda passed to signIn was called. */
@@ -36,7 +47,8 @@ class SignInViewModelTest {
   fun setUp() {
     Dispatchers.setMain(dispatcher)
     repository = FakeAuthRepository(onSignIn = { user })
-    viewModel = SignInViewModel(repository)
+    profiles = FakeUserProfileRepository()
+    viewModel = SignInViewModel(repository, profiles)
     tokenRequests = 0
   }
 
@@ -61,6 +73,7 @@ class SignInViewModelTest {
     assertFalse(viewModel.uiState.value.isLoading)
     assertNull(viewModel.uiState.value.error)
     assertNull(viewModel.uiState.value.signedInUser)
+    assertNull(viewModel.uiState.value.next)
   }
 
   @Test
@@ -76,18 +89,156 @@ class SignInViewModelTest {
     pendingToken.complete("token-1")
     advanceUntilIdle()
     assertFalse(viewModel.uiState.value.isLoading)
+    assertEquals(AfterSignIn.ONBOARDING, viewModel.uiState.value.next)
   }
 
   @Test
-  fun signIn_success_passesTheTokenToTheRepositoryAndExposesTheUser() = runTest {
+  fun signIn_success_newUser_passesTheTokenToTheRepositoryAndGoesToOnboarding() = runTest {
     viewModel.signIn(token("the-google-token"))
     advanceUntilIdle()
 
     assertEquals(listOf("the-google-token"), repository.signInTokens)
     assertEquals(
-        SignInUiState(isLoading = false, error = null, signedInUser = user),
+        SignInUiState(
+            isLoading = false,
+            error = null,
+            signedInUser = user,
+            next = AfterSignIn.ONBOARDING,
+        ),
         viewModel.uiState.value,
     )
+  }
+
+  @Test
+  fun signIn_success_returningUser_goesToOverview() = runTest {
+    profiles.seed(returningProfile)
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(
+        SignInUiState(
+            isLoading = false,
+            error = null,
+            signedInUser = user,
+            next = AfterSignIn.OVERVIEW,
+        ),
+        viewModel.uiState.value,
+    )
+  }
+
+  @Test
+  fun signIn_looksUpTheProfileOfTheSignedInUser() = runTest {
+    // A profile exists, but for someone else: the signed-in user is new.
+    profiles.seed(returningProfile.copy(uid = "someone-else"))
+    val recording = RecordingProfileRepository(profiles)
+    viewModel = SignInViewModel(repository, recording)
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(listOf(user.uid), recording.requestedUids)
+    assertEquals(AfterSignIn.ONBOARDING, viewModel.uiState.value.next)
+  }
+
+  @Test
+  fun signIn_doesNotCheckTheProfileWhenSignInFails() = runTest {
+    val recording = RecordingProfileRepository(profiles)
+    viewModel = SignInViewModel(repository, recording)
+    repository.onSignIn = { throw IllegalStateException("rejected token") }
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertTrue(recording.requestedUids.isEmpty())
+    assertNull(viewModel.uiState.value.next)
+  }
+
+  @Test
+  fun signIn_isLoadingWhileTheProfileIsChecked() = runTest {
+    val pendingProfile = CompletableDeferred<UserProfile?>()
+    viewModel = SignInViewModel(repository, PendingProfileRepository(pendingProfile))
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+    assertTrue(viewModel.uiState.value.isLoading)
+    assertNull(viewModel.uiState.value.next)
+    assertNull(viewModel.uiState.value.error)
+    assertEquals(listOf("token-1"), repository.signInTokens)
+
+    // A second tap while the profile is checked is ignored too.
+    viewModel.signIn(token("second"))
+    advanceUntilIdle()
+    assertEquals(1, tokenRequests)
+
+    pendingProfile.complete(returningProfile)
+    advanceUntilIdle()
+    assertEquals(
+        SignInUiState(signedInUser = user, next = AfterSignIn.OVERVIEW),
+        viewModel.uiState.value,
+    )
+  }
+
+  @Test
+  fun signIn_profileCheckOffline_showsNoConnectionError() = runTest {
+    profiles.getProfileError =
+        FirebaseFirestoreException("offline", FirebaseFirestoreException.Code.UNAVAILABLE)
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(error = SignInError.NO_CONNECTION), viewModel.uiState.value)
+  }
+
+  @Test
+  fun signIn_profileCheckIoError_showsNoConnectionError() = runTest {
+    profiles.getProfileError = IOException("offline")
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(error = SignInError.NO_CONNECTION), viewModel.uiState.value)
+  }
+
+  @Test
+  fun signIn_profileCheckDenied_showsFailedError() = runTest {
+    profiles.getProfileError =
+        FirebaseFirestoreException("denied", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(error = SignInError.FAILED), viewModel.uiState.value)
+  }
+
+  @Test
+  fun signIn_profileCheckUnexpectedError_showsFailedError() = runTest {
+    profiles.getProfileError = IllegalStateException("boom")
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(error = SignInError.FAILED), viewModel.uiState.value)
+  }
+
+  @Test
+  fun signIn_canBeRetriedAfterAProfileCheckFailure() = runTest {
+    profiles.getProfileError =
+        FirebaseFirestoreException("offline", FirebaseFirestoreException.Code.UNAVAILABLE)
+    viewModel.signIn(token())
+    advanceUntilIdle()
+    assertEquals(SignInError.NO_CONNECTION, viewModel.uiState.value.error)
+
+    profiles.getProfileError = null
+    profiles.seed(returningProfile)
+    viewModel.signIn(token("retry-token"))
+    advanceUntilIdle()
+
+    assertEquals(
+        SignInUiState(signedInUser = user, next = AfterSignIn.OVERVIEW),
+        viewModel.uiState.value,
+    )
+    assertEquals(listOf("token-1", "retry-token"), repository.signInTokens)
   }
 
   @Test
@@ -107,6 +258,7 @@ class SignInViewModelTest {
     assertEquals(1, tokenRequests)
     assertEquals(listOf("first"), repository.signInTokens)
     assertEquals(user, viewModel.uiState.value.signedInUser)
+    assertEquals(AfterSignIn.ONBOARDING, viewModel.uiState.value.next)
   }
 
   @Test
@@ -173,7 +325,10 @@ class SignInViewModelTest {
     viewModel.signIn(token("retry-token"))
     advanceUntilIdle()
 
-    assertEquals(SignInUiState(signedInUser = user), viewModel.uiState.value)
+    assertEquals(
+        SignInUiState(signedInUser = user, next = AfterSignIn.ONBOARDING),
+        viewModel.uiState.value,
+    )
     assertEquals(listOf("retry-token"), repository.signInTokens)
   }
 
@@ -226,7 +381,10 @@ class SignInViewModelTest {
     assertTrue(viewModel.uiState.value.isLoading)
     advanceUntilIdle()
 
-    assertEquals(SignInUiState(signedInUser = user), viewModel.uiState.value)
+    assertEquals(
+        SignInUiState(signedInUser = user, next = AfterSignIn.ONBOARDING),
+        viewModel.uiState.value,
+    )
     assertEquals(listOf("token-1", "retry-token"), repository.signInTokens)
   }
 
@@ -240,6 +398,7 @@ class SignInViewModelTest {
 
     assertEquals(2, tokenRequests)
     assertEquals(user, viewModel.uiState.value.signedInUser)
+    assertEquals(AfterSignIn.ONBOARDING, viewModel.uiState.value.next)
   }
 
   @Test
@@ -260,6 +419,32 @@ class SignInViewModelTest {
 
     viewModel.clearError()
 
-    assertEquals(SignInUiState(signedInUser = user), viewModel.uiState.value)
+    assertEquals(
+        SignInUiState(signedInUser = user, next = AfterSignIn.ONBOARDING),
+        viewModel.uiState.value,
+    )
   }
+}
+
+/** Delegates to [delegate] and records the uids passed to [getProfile]. */
+private class RecordingProfileRepository(private val delegate: UserProfileRepository) :
+    UserProfileRepository by delegate {
+  val requestedUids = mutableListOf<String>()
+
+  override suspend fun getProfile(uid: String): UserProfile? {
+    requestedUids += uid
+    return delegate.getProfile(uid)
+  }
+}
+
+/** A [UserProfileRepository] whose [getProfile] suspends until [result] completes. */
+private class PendingProfileRepository(private val result: CompletableDeferred<UserProfile?>) :
+    UserProfileRepository {
+  override suspend fun getProfile(uid: String): UserProfile? = result.await()
+
+  override fun observeProfile(uid: String): Flow<UserProfile?> = flowOf(null)
+
+  override suspend fun createProfile(profile: UserProfile) = error("unused")
+
+  override suspend fun updateProfile(profile: UserProfile) = error("unused")
 }
