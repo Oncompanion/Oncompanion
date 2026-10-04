@@ -42,8 +42,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -110,9 +112,16 @@ fun OverviewScreen(
   OverviewContent(
       uiState = uiState,
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
-      onOpenPlanning = { navigationActions.navigateTo(Route.PLANNING) },
+      // Planning is a tab: switch to it like the bottom bar does
+      onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
       onRetry = viewModel::loadDay,
       modifier = modifier,
+      bottomBar = {
+        BottomNavigationBar(
+            selectedTab = Tab.OVERVIEW,
+            onTabSelected = { tab -> navigationActions.navigateToTab(tab.route) },
+        )
+      },
   )
 }
 

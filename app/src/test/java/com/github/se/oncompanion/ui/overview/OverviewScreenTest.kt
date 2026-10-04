@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -37,6 +38,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -83,9 +85,14 @@ class OverviewScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     val openedRoutes = mutableListOf<String>()
+    val openedTabs = mutableListOf<String>()
 
     override fun navigateTo(screen: String) {
       openedRoutes += screen
+    }
+
+    override fun navigateToTab(route: String) {
+      openedTabs += route
     }
   }
 
@@ -266,7 +273,9 @@ class OverviewScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_see_planning).performScrollTo().performClick()
 
     composeTestRule.runOnIdle {
-      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedRoutes)
+      // Planning is a tab: it opens with tab navigation, not stacked on the Overview
+      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedTabs)
+      assertEquals(emptyList<String>(), navigationActions.openedRoutes)
     }
   }
 
@@ -387,5 +396,33 @@ class OverviewScreenTest {
     }
     val tops = tileTops()
     assertTrue("tiles should be one per row: $tops", tops[0] < tops[1] && tops[1] < tops[2])
+  }
+
+  @Test
+  fun overviewScreen_showsBottomBarWithOverviewSelected() {
+    setOverviewScreen()
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).assertIsSelected()
+  }
+
+  @Test
+  fun clickingATab_opensItWithTabNavigation() {
+    val navigationActions = setOverviewScreen()
+
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Route.PLANNING, Route.EVENTS), navigationActions.openedTabs)
+      assertEquals(emptyList<String>(), navigationActions.openedRoutes)
+    }
+  }
+
+  @Test
+  fun overviewContent_hasNoBottomBarByDefault() {
+    composeTestRule.setContent {
+      OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+    }
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
   }
 }

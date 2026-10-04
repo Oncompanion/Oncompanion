@@ -50,4 +50,7 @@
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
     <string name="cancer_type_hint">Start typing to see suggestions</string>
+
+    <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
+    <string name="tab_overview">Overview</string>
 </resources>

@@ -26,6 +26,11 @@ object C {
     const val overview_today_list = "overview_today_list"
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
+
+    const val bottom_navigation_bar = "bottom_navigation_bar"
+    const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
+    const val bottom_navigation_tab_planning = "bottom_navigation_tab_planning"
+    const val bottom_navigation_tab_events = "bottom_navigation_tab_events"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"
