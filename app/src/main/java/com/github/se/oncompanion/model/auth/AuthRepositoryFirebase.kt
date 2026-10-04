@@ -37,17 +37,30 @@ class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.g
     val user = result.user ?: throw IllegalStateException("Firebase returned no user after sign-in")
     // Google's profile claims (given_name, family_name...) are only available in the sign-in result
     val givenName = result.additionalUserInfo?.profile?.get(GOOGLE_GIVEN_NAME) as? String
-    return user.toAuthUser().copy(givenName = givenName)
+    lastGivenName = givenName?.let { user.uid to it }
+    return user.toAuthUser()
   }
 
   override fun signOut() {
+    lastGivenName = null
     auth.signOut()
   }
 
   private fun FirebaseUser.toAuthUser() =
-      AuthUser(uid = uid, email = email, displayName = displayName)
+      AuthUser(
+          uid = uid,
+          email = email,
+          displayName = displayName,
+          givenName = lastGivenName?.takeIf { it.first == uid }?.second,
+      )
 
   private companion object {
     const val GOOGLE_GIVEN_NAME = "given_name"
+
+    /**
+     * Given name of the last user who signed in, with their uid. Firebase doesn't keep it, so it is
+     * kept here for as long as the app runs, shared by every instance (screens create their own).
+     */
+    @Volatile var lastGivenName: Pair<String, String>? = null
   }
 }
