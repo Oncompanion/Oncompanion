@@ -16,7 +16,7 @@ object Route {
   const val EVENTS = "events"
   const val SYMPTOMS = "symptoms"
   const val PRESCRIPTIONS = "prescriptions"
-  const val CARE_CIRCLE = "care_circle"
+  const val CLOSE_CIRCLE = "close_circle"
   const val PROFILE = "profile"
 }
 
@@ -44,8 +44,8 @@ object Screen {
   // Route.PRESCRIPTIONS
   const val PRESCRIPTIONS = "prescriptions_home"
 
-  // Route.CARE_CIRCLE
-  const val CARE_CIRCLE = "care_circle_home"
+  // Route.CLOSE_CIRCLE
+  const val CLOSE_CIRCLE = "close_circle_home"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"

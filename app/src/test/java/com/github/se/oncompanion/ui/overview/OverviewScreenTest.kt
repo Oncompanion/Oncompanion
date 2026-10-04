@@ -283,7 +283,7 @@ class OverviewScreenTest {
   fun shortcutTiles_andProfileButton_openTheirSection() {
     val navigationActions = setOverviewScreen()
 
-    listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
+    listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CLOSE_CIRCLE)
         .forEach { shortcut ->
           composeTestRule
               .onNode(hasTestTag(shortcut.testTag) and hasText(context.getString(shortcut.label)))
@@ -300,7 +300,7 @@ class OverviewScreenTest {
 
     composeTestRule.runOnIdle {
       assertEquals(
-          listOf(Route.SYMPTOMS, Route.PRESCRIPTIONS, Route.CARE_CIRCLE, Route.PROFILE),
+          listOf(Route.SYMPTOMS, Route.PRESCRIPTIONS, Route.CLOSE_CIRCLE, Route.PROFILE),
           navigationActions.openedRoutes,
       )
     }
@@ -371,7 +371,7 @@ class OverviewScreenTest {
       listOf(
               OverviewShortcut.SYMPTOMS,
               OverviewShortcut.PRESCRIPTIONS,
-              OverviewShortcut.CARE_CIRCLE,
+              OverviewShortcut.CLOSE_CIRCLE,
           )
           .map { composeTestRule.onNodeWithTag(it.testTag).fetchSemanticsNode().positionInRoot.y }
 
