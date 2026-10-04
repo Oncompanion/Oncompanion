@@ -83,7 +83,9 @@ class AppNavHostTest {
   fun overviewStartRoute_displaysOverviewScreen() {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
+    // The default ViewModel works without Firebase: a greeting and the empty day
+    composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())

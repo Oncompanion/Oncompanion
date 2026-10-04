@@ -12,10 +12,31 @@
     <string name="profile_title">Profile</string>
 
     <!-- Overview -->
-    <string name="overview_welcome">Welcome</string>
-    <string name="overview_welcome_name">Welcome, %1$s</string>
+    <string name="overview_greeting_morning">Good morning</string>
+    <string name="overview_greeting_morning_name">Good morning, %1$s</string>
+    <string name="overview_greeting_afternoon">Good afternoon</string>
+    <string name="overview_greeting_afternoon_name">Good afternoon, %1$s</string>
+    <string name="overview_greeting_evening">Good evening</string>
+    <string name="overview_greeting_evening_name">Good evening, %1$s</string>
+    <string name="overview_next_appointment">NEXT APPOINTMENT</string>
+    <string name="overview_appointment_with">With %1$s</string>
+    <string name="overview_today_at">Today, %1$s</string>
+    <string name="overview_tomorrow_at">Tomorrow, %1$s</string>
+    <string name="overview_no_appointment">No upcoming appointment</string>
+    <string name="overview_no_appointment_hint">Add your next appointment in Planning to see it here.</string>
+    <string name="overview_open_planning">Open Planning</string>
+    <string name="overview_today">Today</string>
+    <string name="overview_see_planning">See planning</string>
+    <string name="overview_nothing_today">Nothing planned today</string>
+    <string name="overview_nothing_today_hint">Medication intakes and events of the day will appear here.</string>
+    <string name="overview_next">Next</string>
+    <string name="overview_now">Now</string>
+    <string name="overview_not_taken">Not taken yet</string>
+    <string name="overview_done">Done</string>
+    <string name="overview_error_title">Couldn\'t load your day</string>
+    <string name="overview_error_hint">Your shortcuts still work. Check your connection and try again.</string>
+    <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
-    <string name="overview_scan_prescription">Scan prescription</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
