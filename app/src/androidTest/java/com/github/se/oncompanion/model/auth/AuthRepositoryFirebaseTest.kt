@@ -3,12 +3,14 @@ package com.github.se.oncompanion.model.auth
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -72,7 +74,7 @@ class AuthRepositoryFirebaseTest {
   }
 
   @Test
-  fun currentUser_matchesSignedInUserWithoutGivenName() = runBlocking {
+  fun currentUser_matchesSignedInUserWithGivenName() = runBlocking {
     val signedIn = repository.signInWithGoogle(aliceToken)
 
     val current = repository.currentUser
@@ -80,8 +82,66 @@ class AuthRepositoryFirebaseTest {
     assertEquals(signedIn.uid, current!!.uid)
     assertEquals(email, current.email)
     assertEquals("Alice Martin", current.displayName)
-    assertNull(current.givenName)
+    assertEquals("Alice", current.givenName)
     assertEquals(auth.currentUser?.uid, current.uid)
+  }
+
+  @Test
+  fun currentUser_givenNameIsSharedWithOtherInstances() = runBlocking {
+    repository.signInWithGoogle(aliceToken)
+
+    // Each screen creates its own repository: onboarding must still see the given name
+    val other = AuthRepositoryFirebase(auth).currentUser
+    assertEquals("Alice", other?.givenName)
+    assertEquals("Alice", other?.firstNameGuess())
+  }
+
+  @Test
+  fun currentUser_givenNameIsClearedBySignOut() = runBlocking {
+    val alice = repository.signInWithGoogle(aliceToken)
+    repository.signOut()
+    // Signed in again without going through signInWithGoogle (e.g. an earlier launch)
+    auth.signInWithCredential(GoogleAuthProvider.getCredential(aliceToken, null)).await()
+
+    val current = repository.currentUser
+    assertEquals(alice.uid, current?.uid)
+    assertNull(current?.givenName)
+  }
+
+  @Test
+  fun currentUser_givenNameIsNotGivenToAnotherAccount() = runBlocking {
+    repository.signInWithGoogle(aliceToken)
+    // Another account signs in without going through the repository
+    auth.signOut()
+    val bobToken =
+        FirebaseEmulator.fakeGoogleIdToken(
+            sub = "bob-$suffix",
+            email = "bob-$suffix@example.com",
+            name = "Bob Stone",
+        )
+    auth.signInWithCredential(GoogleAuthProvider.getCredential(bobToken, null)).await()
+
+    val current = repository.currentUser
+    assertEquals("bob-$suffix@example.com", current?.email)
+    assertNull(current?.givenName)
+    assertEquals("Bob", current?.firstNameGuess())
+  }
+
+  @Test
+  fun signInWithGoogle_withoutGivenNameDoesNotKeepPreviousOne() = runBlocking {
+    repository.signInWithGoogle(aliceToken)
+    repository.signOut()
+    val carolToken =
+        FirebaseEmulator.fakeGoogleIdToken(
+            sub = "carol-$suffix",
+            email = "carol-$suffix@example.com",
+            name = "Carol Hill",
+        )
+
+    val carol = repository.signInWithGoogle(carolToken)
+
+    assertNull(carol.givenName)
+    assertNull(repository.currentUser?.givenName)
   }
 
   @Test

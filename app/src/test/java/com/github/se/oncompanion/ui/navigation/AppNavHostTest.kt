@@ -3,6 +3,8 @@ package com.github.se.oncompanion.ui.navigation
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
@@ -89,6 +91,33 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverIsDisabled() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingRoleContinue_opensInformationScreen_andBackReturnsToRoleScreen() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_INFORMATION, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_ROLE, NavigationActions(navController).currentRoute())
     }
   }
 

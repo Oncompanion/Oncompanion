@@ -9,9 +9,9 @@ data class AuthUser(
     /** Full name from the Google account. */
     val displayName: String? = null,
     /**
-     * First name from the Google account, used to pre-fill onboarding. Only known right after
-     * [AuthRepository.signInWithGoogle]; `null` when the user comes from
-     * [AuthRepository.currentUser].
+     * First name from the Google account, used to pre-fill onboarding. Only known after
+     * [AuthRepository.signInWithGoogle], until the app is closed: `null` when the user was signed
+     * in by an earlier launch.
      */
     val givenName: String? = null,
 ) {

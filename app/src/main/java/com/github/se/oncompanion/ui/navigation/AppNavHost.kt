@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -18,6 +20,8 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
+import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 
 /**
@@ -50,10 +54,10 @@ fun AppNavHost(
     }
 
     navigation(startDestination = Screen.ONBOARDING_ROLE, route = Route.ONBOARDING) {
-      composable(Screen.ONBOARDING_ROLE) {
-        PlaceholderScreen(
-            title = stringResource(R.string.onboarding_role_title),
-            testTag = C.Tag.onboarding_role_screen,
+      composable(Screen.ONBOARDING_ROLE) { entry ->
+        RoleScreen(
+            viewModel = onboardingViewModel(navController, entry),
+            onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
         )
       }
       composable(Screen.ONBOARDING_INFORMATION) {
@@ -138,4 +142,17 @@ private fun NavGraphBuilder.placeholderGraph(
   navigation(startDestination = screen, route = route) {
     composable(screen) { PlaceholderScreen(title = stringResource(title), testTag = testTag) }
   }
+}
+
+/**
+ * The [OnboardingViewModel] shared by the onboarding screens: it belongs to the onboarding graph,
+ * so it keeps the user's answers while they move between the steps.
+ */
+@Composable
+private fun onboardingViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): OnboardingViewModel {
+  val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
+  return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
 }
