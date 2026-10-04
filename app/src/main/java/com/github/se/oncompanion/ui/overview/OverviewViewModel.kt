@@ -12,6 +12,7 @@ import com.github.se.oncompanion.model.overview.TodayItem
 import com.github.se.oncompanion.model.overview.TodayItemKind
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import java.time.Duration
 import java.time.LocalDateTime
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -29,6 +30,8 @@ enum class TodayItemStatus {
   DONE,
   /** A medication whose time has passed without the user confirming the intake. */
   NOT_TAKEN,
+  /** An event or appointment happening right now. */
+  NOW,
   /** The first item still to come. */
   NEXT,
   /** Planned after the next one. */
@@ -155,8 +158,9 @@ class OverviewViewModel(
   }
 
   /**
-   * Decides each item's status at [now]: a medication is done once taken, an event or an
-   * appointment once it's over (its end, or else its start, has passed).
+   * Decides each item's status at [now]: a medication is done once taken; an event or an
+   * appointment is happening from its start until its end (or [DEFAULT_DURATION] after its start
+   * when its end isn't known), then it's done.
    */
   private fun entriesOf(items: List<TodayItem>, now: LocalDateTime): List<TodayEntry> {
     val sorted = items.sortedBy { it.time }
@@ -165,8 +169,9 @@ class OverviewViewModel(
           item.kind == TodayItemKind.MEDICATION && item.isTaken -> TodayItemStatus.DONE
           item.kind == TodayItemKind.MEDICATION && item.time.isBefore(now) ->
               TodayItemStatus.NOT_TAKEN
-          item.kind != TodayItemKind.MEDICATION && !(item.endTime ?: item.time).isAfter(now) ->
-              TodayItemStatus.DONE
+          item.kind == TodayItemKind.MEDICATION -> null
+          !(item.endTime ?: item.time.plus(DEFAULT_DURATION)).isAfter(now) -> TodayItemStatus.DONE
+          !item.time.isAfter(now) -> TodayItemStatus.NOW
           else -> null
         }
     val next = sorted.firstOrNull { statusWithoutNext(it) == null }
@@ -180,5 +185,11 @@ class OverviewViewModel(
 
   private companion object {
     const val TAG = "OverviewViewModel"
+
+    /**
+     * How long an event or appointment counts as happening when its end isn't known (the planning
+     * data only has start times), so it isn't ticked as done the minute it starts.
+     */
+    val DEFAULT_DURATION: Duration = Duration.ofHours(1)
   }
 }

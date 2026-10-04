@@ -314,6 +314,16 @@ class OverviewScreenTest {
   // ----- Review fixes -----
 
   @Test
+  fun happeningNow_showsANowChip() {
+    setContent(
+        loaded.copy(
+            todayEntries = listOf(entry("chemo", 9, TodayItemStatus.NOW, TodayItemKind.APPOINTMENT))
+        )
+    )
+    assertTextInside(context.getString(R.string.overview_now), C.Tag.overviewTodayItem("chemo"))
+  }
+
+  @Test
   fun notTakenMedication_showsANeutralChip() {
     setContent(
         loaded.copy(

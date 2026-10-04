@@ -239,6 +239,12 @@ private fun TodayRow(entry: TodayEntry) {
               container = colors.tertiaryContainer,
               content = colors.onTertiaryContainer,
           )
+      TodayItemStatus.NOW ->
+          StatusChip(
+              text = stringResource(R.string.overview_now),
+              container = colors.primaryContainer,
+              content = colors.onPrimaryContainer,
+          )
       // Neutral, not alarming: the app only reports what the user entered
       TodayItemStatus.NOT_TAKEN ->
           StatusChip(

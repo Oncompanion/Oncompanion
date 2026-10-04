@@ -224,13 +224,14 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun eventsAndAppointments_areDoneOnceOver() {
+  fun eventsAndAppointments_areNowWhileHappening_andDoneOnceOver() {
     val items =
         listOf(
             event("ended", now.withHour(7), end = now.withHour(8)),
-            event("started-no-end", now.withHour(8)),
+            event("no-end-over", now.withHour(7).withMinute(30)),
             event("in-progress", now.withHour(8), end = now.withHour(10)),
             event("later", now.withHour(15)),
+            event("evening", now.withHour(18)),
         )
 
     val vm = viewModel(overview = FakeOverviewRepository(todayItems = items))
@@ -238,12 +239,43 @@ class OverviewViewModelTest {
     assertEquals(
         mapOf(
             "ended" to TodayItemStatus.DONE,
-            "started-no-end" to TodayItemStatus.DONE,
-            "in-progress" to TodayItemStatus.NEXT,
-            "later" to TodayItemStatus.LATER,
+            "no-end-over" to TodayItemStatus.DONE,
+            "in-progress" to TodayItemStatus.NOW,
+            "later" to TodayItemStatus.NEXT,
+            "evening" to TodayItemStatus.LATER,
         ),
         statusesOf(vm),
     )
+  }
+
+  @Test
+  fun appointmentWithoutEnd_isNowForAnHour_thenDone() {
+    var time = now // 9:00
+    val chemo =
+        TodayItem(
+            id = "chemo",
+            kind = TodayItemKind.APPOINTMENT,
+            time = now.minusMinutes(10),
+            title = "Chemotherapy session",
+        )
+    val vm =
+        OverviewViewModel(
+            FakeAuthRepository(),
+            { FakeUserProfileRepository() },
+            FakeOverviewRepository(todayItems = listOf(chemo, item("lunch", 13))),
+            clock = { time },
+        )
+
+    // Started 10 minutes ago: still happening, and the medication after it is next
+    assertEquals(
+        mapOf("chemo" to TodayItemStatus.NOW, "lunch" to TodayItemStatus.NEXT),
+        statusesOf(vm),
+    )
+
+    time = now.plusMinutes(50) // an hour after it started
+    vm.refreshNow()
+
+    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["chemo"])
   }
 
   @Test
