@@ -43,10 +43,11 @@ class SignInViewModel(
   val uiState: StateFlow<SignInUiState> = _uiState.asStateFlow()
 
   /**
-   * Signs in: gets a Google ID token with [getGoogleIdToken] (it shows Google's dialog, so it needs
-   * an Activity: the screen provides it, this ViewModel never holds a Context), then signs in to
-   * Firebase. Does nothing while a sign-in is already in progress. If the user closes Google's
-   * dialog, no error is shown.
+   * Signs in: gets a Google ID token with [getGoogleIdToken], then signs in to Firebase. Showing
+   * Google's dialog needs an Activity, so the screen provides that step: this ViewModel doesn't
+   * store a Context, but [getGoogleIdToken] usually captures the Activity while the dialog is open
+   * (e.g. across a rotation, until the dialog returns). Does nothing while a sign-in is already in
+   * progress. If the user closes Google's dialog, no error is shown.
    */
   fun signIn(getGoogleIdToken: suspend () -> String) {
     if (_uiState.value.isLoading) return
