@@ -25,4 +25,8 @@
     <string name="sign_in_error_no_connection">No internet connection. Check your connection and try again.</string>
     <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
     <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
+
+    <!-- Onboarding -->
+    <string name="cancer_type_label">Cancer type</string>
+    <string name="cancer_type_hint">Start typing to see suggestions</string>
 </resources>
