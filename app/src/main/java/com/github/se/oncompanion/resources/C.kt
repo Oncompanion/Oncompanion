@@ -31,5 +31,8 @@ object C {
     const val profile_screen = "profile_screen"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+    const val cancer_type_field = "cancer_type_field"
+    const val cancer_type_suggestions = "cancer_type_suggestions"
+    const val cancer_type_suggestion = "cancer_type_suggestion"
   }
 }
