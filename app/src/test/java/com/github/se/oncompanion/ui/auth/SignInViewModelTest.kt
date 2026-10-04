@@ -157,6 +157,27 @@ class SignInViewModelTest {
   }
 
   @Test
+  fun signIn_googleNetworkError_showsNoConnectionErrorAndDoesNotCallRepository() = runTest {
+    viewModel.signIn(failingToken(GoogleSignInException.Reason.NETWORK))
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(error = SignInError.NO_CONNECTION), viewModel.uiState.value)
+    assertTrue(repository.signInTokens.isEmpty())
+  }
+
+  @Test
+  fun signIn_canBeRetriedAfterAGoogleNetworkError() = runTest {
+    viewModel.signIn(failingToken(GoogleSignInException.Reason.NETWORK))
+    advanceUntilIdle()
+
+    viewModel.signIn(token("retry-token"))
+    advanceUntilIdle()
+
+    assertEquals(SignInUiState(signedInUser = user), viewModel.uiState.value)
+    assertEquals(listOf("retry-token"), repository.signInTokens)
+  }
+
+  @Test
   fun signIn_googleFailure_showsFailedError() = runTest {
     viewModel.signIn(failingToken(GoogleSignInException.Reason.FAILED))
     advanceUntilIdle()

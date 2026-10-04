@@ -74,6 +74,7 @@ class SignInViewModel(
             when (reason) {
               GoogleSignInException.Reason.CANCELLED -> null
               GoogleSignInException.Reason.NO_ACCOUNT -> SignInError.NO_GOOGLE_ACCOUNT
+              GoogleSignInException.Reason.NETWORK -> SignInError.NO_CONNECTION
               GoogleSignInException.Reason.FAILED -> SignInError.FAILED
             }
         isNetworkError() -> SignInError.NO_CONNECTION

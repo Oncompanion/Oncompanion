@@ -23,9 +23,9 @@ class GoogleSignInExceptionTest {
   }
 
   @Test
-  fun reasonEnumHasExactlyTheThreeSpecifiedValues() {
+  fun reasonEnumHasExactlyTheFourSpecifiedValues() {
     assertEquals(
-        listOf("CANCELLED", "NO_ACCOUNT", "FAILED"),
+        listOf("CANCELLED", "NO_ACCOUNT", "NETWORK", "FAILED"),
         GoogleSignInException.Reason.entries.map { it.name },
     )
   }
