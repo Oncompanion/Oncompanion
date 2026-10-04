@@ -29,4 +29,11 @@
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
     <string name="cancer_type_hint">Start typing to see suggestions</string>
+    <string name="onboarding_role_subtitle">Choose what fits you best, so Oncompanion shows you the right features.</string>
+    <string name="onboarding_role_patient">I\'m a patient</string>
+    <string name="onboarding_role_patient_description">I\'m receiving cancer treatment and want to keep track of my care.</string>
+    <string name="onboarding_role_caregiver">I\'m a caregiver</string>
+    <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
+    <string name="onboarding_coming_soon">Coming soon</string>
+    <string name="onboarding_continue">Continue</string>
 </resources>
