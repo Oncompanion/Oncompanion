@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -261,9 +262,11 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
       val labelStyle = MaterialTheme.typography.titleMedium
       val labels = tileShortcuts.map { stringResource(it.label) }
       val measurer = rememberTextMeasurer()
+      val density = LocalDensity.current
+      // Measured again only when the labels, their style or the font size change
       val widestLabel =
-          with(LocalDensity.current) {
-            labels.maxOf { measurer.measure(it, labelStyle).size.width }.toDp()
+          remember(labels, labelStyle, density) {
+            with(density) { labels.maxOf { measurer.measure(it, labelStyle).size.width }.toDp() }
           }
       val labelSpaceInRow = (maxWidth - tileSpacing * 2) / 3 - tilePadding * 2
       // Large tiles: easy to read and to tap on a low-energy day
