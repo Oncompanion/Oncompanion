@@ -12,6 +12,7 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
@@ -32,8 +33,16 @@ fun AppNavHost(
   NavHost(navController = navController, startDestination = startRoute) {
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
       composable(Screen.SIGN_IN) {
-        // Until session routing checks the profile, every sign-in continues to onboarding
-        SignInScreen(onSignedIn = { navigationActions.navigateAndClearBackStack(Route.ONBOARDING) })
+        SignInScreen(
+            onSignedIn = { next ->
+              navigationActions.navigateAndClearBackStack(
+                  when (next) {
+                    AfterSignIn.ONBOARDING -> Route.ONBOARDING
+                    AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                  }
+              )
+            }
+        )
       }
     }
 

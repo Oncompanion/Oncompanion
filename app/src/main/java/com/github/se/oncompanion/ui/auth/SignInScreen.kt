@@ -32,19 +32,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.resources.C
 
 /**
  * Sign-in screen (Figma "US-01 / Login"): the only way in is "Continue with Google". The first
  * sign-in creates the account.
  *
- * @param onSignedIn called once after a successful sign-in
+ * @param onSignedIn called once after a successful sign-in, with where to go next
  * @param credentialProvider shows Google's dialog; replaceable in tests
  */
 @Composable
 fun SignInScreen(
-    onSignedIn: (AuthUser) -> Unit,
+    onSignedIn: (AfterSignIn) -> Unit,
     viewModel: SignInViewModel = viewModel { SignInViewModel() },
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
@@ -52,7 +51,7 @@ fun SignInScreen(
   val context = LocalContext.current
   val signIn = { viewModel.signIn { credentialProvider.getGoogleIdToken(context) } }
 
-  LaunchedEffect(uiState.signedInUser) { uiState.signedInUser?.let(onSignedIn) }
+  LaunchedEffect(uiState.next) { uiState.next?.let(onSignedIn) }
 
   SignInContent(
       uiState = uiState,
