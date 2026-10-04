@@ -23,7 +23,7 @@ class FakeOverviewRepositoryTest {
 
   @Test
   fun sampleData_hasTheMockupAppointmentTomorrow() = runBlocking {
-    val appointment = FakeOverviewRepository.withSampleData(today).observeNextAppointment().first()
+    val appointment = OverviewSampleData.repository(today).observeNextAppointment().first()
 
     assertEquals("Oncology check-up", appointment?.title)
     assertEquals(LocalDateTime.of(2026, 10, 4, 9, 30), appointment?.dateTime)
@@ -31,7 +31,7 @@ class FakeOverviewRepositoryTest {
 
   @Test
   fun sampleData_hasThreeItemsToday_withUniqueIds() = runBlocking {
-    val items = FakeOverviewRepository.withSampleData(today).observeTodayItems().first()
+    val items = OverviewSampleData.repository(today).observeTodayItems().first()
 
     assertEquals(3, items.size)
     assertTrue(items.all { it.time.toLocalDate() == today })

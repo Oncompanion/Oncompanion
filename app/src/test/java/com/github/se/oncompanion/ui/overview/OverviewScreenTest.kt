@@ -26,6 +26,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.overview.FakeOverviewRepository
 import com.github.se.oncompanion.model.overview.NextAppointment
+import com.github.se.oncompanion.model.overview.OverviewSampleData
 import com.github.se.oncompanion.model.overview.TodayItem
 import com.github.se.oncompanion.model.overview.TodayItemKind
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
@@ -245,7 +246,7 @@ class OverviewScreenTest {
 
   @Test
   fun screen_showsTheRepositoryData() {
-    setOverviewScreen(FakeOverviewRepository.withSampleData(morning.toLocalDate()))
+    setOverviewScreen(OverviewSampleData.repository(morning.toLocalDate()))
 
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem("gentle-yoga")).assertExists()
