@@ -5,7 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,7 +38,8 @@ fun GoogleSignInButton(
   OutlinedButton(
       onClick = onClick,
       enabled = enabled,
-      modifier = modifier.fillMaxWidth().height(40.dp),
+      // At least 40 dp (branding), taller with large font sizes so the label is never clipped
+      modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
       shape = RoundedCornerShape(20.dp),
       border = BorderStroke(1.dp, colors.border.copy(alpha = if (enabled) 1f else 0.12f)),
       colors =
@@ -48,7 +49,8 @@ fun GoogleSignInButton(
               disabledContainerColor = colors.container.copy(alpha = 0.38f),
               disabledContentColor = colors.content.copy(alpha = 0.38f),
           ),
-      contentPadding = PaddingValues(horizontal = 12.dp),
+      // Vertical padding keeps space around the label when large fonts make the button grow
+      contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
   ) {
     // The "G" keeps its own colors (no tint), as the branding guidelines require
     Icon(
