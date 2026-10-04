@@ -31,6 +31,7 @@
     <string name="overview_nothing_today">Nothing planned today</string>
     <string name="overview_nothing_today_hint">Medication intakes and events of the day will appear here.</string>
     <string name="overview_next">Next</string>
+    <string name="overview_not_taken">Not taken yet</string>
     <string name="overview_done">Done</string>
     <string name="overview_error_title">Couldn\'t load your day</string>
     <string name="overview_error_hint">Your shortcuts still work. Check your connection and try again.</string>

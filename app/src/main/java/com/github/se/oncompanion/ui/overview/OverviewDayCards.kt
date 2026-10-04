@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -232,17 +233,33 @@ private fun TodayRow(entry: TodayEntry) {
               tint = colors.primary,
           )
       TodayItemStatus.NEXT ->
-          Text(
+          StatusChip(
               text = stringResource(R.string.overview_next),
-              style = MaterialTheme.typography.labelMedium,
-              color = colors.onTertiaryContainer,
-              modifier =
-                  Modifier.background(colors.tertiaryContainer, RoundedCornerShape(8.dp))
-                      .padding(horizontal = 8.dp, vertical = 4.dp),
+              container = colors.tertiaryContainer,
+              content = colors.onTertiaryContainer,
+          )
+      // Neutral, not alarming: the app only reports what the user entered
+      TodayItemStatus.NOT_TAKEN ->
+          StatusChip(
+              text = stringResource(R.string.overview_not_taken),
+              container = colors.surfaceContainerHighest,
+              content = colors.onSurfaceVariant,
           )
       TodayItemStatus.LATER -> {}
     }
   }
+}
+
+@Composable
+private fun StatusChip(text: String, container: Color, content: Color) {
+  Text(
+      text = text,
+      style = MaterialTheme.typography.labelMedium,
+      color = content,
+      modifier =
+          Modifier.background(container, RoundedCornerShape(8.dp))
+              .padding(horizontal = 8.dp, vertical = 4.dp),
+  )
 }
 
 private fun TodayItemKind.icon(): Int =

@@ -33,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
@@ -96,6 +97,12 @@ fun OverviewScreen(
     viewModel: OverviewViewModel = viewModel { OverviewViewModel() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
+  // current
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshNow()
+    onPauseOrDispose {}
+  }
   OverviewContent(
       uiState = uiState,
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },

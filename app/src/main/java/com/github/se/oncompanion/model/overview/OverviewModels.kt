@@ -27,16 +27,21 @@ enum class TodayItemKind {
 /**
  * Something planned today, as shown in the Overview's "Today" list.
  *
+ * Whether an item is over depends on the time, so the Overview decides it: this model only holds
+ * what the user entered.
+ *
  * @property id unique among today's items
- * @property time when it is planned, in local time
+ * @property time when it is planned (or starts), in local time
+ * @property endTime when it ends, if known (events and appointments)
  * @property subtitle a short detail line (dose, place...), if any
- * @property isDone true once it's over or, for a medication, taken
+ * @property isTaken for a medication, whether the user confirmed the intake; ignored otherwise
  */
 data class TodayItem(
     val id: String,
     val kind: TodayItemKind,
     val time: LocalDateTime,
     val title: String,
+    val endTime: LocalDateTime? = null,
     val subtitle: String? = null,
-    val isDone: Boolean = false,
+    val isTaken: Boolean = false,
 )

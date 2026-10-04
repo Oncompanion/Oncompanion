@@ -32,14 +32,20 @@ class OverviewViewModelTest {
 
   private val now = LocalDateTime.of(2026, 10, 3, 9, 0)
 
-  private fun item(id: String, hour: Int, isDone: Boolean = false) =
+  private fun item(id: String, hour: Int, isTaken: Boolean = false) =
       TodayItem(
           id = id,
           kind = TodayItemKind.MEDICATION,
           time = now.withHour(hour),
           title = "Item $id",
-          isDone = isDone,
+          isTaken = isTaken,
       )
+
+  private fun event(id: String, start: LocalDateTime, end: LocalDateTime? = null) =
+      TodayItem(id = id, kind = TodayItemKind.EVENT, time = start, endTime = end, title = id)
+
+  private fun statusesOf(vm: OverviewViewModel) =
+      vm.uiState.value.todayEntries.associate { it.item.id to it.status }
 
   private fun signedIn(user: AuthUser) =
       FakeAuthRepository(onSignIn = { user }).also { runBlocking { it.signInWithGoogle("token") } }
@@ -125,7 +131,7 @@ class OverviewViewModelTest {
 
   @Test
   fun todayItems_areSorted_andTheFirstNotDoneIsNext() {
-    val items = listOf(item("late", 18), item("taken", 8, isDone = true), item("soon", 13))
+    val items = listOf(item("late", 18), item("taken", 8, isTaken = true), item("soon", 13))
 
     val entries =
         viewModel(overview = FakeOverviewRepository(todayItems = items)).uiState.value.todayEntries
@@ -139,7 +145,7 @@ class OverviewViewModelTest {
 
   @Test
   fun whenEverythingIsDone_nothingIsNext() {
-    val items = listOf(item("a", 8, isDone = true), item("b", 9, isDone = true))
+    val items = listOf(item("a", 8, isTaken = true), item("b", 9, isTaken = true))
 
     val entries =
         viewModel(overview = FakeOverviewRepository(todayItems = items)).uiState.value.todayEntries
@@ -201,5 +207,93 @@ class OverviewViewModelTest {
 
     assertFalse(vm.uiState.value.hasError)
     assertEquals(1, vm.uiState.value.todayEntries.size)
+  }
+
+  // ----- Status decided with the clock -----
+
+  @Test
+  fun pastMedicationNotTaken_isNotTaken_andTheNextOneIsNext() {
+    val items = listOf(item("morning", 8), item("lunch", 13))
+
+    val vm = viewModel(overview = FakeOverviewRepository(todayItems = items))
+
+    assertEquals(
+        mapOf("morning" to TodayItemStatus.NOT_TAKEN, "lunch" to TodayItemStatus.NEXT),
+        statusesOf(vm),
+    )
+  }
+
+  @Test
+  fun eventsAndAppointments_areDoneOnceOver() {
+    val items =
+        listOf(
+            event("ended", now.withHour(7), end = now.withHour(8)),
+            event("started-no-end", now.withHour(8)),
+            event("in-progress", now.withHour(8), end = now.withHour(10)),
+            event("later", now.withHour(15)),
+        )
+
+    val vm = viewModel(overview = FakeOverviewRepository(todayItems = items))
+
+    assertEquals(
+        mapOf(
+            "ended" to TodayItemStatus.DONE,
+            "started-no-end" to TodayItemStatus.DONE,
+            "in-progress" to TodayItemStatus.NEXT,
+            "later" to TodayItemStatus.LATER,
+        ),
+        statusesOf(vm),
+    )
+  }
+
+  @Test
+  fun refreshNow_updatesTheTime_andTheStatuses() {
+    var time = now
+    val vm =
+        OverviewViewModel(
+            FakeAuthRepository(),
+            { FakeUserProfileRepository() },
+            FakeOverviewRepository(todayItems = listOf(item("lunch", 13))),
+            clock = { time },
+        )
+    assertEquals(TodayItemStatus.NEXT, statusesOf(vm)["lunch"])
+
+    time = now.withHour(20)
+    vm.refreshNow()
+
+    assertEquals(now.withHour(20), vm.uiState.value.now)
+    assertEquals(TodayItemStatus.NOT_TAKEN, statusesOf(vm)["lunch"])
+  }
+
+  @Test
+  fun refreshNow_reloadsTheDay_onlyWhenTheDateChanges() {
+    var time = now
+    var observations = 0
+    val counting =
+        object : OverviewRepository {
+          override fun observeNextAppointment(): Flow<NextAppointment?> = flowOf(null)
+
+          override fun observeTodayItems(): Flow<List<TodayItem>> = flow {
+            observations++
+            emit(emptyList())
+          }
+        }
+    val vm =
+        OverviewViewModel(
+            FakeAuthRepository(),
+            { FakeUserProfileRepository() },
+            counting,
+            clock = { time },
+        )
+    assertEquals(1, observations)
+
+    time = now.withHour(23)
+    vm.refreshNow()
+    assertEquals(1, observations)
+
+    time = now.plusDays(1).withHour(7)
+    vm.refreshNow()
+    assertEquals(2, observations)
+    assertEquals(now.plusDays(1).toLocalDate(), vm.uiState.value.now.toLocalDate())
   }
 }

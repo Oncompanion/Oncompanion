@@ -65,7 +65,7 @@ class OverviewScreenTest {
               time = morning.withHour(hour),
               title = "Title $id",
               subtitle = "Subtitle $id",
-              isDone = status == TodayItemStatus.DONE,
+              isTaken = status == TodayItemStatus.DONE,
           ),
           status,
       )
@@ -302,5 +302,42 @@ class OverviewScreenTest {
       )
     }
     composeTestRule.onNodeWithTag("bar").assertIsDisplayed()
+  }
+
+  // ----- Review fixes -----
+
+  @Test
+  fun notTakenMedication_showsANeutralChip() {
+    setContent(
+        loaded.copy(
+            todayEntries =
+                listOf(entry("med", 8, TodayItemStatus.NOT_TAKEN, TodayItemKind.MEDICATION))
+        )
+    )
+    assertTextInside(context.getString(R.string.overview_not_taken), C.Tag.overviewTodayItem("med"))
+  }
+
+  @Test
+  fun screen_refreshesTheTime_whenItComesBack() {
+    var time = morning
+    val viewModel =
+        OverviewViewModel(
+            authRepository = FakeAuthRepository(),
+            profileRepository = { FakeUserProfileRepository() },
+            overviewRepository = FakeOverviewRepository(),
+            clock = { time },
+        )
+    // Hours later, the user comes back to the Overview
+    time = morning.withHour(20)
+    composeTestRule.setContent {
+      OverviewScreen(
+          navigationActions = NavigationActions(TestNavHostController(LocalContext.current)),
+          viewModel = viewModel,
+      )
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_greeting)
+        .assertTextEquals(context.getString(R.string.overview_greeting_evening))
   }
 }
