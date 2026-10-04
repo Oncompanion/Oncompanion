@@ -20,8 +20,15 @@ import kotlinx.coroutines.tasks.await
  * rejection is logged; [UserProfile.isValid] mirrors the rules so this shouldn't happen.
  */
 class UserProfileRepositoryFirestore(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
 ) : UserProfileRepository {
+
+  /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
+  constructor(db: FirebaseFirestore) : this({ db })
+
+  // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
+  // ViewModel default) where Firebase isn't initialized, like unit tests
+  private val db: FirebaseFirestore by lazy(dbProvider)
 
   override suspend fun getProfile(uid: String): UserProfile? =
       fromDocument(document(uid).get().await())
