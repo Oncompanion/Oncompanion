@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -129,6 +131,36 @@ class AppNavHostTest {
     composeTestRule
         .onNodeWithText(context.getString(R.string.onboarding_information_title))
         .assertIsDisplayed()
+  }
+
+  @Test
+  fun onboardingInformationScreen_showsTheFormWithTheDefaultViewModel() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_family_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertExists()
+    // No Firebase user in tests: nothing is pre-filled, so the first name is still missing
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).assertIsNotEnabled()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingSteps_shareTheViewModel_soInformationIsKeptWhenGoingBackAndForth() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertTextContains("Sam")
   }
 
   /** A top-level feature destination and what its placeholder displays. */

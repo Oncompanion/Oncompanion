@@ -57,6 +57,13 @@
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
     <string name="onboarding_coming_soon">Coming soon</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
+    <string name="onboarding_first_name">First name*</string>
+    <string name="onboarding_required">*Required</string>
+    <string name="onboarding_first_name_missing">Please enter your first name</string>
+    <string name="onboarding_family_name">Family name</string>
+    <string name="onboarding_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
+    <string name="onboarding_error_save_failed">Couldn\'t save your information. Please try again.</string>
 
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
