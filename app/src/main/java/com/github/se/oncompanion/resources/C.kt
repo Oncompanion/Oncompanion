@@ -13,11 +13,23 @@ object C {
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
     const val overview_shortcut_care_circle = "overview_shortcut_care_circle"
     const val overview_shortcut_profile = "overview_shortcut_profile"
+    const val overview_greeting = "overview_greeting"
+    const val overview_date = "overview_date"
+    const val overview_loading = "overview_loading"
+    const val overview_error = "overview_error"
+    const val overview_retry = "overview_retry"
+    const val overview_next_appointment = "overview_next_appointment"
+    const val overview_no_appointment = "overview_no_appointment"
+    const val overview_see_planning = "overview_see_planning"
+    const val overview_today_list = "overview_today_list"
+    const val overview_today_empty = "overview_today_empty"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     const val profile_screen = "profile_screen"
+
+    fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
   }
 }
