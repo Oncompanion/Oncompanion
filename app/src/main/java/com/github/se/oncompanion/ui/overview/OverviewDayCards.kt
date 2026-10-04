@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -203,7 +203,8 @@ private fun TodayRow(entry: TodayEntry) {
         text = item.time.format(timeFormatter),
         style = MaterialTheme.typography.labelMedium,
         color = if (done) colors.onSurfaceVariant else colors.onSurface,
-        modifier = Modifier.width(40.dp),
+        // At least 40dp so times line up, wider if the user enlarged the font
+        modifier = Modifier.widthIn(min = 40.dp),
     )
     Box(
         modifier = Modifier.size(40.dp).background(colors.secondaryContainer, CircleShape),

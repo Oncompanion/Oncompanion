@@ -23,6 +23,7 @@ object C {
     const val overview_see_planning = "overview_see_planning"
     const val overview_today_list = "overview_today_list"
     const val overview_today_empty = "overview_today_empty"
+    const val overview_shortcuts = "overview_shortcuts"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"

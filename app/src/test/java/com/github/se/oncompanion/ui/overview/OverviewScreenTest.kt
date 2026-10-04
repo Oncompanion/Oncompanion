@@ -2,11 +2,13 @@ package com.github.se.oncompanion.ui.overview
 
 import android.content.Context
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -19,6 +21,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -36,9 +39,12 @@ import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class OverviewScreenTest {
@@ -340,5 +346,36 @@ class OverviewScreenTest {
     composeTestRule
         .onNodeWithTag(C.Tag.overview_greeting)
         .assertTextEquals(context.getString(R.string.overview_greeting_evening))
+  }
+
+  private fun tileTops(): List<Float> =
+      listOf(
+              OverviewShortcut.SYMPTOMS,
+              OverviewShortcut.PRESCRIPTIONS,
+              OverviewShortcut.CARE_CIRCLE,
+          )
+          .map { composeTestRule.onNodeWithTag(it.testTag).fetchSemanticsNode().positionInRoot.y }
+
+  // Text needs real measurements, and a real phone width (Pixel 8a), to decide the tiles' layout
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = "w412dp-h916dp")
+  fun tiles_areInOneRow_withTheDefaultFontSize() {
+    setContent(loaded)
+    assertEquals(1, tileTops().distinct().size)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = "w412dp-h916dp")
+  fun tiles_stack_withTheLargestFontSize() {
+    composeTestRule.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+        OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+      }
+    }
+    val tops = tileTops()
+    assertTrue("tiles should be one per row: $tops", tops[0] < tops[1] && tops[1] < tops[2])
   }
 }

@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,9 +29,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -236,7 +239,16 @@ private fun DayError(onRetry: () -> Unit) {
   }
 }
 
-/** "How do you feel today?" and one large tile per main section. */
+/** Space between two tiles. */
+private val tileSpacing = 12.dp
+
+/** Horizontal padding inside a tile. */
+private val tilePadding = 8.dp
+
+/**
+ * "How do you feel today?" and one large tile per main section: three in a row, or one per row when
+ * a label wouldn't fit in a third of the width (small screen or large font).
+ */
 @Composable
 private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,47 +257,87 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    // Large tiles: easy to read and to tap on a low-energy day
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      tileShortcuts.forEach { shortcut ->
-        ShortcutTile(
-            shortcut = shortcut,
-            onClick = { onShortcutClick(shortcut) },
-            modifier = Modifier.weight(1f),
-        )
+    BoxWithConstraints(Modifier.fillMaxWidth().testTag(C.Tag.overview_shortcuts)) {
+      val labelStyle = MaterialTheme.typography.titleMedium
+      val labels = tileShortcuts.map { stringResource(it.label) }
+      val measurer = rememberTextMeasurer()
+      val widestLabel =
+          with(LocalDensity.current) {
+            labels.maxOf { measurer.measure(it, labelStyle).size.width }.toDp()
+          }
+      val labelSpaceInRow = (maxWidth - tileSpacing * 2) / 3 - tilePadding * 2
+      // Large tiles: easy to read and to tap on a low-energy day
+      if (widestLabel <= labelSpaceInRow) {
+        Row(horizontalArrangement = Arrangement.spacedBy(tileSpacing)) {
+          tileShortcuts.forEach { shortcut ->
+            ShortcutTile(shortcut, { onShortcutClick(shortcut) }, Modifier.weight(1f))
+          }
+        }
+      } else {
+        Column(verticalArrangement = Arrangement.spacedBy(tileSpacing)) {
+          tileShortcuts.forEach { shortcut ->
+            ShortcutTile(
+                shortcut,
+                { onShortcutClick(shortcut) },
+                Modifier.fillMaxWidth(),
+                stacked = true,
+            )
+          }
+        }
       }
     }
   }
 }
 
+/** A shortcut tile: icon above the label, or next to it when [stacked] (one tile per row). */
 @Composable
 private fun ShortcutTile(
     shortcut: OverviewShortcut,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    stacked: Boolean = false,
 ) {
   Surface(
       onClick = onClick,
-      modifier = modifier.heightIn(min = 104.dp).testTag(shortcut.testTag),
+      modifier = modifier.heightIn(min = if (stacked) 72.dp else 104.dp).testTag(shortcut.testTag),
       shape = RoundedCornerShape(16.dp),
       color = MaterialTheme.colorScheme.secondaryContainer,
   ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 8.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-    ) {
-      // The label below already describes the tile, so the icon is decorative
-      Icon(
-          painter = painterResource(shortcut.icon),
-          contentDescription = null,
-          modifier = Modifier.size(32.dp),
-      )
-      Text(
-          text = stringResource(shortcut.label),
-          style = MaterialTheme.typography.titleMedium,
-          textAlign = TextAlign.Center,
-      )
+    // The label already describes the tile, so the icon is decorative
+    val icon =
+        @Composable {
+          Icon(
+              painter = painterResource(shortcut.icon),
+              contentDescription = null,
+              modifier = Modifier.size(32.dp),
+          )
+        }
+    val label =
+        @Composable {
+          Text(
+              text = stringResource(shortcut.label),
+              style = MaterialTheme.typography.titleMedium,
+              textAlign = if (stacked) TextAlign.Start else TextAlign.Center,
+          )
+        }
+    if (stacked) {
+      Row(
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        icon()
+        label()
+      }
+    } else {
+      Column(
+          modifier = Modifier.padding(horizontal = tilePadding, vertical = 16.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+      ) {
+        icon()
+        label()
+      }
     }
   }
 }
