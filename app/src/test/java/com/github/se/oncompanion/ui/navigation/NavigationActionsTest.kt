@@ -223,4 +223,57 @@ class NavigationActionsTest {
       assertFalse(routesInBackStack().contains(Screen.OVERVIEW))
     }
   }
+
+  private fun screensInBackStack(): List<String?> =
+      navController.backStack.filter { it.destination !is NavGraph }.map { it.destination.route }
+
+  @Test
+  fun navigateToTab_opensTheTab_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.runOnIdle { navigationActions.navigateToTab(Route.PLANNING) }
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+
+    composeTestRule.runOnIdle { navigationActions.goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun navigateToTab_betweenTabs_keepsOnlyOverviewBelow() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.runOnIdle {
+      navigationActions.navigateToTab(Route.PLANNING)
+      navigationActions.navigateToTab(Route.EVENTS)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.events_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Screen.OVERVIEW, Screen.EVENTS), screensInBackStack())
+    }
+
+    composeTestRule.runOnIdle { navigationActions.goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun navigateToTab_currentTab_doesNotPushACopy() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.runOnIdle {
+      navigationActions.navigateToTab(Route.PLANNING)
+      navigationActions.navigateToTab(Route.PLANNING)
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Screen.OVERVIEW, Screen.PLANNING), screensInBackStack())
+    }
+  }
+
+  @Test
+  fun navigateToTab_overviewFromAnotherTab_leavesOnlyOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.runOnIdle {
+      navigationActions.navigateToTab(Route.EVENTS)
+      navigationActions.navigateToTab(Route.OVERVIEW)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(listOf(Screen.OVERVIEW), screensInBackStack()) }
+  }
 }

@@ -72,6 +72,19 @@ open class NavigationActions(private val navController: NavHostController) {
   }
 
   /**
+   * Switches to the bottom-bar tab [route] (Overview, Planning or Events). Tabs never stack: only
+   * Overview stays below the current tab, so Back from Planning or Events returns to Overview, and
+   * re-selecting the current tab does nothing. Each tab keeps its state when you switch away.
+   */
+  open fun navigateToTab(route: String) {
+    navController.navigate(route) {
+      popUpTo(Screen.OVERVIEW) { saveState = true }
+      launchSingleTop = true
+      restoreState = true
+    }
+  }
+
+  /**
    * Returns to the previous screen. Does nothing on the first screen of the back stack, so the
    * NavHost is never left empty (blank screen).
    */

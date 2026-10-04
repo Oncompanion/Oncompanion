@@ -5,7 +5,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -81,7 +85,9 @@ class AppNavHostTest {
   fun overviewStartRoute_displaysOverviewScreen() {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
+    // The default ViewModel works without Firebase: a greeting and the empty day
+    composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
@@ -171,7 +177,13 @@ class AppNavHostTest {
     featureDestinations.forEach { destination ->
       composeTestRule.runOnIdle { navigationActions.navigateTo(destination.route) }
       composeTestRule.onNodeWithTag(destination.testTag).assertIsDisplayed()
-      composeTestRule.onNodeWithText(context.getString(destination.titleRes)).assertIsDisplayed()
+      // Tabs also show their label in the bottom bar, so look for the title inside the screen
+      composeTestRule
+          .onNode(
+              hasText(context.getString(destination.titleRes)) and
+                  hasAnyAncestor(hasTestTag(destination.testTag))
+          )
+          .assertIsDisplayed()
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
       composeTestRule.runOnIdle {
         assertEquals(destination.screen, navigationActions.currentRoute())
@@ -202,6 +214,57 @@ class AppNavHostTest {
       composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     }
+  }
+
+  private fun assertOnTab(tab: Tab, screenTag: String) {
+    composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(tab.testTag).assertIsSelected()
+    Tab.entries
+        .filter { it != tab }
+        .forEach { composeTestRule.onNodeWithTag(it.testTag).assertIsNotSelected() }
+  }
+
+  @Test
+  fun bottomBar_switchesBetweenTheThreeTabs_andHighlightsTheCurrentOne() {
+    setNavHost(Route.OVERVIEW)
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    assertOnTab(Tab.PLANNING, C.Tag.planning_screen)
+
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+    assertOnTab(Tab.EVENTS, C.Tag.events_screen)
+
+    composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun bottomBar_backFromPlanningOrEvents_returnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+
+    listOf(Tab.PLANNING to C.Tag.planning_screen, Tab.EVENTS to C.Tag.events_screen).forEach {
+        (tab, screenTag) ->
+      composeTestRule.onNodeWithTag(tab.testTag).performClick()
+      composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
+
+      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+      assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+    }
+  }
+
+  @Test
+  fun bottomBar_isNotShownOnSections() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertIsDisplayed()
+
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
+        .performScrollTo()
+        .performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
   }
 
   @Test
