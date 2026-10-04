@@ -57,4 +57,6 @@ Run these before every commit and make sure they pass:
 - Never push to `main`. Work on a branch and open a pull request. Merging needs one approving review and a green CI (tests + SonarCloud).
 - Branch names: `feature/<short-name>`, `fix/<short-name>`, `chore/<short-name>`, `ci/<short-name>`, `docs/<short-name>`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `test:`, `refactor:`, `chore:`, `ci:`, `docs:`, followed by a short imperative summary (e.g. `feat: add one-tap fatigue logging`).
+- Commit titles: **50 characters or less** (72 at most, GitHub cuts longer ones), imperative, no final period. If needed, a body after a blank line, wrapped at 72 characters, explaining **why**.
+- **One logical change per commit, with its tests** (not `feat: add X` then `test: add tests for X`). Every commit should build and pass its tests. Use `test:` only when tests are the change itself: fakes, test helpers, or tests for existing code.
 - Keep PRs small and focused on one task from the Scrum board, and link the related issue in the description.

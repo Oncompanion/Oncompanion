@@ -49,7 +49,9 @@ class AppNavHostTest {
   fun defaultStartRoute_displaysSignInScreen() {
     setNavHost()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.sign_in_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(context.getString(R.string.sign_in_welcome)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.sign_in_loading).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.SIGN_IN, navController.currentDestination?.route)
     }

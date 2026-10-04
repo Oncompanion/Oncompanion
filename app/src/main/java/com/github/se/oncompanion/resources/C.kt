@@ -6,6 +6,8 @@ object C {
     const val main_screen_container = "main_screen_container"
 
     const val sign_in_screen = "sign_in_screen"
+    const val google_sign_in_button = "google_sign_in_button"
+    const val sign_in_loading = "sign_in_loading"
     const val onboarding_role_screen = "onboarding_role_screen"
     const val onboarding_information_screen = "onboarding_information_screen"
     const val overview_screen = "overview_screen"
@@ -24,5 +26,9 @@ object C {
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     const val profile_screen = "profile_screen"
+
+    const val cancer_type_field = "cancer_type_field"
+    const val cancer_type_suggestions = "cancer_type_suggestions"
+    const val cancer_type_suggestion = "cancer_type_suggestion"
   }
 }

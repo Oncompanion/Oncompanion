@@ -15,14 +15,16 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.AfterSignIn
+import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
- * The sign-in and onboarding screens, and every feature added with [placeholderGraph], are
- * placeholders until their PRs land.
+ * The onboarding screens, and every feature added with [placeholderGraph], are placeholders until
+ * their PRs land.
  */
 @Composable
 fun AppNavHost(
@@ -34,9 +36,15 @@ fun AppNavHost(
   NavHost(navController = navController, startDestination = startRoute) {
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
       composable(Screen.SIGN_IN) {
-        PlaceholderScreen(
-            title = stringResource(R.string.sign_in_title),
-            testTag = C.Tag.sign_in_screen,
+        SignInScreen(
+            onSignedIn = { next ->
+              navigationActions.navigateAndClearBackStack(
+                  when (next) {
+                    AfterSignIn.ONBOARDING -> Route.ONBOARDING
+                    AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                  }
+              )
+            }
         )
       }
     }

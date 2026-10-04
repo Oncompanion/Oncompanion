@@ -9,13 +9,37 @@ service cloud.firestore {
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
+    // Field `key` is absent, null, or a string of at most `max` characters
+    function optionalString(data, key, max) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= max);
+    }
 
     // ---------- Users ----------
-    // Each user has one document: /users/{uid}. Only they can read or write it.
+    // Each user has one profile document: /users/{uid}. Only they can read or write it.
+    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH).
+    function isValidProfile(data) {
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'createdAt'])
+          && data.keys().hasAll(['role', 'firstName', 'createdAt'])
+          && data.role in ['PATIENT', 'CAREGIVER']
+          && data.firstName is string
+          && data.firstName.trim().size() > 0
+          && data.firstName.size() <= 50
+          && optionalString(data, 'familyName', 50)
+          && optionalString(data, 'cancerType', 100)
+          && data.createdAt is timestamp;
+    }
+
     match /users/{uid} {
-      allow read, update, delete: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid)
-                    && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt']);
+                    && isValidProfile(request.resource.data)
+                    && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(uid)
+                    && isValidProfile(request.resource.data)
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // The role is chosen during onboarding and can't change afterwards (care-circle
+                    // access will depend on it)
+                    && request.resource.data.role == resource.data.role;
 
       // Everything personal (entries, records, reminders...) goes under the user:
       // /users/{uid}/<anything>/{docId}
