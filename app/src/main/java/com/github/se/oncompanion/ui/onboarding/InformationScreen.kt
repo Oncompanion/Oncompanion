@@ -49,6 +49,7 @@ import com.github.se.oncompanion.resources.C
 fun InformationScreen(viewModel: OnboardingViewModel, onSaved: () -> Unit) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+  // Leaves onboarding once the profile is saved
   LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) onSaved() }
 
   InformationContent(
@@ -76,6 +77,7 @@ fun InformationContent(
     onErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
   val errorMessage = uiState.error?.let { stringResource(it.messageRes()) }
   LaunchedEffect(uiState.error) {
@@ -100,6 +102,7 @@ fun InformationContent(
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState()),
     ) {
+      // Title and subtitle
       Text(
           text = stringResource(R.string.onboarding_information_title),
           style = MaterialTheme.typography.headlineMedium,
@@ -112,6 +115,7 @@ fun InformationContent(
       )
       Spacer(Modifier.height(32.dp))
       Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // First name (required): "*Required" below it, or an error once it's been cleared
         OutlinedTextField(
             value = uiState.firstName,
             onValueChange = {
@@ -136,6 +140,7 @@ fun InformationContent(
                 ),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_first_name_field),
         )
+        // Family name (optional)
         OutlinedTextField(
             value = uiState.familyName,
             onValueChange = onFamilyNameChange,
@@ -148,19 +153,23 @@ fun InformationContent(
                 ),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_family_name_field),
         )
+        // Cancer type (optional): free text with suggestions
         CancerTypeField(
             value = uiState.cancerType,
             onValueChange = onCancerTypeChange,
             modifier = Modifier.fillMaxWidth(),
         )
       }
+      // Pushes Continue to the bottom of the screen when there's room
       Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
+      // Continue saves the profile; enabled when a first name is filled in and nothing is saving
       Button(
           onClick = onContinue,
           enabled = uiState.canSave,
           modifier =
               Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(C.Tag.onboarding_save_button),
       ) {
+        // While saving: a spinner instead of the text, same button size
         if (uiState.isSaving) {
           Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
@@ -176,6 +185,7 @@ fun InformationContent(
   }
 }
 
+/** The message shown in the snackbar for each saving error. */
 private fun OnboardingError.messageRes(): Int =
     when (this) {
       OnboardingError.NOT_SIGNED_IN -> R.string.onboarding_error_not_signed_in
