@@ -29,6 +29,38 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
+    // Keep the limit in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH).
+    function isValidPrescription(data) {
+      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt'])
+          && data.keys().hasAll(['prescribedOn', 'createdAt'])
+          && optionalString(data, 'prescribedBy', 100)
+          && data.prescribedOn is timestamp
+          && data.createdAt is timestamp;
+    }
+
+    // Keep the limits in sync with Medication (MAX_TEXT_LENGTH, MAX_DURATION_DAYS) and
+    // Prescription (MAX_MEDICATIONS, for the position).
+    function isValidMedication(data) {
+      return data.keys().hasOnly(['prescriptionId', 'name', 'dosage', 'frequency', 'startDate',
+                                  'durationDays', 'position'])
+          && data.keys().hasAll(['prescriptionId', 'name', 'startDate', 'position'])
+          && data.prescriptionId is string
+          && data.prescriptionId.trim().size() > 0
+          && data.name is string
+          && data.name.trim().size() > 0
+          && data.name.size() <= 100
+          && optionalString(data, 'dosage', 100)
+          && optionalString(data, 'frequency', 100)
+          && data.startDate is timestamp
+          // No duration = no end date
+          && (data.get('durationDays', null) == null
+              || (data.durationDays is int && data.durationDays >= 1 && data.durationDays <= 3650))
+          // Rank of the medication in its prescription
+          && data.position is int
+          && data.position >= 0
+          && data.position < 20;
+    }
+
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -41,11 +73,30 @@ service cloud.firestore {
                     // access will depend on it)
                     && request.resource.data.role == resource.data.role;
 
-      // Everything personal (entries, records, reminders...) goes under the user:
-      // /users/{uid}/<anything>/{docId}
-      match /{subcollection}/{docId} {
-        allow read, write: if isOwner(uid);
+      // ---------- Prescriptions and medications ----------
+      // /users/{uid}/prescriptions/{prescriptionId}: what the medications of a prescription share.
+      match /prescriptions/{prescriptionId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == resource.data.createdAt;
       }
+
+      // /users/{uid}/medications/{medicationId}: one per medication, linked to its prescription.
+      match /medications/{medicationId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidMedication(request.resource.data);
+        allow update: if isOwner(uid)
+                      && isValidMedication(request.resource.data)
+                      // A medication stays in the prescription it was saved with
+                      && request.resource.data.prescriptionId == resource.data.prescriptionId;
+      }
+
+      // Everything personal (entries, records, reminders...) goes under the user, in a collection
+      // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
 
     // ---------- Everything else ----------
