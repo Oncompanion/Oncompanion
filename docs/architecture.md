@@ -10,15 +10,15 @@ To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) o
 
 ## Layers
 
-**UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes. No Firebase or Android `Context` here. Overview, Planning and Events are the bottom-bar tabs. Overview only holds shortcuts to the other sections, so it has no data dependency.
+**UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes. No Firebase or Android `Context` here. Overview, Planning and Events are the bottom-bar tabs. Overview shows what comes next (the next appointment, medication intake or Ligue event) by taking the first upcoming item from `ObservePlanning`. It is read-only: symptoms are logged from the symptom tracker, not from Overview.
 
 **Domain layer** (`domain/<feature>/`, optional). One class per use case with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (questions, directory, events, appointments list) go straight from the ViewModel to the repository.
 
-- `LogSymptom` turns a one-tap entry or a voice transcript into a symptom entry for the right patient, so Home and the symptom tracker share the same logic.
+- `LogSymptom` turns a one-tap entry or a voice transcript into a symptom entry for the right patient, so one-tap entries and the voice journal in the symptom tracker share the same logic.
 - `ManageMedicationSchedule` saves a confirmed medication and keeps its reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule.
 - `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
 - `GenerateAppointmentSummary` gathers the symptoms, open questions and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
-- `ObservePlanning` merges the appointments, the medication intakes from the schedule and the Ligue events of a week into one time-ordered list for the Planning screen. Planning has no store of its own: each item points back to the feature that owns it, which handles editing.
+- `ObservePlanning` merges the appointments, the medication intakes from the schedule and the Ligue events of a week into one time-ordered list for the Planning screen. Overview reuses it to show the next upcoming item. Planning has no store of its own: each item points back to the feature that owns it, which handles editing.
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
 
 **Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
