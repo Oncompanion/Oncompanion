@@ -305,25 +305,12 @@ class UserProfileSecurityRulesTest {
   // ---- subcollections and other paths ----
 
   @Test
-  fun ownerCanWriteAndReadSubcollection(): Unit = runBlocking {
+  fun ownerCannotWriteOrReadAnUnmatchedSubcollection(): Unit = runBlocking {
+    // No catch-all rule: a collection under the user without its own `match` is denied
     val doc = userDoc(aliceUid).collection("notes").document("s1")
-    allowed(doc.set(mapOf("text" to "Ask about fatigue", "pinned" to true)))
-    assertTrue(allowed(doc.get(Source.SERVER)).exists())
-  }
-
-  @Test
-  fun otherUserCannotWriteOrReadSubcollection(): Unit = runBlocking {
-    val doc = userDoc(aliceUid).collection("notes").document("s1")
-    allowed(doc.set(mapOf("text" to "a")))
-    EmulatorTestData.signIn("bob")
-    denied(doc.set(mapOf("text" to "b")))
+    denied(doc.set(mapOf("text" to "Ask about fatigue")))
     denied(doc.get(Source.SERVER))
-  }
-
-  @Test
-  fun signedOutCannotWriteSubcollection(): Unit = runBlocking {
-    EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
-    denied(userDoc(aliceUid).collection("notes").document("s1").set(mapOf("text" to "x")))
+    denied(userDoc(aliceUid).collection("notes").get(Source.SERVER))
   }
 
   @Test

@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.model.symptom
 
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +25,7 @@ class SymptomEntryTest {
     assertEquals(10, SymptomEntry.MAX_INTENSITY)
     assertEquals(50, SymptomEntry.MAX_OTHER_LABEL_LENGTH)
     assertEquals(1000, SymptomEntry.MAX_NOTES_LENGTH)
+    assertEquals(Duration.ofMinutes(5), SymptomEntry.MAX_CLOCK_DRIFT)
   }
 
   @Test
@@ -89,6 +91,23 @@ class SymptomEntryTest {
   fun listedTypeWithLabelIsInvalid() {
     assertFalse(valid.copy(otherLabel = "Hiccups").isValid())
     assertFalse(valid.copy(otherLabel = "").isValid())
+  }
+
+  @Test
+  fun occurredAt_canBeInThePast_orUpTo5MinutesAhead() {
+    val now = valid.occurredAt
+
+    assertTrue(valid.isValid(now))
+    assertTrue(valid.isValid(now.plus(Duration.ofDays(400))))
+    assertTrue(valid.isValid(now.minus(Duration.ofMinutes(5))))
+    assertFalse(valid.isValid(now.minus(Duration.ofMinutes(5)).minusSeconds(1)))
+    assertFalse(valid.isValid(now.minus(Duration.ofDays(1))))
+  }
+
+  @Test
+  fun isValid_usesTheCurrentTimeByDefault() {
+    assertTrue(valid.copy(occurredAt = Instant.now()).isValid())
+    assertFalse(valid.copy(occurredAt = Instant.now().plus(Duration.ofHours(1))).isValid())
   }
 
   @Test

@@ -13,9 +13,9 @@ import kotlinx.coroutines.flow.update
  * In-memory [SymptomRepository] for ViewModel unit tests (no Firebase).
  *
  * Follows the same contract as [SymptomRepositoryFirestore]:
- * - [addSymptom] requires [SymptomEntry.isValid] (else [IllegalArgumentException]), stores the
- *   entry with a new ID (`symptom-1`, `symptom-2`...) and `createdAt = clock()`, and returns the
- *   ID.
+ * - [addSymptom] requires [SymptomEntry.isValid] at `clock()` (else [IllegalArgumentException]),
+ *   stores the entry with a new ID (`symptom-1`, `symptom-2`...) and `createdAt = clock()`, and
+ *   returns the ID.
  * - [observeSymptoms] emits the user's entries newest `occurredAt` first, then every change.
  * - [observeSymptom] emits the entry (or null), then every change.
  *
@@ -63,7 +63,7 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
 
   override suspend fun addSymptom(uid: String, entry: SymptomEntry): String {
     writeError?.let { throw it }
-    require(entry.isValid()) { "Invalid symptom entry: $entry" }
+    require(entry.isValid(now = clock())) { "Invalid symptom entry: $entry" }
     val id = "symptom-${nextId++}"
     seed(uid, entry.copy(id = id, createdAt = clock()))
     return id

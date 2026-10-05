@@ -51,6 +51,17 @@ class FakeSymptomRepositoryTest {
   }
 
   @Test
+  fun addEntryInTheFutureOfTheClockThrows() = runTest {
+    try {
+      repository.addSymptom("alice", entry("2026-10-05T12:06:00Z"))
+      fail("Expected IllegalArgumentException")
+    } catch (e: IllegalArgumentException) {
+      // expected: more than 5 minutes after the clock (12:00)
+    }
+    assertTrue(repository.symptoms("alice").isEmpty())
+  }
+
+  @Test
   fun addWithWriteErrorThrowsItAndStoresNothing() = runTest {
     val error = IllegalStateException("boom")
     repository.writeError = error
