@@ -46,6 +46,9 @@
     <string name="symptom_type_sleep_problems">Sleep problems</string>
     <string name="symptom_type_breathlessness">Breathlessness</string>
     <string name="symptom_type_other">Other</string>
+    <string name="symptom_severity_mild">Mild</string>
+    <string name="symptom_severity_moderate">Moderate</string>
+    <string name="symptom_severity_severe">Severe</string>
     <string name="symptom_back">Back</string>
     <string name="symptom_intensity_value">%1$d/10</string>
     <string name="symptom_intensity_description">Intensity %1$d out of 10</string>
