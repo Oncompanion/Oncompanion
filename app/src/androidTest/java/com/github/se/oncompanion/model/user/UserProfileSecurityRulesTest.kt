@@ -306,24 +306,24 @@ class UserProfileSecurityRulesTest {
 
   @Test
   fun ownerCanWriteAndReadSubcollection(): Unit = runBlocking {
-    val doc = userDoc(aliceUid).collection("symptoms").document("s1")
-    allowed(doc.set(mapOf("type" to "fatigue", "level" to 3)))
+    val doc = userDoc(aliceUid).collection("notes").document("s1")
+    allowed(doc.set(mapOf("text" to "Ask about fatigue", "pinned" to true)))
     assertTrue(allowed(doc.get(Source.SERVER)).exists())
   }
 
   @Test
   fun otherUserCannotWriteOrReadSubcollection(): Unit = runBlocking {
-    val doc = userDoc(aliceUid).collection("symptoms").document("s1")
-    allowed(doc.set(mapOf("type" to "fatigue")))
+    val doc = userDoc(aliceUid).collection("notes").document("s1")
+    allowed(doc.set(mapOf("text" to "a")))
     EmulatorTestData.signIn("bob")
-    denied(doc.set(mapOf("type" to "nausea")))
+    denied(doc.set(mapOf("text" to "b")))
     denied(doc.get(Source.SERVER))
   }
 
   @Test
   fun signedOutCannotWriteSubcollection(): Unit = runBlocking {
     EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
-    denied(userDoc(aliceUid).collection("symptoms").document("s1").set(mapOf("type" to "x")))
+    denied(userDoc(aliceUid).collection("notes").document("s1").set(mapOf("text" to "x")))
   }
 
   @Test

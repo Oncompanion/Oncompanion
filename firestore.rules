@@ -29,6 +29,27 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
+    // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY,
+    // MAX_OTHER_LABEL_LENGTH, MAX_NOTES_LENGTH).
+    function isValidSymptom(data) {
+      return data.keys().hasOnly(['type', 'otherLabel', 'intensity', 'occurredAt', 'notes', 'createdAt'])
+          && data.keys().hasAll(['type', 'intensity', 'occurredAt', 'createdAt'])
+          && data.type in ['FATIGUE', 'NAUSEA', 'PAIN', 'APPETITE_LOSS', 'SLEEP_PROBLEMS',
+                           'BREATHLESSNESS', 'OTHER']
+          // "Other" needs a label; the listed types have none
+          && (data.type == 'OTHER'
+              ? data.get('otherLabel', null) is string
+                  && data.otherLabel.trim().size() > 0
+                  && data.otherLabel.size() <= 50
+              : data.get('otherLabel', null) == null)
+          && data.intensity is int
+          && data.intensity >= 1
+          && data.intensity <= 10
+          && data.occurredAt is timestamp
+          && optionalString(data, 'notes', 1000)
+          && data.createdAt is timestamp;
+    }
+
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -41,10 +62,20 @@ service cloud.firestore {
                     // access will depend on it)
                     && request.resource.data.role == resource.data.role;
 
+      // ---------- Symptoms ----------
+      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can't be changed yet.
+      match /symptoms/{symptomId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidSymptom(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+      }
+
       // Everything personal (entries, records, reminders...) goes under the user:
-      // /users/{uid}/<anything>/{docId}
+      // /users/{uid}/<anything>/{docId}. Collections with their own `match` above are excluded,
+      // otherwise this rule would allow writes their validation denies.
       match /{subcollection}/{docId} {
-        allow read, write: if isOwner(uid);
+        allow read, write: if isOwner(uid) && !(subcollection in ['symptoms']);
       }
     }
 
