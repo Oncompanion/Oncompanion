@@ -28,6 +28,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -78,10 +79,15 @@ class SymptomJournalScreenTest {
               )
       )
 
-  /** Records Back instead of navigating. */
+  /** Records navigation instead of navigating. */
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
+    val opened = mutableListOf<String>()
     var backCount = 0
+
+    override fun navigateTo(screen: String) {
+      opened += screen
+    }
 
     override fun goBack() {
       backCount++
@@ -91,12 +97,14 @@ class SymptomJournalScreenTest {
   private fun setContent(
       state: SymptomJournalUiState,
       onBack: () -> Unit = {},
+      onEntryClick: (String) -> Unit = {},
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
       SymptomJournalContent(
           uiState = state,
           onBack = onBack,
+          onEntryClick = onEntryClick,
           onRetry = onRetry,
       )
     }
@@ -213,6 +221,16 @@ class SymptomJournalScreenTest {
   }
 
   @Test
+  fun tappingAnEntry_opensIt() {
+    val clicked = mutableListOf<String>()
+    setContent(filled, onEntryClick = { clicked += it })
+
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("hiccups")).performClick()
+
+    assertEquals(listOf("hiccups"), clicked)
+  }
+
+  @Test
   fun backButton_callsBack() {
     var backs = 0
     setContent(loaded, onBack = { backs++ })
@@ -225,7 +243,7 @@ class SymptomJournalScreenTest {
   // ----- With the ViewModel -----
 
   @Test
-  fun screen_showsTheJournal_andGoesBack() {
+  fun screen_showsTheJournal_andNavigates() {
     val repository = FakeSymptomRepository().apply { seed("alice", fatigue) }
     val auth =
         FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
@@ -238,10 +256,13 @@ class SymptomJournalScreenTest {
       SymptomJournalScreen(navigationActions = navigationActions, viewModel = viewModel)
     }
 
-    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).performClick()
     composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
 
-    composeTestRule.runOnIdle { assertEquals(1, navigationActions.backCount) }
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Screen.symptomDetail("fatigue")), navigationActions.opened)
+      assertEquals(1, navigationActions.backCount)
+    }
   }
 
   @Test

@@ -33,6 +33,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.symptom.severity
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -48,7 +49,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 
 /**
  * The symptom journal (US-8 "Review my symptom journal"): the user's symptoms grouped by day,
- * newest first (Figma: "Symptoms – History").
+ * newest first (Figma: "Symptoms – History"). Tapping one opens its detail.
  */
 @Composable
 fun SymptomJournalScreen(
@@ -65,6 +66,7 @@ fun SymptomJournalScreen(
   SymptomJournalContent(
       uiState = uiState,
       onBack = navigationActions::goBack,
+      onEntryClick = { id -> navigationActions.navigateTo(Screen.symptomDetail(id)) },
       onRetry = viewModel::load,
       modifier = modifier,
   )
@@ -73,6 +75,7 @@ fun SymptomJournalScreen(
 /**
  * Stateless content of the journal, so each state can be tested without a ViewModel.
  *
+ * @param onEntryClick opens the entry with the given ID
  * @param onRetry reloads the journal after an error
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +83,7 @@ fun SymptomJournalScreen(
 fun SymptomJournalContent(
     uiState: SymptomJournalUiState,
     onBack: () -> Unit,
+    onEntryClick: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -112,14 +116,14 @@ fun SymptomJournalContent(
                 hint = stringResource(R.string.symptom_journal_empty_hint),
                 testTag = C.Tag.symptom_journal_empty,
             )
-        else -> JournalList(uiState.days, uiState.today)
+        else -> JournalList(uiState.days, uiState.today, onEntryClick)
       }
     }
   }
 }
 
 @Composable
-private fun JournalList(days: List<JournalDay>, today: LocalDate) {
+private fun JournalList(days: List<JournalDay>, today: LocalDate, onEntryClick: (String) -> Unit) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.symptom_journal_list),
       contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -127,7 +131,9 @@ private fun JournalList(days: List<JournalDay>, today: LocalDate) {
   ) {
     days.forEach { day ->
       item(key = "day-${day.date}") { DayHeader(day.date, today) }
-      items(day.entries, key = { it.entry.id }) { journalEntry -> EntryRow(journalEntry) }
+      items(day.entries, key = { it.entry.id }) { journalEntry ->
+        EntryRow(journalEntry, onClick = { onEntryClick(journalEntry.entry.id) })
+      }
     }
   }
 }
@@ -155,9 +161,10 @@ private fun DayHeader(date: LocalDate, today: LocalDate) {
 
 /** One entry: what it was, its severity in words and the time. */
 @Composable
-private fun EntryRow(journalEntry: JournalEntry) {
+private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
   val entry = journalEntry.entry
   Surface(
+      onClick = onClick,
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptomJournalItem(entry.id)),
       shape = RoundedCornerShape(16.dp),
       color = MaterialTheme.colorScheme.surfaceContainerLow,
