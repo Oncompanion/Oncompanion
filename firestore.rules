@@ -71,12 +71,8 @@ service cloud.firestore {
                       && request.resource.data.createdAt == request.time;
       }
 
-      // Everything personal (entries, records, reminders...) goes under the user:
-      // /users/{uid}/<anything>/{docId}. Collections with their own `match` above are excluded,
-      // otherwise this rule would allow writes their validation denies.
-      match /{subcollection}/{docId} {
-        allow read, write: if isOwner(uid) && !(subcollection in ['symptoms']);
-      }
+      // Everything personal (entries, records, reminders...) goes under the user, in a collection
+      // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
 
     // ---------- Everything else ----------

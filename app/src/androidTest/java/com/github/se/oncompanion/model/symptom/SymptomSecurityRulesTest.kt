@@ -208,8 +208,8 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun wildcardRuleDoesNotCoverSymptoms(): Unit = runBlocking {
-    // Would be allowed by the generic /users/{uid}/{subcollection} rule
+  fun createWithUnrelatedDataIsDenied(): Unit = runBlocking {
+    // No other rule allows writes under the user, whatever the data
     assertCreateDenied(mapOf("anything" to true))
   }
 }
