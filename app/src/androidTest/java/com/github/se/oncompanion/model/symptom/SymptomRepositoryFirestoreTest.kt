@@ -257,6 +257,7 @@ class SymptomRepositoryFirestoreTest {
             fatigue().copy(otherLabel = "Hiccups"),
             hiccups().copy(otherLabel = " "),
             fatigue().copy(notes = "n".repeat(1001)),
+            fatigue().copy(occurredAt = Instant.now().plusSeconds(3600)),
         )
     for (invalid in invalids) {
       try {

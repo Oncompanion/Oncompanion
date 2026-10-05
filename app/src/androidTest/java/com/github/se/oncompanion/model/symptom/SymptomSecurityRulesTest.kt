@@ -10,6 +10,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
+import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -184,6 +186,19 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
+  fun createInTheFutureIsDenied() {
+    // More than the 5 minutes allowed for clock drift, measured against the server's time
+    val inOneHour = Timestamp(Instant.now().plus(Duration.ofHours(1)))
+    assertCreateDenied(validSymptom().apply { put("occurredAt", inOneHour) })
+  }
+
+  @Test
+  fun createInThePastIsAllowed(): Unit = runBlocking {
+    val lastYear = Timestamp(Instant.now().minus(Duration.ofDays(365)))
+    allowed(symptoms(aliceUid).document().set(validSymptom().apply { put("occurredAt", lastYear) }))
+  }
+
+  @Test
   fun listedTypeWithLabelIsDenied() {
     assertCreateDenied(validSymptom().apply { put("otherLabel", "Hiccups") })
   }
@@ -208,8 +223,8 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun wildcardRuleDoesNotCoverSymptoms(): Unit = runBlocking {
-    // Would be allowed by the generic /users/{uid}/{subcollection} rule
+  fun createWithUnrelatedDataIsDenied(): Unit = runBlocking {
+    // No other rule allows writes under the user, whatever the data
     assertCreateDenied(mapOf("anything" to true))
   }
 }

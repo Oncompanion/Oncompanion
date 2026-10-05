@@ -30,7 +30,7 @@ service cloud.firestore {
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY,
-    // MAX_OTHER_LABEL_LENGTH, MAX_NOTES_LENGTH).
+    // MAX_OTHER_LABEL_LENGTH, MAX_NOTES_LENGTH, MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
       return data.keys().hasOnly(['type', 'otherLabel', 'intensity', 'occurredAt', 'notes', 'createdAt'])
           && data.keys().hasAll(['type', 'intensity', 'occurredAt', 'createdAt'])
@@ -46,6 +46,10 @@ service cloud.firestore {
           && data.intensity >= 1
           && data.intensity <= 10
           && data.occurredAt is timestamp
+          // Not in the future (it would stay at the top of the journal), with 5 minutes of margin
+          // for a phone clock ahead of the server's. Offline writes reach the server later, so
+          // request.time is then even later.
+          && data.occurredAt <= request.time + duration.value(5, 'm')
           && optionalString(data, 'notes', 1000)
           && data.createdAt is timestamp;
     }
@@ -71,12 +75,8 @@ service cloud.firestore {
                       && request.resource.data.createdAt == request.time;
       }
 
-      // Everything personal (entries, records, reminders...) goes under the user:
-      // /users/{uid}/<anything>/{docId}. Collections with their own `match` above are excluded,
-      // otherwise this rule would allow writes their validation denies.
-      match /{subcollection}/{docId} {
-        allow read, write: if isOwner(uid) && !(subcollection in ['symptoms']);
-      }
+      // Everything personal (entries, records, reminders...) goes under the user, in a collection
+      // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
 
     // ---------- Everything else ----------
