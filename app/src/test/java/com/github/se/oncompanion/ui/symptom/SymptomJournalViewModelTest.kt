@@ -24,8 +24,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SymptomJournalViewModelTest {
 
-  private val repository = FakeSymptomRepository()
-
   /** The time the ViewModel sees; starts on Monday 5 October 2026, 12:00 in UTC. */
   private var current: Clock = Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"), ZoneOffset.UTC)
 
@@ -38,6 +36,9 @@ class SymptomJournalViewModelTest {
 
         override fun instant(): Instant = current.instant()
       }
+
+  /** Uses the same time as the ViewModel, as it rejects symptoms dated after it. */
+  private val repository = FakeSymptomRepository(clock = { current.instant() })
 
   /** The IDs of each day of [state], by date. */
   private fun idsByDay(state: SymptomJournalUiState) =
