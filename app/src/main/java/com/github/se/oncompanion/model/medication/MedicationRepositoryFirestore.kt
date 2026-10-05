@@ -3,12 +3,18 @@ package com.github.se.oncompanion.model.medication
 import android.util.Log
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -36,7 +42,21 @@ class MedicationRepositoryFirestore(
   override fun newId(): String = db.collection(USERS).document().id
 
   override fun observePrescriptions(uid: String): Flow<List<Prescription>> =
-      TODO("Not implemented yet")
+      combine(prescriptions(uid).snapshots(), medications(uid).snapshots()) {
+          prescriptions,
+          medications ->
+        val medicationsByPrescription = medications.groupBy { it.getString(FIELD_PRESCRIPTION_ID) }
+        prescriptions
+            .mapNotNull { toPrescription(it, medicationsByPrescription[it.id].orEmpty()) }
+            // The two collections are listened to separately: a prescription can show up a moment
+            // before its medications, or stay a moment after them. It is left out meanwhile.
+            .filter { it.medications.isNotEmpty() }
+            .sortedWith(
+                compareByDescending<Prescription> { it.prescribedOn }
+                    // Not confirmed by the server yet: counts as the most recently saved
+                    .thenByDescending { it.createdAt ?: Instant.MAX }
+            )
+      }
 
   override suspend fun getPrescription(uid: String, id: String): Prescription? {
     val prescription = prescriptions(uid).document(id).get().await()
@@ -45,7 +65,10 @@ class MedicationRepositoryFirestore(
     return toPrescription(prescription, medications.documents)
   }
 
-  override fun observeMedications(uid: String): Flow<List<Medication>> = TODO("Not implemented yet")
+  override fun observeMedications(uid: String): Flow<List<Medication>> =
+      medications(uid).snapshots().map { documents ->
+        documents.mapNotNull(::toMedication).sortedWith(compareBy({ it.startDate }, { it.name }))
+      }
 
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     require(prescription.isValid()) { "Invalid prescription" }
@@ -72,6 +95,18 @@ class MedicationRepositoryFirestore(
       db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
 
   private fun medications(uid: String) = db.collection(USERS).document(uid).collection(MEDICATIONS)
+
+  /** Emits the documents of the collection now and every time they change. */
+  private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> = callbackFlow {
+    val registration = addSnapshotListener { snapshot, error ->
+      if (error != null) {
+        close(error)
+      } else if (snapshot != null) {
+        trySend(snapshot.documents)
+      }
+    }
+    awaitClose { registration.remove() }
+  }
 
   private fun Task<Void>.logServerRejection(prescriptionId: String) {
     addOnFailureListener { e ->

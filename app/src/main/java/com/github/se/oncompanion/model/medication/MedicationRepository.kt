@@ -25,8 +25,8 @@ interface MedicationRepository {
   suspend fun getPrescription(uid: String, id: String): Prescription?
 
   /**
-   * Emits all the medications of [uid] now and every time they change, earliest start date first,
-   * for features that don't need the prescriptions (e.g. Planning).
+   * Emits all the medications of [uid] now and every time they change, earliest start date first
+   * then by name, for features that don't need the prescriptions (e.g. Planning).
    */
   fun observeMedications(uid: String): Flow<List<Medication>>
 

@@ -65,7 +65,13 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
     readError?.let { throw it }
     emitAll(
         store
-            .map { all -> sorted(all[uid]).flatMap { it.medications }.sortedBy { it.startDate } }
+            .map { all ->
+              all[uid]
+                  .orEmpty()
+                  .values
+                  .flatMap { it.medications }
+                  .sortedWith(compareBy({ it.startDate }, { it.name }))
+            }
             .distinctUntilChanged()
     )
   }

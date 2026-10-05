@@ -4,10 +4,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -94,6 +97,30 @@ class MedicationRepositoryFirestoreTest {
             .get(Source.SERVER)
             .await()
       }
+
+  /** Waits for the first value of the stream that satisfies [predicate]. */
+  private suspend fun <T> Flow<T>.awaitFirst(predicate: (T) -> Boolean = { true }): T =
+      withTimeout(10.seconds) { first { predicate(it) } }
+
+  private fun singleMedication(
+      id: String,
+      prescribedOn: LocalDate,
+      name: String = "Paracetamol 1 g",
+      startDate: LocalDate = prescribedOn,
+  ) =
+      Prescription(
+          id = id,
+          prescribedOn = prescribedOn,
+          medications =
+              listOf(
+                  Medication(
+                      id = "$id-med",
+                      prescriptionId = id,
+                      name = name,
+                      startDate = startDate,
+                  )
+              ),
+      )
 
   // ---- new IDs ----
 
@@ -262,6 +289,150 @@ class MedicationRepositoryFirestoreTest {
     assertNull(repository.getPrescription(bobUid, "presc-1"))
   }
 
+  // ---- observe prescriptions ----
+
+  @Test
+  fun observePrescriptionsEmitsAnEmptyListWhenThereAreNone(): Unit = runBlocking {
+    assertEquals(emptyList<Prescription>(), repository.observePrescriptions(aliceUid).awaitFirst())
+  }
+
+  @Test
+  fun observePrescriptionsEmitsPrescriptionsWithTheirMedications(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.isNotEmpty() }
+
+    assertSameContent(prescription(), observed.single())
+    assertNotNull(observed.single().createdAt)
+  }
+
+  @Test
+  fun observePrescriptionsEmitsAgainWhenOneIsAdded(): Unit = runBlocking {
+    val stream = repository.observePrescriptions(aliceUid)
+    assertTrue(stream.awaitFirst().isEmpty())
+
+    repository.addPrescription(aliceUid, prescription())
+
+    assertEquals(listOf("presc-1"), stream.awaitFirst { it.isNotEmpty() }.map { it.id })
+  }
+
+  @Test
+  fun observePrescriptionsNeverEmitsAPrescriptionWithoutItsMedications(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.isNotEmpty() }
+
+    assertEquals(2, observed.single().medications.size)
+  }
+
+  @Test
+  fun observePrescriptionsOrdersMostRecentlyPrescribedFirst(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, singleMedication("august", LocalDate.of(2026, 8, 20)))
+    repository.addPrescription(aliceUid, singleMedication("september", september29))
+    repository.addPrescription(aliceUid, singleMedication("mid", LocalDate.of(2026, 9, 12)))
+    awaitServerAck()
+
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.size == 3 }
+
+    assertEquals(listOf("september", "mid", "august"), observed.map { it.id })
+  }
+
+  @Test
+  fun observePrescriptionsOrdersSameDayByMostRecentlySaved(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, singleMedication("saved-first", september29))
+    awaitServerAck()
+    repository.addPrescription(aliceUid, singleMedication("saved-second", september29))
+    awaitServerAck()
+    // Saved offline: not confirmed by the server yet, so it counts as the most recent
+    db.disableNetwork().await()
+    repository.addPrescription(aliceUid, singleMedication("pending", september29))
+
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.size == 3 }
+
+    assertEquals(listOf("pending", "saved-second", "saved-first"), observed.map { it.id })
+  }
+
+  @Test
+  fun observePrescriptionsSkipsMalformedDocuments(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    // A prescription without a date, and a medication of presc-1 without a name
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "no-date",
+        """{"prescribedBy": {"stringValue": "Dr. Nobody"}}""",
+    )
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/medications",
+        "no-name",
+        """{"prescriptionId": {"stringValue": "presc-1"}, "position": {"integerValue": "2"}}""",
+    )
+    // A valid one written afterwards tells us the stream has seen the malformed documents too
+    repository.addPrescription(aliceUid, singleMedication("after", LocalDate.of(2026, 9, 30)))
+    awaitServerAck()
+
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.size >= 2 }
+
+    assertEquals(listOf("after", "presc-1"), observed.map { it.id })
+    assertEquals(2, observed.last().medications.size)
+  }
+
+  @Test
+  fun observePrescriptionsOfAnotherUserEndsWithPermissionDenied(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    EmulatorTestData.createUser("bob")
+
+    try {
+      // Collected until it fails: the stream may first emit what this device has cached
+      withTimeout(10.seconds) { repository.observePrescriptions(aliceUid).collect {} }
+      fail("Expected FirebaseFirestoreException")
+    } catch (e: FirebaseFirestoreException) {
+      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
+    }
+  }
+
+  // ---- observe medications ----
+
+  @Test
+  fun observeMedicationsEmitsAnEmptyListWhenThereAreNone(): Unit = runBlocking {
+    assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
+  }
+
+  @Test
+  fun observeMedicationsEmitsEveryMedicationEarliestStartFirstThenByName(): Unit = runBlocking {
+    // presc-1: Ondansetron starts on 1 Oct, Dexamethasone on 29 Sep
+    repository.addPrescription(aliceUid, prescription())
+    repository.addPrescription(
+        aliceUid,
+        singleMedication("other", september29, name = "Amoxicillin", startDate = september29),
+    )
+    repository.addPrescription(
+        aliceUid,
+        singleMedication("old", LocalDate.of(2026, 9, 12), name = "Zolpidem"),
+    )
+    awaitServerAck()
+
+    val observed = repository.observeMedications(aliceUid).awaitFirst { it.size == 4 }
+
+    assertEquals(
+        listOf("Zolpidem", "Amoxicillin", "Dexamethasone 4 mg", "Ondansetron 8 mg"),
+        observed.map { it.name },
+    )
+    assertEquals(prescription().medications.first(), observed.last())
+  }
+
+  @Test
+  fun observeMedicationsEmitsAgainWhenAPrescriptionIsAdded(): Unit = runBlocking {
+    val stream = repository.observeMedications(aliceUid)
+    assertTrue(stream.awaitFirst().isEmpty())
+
+    repository.addPrescription(aliceUid, prescription())
+
+    assertEquals(2, stream.awaitFirst { it.isNotEmpty() }.size)
+  }
+
   // ---- offline ----
 
   @Test
@@ -273,5 +444,16 @@ class MedicationRepositoryFirestoreTest {
     val cached = withTimeout(5.seconds) { repository.getPrescription(aliceUid, "presc-1") }
     assertSameContent(prescription(), cached)
     assertNull("Not confirmed by the server yet", cached!!.createdAt)
+  }
+
+  @Test
+  fun streamsEmitOfflineWrites(): Unit = runBlocking {
+    db.disableNetwork().await()
+
+    repository.addPrescription(aliceUid, prescription())
+
+    val prescriptions = repository.observePrescriptions(aliceUid).awaitFirst { it.isNotEmpty() }
+    assertSameContent(prescription(), prescriptions.single())
+    assertEquals(2, repository.observeMedications(aliceUid).awaitFirst { it.isNotEmpty() }.size)
   }
 }

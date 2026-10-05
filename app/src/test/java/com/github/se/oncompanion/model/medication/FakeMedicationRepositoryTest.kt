@@ -150,12 +150,12 @@ class FakeMedicationRepositoryTest {
   }
 
   @Test
-  fun observeMedicationsEmitsAllMedicationsEarliestStartFirst() = runTest {
+  fun observeMedicationsEmitsAllMedicationsEarliestStartFirstThenByName() = runTest {
     repository.addPrescription("alice", recent)
     repository.addPrescription("alice", older)
 
     assertEquals(
-        listOf("paracetamol", "ondansetron", "dexamethasone"),
+        listOf("paracetamol", "dexamethasone", "ondansetron"),
         repository.observeMedications("alice").first().map { it.id },
     )
   }
