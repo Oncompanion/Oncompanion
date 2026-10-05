@@ -1,0 +1,168 @@
+package com.github.se.oncompanion.model.medication
+
+import android.util.Log
+import com.google.android.gms.tasks.Task
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.tasks.await
+
+/**
+ * [MedicationRepository] backed by Cloud Firestore: what a prescription's medications share is at
+ * `/users/{uid}/prescriptions/{id}`, and each medication at `/users/{uid}/medications/{id}`.
+ *
+ * A prescription and its medications are written in one batch, so they are saved together or not at
+ * all. Writes return as soon as they are applied to the local cache, without waiting for the
+ * server, so they never block the UI (offline, Firestore syncs them when the connection comes
+ * back). If the server later rejects a write (security rules), Firestore rolls the local change
+ * back and the rejection is logged; [Prescription.isValid] mirrors the rules so this shouldn't
+ * happen.
+ */
+class MedicationRepositoryFirestore(
+    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+) : MedicationRepository {
+
+  /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
+  constructor(db: FirebaseFirestore) : this({ db })
+
+  // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
+  // ViewModel default) where Firebase isn't initialized, like unit tests
+  private val db: FirebaseFirestore by lazy(dbProvider)
+
+  override fun newId(): String = db.collection(USERS).document().id
+
+  override fun observePrescriptions(uid: String): Flow<List<Prescription>> =
+      TODO("Not implemented yet")
+
+  override suspend fun getPrescription(uid: String, id: String): Prescription? {
+    val prescription = prescriptions(uid).document(id).get().await()
+    if (!prescription.exists()) return null
+    val medications = medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get().await()
+    return toPrescription(prescription, medications.documents)
+  }
+
+  override fun observeMedications(uid: String): Flow<List<Medication>> = TODO("Not implemented yet")
+
+  override suspend fun addPrescription(uid: String, prescription: Prescription) {
+    require(prescription.isValid()) { "Invalid prescription" }
+    val batch = db.batch()
+    batch.set(
+        prescriptions(uid).document(prescription.id),
+        prescriptionFields(prescription) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()),
+    )
+    prescription.medications.forEachIndexed { position, medication ->
+      batch.set(medications(uid).document(medication.id), medicationFields(medication, position))
+    }
+    batch.commit().logServerRejection(prescription.id)
+  }
+
+  override suspend fun updatePrescription(uid: String, prescription: Prescription) {
+    TODO("Not implemented yet")
+  }
+
+  override suspend fun deletePrescription(uid: String, id: String) {
+    TODO("Not implemented yet")
+  }
+
+  private fun prescriptions(uid: String) =
+      db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
+
+  private fun medications(uid: String) = db.collection(USERS).document(uid).collection(MEDICATIONS)
+
+  private fun Task<Void>.logServerRejection(prescriptionId: String) {
+    addOnFailureListener { e ->
+      Log.e(TAG, "The server rejected prescription $prescriptionId; the change was rolled back", e)
+    }
+  }
+
+  // A calendar day is stored as the Timestamp of its midnight in Switzerland. Both directions use
+  // ZONE and never the phone's time zone, so the day read back is always the day that was saved.
+  private fun LocalDate.toTimestamp() = Timestamp(atStartOfDay(ZONE).toInstant())
+
+  private fun Timestamp.toLocalDate(): LocalDate = toInstant().atZone(ZONE).toLocalDate()
+
+  /** The fields of the prescription document, except `createdAt`. */
+  private fun prescriptionFields(prescription: Prescription): Map<String, Any?> =
+      mapOf(
+          FIELD_PRESCRIBED_BY to prescription.prescribedBy,
+          FIELD_PRESCRIBED_ON to prescription.prescribedOn.toTimestamp(),
+      )
+
+  private fun medicationFields(medication: Medication, position: Int): Map<String, Any?> =
+      mapOf(
+          FIELD_PRESCRIPTION_ID to medication.prescriptionId,
+          FIELD_NAME to medication.name,
+          FIELD_DOSAGE to medication.dosage,
+          FIELD_FREQUENCY to medication.frequency,
+          FIELD_START_DATE to medication.startDate.toTimestamp(),
+          FIELD_DURATION_DAYS to medication.durationDays,
+          FIELD_POSITION to position,
+      )
+
+  /** Builds a prescription from its document and the documents of its medications, in any order. */
+  private fun toPrescription(doc: DocumentSnapshot, medications: List<DocumentSnapshot>) =
+      try {
+        Prescription(
+            id = doc.id,
+            prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
+            prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
+            medications =
+                medications.sortedBy { it.getLong(FIELD_POSITION) ?: 0 }.mapNotNull(::toMedication),
+            // Pending server timestamps read as null until the write reaches the server
+            createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
+        )
+      } catch (e: Exception) {
+        Log.e(TAG, "Malformed prescription document ${doc.id}", e)
+        null
+      }
+
+  private fun toMedication(doc: DocumentSnapshot): Medication? =
+      try {
+        Medication(
+            id = doc.id,
+            prescriptionId = doc.getString(FIELD_PRESCRIPTION_ID)!!,
+            name = doc.getString(FIELD_NAME)!!,
+            dosage = doc.getString(FIELD_DOSAGE),
+            frequency = doc.getString(FIELD_FREQUENCY),
+            startDate = doc.getTimestamp(FIELD_START_DATE)!!.toLocalDate(),
+            durationDays = doc.getLong(FIELD_DURATION_DAYS)?.toInt(),
+        )
+      } catch (e: Exception) {
+        Log.e(TAG, "Malformed medication document ${doc.id}", e)
+        null
+      }
+
+  companion object {
+    const val USERS = "users"
+    const val PRESCRIPTIONS = "prescriptions"
+    const val MEDICATIONS = "medications"
+
+    // Prescription fields
+    const val FIELD_PRESCRIBED_BY = "prescribedBy"
+    const val FIELD_PRESCRIBED_ON = "prescribedOn"
+    const val FIELD_CREATED_AT = "createdAt"
+
+    // Medication fields
+    const val FIELD_PRESCRIPTION_ID = "prescriptionId"
+    const val FIELD_NAME = "name"
+    const val FIELD_DOSAGE = "dosage"
+    const val FIELD_FREQUENCY = "frequency"
+    const val FIELD_START_DATE = "startDate"
+    const val FIELD_DURATION_DAYS = "durationDays"
+    /**
+     * Rank of the medication in its prescription, to read them back in the order they were saved.
+     */
+    const val FIELD_POSITION = "position"
+
+    /**
+     * The time zone used to store calendar days, see [FIELD_PRESCRIBED_ON] and [FIELD_START_DATE].
+     */
+    val ZONE: ZoneId = ZoneId.of("Europe/Zurich")
+
+    private const val TAG = "MedicationRepository"
+  }
+}
