@@ -27,6 +27,7 @@ import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
+import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -82,13 +83,7 @@ fun AppNavHost(
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
-      // Placeholder until the journal's PR lands
-      composable(Screen.SYMPTOMS) {
-        PlaceholderScreen(
-            title = stringResource(R.string.symptoms_title),
-            testTag = C.Tag.symptoms_screen,
-        )
-      }
+      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
       composable(
           Screen.SYMPTOM_DETAIL,
           arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
