@@ -38,6 +38,15 @@
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
 
+    <!-- Symptoms -->
+    <string name="symptom_type_fatigue">Fatigue</string>
+    <string name="symptom_type_nausea">Nausea</string>
+    <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_appetite_loss">Loss of appetite</string>
+    <string name="symptom_type_sleep_problems">Sleep problems</string>
+    <string name="symptom_type_breathlessness">Breathlessness</string>
+    <string name="symptom_type_other">Other</string>
+
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
     <string name="sign_in_subtitle">Sign in with your Google account to continue. New here? Your account is created automatically.</string>
