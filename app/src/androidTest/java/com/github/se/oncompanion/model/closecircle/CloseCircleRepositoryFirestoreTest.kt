@@ -130,6 +130,15 @@ class CloseCircleRepositoryFirestoreTest {
   }
 
   @Test
+  fun membersWithTheSameName_areSortedByUid(): Unit = runBlocking {
+    addMember("b", "Sophie", "Dubois")
+    addMember("c", "SOPHIE", "dubois")
+    addMember("a", "Sophie", "Dubois")
+
+    assertEquals(listOf("a", "b", "c"), firstMembers().map { it.uid })
+  }
+
+  @Test
   fun malformedFields_fallBackToSafeDefaults(): Unit = runBlocking {
     addMember("a", "Ann", relationship = "COUSIN", permissions = listOf("EDIT", "EVENTS", 3))
     addMember("b", "Bob", permissions = "PLANNING")

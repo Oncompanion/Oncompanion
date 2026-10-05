@@ -17,6 +17,7 @@ class CloseCircleMemberTest {
     assertEquals(Relationship.OTHER, Relationship.fromName("COUSIN"))
     assertEquals(Relationship.OTHER, Relationship.fromName("son"))
     assertEquals(Relationship.OTHER, Relationship.fromName(null))
+    assertEquals(Relationship.OTHER, Relationship.fromName(""))
   }
 
   @Test
@@ -26,6 +27,12 @@ class CloseCircleMemberTest {
         CarePermission.fromNames(listOf("SYMPTOMS", "EDIT", "PLANNING", "PLANNING")).toList(),
     )
     assertEquals(emptySet<CarePermission>(), CarePermission.fromNames(emptyList()))
+  }
+
+  @Test
+  fun permissionsFromNames_acceptsASet_andKeepsDisplayOrder() {
+    val reversed = CarePermission.entries.reversed().map { it.name }.toSet()
+    assertEquals(CarePermission.entries, CarePermission.fromNames(reversed).toList())
   }
 
   @Test
@@ -43,6 +50,10 @@ class CloseCircleMemberTest {
         "Sophie",
         CloseCircleMember(uid = "1", firstName = "Sophie", familyName = " ").fullName,
     )
+    assertEquals(
+        "Sophie",
+        CloseCircleMember(uid = "1", firstName = "Sophie", familyName = "").fullName,
+    )
   }
 
   @Test
@@ -51,10 +62,22 @@ class CloseCircleMemberTest {
   }
 
   @Test
+  fun initial_keepsAccents() {
+    assertEquals("É", CloseCircleMember(uid = "1", firstName = "élise").initial)
+  }
+
+  @Test
+  fun initial_ofAnEmptyOrBlankName_isEmpty() {
+    assertEquals("", CloseCircleMember(uid = "1", firstName = "").initial)
+    assertEquals("", CloseCircleMember(uid = "1", firstName = "   ").initial)
+  }
+
+  @Test
   fun hasFullAccess_onlyWithEveryPermission() {
     val all = CloseCircleMember("1", "Sophie", permissions = CarePermission.entries.toSet())
     assertTrue(all.hasFullAccess)
     assertFalse(all.copy(permissions = all.permissions - CarePermission.EVENTS).hasFullAccess)
+    assertFalse(all.copy(permissions = setOf(CarePermission.PLANNING)).hasFullAccess)
     assertFalse(all.copy(permissions = emptySet()).hasFullAccess)
   }
 
