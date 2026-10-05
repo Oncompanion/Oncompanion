@@ -163,7 +163,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertTextContains("Sam")
   }
 
-  /** A top-level feature destination and what its placeholder displays. */
+  /** A feature destination and the title its screen displays. */
   private data class Destination(
       val route: String,
       val screen: String,
@@ -198,11 +198,16 @@ class AppNavHostTest {
               C.Tag.care_circle_screen,
               R.string.care_circle_title,
           ),
-          Destination(Route.PROFILE, Screen.PROFILE, C.Tag.profile_screen, R.string.profile_title),
+          Destination(
+              Route.PROFILE,
+              Screen.PROFILE,
+              C.Tag.profile_screen,
+              R.string.profile_screen_title,
+          ),
       )
 
   @Test
-  fun everyFeatureRoute_opensItsPlaceholderFromOverview_andBackReturnsToOverview() {
+  fun everyFeatureRoute_opensItsScreenFromOverview_andBackReturnsToOverview() {
     setNavHost(Route.OVERVIEW)
     val navigationActions = NavigationActions(navController)
 
@@ -245,6 +250,20 @@ class AppNavHostTest {
 
       composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun profileBackArrow_returnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
     }
   }
 

@@ -24,6 +24,7 @@ import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.profile.ProfileScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -96,7 +97,9 @@ fun AppNavHost(
         R.string.care_circle_title,
         C.Tag.care_circle_screen,
     )
-    placeholderGraph(Route.PROFILE, Screen.PROFILE, R.string.profile_title, C.Tag.profile_screen)
+    navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
+      composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
+    }
   }
 }
 
