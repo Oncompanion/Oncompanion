@@ -7,6 +7,7 @@ import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -59,10 +60,8 @@ class MedicationRepositoryFirestore(
       }
 
   override suspend fun getPrescription(uid: String, id: String): Prescription? {
-    val prescription = prescriptions(uid).document(id).get().await()
-    if (!prescription.exists()) return null
-    val medications = medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get().await()
-    return toPrescription(prescription, medications.documents)
+    val prescription = existingPrescription(uid, id) ?: return null
+    return toPrescription(prescription, medicationsOf(uid, id))
   }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
@@ -84,17 +83,45 @@ class MedicationRepositoryFirestore(
   }
 
   override suspend fun updatePrescription(uid: String, prescription: Prescription) {
-    TODO("Not implemented yet")
+    require(prescription.isValid()) { "Invalid prescription" }
+    if (existingPrescription(uid, prescription.id) == null) return
+    val keptIds = prescription.medications.map { it.id }.toSet()
+    val batch = db.batch()
+    // update() and not set(): createdAt stays as it is
+    batch.update(prescriptions(uid).document(prescription.id), prescriptionFields(prescription))
+    prescription.medications.forEachIndexed { position, medication ->
+      batch.set(medications(uid).document(medication.id), medicationFields(medication, position))
+    }
+    medicationsOf(uid, prescription.id)
+        .filter { it.id !in keptIds }
+        .forEach { batch.delete(it.reference) }
+    batch.commit().logServerRejection(prescription.id)
   }
 
   override suspend fun deletePrescription(uid: String, id: String) {
-    TODO("Not implemented yet")
+    val batch = db.batch()
+    batch.delete(prescriptions(uid).document(id))
+    medicationsOf(uid, id).forEach { batch.delete(it.reference) }
+    batch.commit().logServerRejection(id)
   }
 
   private fun prescriptions(uid: String) =
       db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
 
   private fun medications(uid: String) = db.collection(USERS).document(uid).collection(MEDICATIONS)
+
+  /** The document of prescription [id], or `null` if it doesn't exist. */
+  private suspend fun existingPrescription(uid: String, id: String): DocumentSnapshot? =
+      try {
+        prescriptions(uid).document(id).get().await().takeIf { it.exists() }
+      } catch (e: FirebaseFirestoreException) {
+        // Offline, Firestore fails on a document it has never seen: there is nothing to return
+        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) null else throw e
+      }
+
+  /** The documents of the medications of prescription [id], in any order. */
+  private suspend fun medicationsOf(uid: String, id: String): List<DocumentSnapshot> =
+      medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get().await().documents
 
   /** Emits the documents of the collection now and every time they change. */
   private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> = callbackFlow {
