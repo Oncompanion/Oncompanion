@@ -8,8 +8,6 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -17,14 +15,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Tests [CareCircleRepositoryFirestore] against the Firestore emulator. Who can read the circle is
+ * tested in [CareCircleSecurityRulesTest].
+ */
 @RunWith(AndroidJUnit4::class)
 class CareCircleRepositoryFirestoreTest {
 
@@ -48,10 +51,10 @@ class CareCircleRepositoryFirestoreTest {
     FirebaseEmulator.auth.signOut()
   }
 
-  private fun circle(ownerUid: String = aliceUid): CollectionReference =
-      db.collection("users").document(ownerUid).collection(COLLECTION)
-
-  /** Writes a member as the owner (allowed by the rules for their own subcollections). */
+  /**
+   * Writes a member to alice's circle, bypassing the rules: clients can't write to the circle until
+   * adding a member exists.
+   */
   private suspend fun addMember(
       uid: String,
       firstName: String?,
@@ -67,8 +70,26 @@ class CareCircleRepositoryFirestoreTest {
                 FIELD_PERMISSIONS to permissions,
             )
             .filterValues { it != null }
-    withTimeout(10_000) { circle().document(uid).set(fields).await() }
+    val json = JSONObject()
+    fields.forEach { (key, value) -> json.put(key, restValue(value!!)) }
+    withTimeout(10_000) {
+      EmulatorTestData.createRawDocument("users/$aliceUid/$COLLECTION", uid, json.toString())
+    }
   }
+
+  /** [value] in the Firestore REST format, e.g. {"stringValue": "Sophie"}. */
+  private fun restValue(value: Any): JSONObject =
+      when (value) {
+        is String -> JSONObject().put("stringValue", value)
+        is Int -> JSONObject().put("integerValue", value.toString())
+        is List<*> ->
+            JSONObject()
+                .put(
+                    "arrayValue",
+                    JSONObject().put("values", JSONArray(value.map { restValue(it!!) })),
+                )
+        else -> error("Unsupported test value: $value")
+      }
 
   private suspend fun firstMembers(): List<CareCircleMember> =
       withTimeout(10_000) { repository.observeMembers(aliceUid).first() }
@@ -173,24 +194,12 @@ class CareCircleRepositoryFirestoreTest {
         while (current.isEmpty()) current = emissions.receive()
         assertEquals(listOf("sophie"), current.map { it.uid })
 
-        circle().document("sophie").delete().await()
-        while (current.isNotEmpty()) current = emissions.receive()
+        addMember("marc", "Marc")
+        while (current.size < 2) current = emissions.receive()
+        assertEquals(listOf("marc", "sophie"), current.map { it.uid })
       }
     } finally {
       job.cancel()
-    }
-  }
-
-  @Test
-  fun anotherUsersCircle_isDenied(): Unit = runBlocking {
-    val bobUid = EmulatorTestData.createUser("bob")
-    EmulatorTestData.signIn("alice")
-
-    try {
-      withTimeout(10_000) { repository.observeMembers(bobUid).first() }
-      fail("Expected the read to be denied")
-    } catch (e: FirebaseFirestoreException) {
-      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
     }
   }
 

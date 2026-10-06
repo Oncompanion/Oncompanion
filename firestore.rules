@@ -75,6 +75,14 @@ service cloud.firestore {
                       && request.resource.data.createdAt == request.time;
       }
 
+      // ---------- Care circle ----------
+      // /users/{uid}/circle/{memberUid}: the people the user shares their care with, keyed by the
+      // member's uid. Only the owner can read it. Writes stay denied until adding a member comes
+      // with their validation.
+      match /circle/{memberUid} {
+        allow read: if isOwner(uid);
+      }
+
       // Everything personal (entries, records, reminders...) goes under the user, in a collection
       // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
