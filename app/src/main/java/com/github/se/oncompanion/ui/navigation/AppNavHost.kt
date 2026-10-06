@@ -25,9 +25,9 @@ import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
-import com.github.se.oncompanion.ui.profile.ProfileScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
