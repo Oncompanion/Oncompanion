@@ -135,8 +135,9 @@ class MedicationRepositoryFirestore(
       try {
         !prescriptions(uid).document(id).get(Source.CACHE).await().exists()
       } catch (e: FirebaseFirestoreException) {
+        if (e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
         // Not in the cache: Firestore can't tell whether it exists
-        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) false else throw e
+        false
       }
 
   /** The documents of the medications of prescription [id], in any order. */
