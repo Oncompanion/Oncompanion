@@ -19,7 +19,9 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
@@ -28,8 +30,7 @@ import com.github.se.oncompanion.ui.profile.ProfileScreen
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
- * The onboarding screens and features added with [placeholderGraph] are placeholders until their
- * PRs land.
+ * Every feature added with [placeholderGraph] is a placeholder until its PR lands.
  */
 @Composable
 fun AppNavHost(
@@ -61,10 +62,11 @@ fun AppNavHost(
             onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
         )
       }
-      composable(Screen.ONBOARDING_INFORMATION) {
-        PlaceholderScreen(
-            title = stringResource(R.string.onboarding_information_title),
-            testTag = C.Tag.onboarding_information_screen,
+      composable(Screen.ONBOARDING_INFORMATION) { entry ->
+        InformationScreen(
+            viewModel = onboardingViewModel(navController, entry),
+            // Onboarding is done: Back must not return to it
+            onSaved = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
         )
       }
     }
@@ -90,12 +92,9 @@ fun AppNavHost(
         R.string.prescriptions_title,
         C.Tag.prescriptions_screen,
     )
-    placeholderGraph(
-        Route.CARE_CIRCLE,
-        Screen.CARE_CIRCLE,
-        R.string.care_circle_title,
-        C.Tag.care_circle_screen,
-    )
+    navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
+      composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
+    }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
     }

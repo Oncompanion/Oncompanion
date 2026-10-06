@@ -1,5 +1,17 @@
 <resources>
     <string name="app_name">oncompanion</string>
+    <string name="planning_today">Today</string>
+    <string name="planning_today_date">Today — %1$s</string>
+    <string name="planning_previous_week">Previous week</string>
+    <string name="planning_next_week">Next week</string>
+    <string name="planning_go_today">Go to today</string>
+    <string name="planning_add">Add appointment</string>
+    <string name="planning_empty">No appointments on this day</string>
+    <string name="planning_empty_hint">Tap + to add a doctor appointment.</string>
+    <string name="planning_loading">Loading appointments</string>
+    <string name="planning_error">We couldn’t load your appointments.</string>
+    <string name="planning_retry">Retry</string>
+    <string name="planning_date_unavailable">Date outside supported range</string>
 
     <!-- Placeholder titles, replaced when each screen is implemented -->
     <string name="onboarding_role_title">Who are you?</string>
@@ -69,7 +81,52 @@
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
     <string name="onboarding_coming_soon">Coming soon</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
+    <string name="onboarding_first_name">First name*</string>
+    <string name="onboarding_required">*Required</string>
+    <string name="onboarding_first_name_missing">Please enter your first name</string>
+    <string name="onboarding_family_name">Family name</string>
+    <string name="onboarding_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
+    <string name="onboarding_error_save_failed">Couldn\'t save your information. Please try again.</string>
 
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
+
+    <!-- Care circle -->
+    <string name="care_circle_back">Back</string>
+    <string name="care_circle_intro">The people you trust can follow your care. You choose what each person can see.</string>
+    <string name="care_circle_members_count">Members (%1$d)</string>
+    <string name="care_circle_add_member">Add member</string>
+    <string name="care_circle_empty_title">No one in your circle yet</string>
+    <string name="care_circle_empty_body">Add a relative, friend or nurse so they can follow your care.</string>
+    <string name="care_circle_empty_add_member">Add a member</string>
+    <string name="care_circle_error">Couldn\'t load your circle.</string>
+    <string name="care_circle_retry">Retry</string>
+    <!-- Relationship · what the member can see, e.g. "Son · Planning & events" -->
+    <string name="care_circle_member_summary">%1$s · %2$s</string>
+    <string name="care_circle_access_full">Full access</string>
+    <string name="care_circle_access_none">No access</string>
+    <!-- Joins the last section to the others, e.g. "Planning, events & symptoms" -->
+    <string name="care_circle_access_and">%1$s &amp; %2$s</string>
+    <!-- Temporary messages until the add member and member detail screens exist -->
+    <string name="care_circle_member_not_implemented">Member details aren\'t available yet. This will show %1$s\'s details and what they can see, and let you edit or remove them.</string>
+    <string name="care_circle_add_member_not_implemented">Adding members isn\'t available yet. This will let you add someone and choose what they can see.</string>
+
+    <string name="permission_planning">Planning</string>
+    <string name="permission_events">Events</string>
+    <string name="permission_symptoms">Symptoms</string>
+    <string name="permission_prescriptions">Prescriptions</string>
+
+    <string name="relationship_wife">Wife</string>
+    <string name="relationship_husband">Husband</string>
+    <string name="relationship_partner">Partner</string>
+    <string name="relationship_mother">Mother</string>
+    <string name="relationship_father">Father</string>
+    <string name="relationship_daughter">Daughter</string>
+    <string name="relationship_son">Son</string>
+    <string name="relationship_sister">Sister</string>
+    <string name="relationship_brother">Brother</string>
+    <string name="relationship_friend">Friend</string>
+    <string name="relationship_home_nurse">Home nurse</string>
+    <string name="relationship_other">Other</string>
 </resources>

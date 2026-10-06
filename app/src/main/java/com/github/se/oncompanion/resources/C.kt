@@ -3,6 +3,22 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    const val planning_week = "planning_week"
+    const val planning_list = "planning_list"
+    const val planning_previous = "planning_previous"
+    const val planning_next = "planning_next"
+    const val planning_today = "planning_today"
+    const val planning_heading = "planning_heading"
+    const val planning_empty = "planning_empty"
+    const val planning_loading = "planning_loading"
+    const val planning_error = "planning_error"
+    const val planning_retry = "planning_retry"
+    const val planning_add = "planning_add"
+
+    fun planningDay(date: String) = "planning_day_$date"
+
+    fun planningItem(key: String) = "planning_item_$key"
+
     const val main_screen_container = "main_screen_container"
 
     const val sign_in_screen = "sign_in_screen"
@@ -13,6 +29,10 @@ object C {
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
     const val onboarding_continue_button = "onboarding_continue_button"
     const val onboarding_information_screen = "onboarding_information_screen"
+    const val onboarding_first_name_field = "onboarding_first_name_field"
+    const val onboarding_family_name_field = "onboarding_family_name_field"
+    const val onboarding_save_button = "onboarding_save_button"
+    const val onboarding_saving = "onboarding_saving"
     const val overview_screen = "overview_screen"
     const val overview_shortcut_symptoms = "overview_shortcut_symptoms"
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
@@ -60,5 +80,18 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    // Care circle
+    const val care_circle_back_button = "care_circle_back_button"
+    const val care_circle_loading = "care_circle_loading"
+    const val care_circle_empty = "care_circle_empty"
+    const val care_circle_empty_add_button = "care_circle_empty_add_button"
+    const val care_circle_error = "care_circle_error"
+    const val care_circle_retry_button = "care_circle_retry_button"
+    const val care_circle_member_list = "care_circle_member_list"
+    const val care_circle_members_count = "care_circle_members_count"
+    const val care_circle_add_member_fab = "care_circle_add_member_fab"
+
+    fun careCircleMember(uid: String) = "care_circle_member_$uid"
   }
 }
