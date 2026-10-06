@@ -26,4 +26,4 @@ Closes #
 `./gradlew ktfmtFormat check` passes locally.
 
 ## AI usage
-<!-- e.g. "Implemented with Claude Code. Reviewed by me." or "None". -->
+Implemented with AI. Reviewed by me.
