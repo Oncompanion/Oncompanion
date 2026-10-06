@@ -19,6 +19,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
@@ -91,12 +92,9 @@ fun AppNavHost(
         R.string.prescriptions_title,
         C.Tag.prescriptions_screen,
     )
-    placeholderGraph(
-        Route.CARE_CIRCLE,
-        Screen.CARE_CIRCLE,
-        R.string.care_circle_title,
-        C.Tag.care_circle_screen,
-    )
+    navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
+      composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
+    }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
     }

@@ -64,5 +64,18 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    // Care circle
+    const val care_circle_back_button = "care_circle_back_button"
+    const val care_circle_loading = "care_circle_loading"
+    const val care_circle_empty = "care_circle_empty"
+    const val care_circle_empty_add_button = "care_circle_empty_add_button"
+    const val care_circle_error = "care_circle_error"
+    const val care_circle_retry_button = "care_circle_retry_button"
+    const val care_circle_member_list = "care_circle_member_list"
+    const val care_circle_members_count = "care_circle_members_count"
+    const val care_circle_add_member_fab = "care_circle_add_member_fab"
+
+    fun careCircleMember(uid: String) = "care_circle_member_$uid"
   }
 }
