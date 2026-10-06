@@ -51,7 +51,7 @@ class PlanningScreenTest {
           LocalDensity provides Density(LocalDensity.current.density, fontScale)
       ) {
         OncompanionTheme {
-          PlanningScreen(
+          PlanningContent(
               state,
               date,
               zone,

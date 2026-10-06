@@ -9,6 +9,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -18,38 +19,74 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
+import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+/** Calendar and agenda events supplied by the screen or preview. */
 data class PlanningActions(
     val onDateSelected: (LocalDate) -> Unit,
     val onPreviousWeek: () -> Unit,
     val onNextWeek: () -> Unit,
     val onToday: () -> Unit,
     val onRetry: () -> Unit,
-    val onAddAppointment: (LocalDate) -> Unit,
-    val onItemClick: (PlanningItem) -> Unit,
+    val onAddAppointment: ((LocalDate) -> Unit)? = null,
+    val onItemClick: ((PlanningItem) -> Unit)? = null,
 )
 
-/** Stateless feature content; the app navigation owns its bottom bar and outer insets. */
+/** The Planning tab, collecting calendar state and reusing the app's bottom navigation. */
 @Composable
 fun PlanningScreen(
+    navigationActions: NavigationActions,
+    viewModel: PlanningViewModel,
+    modifier: Modifier = Modifier,
+) {
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
+  PlanningContent(
+      state = state,
+      today = state.today,
+      zoneId = viewModel.zoneId,
+      actions =
+          PlanningActions(
+              viewModel::selectDate,
+              viewModel::previousWeek,
+              viewModel::nextWeek,
+              viewModel::goToToday,
+              viewModel::retry,
+          ),
+      modifier = modifier,
+      bottomBar = {
+        BottomNavigationBar(Tab.PLANNING, { navigationActions.navigateToTab(it.route) })
+      },
+  )
+}
+
+/** Stateless calendar and agenda; unavailable appointment actions are omitted. */
+@Composable
+fun PlanningContent(
     state: PlanningUiState,
     today: LocalDate,
     zoneId: ZoneId,
     actions: PlanningActions,
     modifier: Modifier = Modifier,
+    bottomBar: @Composable () -> Unit = {},
 ) {
   val locale = LocalConfiguration.current.locales[0]
   val fullDate = PlanningDates.format(state.selectedDate)
-  Surface(modifier.fillMaxSize().testTag(C.Tag.planning_screen)) {
-    Box(Modifier.fillMaxSize()) {
+  Scaffold(
+      modifier = modifier.fillMaxSize().testTag(C.Tag.planning_screen),
+      bottomBar = bottomBar,
+  ) { innerPadding ->
+    Box(Modifier.fillMaxSize().padding(innerPadding)) {
       Column {
         Text(
             stringResource(R.string.planning_title),
@@ -114,16 +151,18 @@ fun PlanningScreen(
             Modifier.weight(1f),
         )
       }
-      val addLabel = stringResource(R.string.planning_add)
-      FloatingActionButton(
-          onClick = { actions.onAddAppointment(state.selectedDate) },
-          modifier =
-              Modifier.align(Alignment.BottomEnd)
-                  .padding(16.dp)
-                  .testTag(C.Tag.planning_add)
-                  .semantics { contentDescription = addLabel },
-      ) {
-        Text("+", style = MaterialTheme.typography.headlineMedium)
+      actions.onAddAppointment?.let { onAdd ->
+        val addLabel = stringResource(R.string.planning_add)
+        FloatingActionButton(
+            onClick = { onAdd(state.selectedDate) },
+            modifier =
+                Modifier.align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .testTag(C.Tag.planning_add)
+                    .semantics { contentDescription = addLabel },
+        ) {
+          Text("+", style = MaterialTheme.typography.headlineMedium)
+        }
       }
     }
   }
@@ -220,8 +259,9 @@ internal fun PlanningAgenda(
     zoneId: ZoneId,
     locale: Locale,
     onRetry: () -> Unit,
-    onItemClick: (PlanningItem) -> Unit,
+    onItemClick: ((PlanningItem) -> Unit)?,
     modifier: Modifier = Modifier,
+    canAdd: Boolean = false,
 ) {
   val timePattern = if (DateFormat.is24HourFormat(LocalContext.current)) "HH:mm" else "h:mm a"
   Column(modifier.fillMaxWidth()) {
@@ -249,10 +289,11 @@ internal fun PlanningAgenda(
       ) {
         Text(stringResource(R.string.planning_empty), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.planning_empty_hint),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (canAdd)
+            Text(
+                stringResource(R.string.planning_empty_hint),
+                style = MaterialTheme.typography.bodyMedium,
+            )
       }
     } else {
       LazyColumn(
@@ -275,7 +316,11 @@ internal fun PlanningAgenda(
                 )
               },
               modifier =
-                  Modifier.testTag(C.Tag.planningItem(item.key)).clickable { onItemClick(item) },
+                  Modifier.testTag(C.Tag.planningItem(item.key))
+                      .then(
+                          if (onItemClick == null) Modifier
+                          else Modifier.clickable { onItemClick(item) }
+                      ),
           )
         }
       }

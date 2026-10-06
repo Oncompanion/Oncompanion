@@ -17,12 +17,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Selected calendar day and the agenda currently available for it. */
 data class PlanningUiState(
     val selectedDate: LocalDate,
     val weekStart: LocalDate,
     val items: List<PlanningItem> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
+    val today: LocalDate = selectedDate,
 ) {
   val canGoToPreviousWeek: Boolean
     get() = PlanningDates.isSupported(selectedDate.minusWeeks(1))
@@ -35,7 +37,7 @@ data class PlanningUiState(
 class PlanningViewModel(
     private val repository: PlanningRepository,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    val zoneId: ZoneId,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
   private val mutableState = MutableStateFlow(PlanningUiState(today, mondayOf(today)))
