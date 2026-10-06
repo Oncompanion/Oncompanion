@@ -129,4 +129,8 @@
     <string name="relationship_friend">Friend</string>
     <string name="relationship_home_nurse">Home nurse</string>
     <string name="relationship_other">Other</string>
+    <string name="edit_profile_title">Edit profile</string>
+    <string name="edit_profile_save">Save</string>
+    <string name="edit_profile_cancel">Cancel</string>
+    <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
 </resources>

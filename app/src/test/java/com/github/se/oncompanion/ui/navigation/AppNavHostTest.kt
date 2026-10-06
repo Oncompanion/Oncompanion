@@ -328,4 +328,19 @@ class AppNavHostTest {
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
     assertEquals("overview_home", Screen.OVERVIEW)
   }
+
+  @Test
+  fun editProfile_isDistinctDestination_andBackReturnsThroughProfileToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).performClick()
+    composeTestRule.runOnIdle { NavigationActions(navController).navigateTo(Screen.EDIT_PROFILE) }
+    composeTestRule.onNodeWithTag(C.Tag.edit_profile_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.EDIT_PROFILE, navController.currentDestination?.route)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.edit_profile_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
 }

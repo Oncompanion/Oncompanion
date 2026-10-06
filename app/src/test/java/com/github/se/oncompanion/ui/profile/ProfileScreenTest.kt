@@ -64,6 +64,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_signed_out).assertIsDisplayed()
     composeTestRule.onNodeWithText("Sign in to view your profile.").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_information).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertDoesNotExist()
   }
 
   @Test
@@ -87,7 +88,7 @@ class ProfileScreenTest {
   }
 
   @Test
-  fun loadedProfile_displaysNameEmailMemberSinceAndCancerType_withoutRoleOrEditControls() {
+  fun loadedProfile_displaysNameEmailMemberSinceAndCancerType_withoutRole() {
     setContent(
         ProfileUiState.Loaded(
             ProfileDetails(
@@ -116,7 +117,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithText("Cancer type").assertIsDisplayed()
     composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
     composeTestRule.onNodeWithText("PATIENT").assertDoesNotExist()
-    composeTestRule.onNodeWithText("Edit profile").assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
     composeTestRule.onNodeWithText("Sign out").assertDoesNotExist()
   }
 
@@ -200,5 +201,20 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
 
     composeTestRule.runOnIdle { assertEquals(1, backCount) }
+  }
+
+  @Test
+  fun editAction_callsCallbackOnlyForLoadedProfile() {
+    var edits = 0
+    composeTestRule.setContent {
+      ProfileContent(
+          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null)),
+          onBack = {},
+          onRetry = {},
+          onEdit = { edits++ },
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).performClick()
+    composeTestRule.runOnIdle { assertEquals(1, edits) }
   }
 }
