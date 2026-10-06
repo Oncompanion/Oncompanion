@@ -53,13 +53,16 @@ private fun PlanningPreviewContent(
         ),
         today,
         zone,
-        onDateSelected = { selected = it },
-        onPreviousWeek = { selected = selected.minusWeeks(1) },
-        onNextWeek = { selected = selected.plusWeeks(1) },
-        onToday = { selected = today },
-        onRetry = {},
-        onAddAppointment = {},
-        onItemClick = {},
+        actions =
+            PlanningActions(
+                onDateSelected = { selected = it },
+                onPreviousWeek = { selected = selected.minusWeeks(1) },
+                onNextWeek = { selected = selected.plusWeeks(1) },
+                onToday = { selected = today },
+                onRetry = {},
+                onAddAppointment = {},
+                onItemClick = {},
+            ),
     )
   }
 }

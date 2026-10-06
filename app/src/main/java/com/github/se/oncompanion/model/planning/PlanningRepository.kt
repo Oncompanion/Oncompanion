@@ -17,6 +17,6 @@ data class PlanningRange(val startInclusive: Instant, val endExclusive: Instant)
  * Implementations emit locally available snapshots without waiting for network access. Failures are
  * reported through the flow.
  */
-interface PlanningRepository {
+fun interface PlanningRepository {
   fun observeItems(range: PlanningRange): Flow<List<PlanningItem>>
 }

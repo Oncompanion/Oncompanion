@@ -51,7 +51,12 @@ class PlanningScreenTest {
           LocalDensity provides Density(LocalDensity.current.density, fontScale)
       ) {
         OncompanionTheme {
-          PlanningScreen(state, date, zone, onDate, previous, next, today, onRetry, onAdd, onItem)
+          PlanningScreen(
+              state,
+              date,
+              zone,
+              PlanningActions(onDate, previous, next, today, onRetry, onAdd, onItem),
+          )
         }
       }
     }
@@ -69,7 +74,13 @@ class PlanningScreenTest {
     compose.onNodeWithText("Planning").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_heading).assertTextEquals("Today — 02/10/2026")
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.planningDay(date.toString())).assertIsSelected()
+    compose
+        .onNodeWithTag(C.Tag.planningDay(date.toString()))
+        .assertIsSelected()
+        .assertContentDescriptionEquals("02/10/2026, Today")
+    compose
+        .onNodeWithTag(C.Tag.planningDay(date.minusDays(1).toString()))
+        .assertContentDescriptionEquals("01/10/2026")
     compose.onNodeWithText("02", useUnmergedTree = true).assertExists()
   }
 
@@ -172,7 +183,10 @@ class PlanningScreenTest {
     val last = java.time.LocalDate.of(9999, 12, 31)
     render(PlanningUiState(last, last.minusDays(4), isLoading = false))
     compose.onNodeWithTag(C.Tag.planning_next).assertIsNotEnabled()
-    compose.onNodeWithTag(C.Tag.planningDay("+10000-01-01")).assertIsNotEnabled()
+    compose
+        .onNodeWithTag(C.Tag.planningDay("+10000-01-01"))
+        .assertIsNotEnabled()
+        .assertContentDescriptionEquals("Date outside supported range")
     compose.onNodeWithTag(C.Tag.planning_heading).assertTextEquals("31/12/9999")
   }
 

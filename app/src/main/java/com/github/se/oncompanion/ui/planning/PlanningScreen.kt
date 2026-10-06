@@ -27,19 +27,23 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+data class PlanningActions(
+    val onDateSelected: (LocalDate) -> Unit,
+    val onPreviousWeek: () -> Unit,
+    val onNextWeek: () -> Unit,
+    val onToday: () -> Unit,
+    val onRetry: () -> Unit,
+    val onAddAppointment: (LocalDate) -> Unit,
+    val onItemClick: (PlanningItem) -> Unit,
+)
+
 /** Stateless feature content; the app navigation owns its bottom bar and outer insets. */
 @Composable
 fun PlanningScreen(
     state: PlanningUiState,
     today: LocalDate,
     zoneId: ZoneId,
-    onDateSelected: (LocalDate) -> Unit,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    onToday: () -> Unit,
-    onRetry: () -> Unit,
-    onAddAppointment: (LocalDate) -> Unit,
-    onItemClick: (PlanningItem) -> Unit,
+    actions: PlanningActions,
     modifier: Modifier = Modifier,
 ) {
   val locale = LocalConfiguration.current.locales[0]
@@ -63,7 +67,7 @@ fun PlanningScreen(
           )
           val previousLabel = stringResource(R.string.planning_previous_week)
           TextButton(
-              onPreviousWeek,
+              actions.onPreviousWeek,
               Modifier.testTag(C.Tag.planning_previous).semantics {
                 contentDescription = previousLabel
               },
@@ -73,21 +77,27 @@ fun PlanningScreen(
           }
           val todayLabel = stringResource(R.string.planning_go_today)
           TextButton(
-              onToday,
+              actions.onToday,
               Modifier.testTag(C.Tag.planning_today).semantics { contentDescription = todayLabel },
           ) {
             Text(stringResource(R.string.planning_today))
           }
           val nextLabel = stringResource(R.string.planning_next_week)
           TextButton(
-              onNextWeek,
+              actions.onNextWeek,
               Modifier.testTag(C.Tag.planning_next).semantics { contentDescription = nextLabel },
               enabled = state.canGoToNextWeek,
           ) {
             Text("›")
           }
         }
-        WeekStrip(state.weekStart, state.selectedDate, today, locale, onDateSelected)
+        WeekStrip(
+            state.weekStart,
+            state.selectedDate,
+            today,
+            locale,
+            actions.onDateSelected,
+        )
         Text(
             if (state.selectedDate == today) stringResource(R.string.planning_today_date, fullDate)
             else fullDate,
@@ -95,11 +105,18 @@ fun PlanningScreen(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        PlanningAgenda(state, zoneId, locale, onRetry, onItemClick, Modifier.weight(1f))
+        PlanningAgenda(
+            state,
+            zoneId,
+            locale,
+            actions.onRetry,
+            actions.onItemClick,
+            Modifier.weight(1f),
+        )
       }
       val addLabel = stringResource(R.string.planning_add)
       FloatingActionButton(
-          onClick = { onAddAppointment(state.selectedDate) },
+          onClick = { actions.onAddAppointment(state.selectedDate) },
           modifier =
               Modifier.align(Alignment.BottomEnd)
                   .padding(16.dp)
@@ -126,54 +143,75 @@ internal fun WeekStrip(
   ) {
     repeat(7) { offset ->
       val date = weekStart.plusDays(offset.toLong())
-      val selected = date == selectedDate
-      val supported = PlanningDates.isSupported(date)
-      val unavailableLabel = stringResource(R.string.planning_date_unavailable)
-      val todayText = stringResource(R.string.planning_today)
-      Surface(
-          color =
-              if (selected) MaterialTheme.colorScheme.primary
-              else MaterialTheme.colorScheme.surface,
-          contentColor =
-              if (selected) MaterialTheme.colorScheme.onPrimary
-              else MaterialTheme.colorScheme.onSurface,
-          shape = RoundedCornerShape(24.dp),
-          border =
-              if (date == today && !selected)
-                  androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-              else null,
-          modifier =
-              Modifier.weight(1f)
-                  .testTag(C.Tag.planningDay(date.toString()))
-                  .selectable(
-                      selected,
-                      enabled = supported,
-                      role = Role.Tab,
-                      onClick = { onDateSelected(date) },
-                  )
-                  .semantics(mergeDescendants = true) {
-                    contentDescription =
-                        if (supported)
-                            PlanningDates.format(date) + if (date == today) ", $todayText" else ""
-                        else unavailableLabel
-                  },
-      ) {
-        Column(
-            Modifier.padding(horizontal = 2.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-          Text(
-              date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
-              style = MaterialTheme.typography.bodySmall,
-          )
-          Text(
-              if (supported) String.format(Locale.ROOT, "%02d", date.dayOfMonth) else "—",
-              style = MaterialTheme.typography.titleMedium,
-          )
-        }
-      }
+      WeekDay(date, selectedDate, today, locale, onDateSelected, Modifier.weight(1f))
     }
   }
+}
+
+@Composable
+private fun WeekDay(
+    date: LocalDate,
+    selectedDate: LocalDate,
+    today: LocalDate,
+    locale: Locale,
+    onDateSelected: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  val selected = date == selectedDate
+  val supported = PlanningDates.isSupported(date)
+  val unavailableLabel = stringResource(R.string.planning_date_unavailable)
+  val todayText = stringResource(R.string.planning_today)
+  Surface(
+      color =
+          if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+      contentColor =
+          if (selected) MaterialTheme.colorScheme.onPrimary
+          else MaterialTheme.colorScheme.onSurface,
+      shape = RoundedCornerShape(24.dp),
+      border =
+          if (date == today && !selected)
+              androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+          else null,
+      modifier =
+          modifier
+              .testTag(C.Tag.planningDay(date.toString()))
+              .selectable(
+                  selected,
+                  enabled = supported,
+                  role = Role.Tab,
+                  onClick = { onDateSelected(date) },
+              )
+              .semantics(mergeDescendants = true) {
+                contentDescription =
+                    dayDescription(date, today, supported, todayText, unavailableLabel)
+              },
+  ) {
+    Column(
+        Modifier.padding(horizontal = 2.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Text(
+          date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
+          style = MaterialTheme.typography.bodySmall,
+      )
+      Text(
+          if (supported) String.format(Locale.ROOT, "%02d", date.dayOfMonth) else "—",
+          style = MaterialTheme.typography.titleMedium,
+      )
+    }
+  }
+}
+
+private fun dayDescription(
+    date: LocalDate,
+    today: LocalDate,
+    supported: Boolean,
+    todayText: String,
+    unavailableLabel: String,
+): String {
+  if (!supported) return unavailableLabel
+  val formattedDate = PlanningDates.format(date)
+  return if (date == today) "$formattedDate, $todayText" else formattedDate
 }
 
 @Composable
