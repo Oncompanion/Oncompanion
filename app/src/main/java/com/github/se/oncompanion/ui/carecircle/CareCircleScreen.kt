@@ -294,8 +294,9 @@ fun accessSummary(permissions: Set<CarePermission>): String {
   )
 }
 
+/** The section's name as shown to the user, e.g. "Planning". */
 @get:StringRes
-val CarePermission.label: Int
+internal val CarePermission.label: Int
   get() =
       when (this) {
         CarePermission.PLANNING -> R.string.permission_planning
@@ -304,8 +305,9 @@ val CarePermission.label: Int
         CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions
       }
 
+/** The relationship as shown to the user, e.g. "Home nurse". */
 @get:StringRes
-val Relationship.label: Int
+internal val Relationship.label: Int
   get() =
       when (this) {
         Relationship.WIFE -> R.string.relationship_wife
