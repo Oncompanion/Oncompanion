@@ -33,7 +33,11 @@ class CareCircleRepositoryFirestore(
                 close(error)
               } else if (snapshot != null) {
                 // Sorted here rather than in the query, so no Firestore index is needed
-                trySend(snapshot.documents.mapNotNull(::fromDocument).sortedWith(byName))
+                trySend(
+                    snapshot.documents
+                        .mapNotNull(::fromDocument)
+                        .sortedWith(CareCircleMember.BY_NAME)
+                )
               }
             }
     awaitClose { registration.remove() }
@@ -63,9 +67,5 @@ class CareCircleRepositoryFirestore(
     const val FIELD_RELATIONSHIP = "relationship"
     const val FIELD_PERMISSIONS = "permissions"
     private const val TAG = "CareCircleRepository"
-
-    private val byName =
-        compareBy<CareCircleMember, String>(String.CASE_INSENSITIVE_ORDER) { it.fullName }
-            .thenBy { it.uid }
   }
 }

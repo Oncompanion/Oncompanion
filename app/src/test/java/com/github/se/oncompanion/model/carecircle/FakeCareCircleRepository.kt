@@ -9,9 +9,10 @@ import kotlinx.coroutines.flow.map
 /**
  * In-memory [CareCircleRepository] for ViewModel and screen tests (no Firebase).
  *
- * Like [CareCircleRepositoryFirestore], [observeMembers] emits the current members sorted by name,
- * then every change. Test hooks: [setMembers] changes a circle, [observeError] makes the next
- * [observeMembers] collections fail, and [observedOwners] records who was observed.
+ * Like [CareCircleRepositoryFirestore], [observeMembers] emits the current members sorted by
+ * [CareCircleMember.BY_NAME], then every change. Test hooks: [setMembers] changes a circle,
+ * [observeError] makes the next [observeMembers] collections fail, and [observedOwners] records who
+ * was observed.
  */
 class FakeCareCircleRepository : CareCircleRepository {
 
@@ -31,7 +32,7 @@ class FakeCareCircleRepository : CareCircleRepository {
     observedOwners += ownerUid
     observeError?.let { throw it }
     emitAll(
-        circles.map { circle -> circle[ownerUid].orEmpty().sortedBy { it.fullName.lowercase() } }
+        circles.map { circle -> circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME) }
     )
   }
 }

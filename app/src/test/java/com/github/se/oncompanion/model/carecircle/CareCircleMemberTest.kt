@@ -82,6 +82,21 @@ class CareCircleMemberTest {
   }
 
   @Test
+  fun byName_sortsByFullNameIgnoringCase_thenByUid() {
+    val members =
+        listOf(
+            CareCircleMember("c", "sophie", "Dubois"),
+            CareCircleMember("b", "Marc"),
+            CareCircleMember("a", "Sophie", "dubois"),
+            CareCircleMember("d", "laura"),
+        )
+    assertEquals(
+        listOf("d", "b", "a", "c"),
+        members.sortedWith(CareCircleMember.BY_NAME).map { it.uid },
+    )
+  }
+
+  @Test
   fun defaults_areOtherRelationshipAndNoAccess() {
     val member = CareCircleMember(uid = "1", firstName = "Sophie")
     assertEquals(Relationship.OTHER, member.relationship)

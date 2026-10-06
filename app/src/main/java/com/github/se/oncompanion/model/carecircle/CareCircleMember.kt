@@ -65,4 +65,14 @@ data class CareCircleMember(
   /** Whether the member can see every section. */
   val hasFullAccess: Boolean
     get() = permissions.containsAll(CarePermission.entries)
+
+  companion object {
+    /**
+     * The order members are listed in: by full name ignoring case, then by uid so members with the
+     * same name always appear in the same order.
+     */
+    val BY_NAME: Comparator<CareCircleMember> =
+        compareBy<CareCircleMember, String>(String.CASE_INSENSITIVE_ORDER) { it.fullName }
+            .thenBy { it.uid }
+  }
 }
