@@ -1,6 +1,7 @@
 package com.github.se.oncompanion.utils
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
@@ -41,17 +42,20 @@ class FirebaseEmulatorSmokeTest {
   @Test
   fun firestoreEmulatorStoresTheSignedInUsersData(): Unit = runBlocking {
     val uid = EmulatorTestData.createUser("smoke")
-    val doc =
-        FirebaseEmulator.firestore
-            .collection("users")
-            .document(uid)
-            .collection("smoke")
-            .document("ping")
+    // The user's own profile: the rules only allow collections they match, with valid data
+    val doc = FirebaseEmulator.firestore.collection("users").document(uid)
 
     withTimeout(10_000) {
-      doc.set(mapOf("value" to 42L)).await()
+      doc.set(
+              mapOf(
+                  "role" to "PATIENT",
+                  "firstName" to "Smoke",
+                  "createdAt" to FieldValue.serverTimestamp(),
+              )
+          )
+          .await()
       val read = doc.get(Source.SERVER).await()
-      assertEquals(42L, read.getLong("value"))
+      assertEquals("Smoke", read.getString("firstName"))
     }
   }
 }
