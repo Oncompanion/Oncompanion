@@ -9,7 +9,7 @@ The app uses Google Firebase. Firebase Authentication handles Google Sign-In. Cl
 ## ===== MULTI-USER SUPPORT =====
 Users sign in with Google Sign-In through Firebase Authentication. Security rules ensure each user only sees their own data, plus anything explicitly shared with them.
 
-- Care circle: a patient invites family or friends with an invite code and chooses what they can see (medication schedule, symptom log, appointments). Access can be revoked at any time. Circle members get reminders and can log symptoms on the patient's behalf on low-energy days.
+- Care circle: a patient invites family or friends with an invite code and chooses which parts of their care each person can see. Access is read-only: members follow the patient's care but never edit or log anything. It can be changed or revoked at any time, and circle members get reminders.
 - Ligue staff: staff accounts are granted by our team, never self-assigned. Staff keep the directory of contacts and support programs up to date and post events, which patients see in the app. Staff have no access to patients' health data. As a stretch feature, the staff could also create group chats between patients.
 - Doctors: no account needed. Before an appointment, the patient can generate a symptom summary to show on screen or export as a PDF, choosing what goes in it.
 
@@ -19,7 +19,7 @@ The core sensor feature uses the phone's camera and on-device text recognition (
 
 
 ## ===== OFFLINE MODE =====
-The app works fully offline for its essential functions: logging and viewing symptoms, checking the medication schedule and reminders, and reaching emergency contacts. Data is stored locally and synced to Firebase automatically once a connection returns. The Ligue directory is cached on the phone so it stays available offline. Updates from the care circle and staff appear once back online, and entries a caregiver makes offline sync the same way. Text recognition runs fully offline. Voice journaling uses on-device speech recognition where the device supports it, and otherwise records the audio locally and transcribes it once connectivity returns.
+The app works fully offline for its essential functions: logging and viewing symptoms, checking the medication schedule and reminders, and reaching emergency contacts. Data is stored locally and synced to Firebase automatically once a connection returns. The Ligue directory is cached on the phone so it stays available offline. Updates from staff appear once back online, and care circle members see the patient's latest data once they are online too. Text recognition runs fully offline. Voice journaling uses on-device speech recognition where the device supports it, and otherwise records the audio locally and transcribes it once connectivity returns.
 
 ## ===== FIGMA =====
 [Figma design file](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion?t=XIxG9NcnbbcxOcOR-1)
