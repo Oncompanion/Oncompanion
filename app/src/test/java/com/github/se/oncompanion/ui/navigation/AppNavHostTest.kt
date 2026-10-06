@@ -193,10 +193,10 @@ class AppNavHostTest {
               R.string.prescriptions_title,
           ),
           Destination(
-              Route.CLOSE_CIRCLE,
-              Screen.CLOSE_CIRCLE,
-              C.Tag.close_circle_screen,
-              R.string.close_circle_title,
+              Route.CARE_CIRCLE,
+              Screen.CARE_CIRCLE,
+              C.Tag.care_circle_screen,
+              R.string.care_circle_title,
           ),
           Destination(
               Route.PROFILE,

@@ -19,7 +19,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
-import com.github.se.oncompanion.ui.closecircle.CloseCircleScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
@@ -92,8 +92,8 @@ fun AppNavHost(
         R.string.prescriptions_title,
         C.Tag.prescriptions_screen,
     )
-    navigation(startDestination = Screen.CLOSE_CIRCLE, route = Route.CLOSE_CIRCLE) {
-      composable(Screen.CLOSE_CIRCLE) { CloseCircleScreen(navigationActions) }
+    navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
+      composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
     }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }

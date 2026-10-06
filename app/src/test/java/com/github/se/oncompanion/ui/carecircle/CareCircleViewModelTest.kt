@@ -1,11 +1,11 @@
-package com.github.se.oncompanion.ui.closecircle
+package com.github.se.oncompanion.ui.carecircle
 
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
-import com.github.se.oncompanion.model.closecircle.CarePermission
-import com.github.se.oncompanion.model.closecircle.CloseCircleMember
-import com.github.se.oncompanion.model.closecircle.FakeCloseCircleRepository
-import com.github.se.oncompanion.model.closecircle.Relationship
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
+import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
@@ -22,13 +22,13 @@ import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class CloseCircleViewModelTest {
+class CareCircleViewModelTest {
 
   private val dispatcher = StandardTestDispatcher()
   private val ownerUid = "uid-owner"
 
   private val sophie =
-      CloseCircleMember(
+      CareCircleMember(
           uid = "sophie",
           firstName = "Sophie",
           familyName = "Dubois",
@@ -36,7 +36,7 @@ class CloseCircleViewModelTest {
           permissions = CarePermission.entries.toSet(),
       )
   private val marc =
-      CloseCircleMember(
+      CareCircleMember(
           uid = "marc",
           firstName = "Marc",
           familyName = "Dubois",
@@ -44,13 +44,13 @@ class CloseCircleViewModelTest {
           permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
       )
 
-  private lateinit var repository: FakeCloseCircleRepository
+  private lateinit var repository: FakeCareCircleRepository
   private lateinit var auth: FakeAuthRepository
 
   @Before
   fun setUp() = runTest {
     Dispatchers.setMain(dispatcher)
-    repository = FakeCloseCircleRepository()
+    repository = FakeCareCircleRepository()
     auth = FakeAuthRepository(onSignIn = { AuthUser(uid = ownerUid) })
     auth.signInWithGoogle("token")
   }
@@ -61,19 +61,19 @@ class CloseCircleViewModelTest {
   }
 
   private fun createViewModel(authRepository: AuthRepository = auth) =
-      CloseCircleViewModel(repository, authRepository)
+      CareCircleViewModel(repository, authRepository)
 
   @Test
   fun initialState_isLoading() {
     val viewModel = createViewModel()
-    assertEquals(CloseCircleUiState.Loading, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Loading, viewModel.uiState.value)
   }
 
   @Test
   fun emptyCircle_isEmpty() = runTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Empty, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Empty, viewModel.uiState.value)
     assertEquals(listOf(ownerUid), repository.observedOwners)
   }
 
@@ -82,7 +82,7 @@ class CloseCircleViewModelTest {
     repository.setMembers(ownerUid, listOf(sophie, marc))
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Members(listOf(marc, sophie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Members(listOf(marc, sophie)), viewModel.uiState.value)
   }
 
   @Test
@@ -90,22 +90,22 @@ class CloseCircleViewModelTest {
     repository.setMembers("someone-else", listOf(sophie))
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Empty, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Empty, viewModel.uiState.value)
   }
 
   @Test
   fun changesToTheCircle_updateTheState() = runTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Empty, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Empty, viewModel.uiState.value)
 
     repository.setMembers(ownerUid, listOf(sophie))
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
 
     repository.setMembers(ownerUid, emptyList())
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Empty, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Empty, viewModel.uiState.value)
   }
 
   @Test
@@ -114,7 +114,7 @@ class CloseCircleViewModelTest {
         FirebaseFirestoreException("denied", FirebaseFirestoreException.Code.PERMISSION_DENIED)
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Error, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
   }
 
   @Test
@@ -122,7 +122,7 @@ class CloseCircleViewModelTest {
     auth.signOut()
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Error, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
     assertEquals(emptyList<String>(), repository.observedOwners)
   }
 
@@ -142,7 +142,7 @@ class CloseCircleViewModelTest {
         }
     val viewModel = createViewModel(failingAuth)
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Error, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
   }
 
   @Test
@@ -151,13 +151,13 @@ class CloseCircleViewModelTest {
     repository.setMembers(ownerUid, listOf(sophie))
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Error, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
 
     repository.observeError = null
     viewModel.retry()
-    assertEquals(CloseCircleUiState.Loading, viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Loading, viewModel.uiState.value)
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
     assertEquals(listOf(ownerUid, ownerUid), repository.observedOwners)
   }
 
@@ -171,6 +171,6 @@ class CloseCircleViewModelTest {
     // Only the new observation updates the state: no stale "Empty" from the first one
     repository.setMembers(ownerUid, listOf(sophie))
     advanceUntilIdle()
-    assertEquals(CloseCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.Members(listOf(sophie)), viewModel.uiState.value)
   }
 }

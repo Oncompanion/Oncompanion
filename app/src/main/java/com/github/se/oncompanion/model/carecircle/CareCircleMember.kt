@@ -1,6 +1,6 @@
-package com.github.se.oncompanion.model.closecircle
+package com.github.se.oncompanion.model.carecircle
 
-/** What a close circle member is to the patient, picked from a fixed list when adding them. */
+/** What a care circle member is to the patient, picked from a fixed list when adding them. */
 enum class Relationship {
   WIFE,
   HUSBAND,
@@ -22,7 +22,7 @@ enum class Relationship {
 }
 
 /**
- * A section of the patient's data that a close circle member can see. Access is always read-only: a
+ * A section of the patient's data that a care circle member can see. Access is always read-only: a
  * member never edits or logs anything for the patient. Declared in display order.
  */
 enum class CarePermission {
@@ -39,7 +39,7 @@ enum class CarePermission {
 }
 
 /**
- * A person in the signed-in user's close circle, stored at `/users/{ownerUid}/circle/{uid}`.
+ * A person in the signed-in user's care circle, stored at `/users/{ownerUid}/circle/{uid}`.
  *
  * @property uid the member's Firebase Auth user ID, also the document ID
  * @property firstName as typed by the patient when adding the member
@@ -47,7 +47,7 @@ enum class CarePermission {
  * @property relationship what the member is to the patient
  * @property permissions what the member can see, read-only
  */
-data class CloseCircleMember(
+data class CareCircleMember(
     val uid: String,
     val firstName: String,
     val familyName: String? = null,

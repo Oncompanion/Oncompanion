@@ -20,7 +20,7 @@ object C {
     const val overview_screen = "overview_screen"
     const val overview_shortcut_symptoms = "overview_shortcut_symptoms"
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
-    const val overview_shortcut_close_circle = "overview_shortcut_close_circle"
+    const val overview_shortcut_care_circle = "overview_shortcut_care_circle"
     const val overview_shortcut_profile = "overview_shortcut_profile"
     const val overview_greeting = "overview_greeting"
     const val overview_date = "overview_date"
@@ -42,7 +42,7 @@ object C {
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"
     const val prescriptions_screen = "prescriptions_screen"
-    const val close_circle_screen = "close_circle_screen"
+    const val care_circle_screen = "care_circle_screen"
     const val profile_screen = "profile_screen"
     const val profile_back = "profile_back"
     const val profile_loading = "profile_loading"
@@ -65,17 +65,17 @@ object C {
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
 
-    // Close circle
-    const val close_circle_back_button = "close_circle_back_button"
-    const val close_circle_loading = "close_circle_loading"
-    const val close_circle_empty = "close_circle_empty"
-    const val close_circle_empty_add_button = "close_circle_empty_add_button"
-    const val close_circle_error = "close_circle_error"
-    const val close_circle_retry_button = "close_circle_retry_button"
-    const val close_circle_member_list = "close_circle_member_list"
-    const val close_circle_members_count = "close_circle_members_count"
-    const val close_circle_add_member_fab = "close_circle_add_member_fab"
+    // Care circle
+    const val care_circle_back_button = "care_circle_back_button"
+    const val care_circle_loading = "care_circle_loading"
+    const val care_circle_empty = "care_circle_empty"
+    const val care_circle_empty_add_button = "care_circle_empty_add_button"
+    const val care_circle_error = "care_circle_error"
+    const val care_circle_retry_button = "care_circle_retry_button"
+    const val care_circle_member_list = "care_circle_member_list"
+    const val care_circle_members_count = "care_circle_members_count"
+    const val care_circle_add_member_fab = "care_circle_add_member_fab"
 
-    fun close_circle_member(uid: String) = "close_circle_member_$uid"
+    fun careCircleMember(uid: String) = "care_circle_member_$uid"
   }
 }

@@ -1,4 +1,4 @@
-package com.github.se.oncompanion.ui.closecircle
+package com.github.se.oncompanion.ui.carecircle
 
 import android.widget.Toast
 import androidx.annotation.StringRes
@@ -43,41 +43,41 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.model.closecircle.CarePermission
-import com.github.se.oncompanion.model.closecircle.CloseCircleMember
-import com.github.se.oncompanion.model.closecircle.Relationship
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 
 /**
- * The members of the signed-in user's close circle (US-13), following the "US-13 / Circle members"
+ * The members of the signed-in user's care circle (US-13), following the "US-13 / Circle members"
  * Figma mockup. The empty state has no mockup yet.
  *
  * Opening a member (US-15) and adding one (US-14) come in later PRs: for now they show a toast.
  */
 @Composable
-fun CloseCircleScreen(
+fun CareCircleScreen(
     navigationActions: NavigationActions,
     modifier: Modifier = Modifier,
-    viewModel: CloseCircleViewModel = viewModel(),
+    viewModel: CareCircleViewModel = viewModel(),
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
   val resources = LocalResources.current
 
-  CloseCircleContent(
+  CareCircleContent(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onMemberClick = { member ->
         // TODO: open the member detail screen (US-15) instead of this toast
         val message =
-            resources.getString(R.string.close_circle_member_not_implemented, member.firstName)
+            resources.getString(R.string.care_circle_member_not_implemented, member.firstName)
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
       },
       onAddMember = {
         // TODO: open the add member screen (US-14) instead of this toast
-        val message = resources.getString(R.string.close_circle_add_member_not_implemented)
+        val message = resources.getString(R.string.care_circle_add_member_not_implemented)
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
       },
       onRetry = viewModel::retry,
@@ -85,30 +85,30 @@ fun CloseCircleScreen(
   )
 }
 
-/** Stateless content of the close circle screen, so each state can be tested on its own. */
+/** Stateless content of the care circle screen, so each state can be tested on its own. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloseCircleContent(
-    uiState: CloseCircleUiState,
+fun CareCircleContent(
+    uiState: CareCircleUiState,
     onBack: () -> Unit,
-    onMemberClick: (CloseCircleMember) -> Unit,
+    onMemberClick: (CareCircleMember) -> Unit,
     onAddMember: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
-      modifier = modifier.testTag(C.Tag.close_circle_screen),
+      modifier = modifier.testTag(C.Tag.care_circle_screen),
       topBar = {
         TopAppBar(
-            title = { Text(stringResource(R.string.close_circle_title)) },
+            title = { Text(stringResource(R.string.care_circle_title)) },
             navigationIcon = {
               IconButton(
                   onClick = onBack,
-                  modifier = Modifier.testTag(C.Tag.close_circle_back_button),
+                  modifier = Modifier.testTag(C.Tag.care_circle_back_button),
               ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_arrow_back),
-                    contentDescription = stringResource(R.string.close_circle_back),
+                    contentDescription = stringResource(R.string.care_circle_back),
                 )
               }
             },
@@ -116,22 +116,22 @@ fun CloseCircleContent(
       },
       floatingActionButton = {
         // In the empty state, the add button is part of the content instead
-        if (uiState is CloseCircleUiState.Members) {
+        if (uiState is CareCircleUiState.Members) {
           ExtendedFloatingActionButton(
-              text = { Text(stringResource(R.string.close_circle_add_member)) },
+              text = { Text(stringResource(R.string.care_circle_add_member)) },
               icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
               onClick = onAddMember,
-              modifier = Modifier.testTag(C.Tag.close_circle_add_member_fab),
+              modifier = Modifier.testTag(C.Tag.care_circle_add_member_fab),
           )
         }
       },
   ) { innerPadding ->
     val contentModifier = Modifier.fillMaxSize().padding(innerPadding)
     when (uiState) {
-      CloseCircleUiState.Loading -> LoadingState(contentModifier)
-      CloseCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
-      CloseCircleUiState.Error -> ErrorState(onRetry, contentModifier)
-      is CloseCircleUiState.Members -> MemberList(uiState.members, onMemberClick, contentModifier)
+      CareCircleUiState.Loading -> LoadingState(contentModifier)
+      CareCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
+      CareCircleUiState.Error -> ErrorState(onRetry, contentModifier)
+      is CareCircleUiState.Members -> MemberList(uiState.members, onMemberClick, contentModifier)
     }
   }
 }
@@ -139,30 +139,30 @@ fun CloseCircleContent(
 @Composable
 private fun LoadingState(modifier: Modifier) {
   Box(modifier = modifier, contentAlignment = Alignment.Center) {
-    CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.close_circle_loading))
+    CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.care_circle_loading))
   }
 }
 
 @Composable
 private fun MemberList(
-    members: List<CloseCircleMember>,
-    onMemberClick: (CloseCircleMember) -> Unit,
+    members: List<CareCircleMember>,
+    onMemberClick: (CareCircleMember) -> Unit,
     modifier: Modifier,
 ) {
   LazyColumn(
-      modifier = modifier.testTag(C.Tag.close_circle_member_list),
+      modifier = modifier.testTag(C.Tag.care_circle_member_list),
       // Room for the FAB, so it never hides the last member
       contentPadding = PaddingValues(bottom = 88.dp),
   ) {
     item { Intro() }
     item {
       Text(
-          text = stringResource(R.string.close_circle_members_count, members.size),
+          text = stringResource(R.string.care_circle_members_count, members.size),
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           modifier =
               Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                  .testTag(C.Tag.close_circle_members_count),
+                  .testTag(C.Tag.care_circle_members_count),
       )
     }
     items(members, key = { it.uid }) { member ->
@@ -174,7 +174,7 @@ private fun MemberList(
 @Composable
 private fun Intro() {
   Text(
-      text = stringResource(R.string.close_circle_intro),
+      text = stringResource(R.string.care_circle_intro),
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier =
@@ -184,21 +184,20 @@ private fun Intro() {
 
 /** One member: avatar with their initial, full name, and "relationship · what they can see". */
 @Composable
-private fun MemberItem(member: CloseCircleMember, onClick: () -> Unit) {
+private fun MemberItem(member: CareCircleMember, onClick: () -> Unit) {
   ListItem(
       headlineContent = { Text(member.fullName) },
       supportingContent = {
         Text(
             stringResource(
-                R.string.close_circle_member_summary,
+                R.string.care_circle_member_summary,
                 stringResource(member.relationship.label),
                 accessSummary(member.permissions),
             )
         )
       },
       leadingContent = { Monogram(member.initial) },
-      modifier =
-          Modifier.clickable(onClick = onClick).testTag(C.Tag.close_circle_member(member.uid)),
+      modifier = Modifier.clickable(onClick = onClick).testTag(C.Tag.careCircleMember(member.uid)),
   )
 }
 
@@ -222,32 +221,32 @@ private fun EmptyState(onAddMember: () -> Unit, modifier: Modifier) {
   Column(modifier = modifier.verticalScroll(rememberScrollState())) {
     Intro()
     Column(
-        modifier = Modifier.fillMaxWidth().padding(32.dp).testTag(C.Tag.close_circle_empty),
+        modifier = Modifier.fillMaxWidth().padding(32.dp).testTag(C.Tag.care_circle_empty),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
       Icon(
-          painter = painterResource(R.drawable.ic_close_circle),
+          painter = painterResource(R.drawable.ic_care_circle),
           contentDescription = null,
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
           modifier = Modifier.size(48.dp),
       )
       Text(
-          text = stringResource(R.string.close_circle_empty_title),
+          text = stringResource(R.string.care_circle_empty_title),
           style = MaterialTheme.typography.titleMedium,
           textAlign = TextAlign.Center,
       )
       Text(
-          text = stringResource(R.string.close_circle_empty_body),
+          text = stringResource(R.string.care_circle_empty_body),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,
       )
       Button(
           onClick = onAddMember,
-          modifier = Modifier.testTag(C.Tag.close_circle_empty_add_button),
+          modifier = Modifier.testTag(C.Tag.care_circle_empty_add_button),
       ) {
-        Text(stringResource(R.string.close_circle_empty_add_member))
+        Text(stringResource(R.string.care_circle_empty_add_member))
       }
     }
   }
@@ -256,17 +255,17 @@ private fun EmptyState(onAddMember: () -> Unit, modifier: Modifier) {
 @Composable
 private fun ErrorState(onRetry: () -> Unit, modifier: Modifier) {
   Column(
-      modifier = modifier.padding(32.dp).testTag(C.Tag.close_circle_error),
+      modifier = modifier.padding(32.dp).testTag(C.Tag.care_circle_error),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
   ) {
     Text(
-        text = stringResource(R.string.close_circle_error),
+        text = stringResource(R.string.care_circle_error),
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
     )
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.close_circle_retry_button)) {
-      Text(stringResource(R.string.close_circle_retry))
+    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.care_circle_retry_button)) {
+      Text(stringResource(R.string.care_circle_retry))
     }
   }
 }
@@ -279,9 +278,9 @@ private fun ErrorState(onRetry: () -> Unit, modifier: Modifier) {
 fun accessSummary(permissions: Set<CarePermission>): String {
   val granted = CarePermission.entries.filter { it in permissions }
   if (granted.size == CarePermission.entries.size) {
-    return stringResource(R.string.close_circle_access_full)
+    return stringResource(R.string.care_circle_access_full)
   }
-  if (granted.isEmpty()) return stringResource(R.string.close_circle_access_none)
+  if (granted.isEmpty()) return stringResource(R.string.care_circle_access_none)
   // Only the first section is capitalized: "Planning & events"
   val labels = granted.mapIndexed { index, permission ->
     val label = stringResource(permission.label)
@@ -289,7 +288,7 @@ fun accessSummary(permissions: Set<CarePermission>): String {
   }
   if (labels.size == 1) return labels.single()
   return stringResource(
-      R.string.close_circle_access_and,
+      R.string.care_circle_access_and,
       labels.dropLast(1).joinToString(", "),
       labels.last(),
   )
@@ -325,21 +324,21 @@ val Relationship.label: Int
 
 @Preview(showBackground = true)
 @Composable
-fun CloseCircleScreenPreview() {
+fun CareCircleScreenPreview() {
   OncompanionTheme {
-    CloseCircleContent(
+    CareCircleContent(
         uiState =
-            CloseCircleUiState.Members(
+            CareCircleUiState.Members(
                 members =
                     listOf(
-                        CloseCircleMember(
+                        CareCircleMember(
                             uid = "1",
                             firstName = "Sophie",
                             familyName = "Dubois",
                             relationship = Relationship.WIFE,
                             permissions = CarePermission.entries.toSet(),
                         ),
-                        CloseCircleMember(
+                        CareCircleMember(
                             uid = "2",
                             firstName = "Jean",
                             familyName = "Dupont",
@@ -358,10 +357,10 @@ fun CloseCircleScreenPreview() {
 
 @Preview(showBackground = true)
 @Composable
-fun CloseCircleScreenEmptyPreview() {
+fun CareCircleScreenEmptyPreview() {
   OncompanionTheme {
-    CloseCircleContent(
-        uiState = CloseCircleUiState.Empty,
+    CareCircleContent(
+        uiState = CareCircleUiState.Empty,
         onBack = {},
         onMemberClick = {},
         onAddMember = {},

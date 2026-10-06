@@ -1,11 +1,11 @@
-package com.github.se.oncompanion.model.closecircle
+package com.github.se.oncompanion.model.carecircle
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class CloseCircleMemberTest {
+class CareCircleMemberTest {
 
   @Test
   fun relationshipFromName_readsEveryStoredName() {
@@ -39,42 +39,42 @@ class CloseCircleMemberTest {
   fun fullName_joinsFirstAndFamilyName() {
     assertEquals(
         "Sophie Dubois",
-        CloseCircleMember(uid = "1", firstName = "Sophie", familyName = "Dubois").fullName,
+        CareCircleMember(uid = "1", firstName = "Sophie", familyName = "Dubois").fullName,
     )
   }
 
   @Test
   fun fullName_withoutFamilyName_isTheFirstName() {
-    assertEquals("Sophie", CloseCircleMember(uid = "1", firstName = "Sophie").fullName)
+    assertEquals("Sophie", CareCircleMember(uid = "1", firstName = "Sophie").fullName)
     assertEquals(
         "Sophie",
-        CloseCircleMember(uid = "1", firstName = "Sophie", familyName = " ").fullName,
+        CareCircleMember(uid = "1", firstName = "Sophie", familyName = " ").fullName,
     )
     assertEquals(
         "Sophie",
-        CloseCircleMember(uid = "1", firstName = "Sophie", familyName = "").fullName,
+        CareCircleMember(uid = "1", firstName = "Sophie", familyName = "").fullName,
     )
   }
 
   @Test
   fun initial_isTheUppercaseFirstLetter() {
-    assertEquals("S", CloseCircleMember(uid = "1", firstName = " sophie").initial)
+    assertEquals("S", CareCircleMember(uid = "1", firstName = " sophie").initial)
   }
 
   @Test
   fun initial_keepsAccents() {
-    assertEquals("É", CloseCircleMember(uid = "1", firstName = "élise").initial)
+    assertEquals("É", CareCircleMember(uid = "1", firstName = "élise").initial)
   }
 
   @Test
   fun initial_ofAnEmptyOrBlankName_isEmpty() {
-    assertEquals("", CloseCircleMember(uid = "1", firstName = "").initial)
-    assertEquals("", CloseCircleMember(uid = "1", firstName = "   ").initial)
+    assertEquals("", CareCircleMember(uid = "1", firstName = "").initial)
+    assertEquals("", CareCircleMember(uid = "1", firstName = "   ").initial)
   }
 
   @Test
   fun hasFullAccess_onlyWithEveryPermission() {
-    val all = CloseCircleMember("1", "Sophie", permissions = CarePermission.entries.toSet())
+    val all = CareCircleMember("1", "Sophie", permissions = CarePermission.entries.toSet())
     assertTrue(all.hasFullAccess)
     assertFalse(all.copy(permissions = all.permissions - CarePermission.EVENTS).hasFullAccess)
     assertFalse(all.copy(permissions = setOf(CarePermission.PLANNING)).hasFullAccess)
@@ -83,7 +83,7 @@ class CloseCircleMemberTest {
 
   @Test
   fun defaults_areOtherRelationshipAndNoAccess() {
-    val member = CloseCircleMember(uid = "1", firstName = "Sophie")
+    val member = CareCircleMember(uid = "1", firstName = "Sophie")
     assertEquals(Relationship.OTHER, member.relationship)
     assertTrue(member.permissions.isEmpty())
   }

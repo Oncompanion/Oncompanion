@@ -69,11 +69,11 @@ enum class OverviewShortcut(
       R.drawable.ic_prescriptions,
       C.Tag.overview_shortcut_prescriptions,
   ),
-  CLOSE_CIRCLE(
-      Route.CLOSE_CIRCLE,
-      R.string.close_circle_title,
-      R.drawable.ic_close_circle,
-      C.Tag.overview_shortcut_close_circle,
+  CARE_CIRCLE(
+      Route.CARE_CIRCLE,
+      R.string.care_circle_title,
+      R.drawable.ic_care_circle,
+      C.Tag.overview_shortcut_care_circle,
   ),
   /** Shown as the account icon in the top bar rather than as a tile. */
   PROFILE(
@@ -86,7 +86,7 @@ enum class OverviewShortcut(
 
 /** The tiles under "How do you feel today?", in display order. */
 private val tileShortcuts =
-    listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CLOSE_CIRCLE)
+    listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
 
 /** "Saturday 3 October", as in the mockup. The app's UI is in English. */
 private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)

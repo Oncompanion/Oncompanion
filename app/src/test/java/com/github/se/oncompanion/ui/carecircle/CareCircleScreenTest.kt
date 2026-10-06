@@ -1,4 +1,4 @@
-package com.github.se.oncompanion.ui.closecircle
+package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
@@ -19,10 +19,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
-import com.github.se.oncompanion.model.closecircle.CarePermission
-import com.github.se.oncompanion.model.closecircle.CloseCircleMember
-import com.github.se.oncompanion.model.closecircle.FakeCloseCircleRepository
-import com.github.se.oncompanion.model.closecircle.Relationship
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
+import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -34,14 +34,14 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowToast
 
 @RunWith(AndroidJUnit4::class)
-class CloseCircleScreenTest {
+class CareCircleScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
   private val sophie =
-      CloseCircleMember(
+      CareCircleMember(
           uid = "sophie",
           firstName = "Sophie",
           familyName = "Dubois",
@@ -49,7 +49,7 @@ class CloseCircleScreenTest {
           permissions = CarePermission.entries.toSet(),
       )
   private val marc =
-      CloseCircleMember(
+      CareCircleMember(
           uid = "marc",
           firstName = "Marc",
           familyName = "Dubois",
@@ -57,7 +57,7 @@ class CloseCircleScreenTest {
           permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
       )
   private val laura =
-      CloseCircleMember(
+      CareCircleMember(
           uid = "laura",
           firstName = "Laura",
           familyName = "Petit",
@@ -65,18 +65,18 @@ class CloseCircleScreenTest {
           permissions = setOf(CarePermission.SYMPTOMS, CarePermission.PLANNING),
       )
 
-  /** Records the clicks of [CloseCircleContent]. */
+  /** Records the clicks of [CareCircleContent]. */
   private class Events {
     var backClicks = 0
     var addClicks = 0
     var retryClicks = 0
-    val memberClicks = mutableListOf<CloseCircleMember>()
+    val memberClicks = mutableListOf<CareCircleMember>()
   }
 
-  private fun setContent(uiState: CloseCircleUiState): Events {
+  private fun setContent(uiState: CareCircleUiState): Events {
     val events = Events()
     composeTestRule.setContent {
-      CloseCircleContent(
+      CareCircleContent(
           uiState = uiState,
           onBack = { events.backClicks++ },
           onMemberClick = { events.memberClicks += it },
@@ -93,13 +93,13 @@ class CloseCircleScreenTest {
 
   @Test
   fun everyState_showsTheTitleAndABackButton() {
-    val events = setContent(CloseCircleUiState.Loading)
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(string(R.string.close_circle_title)).assertIsDisplayed()
+    val events = setContent(CareCircleUiState.Loading)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_title)).assertIsDisplayed()
     composeTestRule
         .onNode(
-            hasTestTag(C.Tag.close_circle_back_button) and
-                hasContentDescription(string(R.string.close_circle_back))
+            hasTestTag(C.Tag.care_circle_back_button) and
+                hasContentDescription(string(R.string.care_circle_back))
         )
         .assertIsDisplayed()
         .performClick()
@@ -110,31 +110,31 @@ class CloseCircleScreenTest {
 
   @Test
   fun loading_showsOnlyTheProgressIndicator() {
-    setContent(CloseCircleUiState.Loading)
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_loading).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member_list).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_empty).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_error).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_add_member_fab).assertDoesNotExist()
+    setContent(CareCircleUiState.Loading)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_loading).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_list).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_error).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).assertDoesNotExist()
   }
 
   // ---- empty ----
 
   @Test
   fun empty_explainsTheCircleAndOffersToAddAMember() {
-    val events = setContent(CloseCircleUiState.Empty)
-    composeTestRule.onNodeWithText(string(R.string.close_circle_intro)).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_empty).assertIsDisplayed()
-    composeTestRule.onNodeWithText(string(R.string.close_circle_empty_title)).assertIsDisplayed()
-    composeTestRule.onNodeWithText(string(R.string.close_circle_empty_body)).assertIsDisplayed()
+    val events = setContent(CareCircleUiState.Empty)
+    composeTestRule.onNodeWithText(string(R.string.care_circle_intro)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_empty_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_empty_body)).assertIsDisplayed()
     // A single add button: the FAB is hidden while the circle is empty
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_add_member_fab).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_loading).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_loading).assertDoesNotExist()
 
     composeTestRule
         .onNode(
-            hasTestTag(C.Tag.close_circle_empty_add_button) and
-                hasText(string(R.string.close_circle_empty_add_member))
+            hasTestTag(C.Tag.care_circle_empty_add_button) and
+                hasText(string(R.string.care_circle_empty_add_member))
         )
         .assertIsDisplayed()
         .performClick()
@@ -145,16 +145,16 @@ class CloseCircleScreenTest {
 
   @Test
   fun error_showsAMessageAndRetries() {
-    val events = setContent(CloseCircleUiState.Error)
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_error).assertIsDisplayed()
-    composeTestRule.onNodeWithText(string(R.string.close_circle_error)).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member_list).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_add_member_fab).assertDoesNotExist()
+    val events = setContent(CareCircleUiState.Error)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_error).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_error)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_list).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).assertDoesNotExist()
 
     composeTestRule
         .onNode(
-            hasTestTag(C.Tag.close_circle_retry_button) and
-                hasText(string(R.string.close_circle_retry))
+            hasTestTag(C.Tag.care_circle_retry_button) and
+                hasText(string(R.string.care_circle_retry))
         )
         .performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.retryClicks) }
@@ -164,27 +164,27 @@ class CloseCircleScreenTest {
 
   @Test
   fun members_showsIntroCountAndEveryMember() {
-    setContent(CloseCircleUiState.Members(listOf(laura, marc, sophie)))
-    composeTestRule.onNodeWithText(string(R.string.close_circle_intro)).assertIsDisplayed()
+    setContent(CareCircleUiState.Members(listOf(laura, marc, sophie)))
+    composeTestRule.onNodeWithText(string(R.string.care_circle_intro)).assertIsDisplayed()
     composeTestRule
         .onNode(
-            hasTestTag(C.Tag.close_circle_members_count) and
-                hasText(string(R.string.close_circle_members_count, 3))
+            hasTestTag(C.Tag.care_circle_members_count) and
+                hasText(string(R.string.care_circle_members_count, 3))
         )
         .assertIsDisplayed()
     listOf(laura, marc, sophie).forEach { member ->
       composeTestRule
-          .onNodeWithTag(C.Tag.close_circle_member(member.uid))
+          .onNodeWithTag(C.Tag.careCircleMember(member.uid))
           .assertIsDisplayed()
           .assertHasClickAction()
       composeTestRule.onNodeWithText(member.fullName).assertIsDisplayed()
     }
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_empty).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertDoesNotExist()
   }
 
   @Test
   fun members_showRelationshipAndAccessSummary_likeTheMockup() {
-    setContent(CloseCircleUiState.Members(listOf(laura, marc, sophie)))
+    setContent(CareCircleUiState.Members(listOf(laura, marc, sophie)))
     composeTestRule.onNodeWithText("Wife · Full access").assertIsDisplayed()
     composeTestRule.onNodeWithText("Son · Planning & events").assertIsDisplayed()
     composeTestRule.onNodeWithText("Home nurse · Planning & symptoms").assertIsDisplayed()
@@ -192,30 +192,30 @@ class CloseCircleScreenTest {
 
   @Test
   fun members_showTheirInitial() {
-    setContent(CloseCircleUiState.Members(listOf(sophie)))
+    setContent(CareCircleUiState.Members(listOf(sophie)))
     composeTestRule.onNodeWithText("S").assertIsDisplayed()
   }
 
   @Test
   fun clickingAMember_reportsIt() {
-    val events = setContent(CloseCircleUiState.Members(listOf(marc, sophie)))
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member(sophie.uid)).performClick()
+    val events = setContent(CareCircleUiState.Members(listOf(marc, sophie)))
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).performClick()
     composeTestRule.runOnIdle { assertEquals(listOf(sophie), events.memberClicks) }
   }
 
   @Test
   fun members_fabAddsAMember() {
-    val events = setContent(CloseCircleUiState.Members(listOf(sophie)))
+    val events = setContent(CareCircleUiState.Members(listOf(sophie)))
     // The FAB clears its label's semantics, so the label is only in the unmerged tree
     composeTestRule
         .onNode(
-            hasText(string(R.string.close_circle_add_member)) and
-                hasAnyAncestor(hasTestTag(C.Tag.close_circle_add_member_fab)),
+            hasText(string(R.string.care_circle_add_member)) and
+                hasAnyAncestor(hasTestTag(C.Tag.care_circle_add_member_fab)),
             useUnmergedTree = true,
         )
         .assertExists()
     composeTestRule
-        .onNodeWithTag(C.Tag.close_circle_add_member_fab)
+        .onNodeWithTag(C.Tag.care_circle_add_member_fab)
         .assertIsDisplayed()
         .performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.addClicks) }
@@ -224,12 +224,12 @@ class CloseCircleScreenTest {
   @Test
   fun longCircle_lastMemberCanBeScrolledTo() {
     val members =
-        (1..20).map { CloseCircleMember(uid = "m$it", firstName = "Member", familyName = "$it") }
-    setContent(CloseCircleUiState.Members(members))
+        (1..20).map { CareCircleMember(uid = "m$it", firstName = "Member", familyName = "$it") }
+    setContent(CareCircleUiState.Members(members))
     composeTestRule
-        .onNodeWithTag(C.Tag.close_circle_member_list)
-        .performScrollToNode(hasTestTag(C.Tag.close_circle_member("m20")))
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member("m20")).assertIsDisplayed()
+        .onNodeWithTag(C.Tag.care_circle_member_list)
+        .performScrollToNode(hasTestTag(C.Tag.careCircleMember("m20")))
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("m20")).assertIsDisplayed()
   }
 
   // ---- access summary and labels ----
@@ -272,16 +272,16 @@ class CloseCircleScreenTest {
     }
   }
 
-  private fun setScreen(members: List<CloseCircleMember>): RecordingNavigationActions {
-    val repository = FakeCloseCircleRepository()
+  private fun setScreen(members: List<CareCircleMember>): RecordingNavigationActions {
+    val repository = FakeCareCircleRepository()
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }
     repository.setMembers("owner", members)
-    val viewModel = CloseCircleViewModel(repository, auth)
+    val viewModel = CareCircleViewModel(repository, auth)
     lateinit var navigationActions: RecordingNavigationActions
     composeTestRule.setContent {
       navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
-      CloseCircleScreen(navigationActions = navigationActions, viewModel = viewModel)
+      CareCircleScreen(navigationActions = navigationActions, viewModel = viewModel)
     }
     return navigationActions
   }
@@ -289,18 +289,18 @@ class CloseCircleScreenTest {
   @Test
   fun screen_showsTheViewModelsMembers_andBackGoesBack() {
     val navigationActions = setScreen(listOf(sophie))
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member(sophie.uid)).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_back_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, navigationActions.backCalls) }
   }
 
   @Test
   fun screen_clickingAMember_explainsTheDetailScreenIsNotImplemented() {
     setScreen(listOf(sophie))
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_member(sophie.uid)).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).performClick()
     composeTestRule.runOnIdle {
       assertEquals(
-          string(R.string.close_circle_member_not_implemented, "Sophie"),
+          string(R.string.care_circle_member_not_implemented, "Sophie"),
           ShadowToast.getTextOfLatestToast(),
       )
     }
@@ -309,10 +309,10 @@ class CloseCircleScreenTest {
   @Test
   fun screen_addingAMember_explainsItIsNotImplemented() {
     setScreen(listOf(sophie))
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_add_member_fab).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).performClick()
     composeTestRule.runOnIdle {
       assertEquals(
-          string(R.string.close_circle_add_member_not_implemented),
+          string(R.string.care_circle_add_member_not_implemented),
           ShadowToast.getTextOfLatestToast(),
       )
     }
@@ -321,10 +321,10 @@ class CloseCircleScreenTest {
   @Test
   fun screen_emptyCircle_addButtonExplainsItIsNotImplemented() {
     setScreen(emptyList())
-    composeTestRule.onNodeWithTag(C.Tag.close_circle_empty_add_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
     composeTestRule.runOnIdle {
       assertEquals(
-          string(R.string.close_circle_add_member_not_implemented),
+          string(R.string.care_circle_add_member_not_implemented),
           ShadowToast.getTextOfLatestToast(),
       )
     }

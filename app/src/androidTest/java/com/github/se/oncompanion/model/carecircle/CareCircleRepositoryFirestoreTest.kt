@@ -1,11 +1,11 @@
-package com.github.se.oncompanion.model.closecircle
+package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.se.oncompanion.model.closecircle.CloseCircleRepositoryFirestore.Companion.COLLECTION
-import com.github.se.oncompanion.model.closecircle.CloseCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
-import com.github.se.oncompanion.model.closecircle.CloseCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
-import com.github.se.oncompanion.model.closecircle.CloseCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
-import com.github.se.oncompanion.model.closecircle.CloseCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.COLLECTION
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.CollectionReference
@@ -26,9 +26,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class CloseCircleRepositoryFirestoreTest {
+class CareCircleRepositoryFirestoreTest {
 
-  private lateinit var repository: CloseCircleRepositoryFirestore
+  private lateinit var repository: CareCircleRepositoryFirestore
   private lateinit var aliceUid: String
 
   private val db
@@ -39,7 +39,7 @@ class CloseCircleRepositoryFirestoreTest {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
     aliceUid = EmulatorTestData.createUser("alice")
-    repository = CloseCircleRepositoryFirestore(db)
+    repository = CareCircleRepositoryFirestore(db)
   }
 
   @After
@@ -70,7 +70,7 @@ class CloseCircleRepositoryFirestoreTest {
     withTimeout(10_000) { circle().document(uid).set(fields).await() }
   }
 
-  private suspend fun firstMembers(): List<CloseCircleMember> =
+  private suspend fun firstMembers(): List<CareCircleMember> =
       withTimeout(10_000) { repository.observeMembers(aliceUid).first() }
 
   @Test
@@ -84,14 +84,14 @@ class CloseCircleRepositoryFirestoreTest {
 
   @Test
   fun emptyCircle_emitsEmptyList(): Unit = runBlocking {
-    assertEquals(emptyList<CloseCircleMember>(), firstMembers())
+    assertEquals(emptyList<CareCircleMember>(), firstMembers())
   }
 
   @Test
   fun defaultConstructorUsesSharedInstance(): Unit = runBlocking {
     addMember("sophie", "Sophie")
     val members =
-        withTimeout(10_000) { CloseCircleRepositoryFirestore().observeMembers(aliceUid).first() }
+        withTimeout(10_000) { CareCircleRepositoryFirestore().observeMembers(aliceUid).first() }
     assertEquals(listOf("sophie"), members.map { it.uid })
   }
 
@@ -103,21 +103,21 @@ class CloseCircleRepositoryFirestoreTest {
 
     assertEquals(
         listOf(
-            CloseCircleMember(
+            CareCircleMember(
                 "laura",
                 "laura",
                 null,
                 Relationship.HOME_NURSE,
                 setOf(CarePermission.SYMPTOMS),
             ),
-            CloseCircleMember(
+            CareCircleMember(
                 "marc",
                 "Marc",
                 "Dubois",
                 Relationship.SON,
                 setOf(CarePermission.PLANNING, CarePermission.EVENTS),
             ),
-            CloseCircleMember(
+            CareCircleMember(
                 "sophie",
                 "Sophie",
                 "Dubois",
@@ -161,12 +161,12 @@ class CloseCircleRepositoryFirestoreTest {
 
   @Test
   fun observeMembers_emitsChanges(): Unit = runBlocking {
-    val emissions = Channel<List<CloseCircleMember>>(Channel.UNLIMITED)
+    val emissions = Channel<List<CareCircleMember>>(Channel.UNLIMITED)
     val job =
         launch(Dispatchers.IO) { repository.observeMembers(aliceUid).collect(emissions::send) }
     try {
       withTimeout(10_000) {
-        assertEquals(emptyList<CloseCircleMember>(), emissions.receive())
+        assertEquals(emptyList<CareCircleMember>(), emissions.receive())
 
         addMember("sophie", "Sophie")
         var current = emissions.receive()
