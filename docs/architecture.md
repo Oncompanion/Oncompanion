@@ -15,7 +15,7 @@ To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) o
 **Domain layer** (`domain/<feature>/`, optional). One class per use case with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (questions, directory, events, appointments list) go straight from the ViewModel to the repository.
 
 - `LogSymptom` turns a one-tap entry or a voice transcript into a symptom entry for the right patient, so one-tap entries and the voice journal in the symptom tracker share the same logic.
-- `ManageMedicationSchedule` saves a confirmed medication and keeps its reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule.
+- `ManageMedicationSchedule` saves a confirmed prescription with its medications and keeps their reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule.
 - `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
 - `GenerateAppointmentSummary` gathers the symptoms, open questions and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
 - `ObservePlanning` merges the appointments, the medication intakes from the schedule and the Ligue events of a week into one time-ordered list for the Planning screen. Overview reuses it to show the next upcoming item. Planning has no store of its own: each item points back to the feature that owns it, which handles editing.
@@ -32,7 +32,8 @@ Firestore's local cache is the offline store: writes are applied locally right a
 ```
 /users/{uid}                          profile (owner only)
 /users/{uid}/symptoms/{id}
-/users/{uid}/medications/{id}
+/users/{uid}/prescriptions/{id}       doctor and date shared by its medications
+/users/{uid}/medications/{id}         one per medication, linked to its prescription
 /users/{uid}/appointments/{id}
 /users/{uid}/questions/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
@@ -41,3 +42,5 @@ Firestore's local cache is the offline store: writes are applied locally right a
 ```
 
 Care-circle members read a patient's data through rules that check `/users/{uid}/circle/{request.auth.uid}`. Staff status comes from a custom claim set by the team, never from a field users can write.
+
+A prescription is split across two collections. `/prescriptions/{id}` holds what its medications share, the prescribing doctor and the date, so they are stored once and can't end up disagreeing. Each medication is its own document in `/medications/{id}`, linked to its prescription and carrying its own start date and duration, because Planning, reminders and the appointment summary work on single medications and read them without loading prescriptions.

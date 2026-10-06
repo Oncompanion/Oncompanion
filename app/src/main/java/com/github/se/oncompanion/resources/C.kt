@@ -13,6 +13,10 @@ object C {
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
     const val onboarding_continue_button = "onboarding_continue_button"
     const val onboarding_information_screen = "onboarding_information_screen"
+    const val onboarding_first_name_field = "onboarding_first_name_field"
+    const val onboarding_family_name_field = "onboarding_family_name_field"
+    const val onboarding_save_button = "onboarding_save_button"
+    const val onboarding_saving = "onboarding_saving"
     const val overview_screen = "overview_screen"
     const val overview_shortcut_symptoms = "overview_shortcut_symptoms"
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
@@ -55,6 +59,21 @@ object C {
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     const val profile_screen = "profile_screen"
+    const val profile_back = "profile_back"
+    const val profile_loading = "profile_loading"
+    const val profile_signed_out = "profile_signed_out"
+    const val profile_missing = "profile_missing"
+    const val profile_error = "profile_error"
+    const val profile_retry = "profile_retry"
+    const val profile_header = "profile_header"
+    const val profile_initial = "profile_initial"
+    const val profile_name = "profile_name"
+    const val profile_member_since = "profile_member_since"
+    const val profile_information = "profile_information"
+    const val profile_first_name = "profile_first_name"
+    const val profile_family_name = "profile_family_name"
+    const val profile_email = "profile_email"
+    const val profile_cancer_type = "profile_cancer_type"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
     const val cancer_type_suggestion = "cancer_type_suggestion"
@@ -65,5 +84,18 @@ object C {
 
     /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
     fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
+
+    // Care circle
+    const val care_circle_back_button = "care_circle_back_button"
+    const val care_circle_loading = "care_circle_loading"
+    const val care_circle_empty = "care_circle_empty"
+    const val care_circle_empty_add_button = "care_circle_empty_add_button"
+    const val care_circle_error = "care_circle_error"
+    const val care_circle_retry_button = "care_circle_retry_button"
+    const val care_circle_member_list = "care_circle_member_list"
+    const val care_circle_members_count = "care_circle_members_count"
+    const val care_circle_add_member_fab = "care_circle_add_member_fab"
+
+    fun careCircleMember(uid: String) = "care_circle_member_$uid"
   }
 }
