@@ -2,8 +2,11 @@ package com.github.se.oncompanion.ui.planning
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -12,10 +15,12 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class PlanningScreenTest {
@@ -39,10 +44,15 @@ class PlanningScreenTest {
       previous: () -> Unit = {},
       next: () -> Unit = {},
       today: () -> Unit = {},
+      fontScale: Float = 1f,
   ) {
     compose.setContent {
-      OncompanionTheme {
-        PlanningScreen(state, date, zone, onDate, previous, next, today, onRetry, onAdd, onItem)
+      CompositionLocalProvider(
+          LocalDensity provides Density(LocalDensity.current.density, fontScale)
+      ) {
+        OncompanionTheme {
+          PlanningScreen(state, date, zone, onDate, previous, next, today, onRetry, onAdd, onItem)
+        }
       }
     }
   }
@@ -61,6 +71,27 @@ class PlanningScreenTest {
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planningDay(date.toString())).assertIsSelected()
     compose.onNodeWithText("02", useUnmergedTree = true).assertExists()
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h800dp")
+  fun narrowScreenShowsEveryDayAndSundayCanBeSelected() {
+    var selected: LocalDate? = null
+    render(state(), onDate = { selected = it }, fontScale = 1.5f)
+    val weekBounds = compose.onNodeWithTag(C.Tag.planning_week).fetchSemanticsNode().boundsInRoot
+    repeat(7) { offset ->
+      val day = state().weekStart.plusDays(offset.toLong())
+      val node = compose.onNodeWithTag(C.Tag.planningDay(day.toString()))
+      node.assertIsDisplayed()
+      val bounds = node.fetchSemanticsNode().boundsInRoot
+      assertTrue(
+          "$day must fit inside the week strip",
+          bounds.left >= weekBounds.left && bounds.right <= weekBounds.right,
+      )
+    }
+    val sunday = state().weekStart.plusDays(6)
+    compose.onNodeWithTag(C.Tag.planningDay(sunday.toString())).performClick()
+    assertEquals(sunday, selected)
   }
 
   @Test

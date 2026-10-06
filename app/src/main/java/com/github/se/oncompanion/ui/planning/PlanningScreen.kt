@@ -2,11 +2,9 @@ package com.github.se.oncompanion.ui.planning
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -123,11 +121,8 @@ internal fun WeekStrip(
     onDateSelected: (LocalDate) -> Unit,
 ) {
   Row(
-      Modifier.fillMaxWidth()
-          .horizontalScroll(rememberScrollState())
-          .padding(horizontal = 16.dp)
-          .testTag(C.Tag.planning_week),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(C.Tag.planning_week),
+      horizontalArrangement = Arrangement.spacedBy(2.dp),
   ) {
     repeat(7) { offset ->
       val date = weekStart.plusDays(offset.toLong())
@@ -148,7 +143,7 @@ internal fun WeekStrip(
                   androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
               else null,
           modifier =
-              Modifier.widthIn(min = 48.dp)
+              Modifier.weight(1f)
                   .testTag(C.Tag.planningDay(date.toString()))
                   .selectable(
                       selected,
@@ -164,7 +159,7 @@ internal fun WeekStrip(
                   },
       ) {
         Column(
-            Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            Modifier.padding(horizontal = 2.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           Text(
