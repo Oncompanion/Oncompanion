@@ -27,12 +27,13 @@ import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
+import com.github.se.oncompanion.ui.profile.ProfileScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
- * The onboarding screens, and every feature added with [placeholderGraph], are placeholders until
- * their PRs land.
+ * The onboarding screens and features added with [placeholderGraph] are placeholders until their
+ * PRs land.
  */
 @Composable
 fun AppNavHost(
@@ -113,7 +114,9 @@ fun AppNavHost(
         R.string.care_circle_title,
         C.Tag.care_circle_screen,
     )
-    placeholderGraph(Route.PROFILE, Screen.PROFILE, R.string.profile_title, C.Tag.profile_screen)
+    navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
+      composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
+    }
   }
 }
 
