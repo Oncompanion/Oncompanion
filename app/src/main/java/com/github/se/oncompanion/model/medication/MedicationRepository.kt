@@ -21,7 +21,10 @@ interface MedicationRepository {
    */
   fun observePrescriptions(uid: String): Flow<List<Prescription>>
 
-  /** Returns the prescription [id] of [uid] with its medications, or `null` if it doesn't exist. */
+  /**
+   * Returns the prescription [id] of [uid] with its medications, or `null` if it doesn't exist.
+   * Offline, also `null` if this device has never loaded it.
+   */
   suspend fun getPrescription(uid: String, id: String): Prescription?
 
   /**
@@ -41,7 +44,9 @@ interface MedicationRepository {
   /**
    * Replaces the content of an existing prescription: its medications become exactly
    * [Prescription.medications], so the ones left out are deleted. [Prescription.createdAt] never
-   * changes. Does nothing if the prescription doesn't exist.
+   * changes. Does nothing if the prescription doesn't exist. Offline, a device that has never
+   * loaded the prescription can't tell: the update is kept and sent when the connection comes back,
+   * and nothing is saved if the prescription doesn't exist.
    *
    * @throws IllegalArgumentException if the prescription is not [Prescription.isValid]
    */

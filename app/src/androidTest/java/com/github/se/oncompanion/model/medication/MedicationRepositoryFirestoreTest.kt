@@ -637,13 +637,67 @@ class MedicationRepositoryFirestoreTest {
   }
 
   @Test
-  fun updateAndDeleteOfUnknownPrescriptionDoNothingOffline(): Unit = runBlocking {
+  fun deleteOfUnknownPrescriptionDoesNothingOffline(): Unit = runBlocking {
     db.disableNetwork().await()
 
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
     withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
 
     assertTrue(repository.observePrescriptions(aliceUid).awaitFirst().isEmpty())
+  }
+
+  @Test
+  fun offlineUpdateOfAPrescriptionThisDeviceNeverLoadedIsSaved(): Unit = runBlocking {
+    // presc-1 exists on the server with one medication, but this device has never loaded it
+    val day = """{"timestampValue": "2026-09-28T22:00:00Z"}"""
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "presc-1",
+        """{"prescribedOn": $day, "createdAt": $day}""",
+    )
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/medications",
+        "presc-1-dexamethasone",
+        """{"prescriptionId": {"stringValue": "presc-1"},
+            "name": {"stringValue": "Dexamethasone 4 mg"},
+            "startDate": $day,
+            "position": {"integerValue": "0"}}""",
+    )
+    db.disableNetwork().await()
+
+    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    db.enableNetwork().await()
+    awaitServerAck()
+
+    assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+  }
+
+  @Test
+  fun offlineUpdateOfAPrescriptionThatNeverExistedIsRejectedByTheServer(): Unit = runBlocking {
+    db.disableNetwork().await()
+
+    // The device can't tell whether presc-1 exists: the update is kept for the server to decide
+    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertTrue(repository.observePrescriptions(aliceUid).awaitFirst().isEmpty())
+
+    db.enableNetwork().await()
+    awaitServerAck()
+    assertFalse(serverSnapshot("prescriptions", "presc-1").exists())
+    assertFalse(serverSnapshot("medications", "presc-1-new").exists())
+    assertTrue(repository.observeMedications(aliceUid).awaitFirst { it.isEmpty() }.isEmpty())
+  }
+
+  @Test
+  fun offlineUpdateOfAPrescriptionKnownAsDeletedWritesNothing(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    repository.deletePrescription(aliceUid, "presc-1")
+    awaitServerAck()
+    db.disableNetwork().await()
+
+    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+
+    // Nothing was written, not even on the device while waiting for the server
+    assertTrue(repository.observeMedications(aliceUid).awaitFirst().isEmpty())
   }
 
   @Test

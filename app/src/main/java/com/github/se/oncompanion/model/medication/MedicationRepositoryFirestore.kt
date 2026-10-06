@@ -8,6 +8,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -25,9 +26,11 @@ import kotlinx.coroutines.tasks.await
  * A prescription and its medications are written in one batch, so they are saved together or not at
  * all. Writes return as soon as they are applied to the local cache, without waiting for the
  * server, so they never block the UI (offline, Firestore syncs them when the connection comes
- * back). If the server later rejects a write (security rules), Firestore rolls the local change
- * back and the rejection is logged; [Prescription.isValid] mirrors the rules so this shouldn't
- * happen.
+ * back). What an update or a deletion needs to know first (whether the prescription was deleted,
+ * which medications it has) is also taken from the local cache. If the server later rejects a write
+ * (security rules, or an update of a prescription that doesn't exist), Firestore rolls the local
+ * change back and the rejection is logged; [Prescription.isValid] mirrors the rules so the former
+ * shouldn't happen.
  */
 class MedicationRepositoryFirestore(
     dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
@@ -84,15 +87,16 @@ class MedicationRepositoryFirestore(
 
   override suspend fun updatePrescription(uid: String, prescription: Prescription) {
     require(prescription.isValid()) { "Invalid prescription" }
-    if (existingPrescription(uid, prescription.id) == null) return
+    if (isKnownAsDeleted(uid, prescription.id)) return
     val keptIds = prescription.medications.map { it.id }.toSet()
     val batch = db.batch()
-    // update() and not set(): createdAt stays as it is
+    // update() and not set(): createdAt stays as it is, and the server rejects the whole batch if
+    // the prescription doesn't exist
     batch.update(prescriptions(uid).document(prescription.id), prescriptionFields(prescription))
     prescription.medications.forEachIndexed { position, medication ->
       batch.set(medications(uid).document(medication.id), medicationFields(medication, position))
     }
-    medicationsOf(uid, prescription.id)
+    cachedMedicationsOf(uid, prescription.id)
         .filter { it.id !in keptIds }
         .forEach { batch.delete(it.reference) }
     batch.commit().logServerRejection(prescription.id)
@@ -101,7 +105,7 @@ class MedicationRepositoryFirestore(
   override suspend fun deletePrescription(uid: String, id: String) {
     val batch = db.batch()
     batch.delete(prescriptions(uid).document(id))
-    medicationsOf(uid, id).forEach { batch.delete(it.reference) }
+    cachedMedicationsOf(uid, id).forEach { batch.delete(it.reference) }
     batch.commit().logServerRejection(id)
   }
 
@@ -110,7 +114,10 @@ class MedicationRepositoryFirestore(
 
   private fun medications(uid: String) = db.collection(USERS).document(uid).collection(MEDICATIONS)
 
-  /** The document of prescription [id], or `null` if it doesn't exist. */
+  /**
+   * The document of prescription [id], or `null` if it doesn't exist, or if the device is offline
+   * and has never loaded it.
+   */
   private suspend fun existingPrescription(uid: String, id: String): DocumentSnapshot? =
       try {
         prescriptions(uid).document(id).get().await().takeIf { it.exists() }
@@ -119,9 +126,29 @@ class MedicationRepositoryFirestore(
         if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) null else throw e
       }
 
+  /**
+   * Whether this device knows that prescription [id] doesn't exist (e.g. it was deleted). Only
+   * looks at the local cache, so it never waits for the network. `false` if the device has never
+   * loaded the prescription: it may exist on the server, which then decides.
+   */
+  private suspend fun isKnownAsDeleted(uid: String, id: String): Boolean =
+      try {
+        !prescriptions(uid).document(id).get(Source.CACHE).await().exists()
+      } catch (e: FirebaseFirestoreException) {
+        // Not in the cache: Firestore can't tell whether it exists
+        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) false else throw e
+      }
+
   /** The documents of the medications of prescription [id], in any order. */
   private suspend fun medicationsOf(uid: String, id: String): List<DocumentSnapshot> =
       medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get().await().documents
+
+  /**
+   * The medications of prescription [id] that this device has in its local cache, without waiting
+   * for the network.
+   */
+  private suspend fun cachedMedicationsOf(uid: String, id: String): List<DocumentSnapshot> =
+      medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get(Source.CACHE).await().documents
 
   /** Emits the documents of the collection now and every time they change. */
   private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> = callbackFlow {
