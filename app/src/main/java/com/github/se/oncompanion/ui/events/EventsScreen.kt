@@ -42,6 +42,7 @@ import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -60,6 +61,7 @@ fun EventsScreen(
   EventsContent(
       uiState = uiState,
       onRetry = viewModel::loadEvents,
+      onEventClick = { event -> navigationActions.navigateTo(Screen.eventDetail(event.id)) },
       modifier = modifier,
       bottomBar = {
         BottomNavigationBar(
@@ -74,6 +76,7 @@ fun EventsScreen(
  * Stateless content of the Events tab, so each state can be tested without a ViewModel.
  *
  * @param onRetry called when the user asks to reload after an error
+ * @param onEventClick called with the event whose card the user tapped
  * @param bottomBar the bottom navigation bar, empty by default
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +85,7 @@ fun EventsContent(
     uiState: EventsUiState,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onEventClick: (Event) -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
 ) {
   Scaffold(
@@ -103,26 +107,31 @@ fun EventsContent(
       uiState.isLoading -> LoadingEvents(contentModifier)
       uiState.hasError -> EventsError(onRetry, contentModifier)
       uiState.events.isEmpty() -> EmptyEvents(contentModifier)
-      else -> EventList(uiState.events, contentModifier)
+      else -> EventList(uiState.events, onEventClick, contentModifier)
     }
   }
 }
 
 @Composable
-private fun EventList(events: List<Event>, modifier: Modifier = Modifier) {
+private fun EventList(
+    events: List<Event>,
+    onEventClick: (Event) -> Unit,
+    modifier: Modifier = Modifier,
+) {
   LazyColumn(
       modifier = modifier.fillMaxSize().testTag(C.Tag.events_list),
       contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    items(events, key = { it.id }) { event -> EventCard(event) }
+    items(events, key = { it.id }) { event -> EventCard(event, onClick = { onEventClick(event) }) }
   }
 }
 
 /** An event in the list (Figma: "Event card"): image, date and place, title and a short summary. */
 @Composable
-private fun EventCard(event: Event) {
+private fun EventCard(event: Event, onClick: () -> Unit) {
   Surface(
+      onClick = onClick,
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.eventCard(event.id)),
       shape = RoundedCornerShape(12.dp),
       color = MaterialTheme.colorScheme.surfaceContainerLow,

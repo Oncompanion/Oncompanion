@@ -5,6 +5,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -18,8 +19,10 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -248,5 +251,26 @@ class AppNavHostTest {
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
     assertEquals("overview_home", Screen.OVERVIEW)
+  }
+
+  @Test
+  fun eventCard_opensItsDetail_andBackReturnsToTheList() {
+    setNavHost(Route.EVENTS)
+    val first = FakeEventRepository.sampleEvents(LocalDate.now()).first()
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(first.id)).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_screen).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_event_title)
+        .assertIsDisplayed()
+        .assertTextEquals(first.title)
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.EVENT_DETAIL, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 }

@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.ui.navigation
 
+import android.net.Uri
 import androidx.navigation.NavHostController
 
 /**
@@ -37,6 +38,12 @@ object Screen {
 
   // Route.EVENTS
   const val EVENTS = "events_home"
+  /** The event's id, argument of [EVENT_DETAIL]. */
+  const val EVENT_ID = "eventId"
+  const val EVENT_DETAIL = "event_detail/{$EVENT_ID}"
+
+  /** The [EVENT_DETAIL] route of the event [eventId]. */
+  fun eventDetail(eventId: String) = "event_detail/${Uri.encode(eventId)}"
 
   // Route.SYMPTOMS
   const val SYMPTOMS = "symptoms_home"

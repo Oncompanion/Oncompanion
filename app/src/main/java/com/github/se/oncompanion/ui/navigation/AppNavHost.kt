@@ -9,13 +9,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 
@@ -65,6 +68,15 @@ fun AppNavHost(
     tabPlaceholderGraph(Tab.PLANNING, Screen.PLANNING, C.Tag.planning_screen, navigationActions)
     navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
       composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+      composable(
+          Screen.EVENT_DETAIL,
+          arguments = listOf(navArgument(Screen.EVENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        EventDetailScreen(
+            eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty(),
+            onBack = navigationActions::goBack,
+        )
+      }
     }
 
     // Features opened from the Overview shortcuts
