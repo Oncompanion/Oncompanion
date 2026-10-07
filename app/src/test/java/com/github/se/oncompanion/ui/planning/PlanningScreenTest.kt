@@ -3,8 +3,12 @@ package com.github.se.oncompanion.ui.planning
 import android.content.Context
 import android.provider.Settings
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
@@ -195,6 +199,34 @@ class PlanningScreenTest {
     val first = java.time.LocalDate.of(1, 1, 1)
     render(PlanningUiState(first, first, isLoading = false))
     compose.onNodeWithTag(C.Tag.planning_previous).assertIsNotEnabled()
+  }
+
+  @Test
+  fun agendaRestoresScrollAndResetsForAnotherDate() {
+    val entries = (0 until 30).map { item.copy(source = PlanningSource.Appointment("item-$it")) }
+    var current by mutableStateOf(state(entries))
+    val restoration = StateRestorationTester(compose)
+    restoration.setContent {
+      OncompanionTheme { PlanningContent(current, date, zone, PlanningActions({}, {}, {}, {}, {})) }
+    }
+    compose
+        .onNodeWithTag(C.Tag.planning_list)
+        .performScrollToNode(hasTestTag(C.Tag.planningItem(entries.last().key)))
+    restoration.emulateSavedInstanceStateRestore()
+    compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertIsDisplayed()
+    compose.runOnIdle { current = current.copy(selectedDate = date.plusDays(1)) }
+    compose.onNodeWithTag(C.Tag.planningItem(entries.first().key)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertDoesNotExist()
+  }
+
+  @Test
+  fun readOnlyAgendaDoesNotOfferAnItemAction() {
+    compose.setContent {
+      OncompanionTheme {
+        PlanningContent(state(listOf(item)), date, zone, PlanningActions({}, {}, {}, {}, {}))
+      }
+    }
+    compose.onNodeWithTag(C.Tag.planningItem(item.key)).assertHasNoClickAction()
   }
 
   private fun checkTimeFormat(setting: String, expected: String) {

@@ -4,7 +4,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
-import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
@@ -14,7 +14,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -31,16 +30,16 @@ class PlanningScreenIntegrationTest {
   fun screenConnectsCalendarAndBottomBarWithoutUnavailableActions() {
     val vm =
         PlanningViewModel(
-            PlanningRepository { flowOf(emptyList()) },
+            FakePlanningRepository(),
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
         )
-    var route: String? = null
+    var selectedRoute: String? = null
     val navigation =
         object :
             NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext())) {
-          override fun navigateToTab(selected: String) {
-            route = selected
+          override fun navigateToTab(route: String) {
+            selectedRoute = route
           }
         }
     compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
@@ -58,6 +57,25 @@ class PlanningScreenIntegrationTest {
     compose.onNodeWithTag(C.Tag.planning_today).performClick()
     compose.runOnIdle { assertEquals(date, vm.uiState.value.selectedDate) }
     compose.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
-    compose.runOnIdle { assertEquals(Route.OVERVIEW, route) }
+    compose.runOnIdle { assertEquals(Route.OVERVIEW, selectedRoute) }
+  }
+
+  @Test
+  fun screenRetriesRepositoryFailure() {
+    val repository = FakePlanningRepository().apply { fail = true }
+    val vm =
+        PlanningViewModel(
+            repository,
+            Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
+            zone,
+        )
+    val navigation =
+        NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
+    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
+    compose.runOnIdle { repository.fail = false }
+    compose.onNodeWithTag(C.Tag.planning_retry).performClick()
+    compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
   }
 }

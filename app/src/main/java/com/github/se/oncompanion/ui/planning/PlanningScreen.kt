@@ -4,12 +4,14 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -19,6 +21,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -51,6 +54,10 @@ fun PlanningScreen(
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshToday()
+    onPauseOrDispose {}
+  }
   PlanningContent(
       state = state,
       today = state.today,
@@ -263,6 +270,11 @@ internal fun PlanningAgenda(
     modifier: Modifier = Modifier,
     canAdd: Boolean = false,
 ) {
+  // Save scrolling with the tab, but start at the top when a different day is selected.
+  val listState =
+      rememberSaveable(state.selectedDate.toString(), saver = LazyListState.Saver) {
+        LazyListState()
+      }
   val timePattern = if (DateFormat.is24HourFormat(LocalContext.current)) "HH:mm" else "h:mm a"
   Column(modifier.fillMaxWidth()) {
     if (state.isLoading) {
@@ -298,6 +310,7 @@ internal fun PlanningAgenda(
     } else {
       LazyColumn(
           Modifier.testTag(C.Tag.planning_list),
+          state = listState,
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
         items(state.items, key = { it.key }) { item ->

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
@@ -86,7 +87,12 @@ fun AppNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) {
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(planningRepository, Clock.systemDefaultZone(), ZoneId.systemDefault())
+          PlanningViewModel(
+              planningRepository,
+              Clock.systemDefaultZone(),
+              ZoneId.systemDefault(),
+              createSavedStateHandle(),
+          )
         }
         PlanningScreen(navigationActions, planningViewModel)
       }
