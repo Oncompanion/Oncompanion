@@ -3,6 +3,7 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Planning
     const val planning_week = "planning_week"
     const val planning_list = "planning_list"
     const val planning_previous = "planning_previous"
@@ -57,6 +58,21 @@ object C {
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
     const val symptoms_screen = "symptoms_screen"
+    const val symptom_back_button = "symptom_back_button"
+    const val symptom_journal_loading = "symptom_journal_loading"
+    const val symptom_journal_error = "symptom_journal_error"
+    const val symptom_journal_retry = "symptom_journal_retry"
+    const val symptom_journal_empty = "symptom_journal_empty"
+    const val symptom_journal_list = "symptom_journal_list"
+    const val symptom_detail_screen = "symptom_detail_screen"
+    const val symptom_detail_loading = "symptom_detail_loading"
+    const val symptom_detail_error = "symptom_detail_error"
+    const val symptom_detail_retry = "symptom_detail_retry"
+    const val symptom_detail_not_found = "symptom_detail_not_found"
+    const val symptom_detail_content = "symptom_detail_content"
+    const val symptom_detail_when = "symptom_detail_when"
+    const val symptom_detail_intensity = "symptom_detail_intensity"
+    const val symptom_detail_notes = "symptom_detail_notes"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     const val profile_edit = "profile_edit"
@@ -93,6 +109,11 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    fun symptomJournalItem(symptomId: String) = "symptom_journal_item_$symptomId"
+
+    /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
+    fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
 
     // Care circle
     const val care_circle_back_button = "care_circle_back_button"

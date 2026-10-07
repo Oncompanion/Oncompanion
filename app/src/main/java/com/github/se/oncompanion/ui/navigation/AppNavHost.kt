@@ -7,15 +7,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -26,7 +31,14 @@ import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
+import com.github.se.oncompanion.ui.planning.PlanningScreen
+import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
+import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
+import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
+import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
+import java.time.Clock
+import java.time.ZoneId
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -37,6 +49,7 @@ import com.github.se.oncompanion.ui.profile.ProfileScreen
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
+    planningRepository: PlanningRepository = EmptyPlanningRepository,
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -77,16 +90,36 @@ fun AppNavHost(
     }
 
     // Bottom bar tabs, next to Overview
-    tabPlaceholderGraph(Tab.PLANNING, Screen.PLANNING, C.Tag.planning_screen, navigationActions)
+    navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
+      composable(Screen.PLANNING) {
+        val planningViewModel: PlanningViewModel = viewModel {
+          PlanningViewModel(
+              planningRepository,
+              Clock.systemDefaultZone(),
+              ZoneId.systemDefault(),
+              createSavedStateHandle(),
+          )
+        }
+        PlanningScreen(navigationActions, planningViewModel)
+      }
+    }
     tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
 
     // Features opened from the Overview shortcuts
-    placeholderGraph(
-        Route.SYMPTOMS,
-        Screen.SYMPTOMS,
-        R.string.symptoms_title,
-        C.Tag.symptoms_screen,
-    )
+    navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
+      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
+      composable(
+          Screen.SYMPTOM_DETAIL,
+          arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
+        SymptomDetailScreen(
+            navigationActions = navigationActions,
+            // Scoped to this back stack entry, so each opened symptom has its own ViewModel
+            viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+        )
+      }
+    }
     placeholderGraph(
         Route.PRESCRIPTIONS,
         Screen.PRESCRIPTIONS,

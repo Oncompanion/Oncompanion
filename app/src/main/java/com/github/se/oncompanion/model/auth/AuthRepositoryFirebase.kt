@@ -6,6 +6,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -25,10 +26,15 @@ class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.g
   override val currentUser: AuthUser?
     get() = auth.currentUser?.toAuthUser()
 
-  override fun observeCurrentUser(): Flow<AuthUser?> = callbackFlow {
-    val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.toAuthUser()) }
-    auth.addAuthStateListener(listener) // also delivers the current state right away
-    awaitClose { auth.removeAuthStateListener(listener) }
+  override fun observeCurrentUser(): Flow<AuthUser?> {
+    val states = callbackFlow {
+      val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.toAuthUser()) }
+      auth.addAuthStateListener(listener) // also delivers the current state right away
+      awaitClose { auth.removeAuthStateListener(listener) }
+    }
+    // Firebase notifies listeners on every signOut(), even when already signed out, and delivers
+    // these callbacks later on the main thread, so the same state can arrive twice in a row.
+    return states.distinctUntilChanged()
   }
 
   override suspend fun signInWithGoogle(idToken: String): AuthUser {

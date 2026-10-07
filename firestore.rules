@@ -29,6 +29,21 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
+    // Keep the limits in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH, MAX_MEDICATIONS).
+    // The fields of each medication are not checked here: rules have no loops, and checking 20
+    // entries one by one exceeds the limit of 1000 expressions per request (about 4 fit). The app
+    // checks them before saving (Medication.isValid) and skips the ones it can't read.
+    function isValidPrescription(data) {
+      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications'])
+          && data.keys().hasAll(['prescribedOn', 'createdAt', 'medications'])
+          && optionalString(data, 'prescribedBy', 100)
+          && data.prescribedOn is timestamp
+          && data.createdAt is timestamp
+          && data.medications is list
+          && data.medications.size() >= 1
+          && data.medications.size() <= 20;
+    }
+
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY,
     // MAX_OTHER_LABEL_LENGTH, MAX_NOTES_LENGTH, MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
@@ -65,6 +80,19 @@ service cloud.firestore {
                     // The role is chosen during onboarding and can't change afterwards (care-circle
                     // access will depend on it)
                     && request.resource.data.role == resource.data.role;
+
+      // ---------- Prescriptions ----------
+      // /users/{uid}/prescriptions/{prescriptionId}: a prescription and the list of its
+      // medications, in one document. There is no medications collection.
+      match /prescriptions/{prescriptionId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == resource.data.createdAt;
+      }
 
       // ---------- Symptoms ----------
       // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can't be changed yet.

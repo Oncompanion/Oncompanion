@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.ui.planning
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -17,12 +18,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Selected calendar day and the agenda currently available for it. */
 data class PlanningUiState(
     val selectedDate: LocalDate,
     val weekStart: LocalDate,
     val items: List<PlanningItem> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
+    val today: LocalDate = selectedDate,
 ) {
   val canGoToPreviousWeek: Boolean
     get() = PlanningDates.isSupported(selectedDate.minusWeeks(1))
@@ -35,37 +38,58 @@ data class PlanningUiState(
 class PlanningViewModel(
     private val repository: PlanningRepository,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    val zoneId: ZoneId,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
-  private val mutableState = MutableStateFlow(PlanningUiState(today, mondayOf(today)))
+  private val initialDate =
+      savedStateHandle.get<String>(SELECTED_DATE)?.let {
+        runCatching { LocalDate.parse(it) }.getOrNull()?.takeIf(PlanningDates::isSupported)
+      } ?: today
+  private val mutableState =
+      MutableStateFlow(PlanningUiState(initialDate, mondayOf(initialDate), today = today))
   val uiState: StateFlow<PlanningUiState> = mutableState.asStateFlow()
   private var weekItems: List<PlanningItem> = emptyList()
   private var observation: Job? = null
 
   init {
+    savedStateHandle[SELECTED_DATE] = initialDate.toString()
     observeWeek()
   }
 
+  /** Selects a day, observing a new week only when necessary. */
   fun selectDate(date: LocalDate) {
     require(date.year in 1..9999) { "Date must have a four-digit positive year" }
+    savedStateHandle[SELECTED_DATE] = date.toString()
     val week = mondayOf(date)
     val changedWeek = week != mutableState.value.weekStart
     mutableState.value = mutableState.value.copy(selectedDate = date, weekStart = week)
     if (changedWeek) observeWeek() else publishItems()
   }
 
+  /** Moves selection to the previous supported week. */
   fun previousWeek() {
     if (mutableState.value.canGoToPreviousWeek)
         selectDate(mutableState.value.selectedDate.minusWeeks(1))
   }
 
+  /** Moves selection to the next supported week. */
   fun nextWeek() {
     if (mutableState.value.canGoToNextWeek) selectDate(mutableState.value.selectedDate.plusWeeks(1))
   }
 
-  fun goToToday() = selectDate(LocalDate.now(clock.withZone(zoneId)))
+  /** Updates the today marker without changing the selected day or restarting observation. */
+  fun refreshToday() {
+    mutableState.value = mutableState.value.copy(today = LocalDate.now(clock.withZone(zoneId)))
+  }
 
+  /** Selects the current day, including after the screen has crossed midnight. */
+  fun goToToday() {
+    refreshToday()
+    selectDate(mutableState.value.today)
+  }
+
+  /** Retries observation while keeping previously displayed items. */
   fun retry() = observeWeek(preserveItems = true)
 
   private fun observeWeek(preserveItems: Boolean = false) {
@@ -103,6 +127,10 @@ class PlanningViewModel(
                     .filter { it.scheduledAt.atZone(zoneId).toLocalDate() == selected }
                     .sortedWith(compareBy<PlanningItem> { it.scheduledAt }.thenBy { it.key })
         )
+  }
+
+  private companion object {
+    const val SELECTED_DATE = "planning_selected_date"
   }
 
   private fun mondayOf(date: LocalDate): LocalDate =
