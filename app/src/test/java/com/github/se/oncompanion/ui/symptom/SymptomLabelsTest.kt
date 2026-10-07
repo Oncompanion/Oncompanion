@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.symptom.Severity
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import java.time.Instant
@@ -39,6 +40,14 @@ class SymptomLabelsTest {
             "Other",
         ),
         labels,
+    )
+  }
+
+  @Test
+  fun everySeverityHasItsOwnLabel() {
+    assertEquals(
+        listOf("Mild", "Moderate", "Severe"),
+        Severity.entries.map { context.getString(it.label) },
     )
   }
 

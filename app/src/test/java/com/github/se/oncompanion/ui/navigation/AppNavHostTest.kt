@@ -319,6 +319,25 @@ class AppNavHostTest {
   }
 
   @Test
+  fun symptomsShortcut_opensTheJournal_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
+        .performScrollTo()
+        .performClick()
+
+    // Without Firebase nobody is signed in: the journal shows its error state
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_error).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOMS, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
   fun symptomDetailRoute_opensTheDetailOfThatSymptom_andBackReturns() {
     setNavHost(Route.SYMPTOMS)
     composeTestRule.runOnIdle {
