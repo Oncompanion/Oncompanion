@@ -26,6 +26,17 @@ object C {
     const val events_loading = "events_loading"
     const val events_error = "events_error"
     const val events_retry = "events_retry"
+    const val event_detail_screen = "event_detail_screen"
+    const val event_detail_back = "event_detail_back"
+    const val event_detail_loading = "event_detail_loading"
+    const val event_detail_error = "event_detail_error"
+    const val event_detail_retry = "event_detail_retry"
+    const val event_detail_not_found = "event_detail_not_found"
+    const val event_detail_category = "event_detail_category"
+    const val event_detail_event_title = "event_detail_event_title"
+    const val event_detail_date_time = "event_detail_date_time"
+    const val event_detail_location = "event_detail_location"
+    const val event_detail_description = "event_detail_description"
 
     fun eventCard(eventId: String) = "event_card_$eventId"
 
