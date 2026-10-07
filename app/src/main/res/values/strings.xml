@@ -62,6 +62,27 @@
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
 
+    <!-- Symptoms -->
+    <string name="symptom_type_fatigue">Fatigue</string>
+    <string name="symptom_type_nausea">Nausea</string>
+    <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_appetite_loss">Loss of appetite</string>
+    <string name="symptom_type_sleep_problems">Sleep problems</string>
+    <string name="symptom_type_breathlessness">Breathlessness</string>
+    <string name="symptom_type_other">Other</string>
+    <string name="symptom_back">Back</string>
+    <string name="symptom_intensity_value">%1$d/10</string>
+    <string name="symptom_intensity_description">Intensity %1$d out of 10</string>
+    <string name="symptom_retry">Retry</string>
+    <string name="symptom_error_hint">Check your connection and try again.</string>
+    <string name="symptom_detail_title">Symptom</string>
+    <string name="symptom_detail_when">When</string>
+    <string name="symptom_detail_intensity">Intensity</string>
+    <string name="symptom_detail_notes">Notes</string>
+    <string name="symptom_detail_error_title">Couldn\'t load this symptom</string>
+    <string name="symptom_detail_not_found_title">This symptom no longer exists</string>
+    <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
+
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
     <string name="sign_in_subtitle">Sign in with your Google account to continue. New here? Your account is created automatically.</string>
