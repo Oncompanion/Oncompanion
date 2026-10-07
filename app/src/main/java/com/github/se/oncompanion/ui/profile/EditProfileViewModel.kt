@@ -41,7 +41,9 @@ data class EditProfileUiState(
     get() = canEdit && firstName.isNotBlank()
 }
 
-/** An existing profile's draft. Observation never replaces edits for the same profile. */
+/**
+ * An existing profile's draft. Observation refreshes untouched fields and preserves local edits.
+ */
 class EditProfileViewModel(
     private val authRepository: AuthRepository = AuthRepositoryFirebase(),
     private val profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
@@ -52,6 +54,9 @@ class EditProfileViewModel(
   private var observation: Job? = null
   private var saving: Job? = null
   private var generation = 0
+  private var firstNameEdited = false
+  private var familyNameEdited = false
+  private var cancerTypeEdited = false
 
   init {
     retry()
@@ -74,15 +79,19 @@ class EditProfileViewModel(
                     if (current == null) {
                       reset(EditProfileStatus.MISSING_PROFILE)
                     } else {
-                      if (profile == null) {
-                        _uiState.value =
-                            EditProfileUiState(
-                                status = EditProfileStatus.READY,
-                                firstName = current.firstName,
-                                familyName = current.familyName.orEmpty(),
-                                cancerType = current.cancerType.orEmpty(),
-                            )
-                      }
+                      val state = _uiState.value
+                      _uiState.value =
+                          state.copy(
+                              status = EditProfileStatus.READY,
+                              firstName =
+                                  if (firstNameEdited) state.firstName else current.firstName,
+                              familyName =
+                                  if (familyNameEdited) state.familyName
+                                  else current.familyName.orEmpty(),
+                              cancerType =
+                                  if (cancerTypeEdited) state.cancerType
+                                  else current.cancerType.orEmpty(),
+                          )
                       profile = current
                     }
                   }
@@ -114,10 +123,24 @@ class EditProfileViewModel(
   }
 
   private fun edit(change: (EditProfileUiState) -> EditProfileUiState) {
-    if (_uiState.value.canEdit) _uiState.value = change(_uiState.value).copy(saveFailed = false)
+    val state = _uiState.value
+    if (!state.canEdit) return
+    val updated = change(state)
+    firstNameEdited = firstNameEdited || updated.firstName != state.firstName
+    familyNameEdited = familyNameEdited || updated.familyName != state.familyName
+    cancerTypeEdited = cancerTypeEdited || updated.cancerType != state.cancerType
+    _uiState.value = updated.copy(saveFailed = false)
   }
 
-  /** Returns on the local write, including offline; role and creation time stay unchanged. */
+  /**
+   * Saves the draft locally, including offline; role and creation time stay unchanged.
+   *
+   * [UserProfileRepositoryFirestore.updateProfile] completes once the write is applied locally,
+   * without waiting for server acceptance. `saveFailed` only reports exceptions thrown by the
+   * repository call before or during local completion, such as validation or immediate write
+   * errors. A later server/security-rule rejection cannot set `saveFailed`; Firestore may roll back
+   * the local change after this screen has reported completion.
+   */
   fun saveProfile() {
     val state = _uiState.value
     val original = profile ?: return
@@ -159,6 +182,9 @@ class EditProfileViewModel(
     generation++
     saving?.cancel()
     profile = null
+    firstNameEdited = false
+    familyNameEdited = false
+    cancerTypeEdited = false
     _uiState.value = EditProfileUiState(status = status)
   }
 }

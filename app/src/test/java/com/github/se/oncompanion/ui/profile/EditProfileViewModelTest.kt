@@ -177,6 +177,103 @@ class EditProfileViewModelTest {
   }
 
   @Test
+  fun familyNameEditSavesLatestRemoteCancerType() = runTest {
+    signIn()
+    profiles.seed(original.copy(cancerType = "A"))
+    val vm = vm()
+    advanceUntilIdle()
+    vm.onFamilyNameChange("Edited")
+    val remote = original.copy(firstName = "Remote", familyName = "Elsewhere", cancerType = "B")
+    profiles.seed(remote)
+    advanceUntilIdle()
+    assertEquals("Remote", vm.uiState.value.firstName)
+    assertEquals("Edited", vm.uiState.value.familyName)
+    assertEquals("B", vm.uiState.value.cancerType)
+    vm.saveProfile()
+    advanceUntilIdle()
+    assertEquals(remote.copy(familyName = "Edited"), writes.single())
+  }
+
+  @Test
+  fun editedAndClearedFieldsSurviveMultipleSnapshots() = runTest {
+    signIn()
+    val vm = vm()
+    advanceUntilIdle()
+    vm.onFirstNameChange("Draft")
+    vm.onCancerTypeChange("")
+    profiles.seed(original.copy(firstName = "Remote", familyName = "New", cancerType = "B"))
+    advanceUntilIdle()
+    profiles.seed(original.copy(firstName = "Other", familyName = null, cancerType = "C"))
+    advanceUntilIdle()
+    assertEquals("Draft", vm.uiState.value.firstName)
+    assertEquals("", vm.uiState.value.familyName)
+    assertEquals("", vm.uiState.value.cancerType)
+    vm.saveProfile()
+    advanceUntilIdle()
+    assertEquals(
+        original.copy(firstName = "Draft", familyName = null, cancerType = null),
+        writes.single(),
+    )
+  }
+
+  @Test
+  fun unchangedInputCallbacksDoNotFreezeFields() = runTest {
+    signIn()
+    val vm = vm()
+    advanceUntilIdle()
+    vm.onFirstNameChange(original.firstName)
+    vm.onFamilyNameChange(original.familyName!!)
+    vm.onCancerTypeChange(original.cancerType!!)
+    val remote = original.copy(firstName = "New", familyName = "Remote", cancerType = "B")
+    profiles.seed(remote)
+    advanceUntilIdle()
+    vm.saveProfile()
+    advanceUntilIdle()
+    assertEquals(remote, writes.single())
+  }
+
+  @Test
+  fun retryAndAccountChangeResetEditedFields() = runTest {
+    signIn()
+    val vm = vm()
+    advanceUntilIdle()
+    vm.onFirstNameChange("Draft")
+    vm.onFamilyNameChange("Draft")
+    vm.onCancerTypeChange("Draft")
+    vm.retry()
+    advanceUntilIdle()
+    profiles.seed(original.copy(firstName = "New", familyName = "New", cancerType = "New"))
+    advanceUntilIdle()
+    assertEquals(EditProfileUiState(EditProfileStatus.READY, "New", "New", "New"), vm.uiState.value)
+    vm.onFirstNameChange("Draft")
+    vm.onFamilyNameChange("Draft")
+    vm.onCancerTypeChange("Draft")
+    signIn("uid-2")
+    profiles.seed(original.copy(uid = "uid-2"))
+    advanceUntilIdle()
+    profiles.seed(
+        original.copy(uid = "uid-2", firstName = "Other", familyName = null, cancerType = null)
+    )
+    advanceUntilIdle()
+    assertEquals(EditProfileUiState(EditProfileStatus.READY, "Other"), vm.uiState.value)
+  }
+
+  @Test
+  fun localCompletionDoesNotReportLaterRollbackAsSaveFailure() = runTest {
+    signIn()
+    val vm = vm()
+    advanceUntilIdle()
+    vm.onFamilyNameChange("Edited")
+    vm.saveProfile()
+    advanceUntilIdle()
+    assertTrue(vm.uiState.value.isSaved)
+    profiles.seed(original)
+    advanceUntilIdle()
+    assertFalse(vm.uiState.value.saveFailed)
+    assertTrue(vm.uiState.value.isSaved)
+  }
+
+  @Test
   fun pendingWriteIgnoresEditsAndDuplicateSaves() = runTest {
     signIn()
     val vm = vm()

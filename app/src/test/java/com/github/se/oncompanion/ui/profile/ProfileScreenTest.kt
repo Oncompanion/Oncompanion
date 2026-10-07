@@ -44,7 +44,7 @@ class ProfileScreenTest {
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      ProfileContent(uiState = state, onBack = onBack, onRetry = onRetry)
+      ProfileContent(uiState = state, onBack = onBack, onRetry = onRetry, onEdit = {})
     }
   }
 
@@ -160,7 +160,7 @@ class ProfileScreenTest {
         }
     val viewModel = ProfileViewModel(ProfileScreenAuthRepository(user), profiles)
 
-    composeTestRule.setContent { ProfileScreen(onBack = {}, viewModel = viewModel) }
+    composeTestRule.setContent { ProfileScreen(onBack = {}, onEdit = {}, viewModel = viewModel) }
 
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()

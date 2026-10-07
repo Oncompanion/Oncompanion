@@ -49,7 +49,7 @@ private val memberSinceFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Local
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
-    onEdit: () -> Unit = {},
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel { ProfileViewModel() },
 ) {
@@ -70,7 +70,7 @@ fun ProfileContent(
     uiState: ProfileUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onEdit: () -> Unit = {},
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
