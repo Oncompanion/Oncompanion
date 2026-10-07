@@ -162,8 +162,10 @@ class MedicationRepositoryFirestore(
       )
 
   /**
-   * Builds a prescription from its document. A medication that can't be read is left out; `null` if
-   * the document itself can't be read or none of its medications can.
+   * Builds a prescription from its document. The security rules don't check the fields of each
+   * medication, so they are checked here: a medication that can't be read or is not
+   * [Medication.isValid] is left out, and so is one that repeats the ID of an earlier one. `null`
+   * if the document itself can't be read or none of its medications is kept.
    */
   private fun toPrescription(doc: DocumentSnapshot): Prescription? =
       try {
@@ -172,7 +174,9 @@ class MedicationRepositoryFirestore(
                 prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
                 prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
                 medications =
-                    (doc.get(FIELD_MEDICATIONS) as List<*>).mapNotNull { toMedication(doc.id, it) },
+                    (doc.get(FIELD_MEDICATIONS) as List<*>)
+                        .mapNotNull { toMedication(doc.id, it) }
+                        .distinctBy { it.id },
                 // Pending server timestamps read as null until the write reaches the server
                 createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
             )
@@ -182,19 +186,25 @@ class MedicationRepositoryFirestore(
         null
       }
 
-  /** Builds a medication from one entry of the list of medications of [prescriptionId]. */
+  /**
+   * Builds a medication from one entry of the list of medications of [prescriptionId], or `null` if
+   * the entry can't be read or its values are not [Medication.isValid].
+   */
   private fun toMedication(prescriptionId: String, entry: Any?): Medication? =
       try {
         val fields = entry as Map<*, *>
         Medication(
-            id = fields[FIELD_ID] as String,
-            prescriptionId = prescriptionId,
-            name = fields[FIELD_NAME] as String,
-            dosage = fields[FIELD_DOSAGE] as String?,
-            frequency = fields[FIELD_FREQUENCY] as String?,
-            startDate = (fields[FIELD_START_DATE] as Timestamp).toLocalDate(),
-            durationDays = (fields[FIELD_DURATION_DAYS] as Number?)?.toInt(),
-        )
+                id = fields[FIELD_ID] as String,
+                prescriptionId = prescriptionId,
+                name = fields[FIELD_NAME] as String,
+                dosage = fields[FIELD_DOSAGE] as String?,
+                frequency = fields[FIELD_FREQUENCY] as String?,
+                startDate = (fields[FIELD_START_DATE] as Timestamp).toLocalDate(),
+                // Only a whole number that fits in an Int: converting a decimal or a bigger number
+                // would turn it into a duration that looks valid
+                durationDays = (fields[FIELD_DURATION_DAYS] as Long?)?.let(Math::toIntExact),
+            )
+            .also { require(it.isValid()) { "Invalid values" } }
       } catch (e: Exception) {
         Log.e(TAG, "Malformed medication in prescription document $prescriptionId", e)
         null

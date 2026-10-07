@@ -38,6 +38,9 @@ class MedicationRepositoryFirestoreTest {
 
   private val september29 = LocalDate.of(2026, 9, 29)
 
+  /** 29 September at midnight in Switzerland, as a Firestore REST value. */
+  private val rawDay = """{"timestampValue": "2026-09-28T22:00:00Z"}"""
+
   @Before
   fun setUp(): Unit = runBlocking {
     EmulatorTestData.signOut()
@@ -106,14 +109,23 @@ class MedicationRepositoryFirestoreTest {
    * The REST fields of a prescription document dated 29 September, holding one medication per (ID,
    * name) pair. A `null` name gives a medication without a name, which is malformed.
    */
-  private fun rawPrescription(vararg medications: Pair<String, String?>): String {
-    val day = """{"timestampValue": "2026-09-28T22:00:00Z"}"""
-    val values = medications.joinToString { (id, name) ->
-      val nameField = name?.let { """"name": {"stringValue": "$it"},""" }.orEmpty()
-      """{"mapValue": {"fields": {"id": {"stringValue": "$id"}, $nameField "startDate": $day}}}"""
-    }
-    return """{"prescribedOn": $day, "createdAt": $day,
-        "medications": {"arrayValue": {"values": [$values]}}}"""
+  private fun rawPrescription(vararg medications: Pair<String, String?>): String =
+      rawPrescriptionOf(*medications.map { (id, name) -> rawMedication(id, name) }.toTypedArray())
+
+  /** Like [rawPrescription], from entries built with [rawMedication]. */
+  private fun rawPrescriptionOf(vararg medications: String): String =
+      """{"prescribedOn": $rawDay, "createdAt": $rawDay,
+        "medications": {"arrayValue": {"values": [${medications.joinToString()}]}}}"""
+
+  /**
+   * The REST value of one medication of a prescription document, starting on 29 September.
+   * [durationDays] is the REST value of its duration, e.g. `{"integerValue": "5"}`.
+   */
+  private fun rawMedication(id: String, name: String?, durationDays: String? = null): String {
+    val nameField = name?.let { """"name": {"stringValue": "$it"},""" }.orEmpty()
+    val durationField = durationDays?.let { """"durationDays": $it,""" }.orEmpty()
+    return """{"mapValue": {"fields": {"id": {"stringValue": "$id"}, $nameField $durationField
+        "startDate": $rawDay}}}"""
   }
 
   /** Waits for the first value of the stream that satisfies [predicate]. */
@@ -422,6 +434,92 @@ class MedicationRepositoryFirestoreTest {
     } catch (e: FirebaseFirestoreException) {
       assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
     }
+  }
+
+  // ---- stored values the security rules don't check ----
+
+  @Test
+  fun medicationsWithAnInvalidIdOrNameAreLeftOut(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "mixed",
+        rawPrescriptionOf(
+            rawMedication("valid-1", "Paracetamol 1 g"),
+            rawMedication("blank-name", "   "),
+            rawMedication("long-name", "a".repeat(Medication.MAX_TEXT_LENGTH + 1)),
+            rawMedication(" ", "Blank ID"),
+            rawMedication("valid-2", "a".repeat(Medication.MAX_TEXT_LENGTH)),
+        ),
+    )
+
+    val stored = repository.getPrescription(aliceUid, "mixed")
+
+    assertEquals(listOf("valid-1", "valid-2"), stored?.medications?.map { it.id })
+  }
+
+  @Test
+  fun medicationsWithAnInvalidDurationAreLeftOut(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "mixed",
+        rawPrescriptionOf(
+            rawMedication("one-day", "Paracetamol 1 g", """{"integerValue": "1"}"""),
+            rawMedication("zero", "Paracetamol 1 g", """{"integerValue": "0"}"""),
+            rawMedication("negative", "Paracetamol 1 g", """{"integerValue": "-3"}"""),
+            rawMedication("too-long", "Paracetamol 1 g", """{"integerValue": "3651"}"""),
+            rawMedication("decimal", "Paracetamol 1 g", """{"doubleValue": 1.5}"""),
+            // 2^32 + 5: would read as 5 days if it were cut down to an Int
+            rawMedication("too-big", "Paracetamol 1 g", """{"integerValue": "4294967301"}"""),
+            rawMedication("text", "Paracetamol 1 g", """{"stringValue": "5"}"""),
+            rawMedication("max", "Paracetamol 1 g", """{"integerValue": "3650"}"""),
+            rawMedication("no-end", "Paracetamol 1 g"),
+        ),
+    )
+
+    val stored = repository.getPrescription(aliceUid, "mixed")
+
+    assertEquals(listOf("one-day", "max", "no-end"), stored?.medications?.map { it.id })
+    assertEquals(listOf(1, 3650, null), stored?.medications?.map { it.durationDays })
+  }
+
+  @Test
+  fun aMedicationIdRepeatedInAPrescriptionIsReadOnce(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "repeated",
+        rawPrescription(
+            "twice" to "Ondansetron 8 mg",
+            "once" to "Dexamethasone 4 mg",
+            "twice" to "Zolpidem",
+        ),
+    )
+
+    val stored = repository.getPrescription(aliceUid, "repeated")
+
+    // The first one is kept
+    assertEquals(listOf("twice", "once"), stored?.medications?.map { it.id })
+    assertEquals("Ondansetron 8 mg", stored?.medications?.first()?.name)
+  }
+
+  @Test
+  fun aPrescriptionWithOnlyInvalidMedicationsIsLeftOut(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "all-invalid",
+        rawPrescriptionOf(
+            rawMedication("blank-name", " "),
+            rawMedication("zero", "Paracetamol 1 g", """{"integerValue": "0"}"""),
+        ),
+    )
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+
+    assertNull(repository.getPrescription(aliceUid, "all-invalid"))
+    val observed = repository.observeMedications(aliceUid).awaitFirst { it.isNotEmpty() }
+    assertEquals(
+        prescription().medications.map { it.id }.sorted(),
+        observed.map { it.id }.sorted(),
+    )
   }
 
   // ---- observe medications ----
