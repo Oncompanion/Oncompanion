@@ -121,4 +121,24 @@ class EventsViewModelTest {
     assertFalse(viewModel.uiState.value.hasError)
     assertEquals(events, viewModel.uiState.value.events)
   }
+
+  @Test
+  fun errorAfterAFirstList_keepsTheEvents() {
+    val events = listOf(event("a"))
+    val failingLater =
+        object : EventRepository {
+          override fun getUpcomingEvents(): Flow<List<Event>> = flow {
+            emit(events)
+            throw IllegalStateException("connection lost")
+          }
+
+          override suspend fun getEvent(id: String): Event? = null
+        }
+
+    val state = EventsViewModel(failingLater).uiState.value
+
+    assertTrue(state.hasError)
+    assertFalse(state.isLoading)
+    assertEquals(events, state.events)
+  }
 }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -18,7 +19,7 @@ import kotlinx.coroutines.launch
  *
  * @property events the upcoming events, soonest first
  * @property isLoading true until the first list arrives
- * @property hasError true if the events couldn't be loaded
+ * @property hasError true if the events couldn't be loaded; [events] then keeps the last list
  */
 data class EventsUiState(
     val events: List<Event> = emptyList(),
@@ -48,7 +49,8 @@ class EventsViewModel(private val repository: EventRepository = FakeEventReposit
           .getUpcomingEvents()
           .catch { e ->
             Log.e(TAG, "Failed to load events", e)
-            _uiState.value = EventsUiState(isLoading = false, hasError = true)
+            // Keep the events already shown: a temporary failure shouldn't empty the list
+            _uiState.update { it.copy(isLoading = false, hasError = true) }
           }
           .collect { events -> _uiState.value = EventsUiState(events, isLoading = false) }
     }

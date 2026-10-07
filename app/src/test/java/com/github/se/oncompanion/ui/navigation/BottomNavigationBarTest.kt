@@ -16,6 +16,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,6 +59,13 @@ class BottomNavigationBarTest {
     Tab.entries.forEach { tab ->
       composeTestRule.runOnIdle { selectedTab = tab }
       assertOnlySelected(tab)
+    }
+  }
+
+  @Test
+  fun everyTab_hasADifferentIconWhenSelected() {
+    Tab.entries.forEach { tab ->
+      assertNotEquals("${tab.name} uses the same icon when selected", tab.icon, tab.selectedIcon)
     }
   }
 

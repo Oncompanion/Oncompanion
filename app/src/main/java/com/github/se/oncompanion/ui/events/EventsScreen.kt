@@ -23,6 +23,7 @@ import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -104,10 +105,15 @@ fun EventsContent(
   ) { innerPadding ->
     val contentModifier = Modifier.padding(innerPadding)
     when {
+      // Events already shown stay on screen while reloading or after a failed refresh
+      uiState.events.isNotEmpty() ->
+          Column(contentModifier) {
+            if (uiState.hasError) RefreshErrorBanner(onRetry)
+            EventList(uiState.events, onEventClick)
+          }
       uiState.isLoading -> LoadingEvents(contentModifier)
       uiState.hasError -> EventsError(onRetry, contentModifier)
-      uiState.events.isEmpty() -> EmptyEvents(contentModifier)
-      else -> EventList(uiState.events, onEventClick, contentModifier)
+      else -> EmptyEvents(contentModifier)
     }
   }
 }
@@ -171,6 +177,33 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+      }
+    }
+  }
+}
+
+/** Shown above the list when refreshing the events failed, so the list stays visible. */
+@Composable
+private fun RefreshErrorBanner(onRetry: () -> Unit) {
+  Surface(
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+              .testTag(C.Tag.events_refresh_error),
+      shape = RoundedCornerShape(12.dp),
+      color = MaterialTheme.colorScheme.surfaceContainerHigh,
+  ) {
+    Row(
+        modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+          text = stringResource(R.string.events_refresh_error),
+          style = MaterialTheme.typography.bodyMedium,
+          modifier = Modifier.weight(1f),
+      )
+      TextButton(onClick = onRetry, modifier = Modifier.testTag(C.Tag.events_refresh_retry)) {
+        Text(stringResource(R.string.events_retry))
       }
     }
   }

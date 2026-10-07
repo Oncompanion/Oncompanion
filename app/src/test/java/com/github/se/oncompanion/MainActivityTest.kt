@@ -24,8 +24,9 @@ class MainActivityTest {
   fun launchingMainActivity_startsOnSignInScreen() {
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
     composeTestRule
-        .onNodeWithText(composeTestRule.activity.getString(R.string.sign_in_title))
+        .onNodeWithText(composeTestRule.activity.getString(R.string.sign_in_welcome))
         .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsDisplayed()
   }
 
   @Test
