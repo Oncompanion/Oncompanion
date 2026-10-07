@@ -24,6 +24,7 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
@@ -128,6 +129,13 @@ fun AppNavHost(
     )
     navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
       composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
+      composable(
+          Screen.CARE_CIRCLE_MEMBER,
+          arguments =
+              listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
+      ) {
+        CareCircleMemberScreen(navigationActions)
+      }
     }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) {

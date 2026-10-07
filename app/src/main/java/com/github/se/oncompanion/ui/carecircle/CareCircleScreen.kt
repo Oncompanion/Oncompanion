@@ -48,13 +48,14 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 
 /**
  * The members of the signed-in user's care circle (US-13), following the "US-13 / Circle members"
- * Figma mockup. The empty state has no mockup yet.
+ * Figma mockup. The empty state has no mockup yet. Tapping a member opens their details (US-15).
  *
- * Opening a member (US-15) and adding one (US-14) come in later PRs: for now they show a toast.
+ * Adding a member (US-14) comes in a later PR: for now it shows a toast.
  */
 @Composable
 fun CareCircleScreen(
@@ -70,10 +71,7 @@ fun CareCircleScreen(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onMemberClick = { member ->
-        // TODO: open the member detail screen (US-15) instead of this toast
-        val message =
-            resources.getString(R.string.care_circle_member_not_implemented, member.firstName)
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        navigationActions.navigateTo(Screen.careCircleMember(member.uid))
       },
       onAddMember = {
         // TODO: open the add member screen (US-14) instead of this toast

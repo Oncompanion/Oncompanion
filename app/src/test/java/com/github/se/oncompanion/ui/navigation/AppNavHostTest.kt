@@ -281,6 +281,28 @@ class AppNavHostTest {
     }
   }
 
+  @Test
+  fun careCircleMember_opensFromTheCircle_andBackReturnsToIt() {
+    setNavHost(Route.CARE_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateTo(Screen.careCircleMember("marc"))
+    }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_MEMBER, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "marc",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.CARE_CIRCLE_MEMBER_ARG),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_screen).assertDoesNotExist()
+  }
+
   private fun assertOnTab(tab: Tab, screenTag: String) {
     composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(tab.testTag).assertIsSelected()

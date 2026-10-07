@@ -266,9 +266,14 @@ class CareCircleScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     var backCalls = 0
+    val navigatedTo = mutableListOf<String>()
 
     override fun goBack() {
       backCalls++
+    }
+
+    override fun navigateTo(screen: String) {
+      navigatedTo += screen
     }
   }
 
@@ -295,14 +300,11 @@ class CareCircleScreenTest {
   }
 
   @Test
-  fun screen_clickingAMember_explainsTheDetailScreenIsNotImplemented() {
-    setScreen(listOf(sophie))
+  fun screen_clickingAMember_opensTheirDetails() {
+    val navigationActions = setScreen(listOf(marc, sophie))
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_member_not_implemented, "Sophie"),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf("care_circle_member/sophie"), navigationActions.navigatedTo)
     }
   }
 
