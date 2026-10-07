@@ -44,7 +44,14 @@ class ProfileScreenTest {
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      ProfileContent(uiState = state, onBack = onBack, onRetry = onRetry)
+      ProfileContent(
+          uiState = state,
+          onBack = onBack,
+          onRetry = onRetry,
+          onSignOut = {},
+          onCancelSignOut = {},
+          onConfirmSignOut = {},
+      )
     }
   }
 
@@ -117,7 +124,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
     composeTestRule.onNodeWithText("PATIENT").assertDoesNotExist()
     composeTestRule.onNodeWithText("Edit profile").assertDoesNotExist()
-    composeTestRule.onNodeWithText("Sign out").assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_sign_out).assertIsDisplayed()
   }
 
   @Test
@@ -159,7 +166,9 @@ class ProfileScreenTest {
         }
     val viewModel = ProfileViewModel(ProfileScreenAuthRepository(user), profiles)
 
-    composeTestRule.setContent { ProfileScreen(onBack = {}, viewModel = viewModel) }
+    composeTestRule.setContent {
+      ProfileScreen(onBack = {}, onSignedOut = {}, viewModel = viewModel)
+    }
 
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()

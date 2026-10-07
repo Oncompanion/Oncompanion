@@ -40,9 +40,19 @@ sealed interface ProfileUiState {
   data class Loaded(val details: ProfileDetails) : ProfileUiState
 
   data object Error : ProfileUiState
+
+  /** Confirmation retains the current screen until sign-out starts; failures allow retry. */
+  data class ConfirmingSignOut(
+      val profile: ProfileUiState,
+      val isSigningOut: Boolean = false,
+      val failed: Boolean = false,
+  ) : ProfileUiState
+
+  /** Firebase is signed out and credential cleanup has finished; the host opens Login. */
+  data object SignOutComplete : ProfileUiState
 }
 
-/** Observes the authenticated user's profile (US-18, read-only Profile screen). */
+/** Observes the authenticated profile and handles confirmed sign-out (US-18, US-19). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModel(
     private val authRepository: AuthRepository = AuthRepositoryFirebase(),
@@ -60,7 +70,63 @@ class ProfileViewModel(
 
   /** Restarts observing after a profile or authentication error. */
   fun retry() {
+    if (
+        _uiState.value is ProfileUiState.ConfirmingSignOut ||
+            _uiState.value == ProfileUiState.SignOutComplete
+    )
+        return
     observeProfile()
+  }
+
+  /** Opens confirmation without changing the authenticated session. */
+  fun requestSignOut() {
+    val state = _uiState.value
+    if (
+        state !is ProfileUiState.ConfirmingSignOut &&
+            state != ProfileUiState.SignedOut &&
+            state != ProfileUiState.SignOutComplete
+    ) {
+      _uiState.value = ProfileUiState.ConfirmingSignOut(state)
+    }
+  }
+
+  /** Dismisses confirmation while keeping the current session and profile. */
+  fun cancelSignOut() {
+    val state = _uiState.value as? ProfileUiState.ConfirmingSignOut ?: return
+    if (!state.isSigningOut) _uiState.value = state.profile
+  }
+
+  /**
+   * Reuses Firebase sign-out, immediately drops profile state, then clears the account picker. The
+   * screen supplies credential cleanup because it needs a Context, like Google sign-in. Firebase
+   * errors keep the confirmation open for retry. Credential cleanup is best effort, matching
+   * GoogleCredentialProvider: it must not leave signed-out users on authenticated screens.
+   * Firestore persistence and pending offline writes are retained; the host must destroy both
+   * active and saved authenticated navigation stacks so their ViewModels cannot be restored.
+   */
+  fun confirmSignOut(clearCredentialState: suspend () -> Unit) {
+    val state = _uiState.value as? ProfileUiState.ConfirmingSignOut ?: return
+    if (state.isSigningOut) return
+    _uiState.value = state.copy(isSigningOut = true, failed = false)
+    try {
+      authRepository.signOut()
+    } catch (error: Exception) {
+      _uiState.value = state.copy(failed = true)
+      return
+    }
+    // Stop cached profile emissions before clearing every reference to the previous user's details.
+    observation?.cancel()
+    _uiState.value = ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, isSigningOut = true)
+    viewModelScope.launch {
+      try {
+        clearCredentialState()
+      } catch (error: CancellationException) {
+        throw error
+      } catch (error: Exception) {
+        Log.w(TAG, "Couldn't clear the Google credential state after sign-out", error)
+      }
+      _uiState.value = ProfileUiState.SignOutComplete
+    }
   }
 
   private fun observeProfile() {
@@ -95,7 +161,15 @@ class ProfileViewModel(
             Log.e(TAG, "Couldn't observe the signed-in user's profile", error)
             emit(ProfileUiState.Error)
           }
-          .collect { _uiState.value = it }
+          .collect { profile ->
+            val state = _uiState.value
+            _uiState.value =
+                if (
+                    state is ProfileUiState.ConfirmingSignOut && profile != ProfileUiState.SignedOut
+                )
+                    state.copy(profile = profile)
+                else profile
+          }
     }
   }
 

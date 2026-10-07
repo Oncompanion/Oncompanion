@@ -70,6 +70,10 @@ open class NavigationActions(private val navController: NavHostController) {
    * should keep each tab's state.
    */
   open fun navigateAndClearBackStack(route: String) {
+    // Saved tab stacks also own ViewModels; never carry them across authentication flows.
+    listOf(Route.OVERVIEW, Route.PLANNING, Route.EVENTS).forEach { tab ->
+      navController.clearBackStack(tab)
+    }
     navController.navigate(route) {
       popUpTo(navController.graph.id) { inclusive = true }
       launchSingleTop = true
