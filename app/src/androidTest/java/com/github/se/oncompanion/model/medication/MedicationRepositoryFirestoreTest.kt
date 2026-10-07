@@ -3,6 +3,7 @@ package com.github.se.oncompanion.model.medication
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -87,16 +88,33 @@ class MedicationRepositoryFirestoreTest {
     withTimeout(10.seconds) { db.waitForPendingWrites().await() }
   }
 
-  /** Reads a document of alice from the server, e.g. `prescriptions/presc-1`. */
-  private suspend fun serverSnapshot(collection: String, id: String): DocumentSnapshot =
-      withTimeout(10.seconds) {
-        db.collection("users")
-            .document(aliceUid)
-            .collection(collection)
-            .document(id)
-            .get(Source.SERVER)
-            .await()
-      }
+  private fun prescriptionDocument(id: String) =
+      db.collection("users").document(aliceUid).collection("prescriptions").document(id)
+
+  /** Reads the document of alice's prescription [id] from the server. */
+  private suspend fun serverPrescription(id: String): DocumentSnapshot =
+      withTimeout(10.seconds) { prescriptionDocument(id).get(Source.SERVER).await() }
+
+  /** The medications stored in the document of prescription [id] on the server, in order. */
+  @Suppress("UNCHECKED_CAST")
+  private suspend fun serverMedications(id: String): List<Map<String, Any?>> =
+      (serverPrescription(id).get("medications") as List<Map<String, Any?>>?).orEmpty()
+
+  private suspend fun serverMedicationIds(id: String) = serverMedications(id).map { it["id"] }
+
+  /**
+   * The REST fields of a prescription document dated 29 September, holding one medication per (ID,
+   * name) pair. A `null` name gives a medication without a name, which is malformed.
+   */
+  private fun rawPrescription(vararg medications: Pair<String, String?>): String {
+    val day = """{"timestampValue": "2026-09-28T22:00:00Z"}"""
+    val values = medications.joinToString { (id, name) ->
+      val nameField = name?.let { """"name": {"stringValue": "$it"},""" }.orEmpty()
+      """{"mapValue": {"fields": {"id": {"stringValue": "$id"}, $nameField "startDate": $day}}}"""
+    }
+    return """{"prescribedOn": $day, "createdAt": $day,
+        "medications": {"arrayValue": {"values": [$values]}}}"""
+  }
 
   /** Waits for the first value of the stream that satisfies [predicate]. */
   private suspend fun <T> Flow<T>.awaitFirst(predicate: (T) -> Boolean = { true }): T =
@@ -223,29 +241,35 @@ class MedicationRepositoryFirestoreTest {
     }
     awaitServerAck()
 
-    assertFalse(serverSnapshot("prescriptions", "presc-1").exists())
+    assertFalse(serverPrescription("presc-1").exists())
   }
 
   @Test
-  fun addWritesOneDocumentPerPrescriptionAndPerMedication(): Unit = runBlocking {
+  fun addWritesOneDocumentHoldingTheMedications(): Unit = runBlocking {
     repository.addPrescription(aliceUid, prescription())
     awaitServerAck()
 
-    val prescriptionDoc = serverSnapshot("prescriptions", "presc-1")
+    val prescriptionDoc = serverPrescription("presc-1")
     assertEquals("Dr. Martin · Oncology", prescriptionDoc.getString("prescribedBy"))
     assertNotNull(prescriptionDoc.getTimestamp("prescribedOn"))
     assertNotNull(prescriptionDoc.getTimestamp("createdAt"))
 
-    val medicationDoc = serverSnapshot("medications", "presc-1-ondansetron")
-    assertEquals("presc-1", medicationDoc.getString("prescriptionId"))
-    assertEquals("Ondansetron 8 mg", medicationDoc.getString("name"))
-    assertEquals("1 tablet", medicationDoc.getString("dosage"))
-    assertEquals("Twice a day", medicationDoc.getString("frequency"))
-    assertNotNull(medicationDoc.getTimestamp("startDate"))
-    assertEquals(5L, medicationDoc.getLong("durationDays"))
-    assertEquals(0L, medicationDoc.getLong("position"))
-
-    assertEquals(1L, serverSnapshot("medications", "presc-1-dexamethasone").getLong("position"))
+    // The medications are a list inside the document, in the order they were saved
+    assertEquals(
+        listOf("presc-1-ondansetron", "presc-1-dexamethasone"),
+        serverMedicationIds("presc-1"),
+    )
+    assertEquals(
+        mapOf(
+            "id" to "presc-1-ondansetron",
+            "name" to "Ondansetron 8 mg",
+            "dosage" to "1 tablet",
+            "frequency" to "Twice a day",
+            "startDate" to Timestamp(Instant.parse("2026-09-30T22:00:00Z")),
+            "durationDays" to 5L,
+        ),
+        serverMedications("presc-1").first(),
+    )
   }
 
   @Test
@@ -270,11 +294,11 @@ class MedicationRepositoryFirestoreTest {
 
     assertEquals(
         Instant.parse("2026-09-28T22:00:00Z"),
-        serverSnapshot("prescriptions", "presc-1").getTimestamp("prescribedOn")!!.toInstant(),
+        serverPrescription("presc-1").getTimestamp("prescribedOn")!!.toInstant(),
     )
     assertEquals(
-        Instant.parse("2026-01-14T23:00:00Z"),
-        serverSnapshot("medications", "winter-med").getTimestamp("startDate")!!.toInstant(),
+        Timestamp(Instant.parse("2026-01-14T23:00:00Z")),
+        serverMedications("presc-1").singleOrNull()?.get("startDate"),
     )
     assertSameContent(summerAndWinter, repository.getPrescription(aliceUid, "presc-1"))
   }
@@ -357,25 +381,32 @@ class MedicationRepositoryFirestoreTest {
   fun observePrescriptionsSkipsMalformedDocuments(): Unit = runBlocking {
     repository.addPrescription(aliceUid, prescription())
     awaitServerAck()
-    // A prescription without a date, and a medication of presc-1 without a name
+    // A prescription without a date, one without medications, and one whose first medication has
+    // no name
     EmulatorTestData.createRawDocument(
         "users/$aliceUid/prescriptions",
         "no-date",
         """{"prescribedBy": {"stringValue": "Dr. Nobody"}}""",
     )
     EmulatorTestData.createRawDocument(
-        "users/$aliceUid/medications",
+        "users/$aliceUid/prescriptions",
+        "no-medications",
+        rawPrescription(),
+    )
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
         "no-name",
-        """{"prescriptionId": {"stringValue": "presc-1"}, "position": {"integerValue": "2"}}""",
+        rawPrescription("no-name-med" to null, "named-med" to "Paracetamol 1 g"),
     )
     // A valid one written afterwards tells us the stream has seen the malformed documents too
     repository.addPrescription(aliceUid, singleMedication("after", LocalDate.of(2026, 9, 30)))
     awaitServerAck()
 
-    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.size >= 2 }
+    val observed = repository.observePrescriptions(aliceUid).awaitFirst { it.size >= 3 }
 
-    assertEquals(listOf("after", "presc-1"), observed.map { it.id })
-    assertEquals(2, observed.last().medications.size)
+    // Same day: presc-1 was saved after the creation time written in the raw document
+    assertEquals(listOf("after", "presc-1", "no-name"), observed.map { it.id })
+    assertEquals(listOf("named-med"), observed.last().medications.map { it.id })
   }
 
   @Test
@@ -480,9 +511,7 @@ class MedicationRepositoryFirestoreTest {
     repository.updatePrescription(aliceUid, edited())
     awaitServerAck()
 
-    assertFalse(serverSnapshot("medications", "presc-1-ondansetron").exists())
-    assertEquals(0L, serverSnapshot("medications", "presc-1-dexamethasone").getLong("position"))
-    assertEquals(1L, serverSnapshot("medications", "presc-1-new").getLong("position"))
+    assertEquals(listOf("presc-1-dexamethasone", "presc-1-new"), serverMedicationIds("presc-1"))
   }
 
   @Test
@@ -517,8 +546,7 @@ class MedicationRepositoryFirestoreTest {
     awaitServerAck()
 
     assertNull(repository.getPrescription(aliceUid, "presc-1"))
-    assertFalse(serverSnapshot("prescriptions", "presc-1").exists())
-    assertFalse(serverSnapshot("medications", "presc-1-new").exists())
+    assertFalse(serverPrescription("presc-1").exists())
   }
 
   @Test
@@ -567,12 +595,13 @@ class MedicationRepositoryFirestoreTest {
 
     assertNull(repository.getPrescription(aliceUid, "presc-1"))
     awaitServerAck()
-    assertFalse(serverSnapshot("prescriptions", "presc-1").exists())
-    assertFalse(serverSnapshot("medications", "presc-1-ondansetron").exists())
-    assertFalse(serverSnapshot("medications", "presc-1-dexamethasone").exists())
+    assertFalse(serverPrescription("presc-1").exists())
     // The other prescription is untouched
     assertSameContent(other, repository.getPrescription(aliceUid, "other"))
-    assertTrue(serverSnapshot("medications", "other-med").exists())
+    assertEquals(
+        listOf("other-med"),
+        repository.observeMedications(aliceUid).awaitFirst { it.size == 1 }.map { it.id },
+    )
   }
 
   @Test
@@ -646,29 +675,93 @@ class MedicationRepositoryFirestoreTest {
   }
 
   @Test
-  fun offlineUpdateOfAPrescriptionThisDeviceNeverLoadedIsSaved(): Unit = runBlocking {
-    // presc-1 exists on the server with one medication, but this device has never loaded it
-    val day = """{"timestampValue": "2026-09-28T22:00:00Z"}"""
-    EmulatorTestData.createRawDocument(
+  fun offlineUpdateOfAPrescriptionThisDeviceNeverLoadedReplacesAllItsMedications(): Unit =
+      runBlocking {
+        // presc-1 exists on the server with two medications, but this device has never loaded it
+        EmulatorTestData.createRawDocument(
+            "users/$aliceUid/prescriptions",
+            "presc-1",
+            rawPrescription(
+                "presc-1-dexamethasone" to "Dexamethasone 4 mg",
+                "presc-1-never-seen" to "Zolpidem",
+            ),
+        )
+        db.disableNetwork().await()
+
+        withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+        db.enableNetwork().await()
+        awaitServerAck()
+
+        assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+        assertEquals(listOf("presc-1-dexamethasone", "presc-1-new"), serverMedicationIds("presc-1"))
+      }
+
+  @Test
+  fun offlineDeleteOfAPrescriptionThisDeviceNeverLoadedRemovesAllItsMedications(): Unit =
+      runBlocking {
+        EmulatorTestData.createRawDocument(
+            "users/$aliceUid/prescriptions",
+            "presc-1",
+            rawPrescription(
+                "presc-1-dexamethasone" to "Dexamethasone 4 mg",
+                "presc-1-never-seen" to "Zolpidem",
+            ),
+        )
+        db.disableNetwork().await()
+
+        withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
+        db.enableNetwork().await()
+        awaitServerAck()
+
+        assertFalse(serverPrescription("presc-1").exists())
+        assertTrue(repository.observeMedications(aliceUid).awaitFirst().isEmpty())
+      }
+
+  @Test
+  fun offlineUpdateFromAnOutdatedCopyLeavesNoMedicationAddedElsewhere(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    db.disableNetwork().await()
+    // Another device adds a medication that this one, offline, never sees
+    EmulatorTestData.replaceRawDocument(
         "users/$aliceUid/prescriptions",
         "presc-1",
-        """{"prescribedOn": $day, "createdAt": $day}""",
+        rawPrescription(
+            "presc-1-ondansetron" to "Ondansetron 8 mg",
+            "presc-1-dexamethasone" to "Dexamethasone 4 mg",
+            "presc-1-added-elsewhere" to "Zolpidem",
+        ),
     )
-    EmulatorTestData.createRawDocument(
-        "users/$aliceUid/medications",
-        "presc-1-dexamethasone",
-        """{"prescriptionId": {"stringValue": "presc-1"},
-            "name": {"stringValue": "Dexamethasone 4 mg"},
-            "startDate": $day,
-            "position": {"integerValue": "0"}}""",
-    )
-    db.disableNetwork().await()
 
     withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
     db.enableNetwork().await()
     awaitServerAck()
 
-    assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+    assertEquals(listOf("presc-1-dexamethasone", "presc-1-new"), serverMedicationIds("presc-1"))
+  }
+
+  @Test
+  fun twoDevicesReplacingTheMedicationsEndWithTheLastListOnly(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    db.disableNetwork().await()
+    // Both devices replace the medications of presc-1 before seeing each other's change
+    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/prescriptions",
+        "presc-1",
+        rawPrescription("other-device-1" to "Zolpidem", "other-device-2" to "Amoxicillin"),
+    )
+
+    // This device's change reaches the server last
+    db.enableNetwork().await()
+    awaitServerAck()
+
+    assertEquals(listOf("presc-1-dexamethasone", "presc-1-new"), serverMedicationIds("presc-1"))
+    assertEquals(
+        listOf("presc-1-dexamethasone", "presc-1-new"),
+        repository.observeMedications(aliceUid).awaitFirst { it.size == 2 }.map { it.id }.sorted(),
+    )
   }
 
   @Test
@@ -681,8 +774,7 @@ class MedicationRepositoryFirestoreTest {
 
     db.enableNetwork().await()
     awaitServerAck()
-    assertFalse(serverSnapshot("prescriptions", "presc-1").exists())
-    assertFalse(serverSnapshot("medications", "presc-1-new").exists())
+    assertFalse(serverPrescription("presc-1").exists())
     assertTrue(repository.observeMedications(aliceUid).awaitFirst { it.isEmpty() }.isEmpty())
   }
 
