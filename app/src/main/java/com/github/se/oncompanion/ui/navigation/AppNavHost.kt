@@ -7,23 +7,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.AfterSignIn
+import com.github.se.oncompanion.ui.auth.SignInScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.events.EventsScreen
+import com.github.se.oncompanion.ui.onboarding.InformationScreen
+import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
+import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.profile.ProfileScreen
+import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
+import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
+import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
- * The sign-in and onboarding screens, and every feature added with [placeholderGraph], are
- * placeholders until their PRs land.
+ * Every feature added with [placeholderGraph] is a placeholder until its PR lands.
  */
 @Composable
 fun AppNavHost(
@@ -35,24 +48,31 @@ fun AppNavHost(
   NavHost(navController = navController, startDestination = startRoute) {
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
       composable(Screen.SIGN_IN) {
-        PlaceholderScreen(
-            title = stringResource(R.string.sign_in_title),
-            testTag = C.Tag.sign_in_screen,
+        SignInScreen(
+            onSignedIn = { next ->
+              navigationActions.navigateAndClearBackStack(
+                  when (next) {
+                    AfterSignIn.ONBOARDING -> Route.ONBOARDING
+                    AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                  }
+              )
+            }
         )
       }
     }
 
     navigation(startDestination = Screen.ONBOARDING_ROLE, route = Route.ONBOARDING) {
-      composable(Screen.ONBOARDING_ROLE) {
-        PlaceholderScreen(
-            title = stringResource(R.string.onboarding_role_title),
-            testTag = C.Tag.onboarding_role_screen,
+      composable(Screen.ONBOARDING_ROLE) { entry ->
+        RoleScreen(
+            viewModel = onboardingViewModel(navController, entry),
+            onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
         )
       }
-      composable(Screen.ONBOARDING_INFORMATION) {
-        PlaceholderScreen(
-            title = stringResource(R.string.onboarding_information_title),
-            testTag = C.Tag.onboarding_information_screen,
+      composable(Screen.ONBOARDING_INFORMATION) { entry ->
+        InformationScreen(
+            viewModel = onboardingViewModel(navController, entry),
+            // Onboarding is done: Back must not return to it
+            onSaved = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
         )
       }
     }
@@ -68,25 +88,32 @@ fun AppNavHost(
     }
 
     // Features opened from the Overview shortcuts
-    placeholderGraph(
-        Route.SYMPTOMS,
-        Screen.SYMPTOMS,
-        R.string.symptoms_title,
-        C.Tag.symptoms_screen,
-    )
+    navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
+      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
+      composable(
+          Screen.SYMPTOM_DETAIL,
+          arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
+        SymptomDetailScreen(
+            navigationActions = navigationActions,
+            // Scoped to this back stack entry, so each opened symptom has its own ViewModel
+            viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+        )
+      }
+    }
     placeholderGraph(
         Route.PRESCRIPTIONS,
         Screen.PRESCRIPTIONS,
         R.string.prescriptions_title,
         C.Tag.prescriptions_screen,
     )
-    placeholderGraph(
-        Route.CARE_CIRCLE,
-        Screen.CARE_CIRCLE,
-        R.string.care_circle_title,
-        C.Tag.care_circle_screen,
-    )
-    placeholderGraph(Route.PROFILE, Screen.PROFILE, R.string.profile_title, C.Tag.profile_screen)
+    navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
+      composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
+    }
+    navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
+      composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
+    }
   }
 }
 
@@ -133,4 +160,17 @@ private fun NavGraphBuilder.placeholderGraph(
   navigation(startDestination = screen, route = route) {
     composable(screen) { PlaceholderScreen(title = stringResource(title), testTag = testTag) }
   }
+}
+
+/**
+ * The [OnboardingViewModel] shared by the onboarding screens: it belongs to the onboarding graph,
+ * so it keeps the user's answers while they move between the steps.
+ */
+@Composable
+private fun onboardingViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): OnboardingViewModel {
+  val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
+  return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
 }

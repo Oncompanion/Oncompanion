@@ -1,8 +1,19 @@
 <resources>
     <string name="app_name">oncompanion</string>
+    <string name="planning_today">Today</string>
+    <string name="planning_today_date">Today — %1$s</string>
+    <string name="planning_previous_week">Previous week</string>
+    <string name="planning_next_week">Next week</string>
+    <string name="planning_go_today">Go to today</string>
+    <string name="planning_add">Add appointment</string>
+    <string name="planning_empty">No appointments on this day</string>
+    <string name="planning_empty_hint">Tap + to add a doctor appointment.</string>
+    <string name="planning_loading">Loading appointments</string>
+    <string name="planning_error">We couldn’t load your appointments.</string>
+    <string name="planning_retry">Retry</string>
+    <string name="planning_date_unavailable">Date outside supported range</string>
 
     <!-- Placeholder titles, replaced when each screen is implemented -->
-    <string name="sign_in_title">Sign in</string>
     <string name="onboarding_role_title">Who are you?</string>
     <string name="onboarding_information_title">Tell us about yourself</string>
     <string name="planning_title">Planning</string>
@@ -11,12 +22,101 @@
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
     <string name="profile_title">Profile</string>
+    <string name="profile_screen_title">My profile</string>
+    <string name="profile_back">Back</string>
+    <string name="profile_personal_information">Personal information</string>
+    <string name="profile_first_name">First name</string>
+    <string name="profile_family_name">Family name</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_member_since">Oncompanion member since %1$s</string>
+    <string name="profile_member">Oncompanion member</string>
+    <string name="profile_signed_out">Sign in to view your profile.</string>
+    <string name="profile_missing">Your profile is not available yet.</string>
+    <string name="profile_error">Couldn\'t load your profile. Check your connection and try again.</string>
+    <string name="profile_retry">Retry</string>
 
     <!-- Overview -->
-    <string name="overview_welcome">Welcome</string>
-    <string name="overview_welcome_name">Welcome, %1$s</string>
+    <string name="overview_greeting_morning">Good morning</string>
+    <string name="overview_greeting_morning_name">Good morning, %1$s</string>
+    <string name="overview_greeting_afternoon">Good afternoon</string>
+    <string name="overview_greeting_afternoon_name">Good afternoon, %1$s</string>
+    <string name="overview_greeting_evening">Good evening</string>
+    <string name="overview_greeting_evening_name">Good evening, %1$s</string>
+    <string name="overview_next_appointment">NEXT APPOINTMENT</string>
+    <string name="overview_appointment_with">With %1$s</string>
+    <string name="overview_today_at">Today, %1$s</string>
+    <string name="overview_tomorrow_at">Tomorrow, %1$s</string>
+    <string name="overview_no_appointment">No upcoming appointment</string>
+    <string name="overview_no_appointment_hint">Add your next appointment in Planning to see it here.</string>
+    <string name="overview_open_planning">Open Planning</string>
+    <string name="overview_today">Today</string>
+    <string name="overview_see_planning">See planning</string>
+    <string name="overview_nothing_today">Nothing planned today</string>
+    <string name="overview_nothing_today_hint">Medication intakes and events of the day will appear here.</string>
+    <string name="overview_next">Next</string>
+    <string name="overview_now">Now</string>
+    <string name="overview_not_taken">Not taken yet</string>
+    <string name="overview_done">Done</string>
+    <string name="overview_error_title">Couldn\'t load your day</string>
+    <string name="overview_error_hint">Your shortcuts still work. Check your connection and try again.</string>
+    <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
-    <string name="overview_scan_prescription">Scan prescription</string>
+
+    <!-- Symptoms -->
+    <string name="symptom_type_fatigue">Fatigue</string>
+    <string name="symptom_type_nausea">Nausea</string>
+    <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_appetite_loss">Loss of appetite</string>
+    <string name="symptom_type_sleep_problems">Sleep problems</string>
+    <string name="symptom_type_breathlessness">Breathlessness</string>
+    <string name="symptom_type_other">Other</string>
+    <string name="symptom_severity_mild">Mild</string>
+    <string name="symptom_severity_moderate">Moderate</string>
+    <string name="symptom_severity_severe">Severe</string>
+    <string name="symptom_back">Back</string>
+    <string name="symptom_intensity_value">%1$d/10</string>
+    <string name="symptom_intensity_description">Intensity %1$d out of 10</string>
+    <string name="symptom_retry">Retry</string>
+    <string name="symptom_error_hint">Check your connection and try again.</string>
+    <string name="symptom_journal_today">Today</string>
+    <string name="symptom_journal_yesterday">Yesterday</string>
+    <string name="symptom_journal_empty_title">No symptoms logged yet</string>
+    <string name="symptom_journal_empty_hint">The symptoms you log will appear here, newest first, so you can show them to your doctor.</string>
+    <string name="symptom_journal_error_title">Couldn\'t load your symptoms</string>
+    <string name="symptom_detail_title">Symptom</string>
+    <string name="symptom_detail_when">When</string>
+    <string name="symptom_detail_intensity">Intensity</string>
+    <string name="symptom_detail_notes">Notes</string>
+    <string name="symptom_detail_error_title">Couldn\'t load this symptom</string>
+    <string name="symptom_detail_not_found_title">This symptom no longer exists</string>
+    <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
+
+    <!-- Sign-in -->
+    <string name="sign_in_welcome">Welcome to Oncompanion</string>
+    <string name="sign_in_subtitle">Sign in with your Google account to continue. New here? Your account is created automatically.</string>
+    <string name="sign_in_with_google">Continue with Google</string>
+    <string name="sign_in_retry">Retry</string>
+    <string name="sign_in_error_no_connection">No internet connection. Check your connection and try again.</string>
+    <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
+    <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
+
+    <!-- Onboarding -->
+    <string name="cancer_type_label">Cancer type</string>
+    <string name="cancer_type_hint">Start typing to see suggestions</string>
+    <string name="onboarding_role_subtitle">Choose what fits you best, so Oncompanion shows you the right features.</string>
+    <string name="onboarding_role_patient">I\'m a patient</string>
+    <string name="onboarding_role_patient_description">I\'m receiving cancer treatment and want to keep track of my care.</string>
+    <string name="onboarding_role_caregiver">I\'m a caregiver</string>
+    <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
+    <string name="onboarding_coming_soon">Coming soon</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
+    <string name="onboarding_first_name">First name*</string>
+    <string name="onboarding_required">*Required</string>
+    <string name="onboarding_first_name_missing">Please enter your first name</string>
+    <string name="onboarding_family_name">Family name</string>
+    <string name="onboarding_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
+    <string name="onboarding_error_save_failed">Couldn\'t save your information. Please try again.</string>
 
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
@@ -29,4 +129,42 @@
     <string name="events_error_supporting">Check your connection and try again.</string>
     <string name="events_retry">Retry</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
+
+    <!-- Care circle -->
+    <string name="care_circle_back">Back</string>
+    <string name="care_circle_intro">The people you trust can follow your care. You choose what each person can see.</string>
+    <string name="care_circle_members_count">Members (%1$d)</string>
+    <string name="care_circle_add_member">Add member</string>
+    <string name="care_circle_empty_title">No one in your circle yet</string>
+    <string name="care_circle_empty_body">Add a relative, friend or nurse so they can follow your care.</string>
+    <string name="care_circle_empty_add_member">Add a member</string>
+    <string name="care_circle_error">Couldn\'t load your circle.</string>
+    <string name="care_circle_retry">Retry</string>
+    <!-- Relationship · what the member can see, e.g. "Son · Planning & events" -->
+    <string name="care_circle_member_summary">%1$s · %2$s</string>
+    <string name="care_circle_access_full">Full access</string>
+    <string name="care_circle_access_none">No access</string>
+    <!-- Joins the last section to the others, e.g. "Planning, events & symptoms" -->
+    <string name="care_circle_access_and">%1$s &amp; %2$s</string>
+    <!-- Temporary messages until the add member and member detail screens exist -->
+    <string name="care_circle_member_not_implemented">Member details aren\'t available yet. This will show %1$s\'s details and what they can see, and let you edit or remove them.</string>
+    <string name="care_circle_add_member_not_implemented">Adding members isn\'t available yet. This will let you add someone and choose what they can see.</string>
+
+    <string name="permission_planning">Planning</string>
+    <string name="permission_events">Events</string>
+    <string name="permission_symptoms">Symptoms</string>
+    <string name="permission_prescriptions">Prescriptions</string>
+
+    <string name="relationship_wife">Wife</string>
+    <string name="relationship_husband">Husband</string>
+    <string name="relationship_partner">Partner</string>
+    <string name="relationship_mother">Mother</string>
+    <string name="relationship_father">Father</string>
+    <string name="relationship_daughter">Daughter</string>
+    <string name="relationship_son">Son</string>
+    <string name="relationship_sister">Sister</string>
+    <string name="relationship_brother">Brother</string>
+    <string name="relationship_friend">Friend</string>
+    <string name="relationship_home_nurse">Home nurse</string>
+    <string name="relationship_other">Other</string>
 </resources>

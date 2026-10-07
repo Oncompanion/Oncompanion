@@ -9,19 +9,136 @@ service cloud.firestore {
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
+    // Field `key` is absent, null, or a string of at most `max` characters
+    function optionalString(data, key, max) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= max);
+    }
 
     // ---------- Users ----------
-    // Each user has one document: /users/{uid}. Only they can read or write it.
-    match /users/{uid} {
-      allow read, update, delete: if isOwner(uid);
-      allow create: if isOwner(uid)
-                    && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt']);
+    // Each user has one profile document: /users/{uid}. Only they can read or write it.
+    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH).
+    function isValidProfile(data) {
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'createdAt'])
+          && data.keys().hasAll(['role', 'firstName', 'createdAt'])
+          && data.role in ['PATIENT', 'CAREGIVER']
+          && data.firstName is string
+          && data.firstName.trim().size() > 0
+          && data.firstName.size() <= 50
+          && optionalString(data, 'familyName', 50)
+          && optionalString(data, 'cancerType', 100)
+          && data.createdAt is timestamp;
+    }
 
-      // Everything personal (entries, records, reminders...) goes under the user:
-      // /users/{uid}/<anything>/{docId}
-      match /{subcollection}/{docId} {
-        allow read, write: if isOwner(uid);
+    // Keep the limit in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH).
+    function isValidPrescription(data) {
+      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt'])
+          && data.keys().hasAll(['prescribedOn', 'createdAt'])
+          && optionalString(data, 'prescribedBy', 100)
+          && data.prescribedOn is timestamp
+          && data.createdAt is timestamp;
+    }
+
+    // Keep the limits in sync with Medication (MAX_TEXT_LENGTH, MAX_DURATION_DAYS) and
+    // Prescription (MAX_MEDICATIONS, for the position).
+    function isValidMedication(data) {
+      return data.keys().hasOnly(['prescriptionId', 'name', 'dosage', 'frequency', 'startDate',
+                                  'durationDays', 'position'])
+          && data.keys().hasAll(['prescriptionId', 'name', 'startDate', 'position'])
+          && data.prescriptionId is string
+          && data.prescriptionId.trim().size() > 0
+          && data.name is string
+          && data.name.trim().size() > 0
+          && data.name.size() <= 100
+          && optionalString(data, 'dosage', 100)
+          && optionalString(data, 'frequency', 100)
+          && data.startDate is timestamp
+          // No duration = no end date
+          && (data.get('durationDays', null) == null
+              || (data.durationDays is int && data.durationDays >= 1 && data.durationDays <= 3650))
+          // Rank of the medication in its prescription
+          && data.position is int
+          && data.position >= 0
+          && data.position < 20;
+    }
+
+    // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY,
+    // MAX_OTHER_LABEL_LENGTH, MAX_NOTES_LENGTH, MAX_CLOCK_DRIFT).
+    function isValidSymptom(data) {
+      return data.keys().hasOnly(['type', 'otherLabel', 'intensity', 'occurredAt', 'notes', 'createdAt'])
+          && data.keys().hasAll(['type', 'intensity', 'occurredAt', 'createdAt'])
+          && data.type in ['FATIGUE', 'NAUSEA', 'PAIN', 'APPETITE_LOSS', 'SLEEP_PROBLEMS',
+                           'BREATHLESSNESS', 'OTHER']
+          // "Other" needs a label; the listed types have none
+          && (data.type == 'OTHER'
+              ? data.get('otherLabel', null) is string
+                  && data.otherLabel.trim().size() > 0
+                  && data.otherLabel.size() <= 50
+              : data.get('otherLabel', null) == null)
+          && data.intensity is int
+          && data.intensity >= 1
+          && data.intensity <= 10
+          && data.occurredAt is timestamp
+          // Not in the future (it would stay at the top of the journal), with 5 minutes of margin
+          // for a phone clock ahead of the server's. Offline writes reach the server later, so
+          // request.time is then even later.
+          && data.occurredAt <= request.time + duration.value(5, 'm')
+          && optionalString(data, 'notes', 1000)
+          && data.createdAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && isValidProfile(request.resource.data)
+                    && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(uid)
+                    && isValidProfile(request.resource.data)
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // The role is chosen during onboarding and can't change afterwards (care-circle
+                    // access will depend on it)
+                    && request.resource.data.role == resource.data.role;
+
+      // ---------- Prescriptions and medications ----------
+      // /users/{uid}/prescriptions/{prescriptionId}: what the medications of a prescription share.
+      match /prescriptions/{prescriptionId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && request.resource.data.createdAt == resource.data.createdAt;
       }
+
+      // /users/{uid}/medications/{medicationId}: one per medication, linked to its prescription.
+      match /medications/{medicationId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidMedication(request.resource.data);
+        allow update: if isOwner(uid)
+                      && isValidMedication(request.resource.data)
+                      // A medication stays in the prescription it was saved with
+                      && request.resource.data.prescriptionId == resource.data.prescriptionId;
+      }
+
+      // ---------- Symptoms ----------
+      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can't be changed yet.
+      match /symptoms/{symptomId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidSymptom(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+      }
+
+      // ---------- Care circle ----------
+      // /users/{uid}/circle/{memberUid}: the people the user shares their care with, keyed by the
+      // member's uid. Only the owner can read it. Writes stay denied until adding a member comes
+      // with their validation.
+      match /circle/{memberUid} {
+        allow read: if isOwner(uid);
+      }
+
+      // Everything personal (entries, records, reminders...) goes under the user, in a collection
+      // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
 
     // ---------- Everything else ----------

@@ -3,8 +3,11 @@ package com.github.se.oncompanion.ui.navigation
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -49,7 +53,9 @@ class AppNavHostTest {
   fun defaultStartRoute_displaysSignInScreen() {
     setNavHost()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.sign_in_title)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(context.getString(R.string.sign_in_welcome)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.sign_in_loading).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.SIGN_IN, navController.currentDestination?.route)
     }
@@ -81,10 +87,39 @@ class AppNavHostTest {
   fun overviewStartRoute_displaysOverviewScreen() {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithText(context.getString(R.string.overview_welcome)).assertIsDisplayed()
+    // The default ViewModel works without Firebase: a greeting and the empty day
+    composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverIsDisabled() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingRoleContinue_opensInformationScreen_andBackReturnsToRoleScreen() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_INFORMATION, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_ROLE, NavigationActions(navController).currentRoute())
     }
   }
 
@@ -98,7 +133,37 @@ class AppNavHostTest {
         .assertIsDisplayed()
   }
 
-  /** A top-level feature destination and what its placeholder displays. */
+  @Test
+  fun onboardingInformationScreen_showsTheFormWithTheDefaultViewModel() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_family_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertExists()
+    // No Firebase user in tests: nothing is pre-filled, so the first name is still missing
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).assertIsNotEnabled()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingSteps_shareTheViewModel_soInformationIsKeptWhenGoingBackAndForth() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertTextContains("Sam")
+  }
+
+  /** A feature destination and the title its screen displays. */
   private data class Destination(
       val route: String,
       val screen: String,
@@ -138,11 +203,16 @@ class AppNavHostTest {
               C.Tag.care_circle_screen,
               R.string.care_circle_title,
           ),
-          Destination(Route.PROFILE, Screen.PROFILE, C.Tag.profile_screen, R.string.profile_title),
+          Destination(
+              Route.PROFILE,
+              Screen.PROFILE,
+              C.Tag.profile_screen,
+              R.string.profile_screen_title,
+          ),
       )
 
   @Test
-  fun everyFeatureRoute_opensItsPlaceholderFromOverview_andBackReturnsToOverview() {
+  fun everyFeatureRoute_opensItsScreenFromOverview_andBackReturnsToOverview() {
     setNavHost(Route.OVERVIEW)
     val navigationActions = NavigationActions(navController)
 
@@ -185,6 +255,20 @@ class AppNavHostTest {
 
       composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun profileBackArrow_returnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
     }
   }
 
@@ -237,6 +321,47 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+  }
+
+  @Test
+  fun symptomsShortcut_opensTheJournal_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
+        .performScrollTo()
+        .performClick()
+
+    // Without Firebase nobody is signed in: the journal shows its error state
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_error).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOMS, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun symptomDetailRoute_opensTheDetailOfThatSymptom_andBackReturns() {
+    setNavHost(Route.SYMPTOMS)
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateTo(Screen.symptomDetail("abc"))
+    }
+
+    // Without Firebase nobody is signed in: the detail shows its error state
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_error).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "abc",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.SYMPTOM_DETAIL_ID),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
   @Test

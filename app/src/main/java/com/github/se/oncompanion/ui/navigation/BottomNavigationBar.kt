@@ -14,7 +14,12 @@ import androidx.compose.ui.res.stringResource
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 
-/** The top-level destinations reachable from the bottom navigation bar, in display order. */
+/**
+ * The top-level destinations reachable from the bottom navigation bar, in display order.
+ *
+ * As recommended by Material 3, [icon] is outlined and [selectedIcon] is its filled version, so the
+ * selected tab also stands out by its icon.
+ */
 enum class Tab(
     val route: String,
     @StringRes val label: Int,
@@ -33,14 +38,14 @@ enum class Tab(
       Route.PLANNING,
       R.string.planning_title,
       R.drawable.ic_tab_planning,
-      R.drawable.ic_tab_planning,
+      R.drawable.ic_tab_planning_selected,
       C.Tag.bottom_navigation_tab_planning,
   ),
   EVENTS(
       Route.EVENTS,
       R.string.events_title,
       R.drawable.ic_tab_events,
-      R.drawable.ic_tab_events,
+      R.drawable.ic_tab_events_selected,
       C.Tag.bottom_navigation_tab_events,
   ),
 }
