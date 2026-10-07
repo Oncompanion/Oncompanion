@@ -276,4 +276,11 @@ class NavigationActionsTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     composeTestRule.runOnIdle { assertEquals(listOf(Screen.OVERVIEW), screensInBackStack()) }
   }
+
+  @Test
+  fun symptomDetail_putsTheIdInTheRoute() {
+    assertEquals("symptoms_detail/{symptomId}", Screen.SYMPTOM_DETAIL)
+    assertEquals("symptomId", Screen.SYMPTOM_DETAIL_ID)
+    assertEquals("symptoms_detail/abc", Screen.symptomDetail("abc"))
+  }
 }

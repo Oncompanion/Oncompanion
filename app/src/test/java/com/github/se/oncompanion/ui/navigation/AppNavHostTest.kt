@@ -387,6 +387,28 @@ class AppNavHostTest {
   }
 
   @Test
+  fun symptomDetailRoute_opensTheDetailOfThatSymptom_andBackReturns() {
+    setNavHost(Route.SYMPTOMS)
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateTo(Screen.symptomDetail("abc"))
+    }
+
+    // Without Firebase nobody is signed in: the detail shows its error state
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_error).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "abc",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.SYMPTOM_DETAIL_ID),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+  }
+
+  @Test
   fun routeAndScreenConstants_haveExpectedValues() {
     assertEquals("auth", Route.AUTH)
     assertEquals("onboarding", Route.ONBOARDING)
