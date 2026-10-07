@@ -53,6 +53,7 @@ class PlanningViewModel(
   private var observation: Job? = null
 
   init {
+    savedStateHandle[SELECTED_DATE] = initialDate.toString()
     observeWeek()
   }
 

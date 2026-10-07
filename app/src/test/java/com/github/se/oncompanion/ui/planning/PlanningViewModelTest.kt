@@ -159,6 +159,15 @@ class PlanningViewModelTest {
       }
 
   @Test
+  fun initialSelectionIsSavedBeforeAnyCalendarAction() =
+      runTest(dispatcher) {
+        val saved = SavedStateHandle()
+        PlanningViewModel(FakePlanningRepository(), clock, zone, saved)
+        drain()
+        assertEquals("2026-10-02", saved.get<String>("planning_selected_date"))
+      }
+
+  @Test
   fun restoresSelectedDateAndObservesItsWeek() =
       runTest(dispatcher) {
         val saved = SavedStateHandle()
