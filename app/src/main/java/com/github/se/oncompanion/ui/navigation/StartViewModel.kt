@@ -21,8 +21,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - signed in without a profile (onboarding not finished) → onboarding ([Route.ONBOARDING])
  *
  * It works offline: Firebase remembers the session and Firestore reads the profile from its local
- * cache. If the profile can't be read in time, the user goes to the Overview: onboarding would try
- * to create a profile that may already exist.
+ * cache. The profile saved on the phone is checked first, since it answers at once, while the
+ * normal read can wait for a slow server. If the profile can't be read in time, the user goes to
+ * the Overview: onboarding would try to create a profile that may already exist.
  *
  * @param profileTimeoutMillis how long to wait for the profile before choosing the Overview
  */
@@ -52,7 +53,10 @@ class StartViewModel(
         } ?: return Route.AUTH
     val hasProfile =
         try {
-          withTimeoutOrNull(profileTimeoutMillis) { profileRepository.getProfile(user.uid) != null }
+          withTimeoutOrNull(profileTimeoutMillis) {
+            // Only ask the server when the phone doesn't know whether the profile exists
+            hasCachedProfile(user.uid) || profileRepository.getProfile(user.uid) != null
+          }
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
@@ -61,6 +65,17 @@ class StartViewModel(
         }
     return if (hasProfile == false) Route.ONBOARDING else Route.OVERVIEW
   }
+
+  /** Whether the profile is saved on the phone; `false` when the cache doesn't know or fails. */
+  private suspend fun hasCachedProfile(uid: String): Boolean =
+      try {
+        profileRepository.getCachedProfile(uid) != null
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.w(TAG, "Couldn't read the cached profile at startup", e)
+        false
+      }
 
   companion object {
     const val DEFAULT_PROFILE_TIMEOUT_MILLIS = 5_000L

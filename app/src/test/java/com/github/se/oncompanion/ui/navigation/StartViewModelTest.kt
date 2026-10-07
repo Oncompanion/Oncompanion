@@ -56,15 +56,25 @@ class StartViewModelTest {
     override fun signOut() = throw UnsupportedOperationException("not used at launch")
   }
 
-  /** [UserProfileRepository] whose [getProfile] runs [onGet] and records every requested uid. */
+  /**
+   * [UserProfileRepository] whose [getProfile] runs [onGet] and [getCachedProfile] runs [onCache]
+   * (by default the cache doesn't know), recording every requested uid.
+   */
   private class RecordingProfileRepository(
-      private val onGet: suspend (uid: String) -> UserProfile?
+      private val onCache: suspend (uid: String) -> UserProfile? = { null },
+      private val onGet: suspend (uid: String) -> UserProfile?,
   ) : UserProfileRepository {
     val requestedUids = mutableListOf<String>()
+    val cachedUids = mutableListOf<String>()
 
     override suspend fun getProfile(uid: String): UserProfile? {
       requestedUids += uid
       return onGet(uid)
+    }
+
+    override suspend fun getCachedProfile(uid: String): UserProfile? {
+      cachedUids += uid
+      return onCache(uid)
     }
 
     override fun observeProfile(uid: String): Flow<UserProfile?> =
@@ -121,6 +131,70 @@ class StartViewModelTest {
 
         assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
         assertEquals(listOf(user.uid), profiles.requestedUids)
+      }
+
+  @Test
+  fun cachedProfile_startsOnOverviewAtOnce_withoutAskingTheServer() =
+      runTest(dispatcher) {
+        // The server would never answer (slow connection): the cached profile must be enough
+        val profiles =
+            RecordingProfileRepository(
+                onCache = { uid -> profile.takeIf { uid == user.uid } },
+                onGet = { awaitCancellation() },
+            )
+
+        val viewModel = StartViewModel(signedIn(), profiles)
+        runCurrent()
+
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(listOf(user.uid), profiles.cachedUids)
+        assertEquals(emptyList<String>(), profiles.requestedUids)
+      }
+
+  @Test
+  fun cacheDoesNotKnow_asksTheServer_andItsAnswerDecides() =
+      runTest(dispatcher) {
+        val profiles = RecordingProfileRepository(onCache = { null }, onGet = { null })
+
+        val viewModel = StartViewModel(signedIn(), profiles)
+        advanceUntilIdle()
+
+        // Not in the cache is unknown, not "no profile": only the server's null means onboarding
+        assertEquals(Route.ONBOARDING, viewModel.startRoute.value)
+        assertEquals(listOf(user.uid), profiles.cachedUids)
+        assertEquals(listOf(user.uid), profiles.requestedUids)
+      }
+
+  @Test
+  fun cacheReadFails_asksTheServer() =
+      runTest(dispatcher) {
+        val profiles =
+            RecordingProfileRepository(
+                onCache = { throw RuntimeException("cache unavailable") },
+                onGet = { null },
+            )
+
+        val viewModel = StartViewModel(signedIn(), profiles)
+        advanceUntilIdle()
+
+        assertEquals(Route.ONBOARDING, viewModel.startRoute.value)
+        assertEquals(listOf(user.uid), profiles.requestedUids)
+      }
+
+  @Test
+  fun cacheReadNeverReturns_timeoutStillApplies() =
+      runTest(dispatcher) {
+        val profiles =
+            RecordingProfileRepository(onCache = { awaitCancellation() }, onGet = { profile })
+
+        val viewModel = StartViewModel(signedIn(), profiles, profileTimeoutMillis = 1_000L)
+        advanceTimeBy(999L)
+        runCurrent()
+        assertNull(viewModel.startRoute.value)
+
+        advanceTimeBy(2L)
+        runCurrent()
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
       }
 
   @Test
