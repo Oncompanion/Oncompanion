@@ -39,7 +39,7 @@ class PlanningViewModel(
     private val repository: PlanningRepository,
     private val clock: Clock,
     val zoneId: ZoneId,
-    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
   private val initialDate =

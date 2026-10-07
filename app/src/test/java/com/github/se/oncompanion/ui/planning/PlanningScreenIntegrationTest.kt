@@ -2,6 +2,7 @@ package com.github.se.oncompanion.ui.planning
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
@@ -33,6 +34,7 @@ class PlanningScreenIntegrationTest {
             FakePlanningRepository(),
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
+            SavedStateHandle(),
         )
     var selectedRoute: String? = null
     val navigation =
@@ -68,6 +70,7 @@ class PlanningScreenIntegrationTest {
             repository,
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
+            SavedStateHandle(),
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))

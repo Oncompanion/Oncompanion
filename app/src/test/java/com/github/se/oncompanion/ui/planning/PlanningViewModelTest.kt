@@ -46,7 +46,7 @@ class PlanningViewModelTest {
   fun selectsTodayAndNavigatesAcrossYearBoundary() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, clock, zone)
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
         assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.selectedDate)
         assertEquals(LocalDate.of(2026, 9, 28), vm.uiState.value.weekStart)
@@ -73,7 +73,7 @@ class PlanningViewModelTest {
                 item("tomorrow", "2026-10-02T22:00:00Z"),
                 item("outside", "2026-11-02T08:00:00Z"),
             )
-        val vm = PlanningViewModel(repository, clock, zone)
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
         assertEquals(
             listOf("appointment:early", "appointment:a", "appointment:b"),
@@ -89,7 +89,7 @@ class PlanningViewModelTest {
   fun errorCanBeRetried() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository().apply { fail = true }
-        val vm = PlanningViewModel(repository, clock, zone)
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
         assertTrue(vm.uiState.value.hasError)
         assertFalse(vm.uiState.value.isLoading)
@@ -104,7 +104,7 @@ class PlanningViewModelTest {
   fun weekRangeAccountsForDaylightSaving() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, clock, zone)
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         vm.selectDate(LocalDate.of(2026, 10, 25))
         drain()
         val range = repository.ranges.last()
@@ -115,7 +115,7 @@ class PlanningViewModelTest {
   @Test
   fun navigationStopsAtSupportedYearBoundaries() =
       runTest(dispatcher) {
-        val vm = PlanningViewModel(FakePlanningRepository(), clock, zone)
+        val vm = PlanningViewModel(FakePlanningRepository(), clock, zone, SavedStateHandle())
         val first = LocalDate.of(1, 1, 1)
         vm.selectDate(first)
         vm.previousWeek()
@@ -144,7 +144,7 @@ class PlanningViewModelTest {
                 }
               }
             }
-        val vm = PlanningViewModel(repository, clock, zone)
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
         assertEquals(listOf(cached), vm.uiState.value.items)
         assertTrue(vm.uiState.value.hasError)
@@ -216,7 +216,7 @@ class PlanningViewModelTest {
               override fun instant(): Instant = now
             }
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, movingClock, zone)
+        val vm = PlanningViewModel(repository, movingClock, zone, SavedStateHandle())
         drain()
         now = Instant.parse("2026-10-02T22:01:00Z")
         vm.refreshToday()
