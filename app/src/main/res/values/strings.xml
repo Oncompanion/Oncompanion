@@ -28,4 +28,5 @@
     <string name="events_error_title">Couldn\'t load the events</string>
     <string name="events_error_supporting">Check your connection and try again.</string>
     <string name="events_retry">Retry</string>
+    <string name="events_refresh_error">Couldn\'t refresh the events.</string>
 </resources>

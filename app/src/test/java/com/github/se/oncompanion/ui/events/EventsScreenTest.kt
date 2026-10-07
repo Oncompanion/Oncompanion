@@ -182,4 +182,29 @@ class EventsScreenTest {
     setContent(EventsUiState(isLoading = false))
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
   }
+
+  @Test
+  fun failedRefresh_keepsTheList_andShowsARetryBanner() {
+    var retries = 0
+    setContent(
+        EventsUiState(events = listOf(yoga), isLoading = false, hasError = true),
+        onRetry = { retries++ },
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(yoga.id)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.events_refresh_error).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.events_error).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.events_refresh_retry).performClick()
+
+    composeTestRule.runOnIdle { assertEquals(1, retries) }
+  }
+
+  @Test
+  fun reloadingWithEvents_keepsTheListInsteadOfTheSpinner() {
+    setContent(EventsUiState(events = listOf(yoga), isLoading = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(yoga.id)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.events_loading).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.events_refresh_error).assertDoesNotExist()
+  }
 }

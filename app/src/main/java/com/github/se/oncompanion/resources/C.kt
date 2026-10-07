@@ -26,6 +26,8 @@ object C {
     const val events_loading = "events_loading"
     const val events_error = "events_error"
     const val events_retry = "events_retry"
+    const val events_refresh_error = "events_refresh_error"
+    const val events_refresh_retry = "events_refresh_retry"
 
     fun eventCard(eventId: String) = "event_card_$eventId"
 
