@@ -315,12 +315,38 @@ internal fun PlanningAgenda(
           state = listState,
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
-        items(state.items, key = { it.key }) { item ->
-          PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+        // A single scrolling agenda keeps untimed medications before all timed entries.
+        val medications = state.items.filter { it.source is PlanningSource.Medication }
+        val scheduled = state.items.filter { it.source !is PlanningSource.Medication }
+        if (medications.isNotEmpty()) {
+          item(key = "section:no-time") {
+            AgendaHeading(R.string.planning_no_set_time, C.Tag.planning_no_set_time)
+          }
+          items(medications, key = { it.key }) { item ->
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+          }
+        }
+        if (scheduled.isNotEmpty()) {
+          item(key = "section:scheduled") {
+            AgendaHeading(R.string.planning_scheduled, C.Tag.planning_scheduled)
+          }
+          items(scheduled, key = { it.key }) { item ->
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+          }
         }
       }
     }
   }
+}
+
+@Composable
+private fun AgendaHeading(label: Int, tag: String) {
+  Text(
+      stringResource(label),
+      Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag(tag).semantics { heading() },
+      style = MaterialTheme.typography.titleSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
 }
 
 @Composable

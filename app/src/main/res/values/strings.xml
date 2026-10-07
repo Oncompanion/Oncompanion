@@ -12,6 +12,8 @@
     <string name="planning_loading">Loading planning</string>
     <string name="planning_error">We couldn’t load your planning.</string>
     <string name="planning_retry">Retry</string>
+    <string name="planning_no_set_time">No set time</string>
+    <string name="planning_scheduled">Scheduled</string>
     <string name="planning_frequency">Frequency: %1$s</string>
     <string name="planning_frequency_unspecified">Frequency not specified</string>
     <string name="planning_type_appointment">Appointment</string>

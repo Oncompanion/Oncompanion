@@ -6,6 +6,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
@@ -80,5 +83,42 @@ class PlanningScreenIntegrationTest {
     compose.onNodeWithTag(C.Tag.planning_retry).performClick()
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
+  }
+
+  @Test
+  fun mixedSourceUpdatesReachTheScreenThroughTheViewModel() {
+    val medication =
+        PlanningItem(
+            PlanningSource.Medication("p", "m"),
+            PlanningTiming.DateOnly(date),
+            "Medication",
+            frequency = "Twice a day",
+        )
+    val event =
+        PlanningItem(
+            PlanningSource.Event("e"),
+            PlanningTiming.Timed(date.atTime(14, 0).atZone(zone).toInstant()),
+            "Workshop",
+            "Geneva",
+        )
+    val repository = FakePlanningRepository().apply { items.value = listOf(event, medication) }
+    val vm =
+        PlanningViewModel(
+            repository,
+            Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
+            zone,
+            SavedStateHandle(),
+        )
+    val navigation =
+        NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
+    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.onNodeWithText("Frequency: Twice a day").assertIsDisplayed()
+    compose.onNodeWithText("Workshop").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planningItem(medication.key)).assertHasNoClickAction()
+    compose.runOnIdle { repository.items.value = listOf(medication.copy(frequency = "As needed")) }
+    compose.onNodeWithText("Frequency: As needed").assertIsDisplayed()
+    compose.onNodeWithText("Workshop").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertDoesNotExist()
   }
 }

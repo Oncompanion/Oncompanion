@@ -21,10 +21,22 @@ private fun PlanningPreviewContent(
   val today = LocalDate.of(2026, 10, 2)
   val zone = ZoneId.of("Europe/Zurich")
   var selected by remember { mutableStateOf(today) }
-  val appointments =
+  val entries =
       if (empty) emptyList()
       else
           listOf(
+              PlanningItem(
+                  PlanningSource.Medication("prescription", "medication-a"),
+                  PlanningTiming.DateOnly(today),
+                  "Medication A",
+                  frequency = "Twice a day",
+              ),
+              PlanningItem(
+                  PlanningSource.Medication("prescription", "medication-b"),
+                  PlanningTiming.DateOnly(today),
+                  "Medication B",
+                  frequency = "Once a day",
+              ),
               PlanningItem(
                   PlanningSource.Appointment("consultation"),
                   PlanningTiming.Timed(today.atTime(9, 0).atZone(zone).toInstant()),
@@ -32,9 +44,10 @@ private fun PlanningPreviewContent(
                   "Hospital, Room 3",
               ),
               PlanningItem(
-                  PlanningSource.Appointment("follow-up"),
+                  PlanningSource.Event("support-workshop"),
                   PlanningTiming.Timed(today.atTime(14, 30).atZone(zone).toInstant()),
-                  "Follow-up with Dr. Martin",
+                  "Support workshop",
+                  "Ligue · Geneva",
               ),
               PlanningItem(
                   PlanningSource.Appointment("next-week"),
@@ -48,7 +61,7 @@ private fun PlanningPreviewContent(
         PlanningUiState(
             selected,
             selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
-            appointments.filter { it.timing.dateIn(zone) == selected },
+            entries.filter { it.timing.dateIn(zone) == selected },
             loading,
             error,
         ),
@@ -61,15 +74,13 @@ private fun PlanningPreviewContent(
                 onNextWeek = { selected = selected.plusWeeks(1) },
                 onToday = { selected = today },
                 onRetry = {},
-                onAddAppointment = {},
-                onItemClick = {},
             ),
     )
   }
 }
 
 @Preview(
-    name = "Planning — fake appointments",
+    name = "Planning — mixed fake entries",
     showBackground = true,
     widthDp = 412,
     heightDp = 820,
