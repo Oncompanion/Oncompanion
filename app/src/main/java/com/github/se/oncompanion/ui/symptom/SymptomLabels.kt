@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.symptom.Severity
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 
@@ -19,6 +20,16 @@ val SymptomType.label: Int
         SymptomType.SLEEP_PROBLEMS -> R.string.symptom_type_sleep_problems
         SymptomType.BREATHLESSNESS -> R.string.symptom_type_breathlessness
         SymptomType.OTHER -> R.string.symptom_type_other
+      }
+
+/** The label of a severity level, as shown in the journal (Figma: "Symptoms – History"). */
+@get:StringRes
+val Severity.label: Int
+  get() =
+      when (this) {
+        Severity.MILD -> R.string.symptom_severity_mild
+        Severity.MODERATE -> R.string.symptom_severity_moderate
+        Severity.SEVERE -> R.string.symptom_severity_severe
       }
 
 /** What the entry is about: the label the user typed for "Other", or else the type's label. */

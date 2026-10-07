@@ -32,8 +32,7 @@ Firestore's local cache is the offline store: writes are applied locally right a
 ```
 /users/{uid}                          profile (owner only)
 /users/{uid}/symptoms/{id}
-/users/{uid}/prescriptions/{id}       doctor and date shared by its medications
-/users/{uid}/medications/{id}         one per medication, linked to its prescription
+/users/{uid}/prescriptions/{id}       doctor, date and the list of its medications
 /users/{uid}/appointments/{id}
 /users/{uid}/questions/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
@@ -43,4 +42,4 @@ Firestore's local cache is the offline store: writes are applied locally right a
 
 Care-circle members read a patient's data through rules that check `/users/{uid}/circle/{request.auth.uid}`. Staff status comes from a custom claim set by the team, never from a field users can write.
 
-A prescription is split across two collections. `/prescriptions/{id}` holds what its medications share, the prescribing doctor and the date, so they are stored once and can't end up disagreeing. Each medication is its own document in `/medications/{id}`, linked to its prescription and carrying its own start date and duration, because Planning, reminders and the appointment summary work on single medications and read them without loading prescriptions.
+A prescription is one document: the prescribing doctor and the date, stored once, and the list of its medications, each with its own ID, start date and duration. A prescription and its medications are always written together (one form, one use case), so keeping them in one document makes saving, replacing or deleting a prescription a single write. It can't be half saved, and its medications can't be partly known by a device that is offline, mixed when two devices edit at once, or left behind after a deletion. Planning, reminders and the appointment summary still work on single medications: the repository reads them out of the prescriptions, so they never deal with a prescription. Anything recorded per intake later (e.g. a medication marked as taken) would go in its own collection, not in the prescription.

@@ -35,6 +35,7 @@ import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
+import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
 import java.time.Clock
 import java.time.ZoneId
 
@@ -105,13 +106,7 @@ fun AppNavHost(
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
-      // Placeholder until the journal's PR lands
-      composable(Screen.SYMPTOMS) {
-        PlaceholderScreen(
-            title = stringResource(R.string.symptoms_title),
-            testTag = C.Tag.symptoms_screen,
-        )
-      }
+      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
       composable(
           Screen.SYMPTOM_DETAIL,
           arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),

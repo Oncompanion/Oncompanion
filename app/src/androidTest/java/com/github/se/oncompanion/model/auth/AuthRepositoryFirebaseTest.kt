@@ -212,6 +212,22 @@ class AuthRepositoryFirebaseTest {
   }
 
   @Test
+  fun observeCurrentUser_ignoresSignOutWhenAlreadySignedOut() = runBlocking {
+    val emissions = mutableListOf<AuthUser?>()
+    val job = launch { repository.observeCurrentUser().take(2).toList(emissions) }
+
+    withTimeout(TIMEOUT_MS) { while (emissions.isEmpty()) kotlinx.coroutines.delay(20) }
+    // Each call makes Firebase notify the listener again with the same signed-out state.
+    repository.signOut()
+    repository.signOut()
+    val signedIn = repository.signInWithGoogle(aliceToken)
+    withTimeout(TIMEOUT_MS) { job.join() }
+
+    assertNull(emissions[0])
+    assertEquals(signedIn.uid, emissions[1]?.uid)
+  }
+
+  @Test
   fun signInWithGoogle_invalidTokenThrows() = runBlocking {
     try {
       repository.signInWithGoogle("not-a-token")
