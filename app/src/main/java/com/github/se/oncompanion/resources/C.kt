@@ -3,6 +3,7 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Planning
     const val planning_week = "planning_week"
     const val planning_list = "planning_list"
     const val planning_previous = "planning_previous"

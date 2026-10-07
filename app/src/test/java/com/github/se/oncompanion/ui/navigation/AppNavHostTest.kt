@@ -218,7 +218,8 @@ class AppNavHostTest {
       composeTestRule
           .onNode(
               hasText(context.getString(destination.titleRes)) and
-                  hasAnyAncestor(hasTestTag(destination.testTag))
+                  hasAnyAncestor(hasTestTag(destination.testTag)) and
+                  !hasAnyAncestor(hasTestTag(C.Tag.bottom_navigation_bar))
           )
           .assertIsDisplayed()
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
@@ -316,6 +317,36 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+  }
+
+  @Test
+  fun planningTabOpensRealCalendarAndRetainsSelectionBetweenTabs() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+    val heading =
+        composeTestRule
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_heading).assertTextContains(heading.single().text)
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+  }
+
+  @Test
+  fun overviewPlanningLinksOpenRealCalendar() {
+    setNavHost(Route.OVERVIEW)
+    listOf(C.Tag.overview_no_appointment, C.Tag.overview_see_planning).forEach { tag ->
+      composeTestRule.onNodeWithTag(tag).performScrollTo().performClick()
+      composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    }
   }
 
   @Test

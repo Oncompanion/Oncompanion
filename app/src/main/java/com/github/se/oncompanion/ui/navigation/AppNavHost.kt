@@ -16,6 +16,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -25,7 +27,11 @@ import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.planning.PlanningScreen
+import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
+import java.time.Clock
+import java.time.ZoneId
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -36,6 +42,7 @@ import com.github.se.oncompanion.ui.profile.ProfileScreen
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
+    planningRepository: PlanningRepository = EmptyPlanningRepository,
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -76,7 +83,14 @@ fun AppNavHost(
     }
 
     // Bottom bar tabs, next to Overview
-    tabPlaceholderGraph(Tab.PLANNING, Screen.PLANNING, C.Tag.planning_screen, navigationActions)
+    navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
+      composable(Screen.PLANNING) {
+        val planningViewModel: PlanningViewModel = viewModel {
+          PlanningViewModel(planningRepository, Clock.systemDefaultZone(), ZoneId.systemDefault())
+        }
+        PlanningScreen(navigationActions, planningViewModel)
+      }
+    }
     tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
 
     // Features opened from the Overview shortcuts
