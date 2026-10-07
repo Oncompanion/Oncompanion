@@ -2,6 +2,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import android.util.Log
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
@@ -25,23 +26,37 @@ class CareCircleRepositoryFirestore(
 
   override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> = callbackFlow {
     val registration =
-        db.collection(UserProfileRepositoryFirestore.COLLECTION)
-            .document(ownerUid)
-            .collection(COLLECTION)
-            .addSnapshotListener { snapshot, error ->
+        circle(ownerUid).addSnapshotListener { snapshot, error ->
+          if (error != null) {
+            close(error)
+          } else if (snapshot != null) {
+            // Sorted here rather than in the query, so no Firestore index is needed
+            trySend(
+                snapshot.documents.mapNotNull(::fromDocument).sortedWith(CareCircleMember.BY_NAME)
+            )
+          }
+        }
+    awaitClose { registration.remove() }
+  }
+
+  override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> =
+      callbackFlow {
+        val registration =
+            circle(ownerUid).document(memberUid).addSnapshotListener { snapshot, error ->
               if (error != null) {
                 close(error)
               } else if (snapshot != null) {
-                // Sorted here rather than in the query, so no Firestore index is needed
-                trySend(
-                    snapshot.documents
-                        .mapNotNull(::fromDocument)
-                        .sortedWith(CareCircleMember.BY_NAME)
-                )
+                // A missing document (never added or removed) is not malformed: no log
+                trySend(if (snapshot.exists()) fromDocument(snapshot) else null)
               }
             }
-    awaitClose { registration.remove() }
-  }
+        awaitClose { registration.remove() }
+      }
+
+  private fun circle(ownerUid: String) =
+      db.collection(UserProfileRepositoryFirestore.COLLECTION)
+          .document(ownerUid)
+          .collection(COLLECTION)
 
   private fun fromDocument(doc: DocumentSnapshot): CareCircleMember? {
     val firstName = doc.getString(FIELD_FIRST_NAME)
@@ -56,6 +71,9 @@ class CareCircleRepositoryFirestore(
         familyName = doc.getString(FIELD_FAMILY_NAME),
         relationship = Relationship.fromName(doc.getString(FIELD_RELATIONSHIP)),
         permissions = CarePermission.fromNames(permissions),
+        // Read leniently: a field of the wrong type is treated as missing
+        email = doc.get(FIELD_EMAIL) as? String,
+        addedAt = (doc.get(FIELD_ADDED_AT) as? Timestamp)?.toInstant(),
     )
   }
 
@@ -66,6 +84,8 @@ class CareCircleRepositoryFirestore(
     const val FIELD_FAMILY_NAME = "familyName"
     const val FIELD_RELATIONSHIP = "relationship"
     const val FIELD_PERMISSIONS = "permissions"
+    const val FIELD_EMAIL = "email"
+    const val FIELD_ADDED_AT = "addedAt"
     private const val TAG = "CareCircleRepository"
   }
 }

@@ -2,12 +2,15 @@ package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.COLLECTION
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_ADDED_AT
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_EMAIL
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -19,6 +22,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -61,6 +65,8 @@ class CareCircleRepositoryFirestoreTest {
       familyName: String? = null,
       relationship: String? = null,
       permissions: Any? = null,
+      email: Any? = null,
+      addedAt: Any? = null,
   ) {
     val fields =
         mapOf(
@@ -68,6 +74,8 @@ class CareCircleRepositoryFirestoreTest {
                 FIELD_FAMILY_NAME to familyName,
                 FIELD_RELATIONSHIP to relationship,
                 FIELD_PERMISSIONS to permissions,
+                FIELD_EMAIL to email,
+                FIELD_ADDED_AT to addedAt,
             )
             .filterValues { it != null }
     val json = JSONObject()
@@ -82,6 +90,7 @@ class CareCircleRepositoryFirestoreTest {
       when (value) {
         is String -> JSONObject().put("stringValue", value)
         is Int -> JSONObject().put("integerValue", value.toString())
+        is Instant -> JSONObject().put("timestampValue", value.toString())
         is List<*> ->
             JSONObject()
                 .put(
@@ -94,6 +103,9 @@ class CareCircleRepositoryFirestoreTest {
   private suspend fun firstMembers(): List<CareCircleMember> =
       withTimeout(10_000) { repository.observeMembers(aliceUid).first() }
 
+  private suspend fun firstMember(uid: String): CareCircleMember? =
+      withTimeout(10_000) { repository.observeMember(aliceUid, uid).first() }
+
   @Test
   fun constantsMatchTheFirestoreLayout() {
     assertEquals("circle", COLLECTION)
@@ -101,6 +113,8 @@ class CareCircleRepositoryFirestoreTest {
     assertEquals("familyName", FIELD_FAMILY_NAME)
     assertEquals("relationship", FIELD_RELATIONSHIP)
     assertEquals("permissions", FIELD_PERMISSIONS)
+    assertEquals("email", FIELD_EMAIL)
+    assertEquals("addedAt", FIELD_ADDED_AT)
   }
 
   @Test
@@ -118,7 +132,15 @@ class CareCircleRepositoryFirestoreTest {
 
   @Test
   fun membersAreReadWithAllFields_andSortedByName(): Unit = runBlocking {
-    addMember("sophie", "Sophie", "Dubois", "WIFE", CarePermission.entries.map { it.name })
+    addMember(
+        "sophie",
+        "Sophie",
+        "Dubois",
+        "WIFE",
+        CarePermission.entries.map { it.name },
+        email = SOPHIE_EMAIL,
+        addedAt = ADDED_AT,
+    )
     addMember("marc", "Marc", "Dubois", "SON", listOf("PLANNING", "EVENTS"))
     addMember("laura", "laura", null, "HOME_NURSE", listOf("SYMPTOMS"))
 
@@ -144,6 +166,8 @@ class CareCircleRepositoryFirestoreTest {
                 "Dubois",
                 Relationship.WIFE,
                 CarePermission.entries.toSet(),
+                SOPHIE_EMAIL,
+                ADDED_AT,
             ),
         ),
         firstMembers(),
@@ -162,13 +186,15 @@ class CareCircleRepositoryFirestoreTest {
   @Test
   fun malformedFields_fallBackToSafeDefaults(): Unit = runBlocking {
     addMember("a", "Ann", relationship = "COUSIN", permissions = listOf("EDIT", "EVENTS", 3))
-    addMember("b", "Bob", permissions = "PLANNING")
+    addMember("b", "Bob", permissions = "PLANNING", email = 3, addedAt = "yesterday")
 
     val members = firstMembers()
     assertEquals(Relationship.OTHER, members[0].relationship)
     assertEquals(setOf(CarePermission.EVENTS), members[0].permissions)
     assertEquals(Relationship.OTHER, members[1].relationship)
     assertTrue(members[1].permissions.isEmpty())
+    assertNull(members[1].email)
+    assertNull(members[1].addedAt)
   }
 
   @Test
@@ -214,5 +240,79 @@ class CareCircleRepositoryFirestoreTest {
     } finally {
       db.enableNetwork().await()
     }
+  }
+
+  // ---- observeMember ----
+
+  @Test
+  fun observeMember_readsAllFields(): Unit = runBlocking {
+    addMember("marc", "Marc", "Dubois", "SON", listOf("PLANNING", "EVENTS"), "marc@x.ch", ADDED_AT)
+
+    assertEquals(
+        CareCircleMember(
+            "marc",
+            "Marc",
+            "Dubois",
+            Relationship.SON,
+            setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+            "marc@x.ch",
+            ADDED_AT,
+        ),
+        firstMember("marc"),
+    )
+  }
+
+  @Test
+  fun observeMember_missingMember_emitsNull(): Unit = runBlocking {
+    addMember("sophie", "Sophie")
+    assertNull(firstMember("marc"))
+  }
+
+  @Test
+  fun observeMember_withoutFirstName_emitsNull(): Unit = runBlocking {
+    addMember("blank", "  ", familyName = "Dubois")
+    assertNull(firstMember("blank"))
+  }
+
+  @Test
+  fun observeMember_emitsWhenAddedThenRemoved(): Unit = runBlocking {
+    val emissions = Channel<CareCircleMember?>(Channel.UNLIMITED)
+    val job =
+        launch(Dispatchers.IO) {
+          repository.observeMember(aliceUid, "marc").collect(emissions::send)
+        }
+    try {
+      withTimeout(10_000) {
+        assertNull(emissions.receive())
+
+        addMember("marc", "Marc")
+        var current = emissions.receive()
+        while (current == null) current = emissions.receive()
+        assertEquals("Marc", current?.firstName)
+
+        EmulatorTestData.deleteRawDocument("users/$aliceUid/$COLLECTION/marc")
+        while (current != null) current = emissions.receive()
+      }
+    } finally {
+      job.cancel()
+    }
+  }
+
+  @Test
+  fun observeMember_offline_readsTheCachedMember(): Unit = runBlocking {
+    addMember("marc", "Marc")
+    assertEquals("marc", firstMember("marc")?.uid) // loads it into the cache
+
+    db.disableNetwork().await()
+    try {
+      assertEquals("marc", firstMember("marc")?.uid)
+    } finally {
+      db.enableNetwork().await()
+    }
+  }
+
+  private companion object {
+    const val SOPHIE_EMAIL = "sophie.dubois@example.com"
+    val ADDED_AT: Instant = Instant.parse("2026-08-14T09:30:00Z")
   }
 }

@@ -77,6 +77,14 @@ object EmulatorTestData {
     )
   }
 
+  /**
+   * Deletes a document bypassing security rules, e.g. to remove one clients can't delete.
+   * [documentPath] is relative to the database root, like `users/{uid}/circle/{memberUid}`.
+   */
+  suspend fun deleteRawDocument(documentPath: String) {
+    request("DELETE", "$FIRESTORE_REST/$documentPath")
+  }
+
   /** Retries a few times: the emulator's host loopback can refuse the very first connections. */
   private suspend fun request(method: String, url: String, body: String? = null) {
     var attempt = 0
