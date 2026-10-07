@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -100,13 +101,14 @@ class PlanningViewModel(
     val week = mutableState.value.weekStart
     val range =
         PlanningRange(
-            week.atStartOfDay(zoneId).toInstant(),
-            week.plusWeeks(1).atStartOfDay(zoneId).toInstant(),
+            week,
+            week.plusWeeks(1),
+            zoneId,
         )
     observation = viewModelScope.launch {
       try {
         repository.observeItems(range).collect { items ->
-          weekItems = items.filter { it.scheduledAt in range }
+          weekItems = items.filter { it.timing in range }
           mutableState.value = mutableState.value.copy(isLoading = false, hasError = false)
           publishItems()
         }
@@ -124,8 +126,13 @@ class PlanningViewModel(
         mutableState.value.copy(
             items =
                 weekItems
-                    .filter { it.scheduledAt.atZone(zoneId).toLocalDate() == selected }
-                    .sortedWith(compareBy<PlanningItem> { it.scheduledAt }.thenBy { it.key })
+                    .filter { it.timing.dateIn(zoneId) == selected }
+                    .sortedWith(
+                        compareBy<PlanningItem> { it.timing is PlanningTiming.Timed }
+                            .thenBy { (it.timing as? PlanningTiming.Timed)?.instant }
+                            .thenBy { if (it.timing is PlanningTiming.DateOnly) it.title else "" }
+                            .thenBy { it.key }
+                    )
         )
   }
 

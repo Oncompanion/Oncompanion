@@ -25,6 +25,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -314,29 +316,58 @@ internal fun PlanningAgenda(
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
         items(state.items, key = { it.key }) { item ->
-          ListItem(
-              leadingContent = {
-                Icon(painterResource(R.drawable.ic_planning_event), contentDescription = null)
-              },
-              headlineContent = { Text(item.title) },
-              supportingContent = item.subtitle?.let { subtitle -> { Text(subtitle) } },
-              trailingContent = {
-                Text(
-                    item.scheduledAt
-                        .atZone(zoneId)
-                        .format(DateTimeFormatter.ofPattern(timePattern, locale)),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-              },
-              modifier =
-                  Modifier.testTag(C.Tag.planningItem(item.key))
-                      .then(
-                          if (onItemClick == null) Modifier
-                          else Modifier.clickable { onItemClick(item) }
-                      ),
-          )
+          PlanningRow(item, zoneId, locale, timePattern, onItemClick)
         }
       }
     }
   }
+}
+
+@Composable
+private fun PlanningRow(
+    item: PlanningItem,
+    zoneId: ZoneId,
+    locale: Locale,
+    timePattern: String,
+    onItemClick: ((PlanningItem) -> Unit)?,
+) {
+  val (icon, typeLabel) =
+      when (item.source) {
+        is PlanningSource.Appointment ->
+            R.drawable.ic_planning_event to R.string.planning_type_appointment
+        is PlanningSource.Event -> R.drawable.ic_care_circle to R.string.planning_type_event
+        is PlanningSource.Medication ->
+            R.drawable.ic_planning_medication to R.string.planning_type_medication
+      }
+  val supportingText =
+      if (item.source is PlanningSource.Medication) {
+        item.frequency
+            ?.takeIf { it.isNotBlank() }
+            ?.let { stringResource(R.string.planning_frequency, it) }
+            ?: stringResource(R.string.planning_frequency_unspecified)
+      } else item.subtitle
+  val timed = item.timing as? PlanningTiming.Timed
+  ListItem(
+      leadingContent = {
+        Icon(painterResource(icon), contentDescription = stringResource(typeLabel))
+      },
+      headlineContent = { Text(item.title) },
+      supportingContent = supportingText?.let { text -> { Text(text) } },
+      trailingContent =
+          timed?.let { value ->
+            {
+              Text(
+                  value.instant
+                      .atZone(zoneId)
+                      .format(DateTimeFormatter.ofPattern(timePattern, locale)),
+                  style = MaterialTheme.typography.labelSmall,
+              )
+            }
+          },
+      modifier =
+          Modifier.testTag(C.Tag.planningItem(item.key))
+              .then(
+                  if (onItemClick == null) Modifier else Modifier.clickable { onItemClick(item) }
+              ),
+  )
 }

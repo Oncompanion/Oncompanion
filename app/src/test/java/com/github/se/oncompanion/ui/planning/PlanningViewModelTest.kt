@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -40,7 +41,11 @@ class PlanningViewModelTest {
   }
 
   private fun item(id: String, instant: String) =
-      PlanningItem(PlanningSource.Appointment(id), Instant.parse(instant), "Consultation")
+      PlanningItem(
+          PlanningSource.Appointment(id),
+          PlanningTiming.Timed(Instant.parse(instant)),
+          "Consultation",
+      )
 
   @Test
   fun selectsTodayAndNavigatesAcrossYearBoundary() =
@@ -76,11 +81,14 @@ class PlanningViewModelTest {
         val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
         assertEquals(
-            listOf("appointment:early", "appointment:a", "appointment:b"),
-            vm.uiState.value.items.map { it.key },
+            listOf("early", "a", "b"),
+            vm.uiState.value.items.map { (it.source as PlanningSource.Appointment).appointmentId },
         )
         vm.selectDate(LocalDate.of(2026, 10, 3))
-        assertEquals(listOf("appointment:tomorrow"), vm.uiState.value.items.map { it.key })
+        assertEquals(
+            listOf("tomorrow"),
+            vm.uiState.value.items.map { (it.source as PlanningSource.Appointment).appointmentId },
+        )
         vm.selectDate(LocalDate.of(2026, 10, 4))
         assertTrue(vm.uiState.value.items.isEmpty())
       }
@@ -226,5 +234,75 @@ class PlanningViewModelTest {
         vm.goToToday()
         assertEquals(LocalDate.of(2026, 10, 3), vm.uiState.value.selectedDate)
         assertEquals(1, repository.ranges.size)
+      }
+
+  @Test
+  fun mixedEntriesKeepMedicationsFirstAndObserveChangesWithinTheWeek() =
+      runTest(dispatcher) {
+        val date = LocalDate.of(2026, 10, 2)
+        fun medication(id: String, day: LocalDate = date, title: String = "Medication") =
+            PlanningItem(
+                PlanningSource.Medication("prescription", id),
+                PlanningTiming.DateOnly(day),
+                title,
+                frequency = "Twice a day",
+            )
+        val first = medication("a", title = "A medication")
+        val tie = medication("b", title = "A medication")
+        val last = medication("c", title = "Z medication")
+        val nextDay = first.copy(timing = PlanningTiming.DateOnly(date.plusDays(1)))
+        val appointment = item("early", "2026-10-01T22:01:00Z")
+        val event =
+            PlanningItem(
+                PlanningSource.Event("event"),
+                PlanningTiming.Timed(Instant.parse("2026-10-02T12:00:00Z")),
+                "Workshop",
+            )
+        val repository =
+            FakePlanningRepository().apply {
+              items.value =
+                  listOf(
+                      event,
+                      last,
+                      tie,
+                      appointment,
+                      first,
+                      nextDay,
+                      medication("outside", date.plusWeeks(1)),
+                  )
+            }
+        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        drain()
+        assertEquals(listOf(first, tie, last, appointment, event), vm.uiState.value.items)
+        assertEquals(1, repository.ranges.size)
+        repository.items.value = listOf(first.copy(frequency = "As recorded"), event)
+        drain()
+        assertEquals("As recorded", vm.uiState.value.items.first().frequency)
+        assertEquals(2, vm.uiState.value.items.size)
+        assertEquals(1, repository.ranges.size)
+        repository.items.value = listOf(first, nextDay)
+        drain()
+        vm.selectDate(date.plusDays(1))
+        assertEquals(listOf(nextDay), vm.uiState.value.items)
+        assertEquals(1, repository.ranges.size)
+      }
+
+  @Test
+  fun dateOnlyEntriesStayOnTheirDayInAnotherDisplayZone() =
+      runTest(dispatcher) {
+        val date = LocalDate.of(2026, 10, 2)
+        val medication =
+            PlanningItem(
+                PlanningSource.Medication("p", "m"),
+                PlanningTiming.DateOnly(date),
+                "Medication",
+            )
+        val repository = FakePlanningRepository().apply { items.value = listOf(medication) }
+        val vm =
+            PlanningViewModel(repository, clock, ZoneId.of("Pacific/Honolulu"), SavedStateHandle())
+        drain()
+        assertEquals(listOf(medication), vm.uiState.value.items)
+        vm.selectDate(date.minusDays(1))
+        assertTrue(vm.uiState.value.items.isEmpty())
       }
 }

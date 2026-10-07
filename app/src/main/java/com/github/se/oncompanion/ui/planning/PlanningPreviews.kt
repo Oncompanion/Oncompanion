@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -26,18 +27,18 @@ private fun PlanningPreviewContent(
           listOf(
               PlanningItem(
                   PlanningSource.Appointment("consultation"),
-                  today.atTime(9, 0).atZone(zone).toInstant(),
+                  PlanningTiming.Timed(today.atTime(9, 0).atZone(zone).toInstant()),
                   "Doctor consultation",
                   "Hospital, Room 3",
               ),
               PlanningItem(
                   PlanningSource.Appointment("follow-up"),
-                  today.atTime(14, 30).atZone(zone).toInstant(),
+                  PlanningTiming.Timed(today.atTime(14, 30).atZone(zone).toInstant()),
                   "Follow-up with Dr. Martin",
               ),
               PlanningItem(
                   PlanningSource.Appointment("next-week"),
-                  today.plusWeeks(1).atTime(10, 0).atZone(zone).toInstant(),
+                  PlanningTiming.Timed(today.plusWeeks(1).atTime(10, 0).atZone(zone).toInstant()),
                   "Doctor consultation",
                   "Clinic",
               ),
@@ -47,7 +48,7 @@ private fun PlanningPreviewContent(
         PlanningUiState(
             selected,
             selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
-            appointments.filter { it.scheduledAt.atZone(zone).toLocalDate() == selected },
+            appointments.filter { it.timing.dateIn(zone) == selected },
             loading,
             error,
         ),

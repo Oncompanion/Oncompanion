@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalDate
@@ -34,7 +35,7 @@ class PlanningScreenTest {
   private val item =
       PlanningItem(
           PlanningSource.Appointment("test"),
-          date.atTime(9, 0).atZone(zone).toInstant(),
+          PlanningTiming.Timed(date.atTime(9, 0).atZone(zone).toInstant()),
           "Doctor consultation",
           "Room 3",
       )
