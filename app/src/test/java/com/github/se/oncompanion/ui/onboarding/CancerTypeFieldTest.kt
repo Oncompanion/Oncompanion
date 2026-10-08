@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -256,5 +257,18 @@ class CancerTypeFieldTest {
         .onAllNodes(hasTestTag(C.Tag.cancer_type_suggestions), useUnmergedTree = true)
         .fetchSemanticsNodes()
         .let { assertTrue(it.isNotEmpty()) }
+  }
+
+  @Test
+  fun disabledField_doesNotOfferSuggestions() {
+    composeTestRule.setContent {
+      CancerTypeField(
+          value = "bre",
+          onValueChange = { throw AssertionError("disabled") },
+          enabled = false,
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_suggestions).assertDoesNotExist()
   }
 }
