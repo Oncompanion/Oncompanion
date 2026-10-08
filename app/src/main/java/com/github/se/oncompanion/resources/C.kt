@@ -159,7 +159,6 @@ object C {
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
 
-<<<<<<< HEAD
     // Care circle member details
     const val care_circle_member_screen = "care_circle_member_screen"
     const val care_circle_member_back_button = "care_circle_member_back_button"
@@ -178,7 +177,7 @@ object C {
     /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
     fun careCircleMemberPermission(permissionName: String) =
         "care_circle_member_permission_$permissionName"
-=======
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
@@ -201,6 +200,5 @@ object C {
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
->>>>>>> origin/main
   }
 }
