@@ -1,5 +1,7 @@
 package com.github.se.oncompanion.model.carecircle
 
+import java.time.Instant
+
 /** What a care circle member is to the patient, picked from a fixed list when adding them. */
 enum class Relationship {
   WIFE,
@@ -46,6 +48,8 @@ enum class CarePermission {
  * @property familyName optional, as typed by the patient
  * @property relationship what the member is to the patient
  * @property permissions what the member can see, read-only
+ * @property email optional contact email, as typed by the patient
+ * @property addedAt when the member joined the circle, or null if unknown
  */
 data class CareCircleMember(
     val uid: String,
@@ -53,6 +57,8 @@ data class CareCircleMember(
     val familyName: String? = null,
     val relationship: Relationship = Relationship.OTHER,
     val permissions: Set<CarePermission> = emptySet(),
+    val email: String? = null,
+    val addedAt: Instant? = null,
 ) {
   /** First and family name, e.g. "Sophie Dubois". */
   val fullName: String

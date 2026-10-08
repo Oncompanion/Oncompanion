@@ -2,6 +2,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -10,18 +11,18 @@ import kotlinx.coroutines.flow.map
  * In-memory [CareCircleRepository] for ViewModel and screen tests (no Firebase).
  *
  * Like [CareCircleRepositoryFirestore], [observeMembers] emits the current members sorted by
- * [CareCircleMember.BY_NAME], then every change. Test hooks: [setMembers] changes a circle,
- * [observeError] makes the next [observeMembers] collections fail, and [observedOwners] records who
- * was observed.
+ * [CareCircleMember.BY_NAME], then every change, and [observeMember] emits one member (or null when
+ * they aren't in the circle), then every change. Test hooks: [setMembers] changes a circle,
+ * [observeError] makes the next collections fail, and [observedOwners] records who was observed.
  */
 class FakeCareCircleRepository : CareCircleRepository {
 
   private val circles = MutableStateFlow<Map<String, List<CareCircleMember>>>(emptyMap())
 
-  /** When non-null, collecting [observeMembers] fails with it. */
+  /** When non-null, collecting [observeMembers] or [observeMember] fails with it. */
   var observeError: Exception? = null
 
-  /** The owner uid of every [observeMembers] collection, in order. */
+  /** The owner uid of every [observeMembers] and [observeMember] collection, in order. */
   val observedOwners = mutableListOf<String>()
 
   fun setMembers(ownerUid: String, members: List<CareCircleMember>) {
@@ -33,6 +34,17 @@ class FakeCareCircleRepository : CareCircleRepository {
     observeError?.let { throw it }
     emitAll(
         circles.map { circle -> circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME) }
+    )
+  }
+
+  override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> = flow {
+    observedOwners += ownerUid
+    observeError?.let { throw it }
+    // Like a document listener, only emits when this member changes
+    emitAll(
+        circles
+            .map { circle -> circle[ownerUid]?.firstOrNull { it.uid == memberUid } }
+            .distinctUntilChanged()
     )
   }
 }

@@ -2,6 +2,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -101,5 +102,12 @@ class CareCircleMemberTest {
     val member = CareCircleMember(uid = "1", firstName = "Sophie")
     assertEquals(Relationship.OTHER, member.relationship)
     assertTrue(member.permissions.isEmpty())
+  }
+
+  @Test
+  fun defaults_haveNoEmailNorAddedDate() {
+    val member = CareCircleMember(uid = "1", firstName = "Sophie")
+    assertNull(member.email)
+    assertNull(member.addedAt)
   }
 }

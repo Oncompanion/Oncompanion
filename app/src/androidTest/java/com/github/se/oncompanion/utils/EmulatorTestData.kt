@@ -78,6 +78,14 @@ object EmulatorTestData {
   }
 
   /**
+   * Deletes a document bypassing security rules, e.g. to remove one clients can't delete.
+   * [documentPath] is relative to the database root, like `users/{uid}/circle/{memberUid}`.
+   */
+  suspend fun deleteRawDocument(documentPath: String) {
+    request("DELETE", "$FIRESTORE_REST/$documentPath")
+  }
+
+  /**
    * Replaces a whole document bypassing security rules, like [createRawDocument]: what another
    * device would do while this one is offline.
    */
