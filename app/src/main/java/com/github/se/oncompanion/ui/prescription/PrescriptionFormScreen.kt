@@ -205,6 +205,7 @@ fun PrescriptionFormContent(
       )
 
       // The medications in order: the open one with its fields, the others as one row each
+      val invalidMedications = uiState.invalidMedications
       uiState.draft.medications.forEachIndexed { position, medication ->
         if (position == uiState.openMedication) {
           OpenMedication(
@@ -224,7 +225,7 @@ fun PrescriptionFormContent(
           ClosedMedication(
               position = position,
               medication = medication,
-              blocksSave = position in uiState.invalidMedications,
+              blocksSave = position in invalidMedications,
               onEdit = { onOpenMedication(position) },
           )
         }
