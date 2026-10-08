@@ -57,6 +57,17 @@ object C {
     const val bottom_navigation_tab_events = "bottom_navigation_tab_events"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
+    const val events_title = "events_title"
+    const val events_empty_state = "events_empty_state"
+    const val events_list = "events_list"
+    const val events_loading = "events_loading"
+    const val events_error = "events_error"
+    const val events_retry = "events_retry"
+    const val events_refresh_error = "events_refresh_error"
+    const val events_refresh_retry = "events_refresh_retry"
+
+    fun eventCard(eventId: String) = "event_card_$eventId"
+
     const val symptoms_screen = "symptoms_screen"
     const val symptom_back_button = "symptom_back_button"
     const val symptom_journal_loading = "symptom_journal_loading"

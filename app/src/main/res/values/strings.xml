@@ -126,6 +126,15 @@
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
 
+    <!-- Events -->
+    <string name="events_screen_title">Upcoming events</string>
+    <string name="events_empty_title">No events yet</string>
+    <string name="events_empty_supporting">Events organized by the Ligue will appear here.</string>
+    <string name="events_error_title">Couldn\'t load the events</string>
+    <string name="events_error_supporting">Check your connection and try again.</string>
+    <string name="events_retry">Retry</string>
+    <string name="events_refresh_error">Couldn\'t refresh the events.</string>
+
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
     <string name="care_circle_intro">The people you trust can follow your care. You choose what each person can see.</string>

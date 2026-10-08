@@ -1,11 +1,8 @@
 package com.github.se.oncompanion.ui.navigation
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,6 +23,7 @@ import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
@@ -103,7 +101,9 @@ fun AppNavHost(
         PlanningScreen(navigationActions, planningViewModel)
       }
     }
-    tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
+    navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
+      composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+    }
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
@@ -138,36 +138,6 @@ fun AppNavHost(
       }
       composable(Screen.EDIT_PROFILE) {
         EditProfileScreen(onBack = navigationActions::goBack, onSaved = navigationActions::goBack)
-      }
-    }
-  }
-}
-
-/**
- * Like [placeholderGraph], for a bottom-bar [tab]: the placeholder is shown with the bottom bar,
- * and its title is the tab's label.
- */
-private fun NavGraphBuilder.tabPlaceholderGraph(
-    tab: Tab,
-    screen: String,
-    testTag: String,
-    navigationActions: NavigationActions,
-) {
-  navigation(startDestination = screen, route = tab.route) {
-    composable(screen) {
-      Scaffold(
-          bottomBar = {
-            BottomNavigationBar(
-                selectedTab = tab,
-                onTabSelected = { selected -> navigationActions.navigateToTab(selected.route) },
-            )
-          }
-      ) { innerPadding ->
-        PlaceholderScreen(
-            title = stringResource(tab.label),
-            testTag = testTag,
-            modifier = Modifier.padding(innerPadding),
-        )
       }
     }
   }
