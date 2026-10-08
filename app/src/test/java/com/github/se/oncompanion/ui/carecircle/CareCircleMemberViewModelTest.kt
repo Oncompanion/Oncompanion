@@ -188,8 +188,11 @@ class CareCircleMemberViewModelTest {
   fun retry_stopsThePreviousObservation() = runTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
+    assertEquals(1, repository.activeObservations)
     viewModel.retry()
     advanceUntilIdle()
+    // The first listener is gone, not just outrun by the new one
+    assertEquals(1, repository.activeObservations)
 
     // Only the new observation updates the state: no stale "NotFound" from the first one
     repository.setMembers(ownerUid, listOf(marc))
