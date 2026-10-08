@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryFirestore
