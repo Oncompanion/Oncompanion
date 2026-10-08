@@ -23,6 +23,7 @@ import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -52,9 +53,14 @@ class EventsScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     val openedTabs = mutableListOf<String>()
+    val openedScreens = mutableListOf<String>()
 
     override fun navigateToTab(route: String) {
       openedTabs += route
+    }
+
+    override fun navigateTo(screen: String) {
+      openedScreens += screen
     }
   }
 
@@ -73,9 +79,10 @@ class EventsScreenTest {
     composeTestRule.setContent { EventsContent(uiState = uiState, onRetry = onRetry) }
   }
 
+  // Clickable cards merge their texts, so look for the text in the unmerged tree
   private fun assertTextInside(text: String, parentTag: String) {
     composeTestRule
-        .onNode(hasText(text) and hasAnyAncestor(hasTestTag(parentTag)))
+        .onNode(hasText(text) and hasAnyAncestor(hasTestTag(parentTag)), useUnmergedTree = true)
         .assertIsDisplayed()
   }
 
@@ -181,6 +188,34 @@ class EventsScreenTest {
   fun eventsContent_hasNoBottomBarByDefault() {
     setContent(EventsUiState(isLoading = false))
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+  }
+
+  @Test
+  fun clickingAnEventCard_reportsTheEvent() {
+    val clicked = mutableListOf<Event>()
+    composeTestRule.setContent {
+      EventsContent(
+          uiState = EventsUiState(events = listOf(yoga), isLoading = false),
+          onRetry = {},
+          onEventClick = { clicked += it },
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(yoga.id)).performClick()
+
+    composeTestRule.runOnIdle { assertEquals(listOf(yoga), clicked) }
+  }
+
+  @Test
+  fun clickingAnEventCard_opensItsDetail() {
+    val navigationActions = setEventsScreen()
+    val first = FakeEventRepository.sampleEvents(LocalDate.now()).first()
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(first.id)).performClick()
+
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Screen.eventDetail(first.id)), navigationActions.openedScreens)
+    }
   }
 
   @Test

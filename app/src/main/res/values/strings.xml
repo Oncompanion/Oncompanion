@@ -133,6 +133,14 @@
     <string name="events_error_title">Couldn\'t load the events</string>
     <string name="events_error_supporting">Check your connection and try again.</string>
     <string name="events_retry">Retry</string>
+
+    <!-- Event detail -->
+    <string name="event_detail_title">Event details</string>
+    <string name="event_detail_back">Back</string>
+    <string name="event_detail_date_time">Date &amp; time</string>
+    <string name="event_detail_location">Location</string>
+    <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
+    <string name="event_detail_error">Couldn\'t load this event. Check your connection and try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
 
     <!-- Care circle -->

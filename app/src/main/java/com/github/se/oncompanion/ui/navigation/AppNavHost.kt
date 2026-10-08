@@ -23,6 +23,7 @@ import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
@@ -103,6 +104,15 @@ fun AppNavHost(
     }
     navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
       composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+      composable(
+          Screen.EVENT_DETAIL,
+          arguments = listOf(navArgument(Screen.EVENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        EventDetailScreen(
+            eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty(),
+            onBack = navigationActions::goBack,
+        )
+      }
     }
 
     // Features opened from the Overview shortcuts
