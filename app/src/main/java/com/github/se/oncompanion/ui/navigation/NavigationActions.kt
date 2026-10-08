@@ -61,6 +61,7 @@ object Screen {
 
   // Route.PROFILE
   const val PROFILE = "profile_home"
+  const val EDIT_PROFILE = "edit_profile"
 }
 
 /** Navigation helpers shared by all screens, so screens never use the NavController directly. */
