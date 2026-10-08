@@ -71,7 +71,15 @@ class PlanningScreenTest {
       items: List<PlanningItem> = emptyList(),
       loading: Boolean = false,
       error: Boolean = false,
-  ) = PlanningUiState(date, LocalDate.of(2026, 9, 28), items, loading, error)
+  ) =
+      PlanningUiState(
+          date,
+          LocalDate.of(2026, 9, 28),
+          untimedItems = items.filter { it.timing is PlanningTiming.DateOnly },
+          scheduledItems = items.filter { it.timing is PlanningTiming.Timed },
+          isLoading = loading,
+          hasError = error,
+      )
 
   @Test
   fun emptyStateAndDates() {

@@ -296,7 +296,11 @@ internal fun PlanningAgenda(
         }
       }
     }
-    if (state.items.isEmpty() && !state.isLoading && !state.hasError) {
+    if (
+        (state.untimedItems.isEmpty() && state.scheduledItems.isEmpty()) &&
+            !state.isLoading &&
+            !state.hasError
+    ) {
       Column(
           Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.planning_empty),
           verticalArrangement = Arrangement.Center,
@@ -317,21 +321,19 @@ internal fun PlanningAgenda(
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
         // A single scrolling agenda keeps untimed medications before all timed entries.
-        val medications = state.items.filter { it.source is PlanningSource.Medication }
-        val scheduled = state.items.filter { it.source !is PlanningSource.Medication }
-        if (medications.isNotEmpty()) {
+        if (state.untimedItems.isNotEmpty()) {
           item(key = "section:no-time") {
             AgendaHeading(R.string.planning_no_set_time, C.Tag.planning_no_set_time)
           }
-          items(medications, key = { it.key }) { item ->
+          items(state.untimedItems, key = { it.key }) { item ->
             PlanningRow(item, zoneId, locale, timePattern, onItemClick)
           }
         }
-        if (scheduled.isNotEmpty()) {
+        if (state.scheduledItems.isNotEmpty()) {
           item(key = "section:scheduled") {
             AgendaHeading(R.string.planning_scheduled, C.Tag.planning_scheduled)
           }
-          items(scheduled, key = { it.key }) { item ->
+          items(state.scheduledItems, key = { it.key }) { item ->
             PlanningRow(item, zoneId, locale, timePattern, onItemClick)
           }
         }

@@ -61,9 +61,16 @@ private fun PlanningPreviewContent(
         PlanningUiState(
             selected,
             selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
-            entries.filter { it.timing.dateIn(zone) == selected },
-            loading,
-            error,
+            untimedItems =
+                entries.filter {
+                  it.timing.dateIn(zone) == selected && it.timing is PlanningTiming.DateOnly
+                },
+            scheduledItems =
+                entries.filter {
+                  it.timing.dateIn(zone) == selected && it.timing is PlanningTiming.Timed
+                },
+            isLoading = loading,
+            hasError = error,
         ),
         today,
         zone,

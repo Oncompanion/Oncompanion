@@ -24,11 +24,16 @@ import kotlinx.coroutines.launch
 data class PlanningUiState(
     val selectedDate: LocalDate,
     val weekStart: LocalDate,
-    val items: List<PlanningItem> = emptyList(),
+    val untimedItems: List<PlanningItem> = emptyList(),
+    val scheduledItems: List<PlanningItem> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     val today: LocalDate = selectedDate,
 ) {
+  /** The complete agenda in section order, derived from the two displayed sections. */
+  val items: List<PlanningItem>
+    get() = untimedItems + scheduledItems
+
   val canGoToPreviousWeek: Boolean
     get() = PlanningDates.isSupported(selectedDate.minusWeeks(1))
 
@@ -125,19 +130,22 @@ class PlanningViewModel(
     val selected = mutableState.value.selectedDate
     // Compare medication names using the phone's locale, including case and accents.
     val titleCollator = Collator.getInstance()
+    // Group by timing once so the view renders the same sections that define ordering.
+    val (untimed, scheduled) =
+        weekItems
+            .filter { it.timing.dateIn(zoneId) == selected }
+            .partition { it.timing is PlanningTiming.DateOnly }
     mutableState.value =
         mutableState.value.copy(
-            items =
-                weekItems
-                    .filter { it.timing.dateIn(zoneId) == selected }
-                    .sortedWith(
-                        compareBy<PlanningItem> { it.timing is PlanningTiming.Timed }
-                            .thenBy { (it.timing as? PlanningTiming.Timed)?.instant }
-                            .thenBy(titleCollator) {
-                              if (it.timing is PlanningTiming.DateOnly) it.title else ""
-                            }
-                            .thenBy { it.key }
-                    )
+            untimedItems =
+                untimed.sortedWith(
+                    compareBy<PlanningItem, String>(titleCollator) { it.title }.thenBy { it.key }
+                ),
+            scheduledItems =
+                scheduled.sortedWith(
+                    compareBy<PlanningItem> { (it.timing as PlanningTiming.Timed).instant }
+                        .thenBy { it.key }
+                ),
         )
   }
 

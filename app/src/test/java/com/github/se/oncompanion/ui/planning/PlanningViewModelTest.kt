@@ -81,6 +81,8 @@ class PlanningViewModelTest {
             )
         val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
+        assertTrue(vm.uiState.value.untimedItems.isEmpty())
+        assertEquals(vm.uiState.value.items, vm.uiState.value.scheduledItems)
         assertEquals(
             listOf("early", "a", "b"),
             vm.uiState.value.items.map { (it.source as PlanningSource.Appointment).appointmentId },
@@ -92,6 +94,8 @@ class PlanningViewModelTest {
         )
         vm.selectDate(LocalDate.of(2026, 10, 4))
         assertTrue(vm.uiState.value.items.isEmpty())
+        assertTrue(vm.uiState.value.untimedItems.isEmpty())
+        assertTrue(vm.uiState.value.scheduledItems.isEmpty())
       }
 
   @Test
@@ -274,6 +278,8 @@ class PlanningViewModelTest {
             }
         val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
         drain()
+        assertEquals(listOf(first, tie, last), vm.uiState.value.untimedItems)
+        assertEquals(listOf(appointment, event), vm.uiState.value.scheduledItems)
         assertEquals(listOf(first, tie, last, appointment, event), vm.uiState.value.items)
         assertEquals(1, repository.ranges.size)
         repository.items.value = listOf(first.copy(frequency = "As recorded"), event)
@@ -284,6 +290,8 @@ class PlanningViewModelTest {
         repository.items.value = listOf(first, nextDay)
         drain()
         vm.selectDate(date.plusDays(1))
+        assertEquals(listOf(nextDay), vm.uiState.value.untimedItems)
+        assertTrue(vm.uiState.value.scheduledItems.isEmpty())
         assertEquals(listOf(nextDay), vm.uiState.value.items)
         assertEquals(1, repository.ranges.size)
       }
@@ -314,7 +322,11 @@ class PlanningViewModelTest {
               }
           val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
           drain()
-          assertEquals(listOf(lower, upper, plain, accented, tie, last), vm.uiState.value.items)
+          assertEquals(
+              listOf(lower, upper, plain, accented, tie, last),
+              vm.uiState.value.untimedItems,
+          )
+          assertTrue(vm.uiState.value.scheduledItems.isEmpty())
         } finally {
           Locale.setDefault(previousLocale)
         }
@@ -337,5 +349,7 @@ class PlanningViewModelTest {
         assertEquals(listOf(medication), vm.uiState.value.items)
         vm.selectDate(date.minusDays(1))
         assertTrue(vm.uiState.value.items.isEmpty())
+        assertTrue(vm.uiState.value.untimedItems.isEmpty())
+        assertTrue(vm.uiState.value.scheduledItems.isEmpty())
       }
 }
