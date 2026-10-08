@@ -77,6 +77,14 @@ object EmulatorTestData {
     )
   }
 
+  /**
+   * Replaces a whole document bypassing security rules, like [createRawDocument]: what another
+   * device would do while this one is offline.
+   */
+  suspend fun replaceRawDocument(collection: String, documentId: String, fieldsJson: String) {
+    request("PATCH", "$FIRESTORE_REST/$collection/$documentId", body = "{\"fields\": $fieldsJson}")
+  }
+
   /** Retries a few times: the emulator's host loopback can refuse the very first connections. */
   private suspend fun request(method: String, url: String, body: String? = null) {
     var attempt = 0

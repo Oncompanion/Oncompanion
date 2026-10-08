@@ -41,6 +41,10 @@
     <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
     <string name="profile_sign_out_cancel">Cancel</string>
     <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>
+    <string name="edit_profile_title">Edit profile</string>
+    <string name="edit_profile_save">Save</string>
+    <string name="edit_profile_cancel">Cancel</string>
+    <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>

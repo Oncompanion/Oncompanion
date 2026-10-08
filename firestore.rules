@@ -29,36 +29,19 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
-    // Keep the limit in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH).
+    // Keep the limits in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH, MAX_MEDICATIONS).
+    // The fields of each medication are not checked here: rules have no loops, and checking 20
+    // entries one by one exceeds the limit of 1000 expressions per request (about 4 fit). The app
+    // checks them before saving (Medication.isValid) and skips the ones it can't read.
     function isValidPrescription(data) {
-      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt'])
-          && data.keys().hasAll(['prescribedOn', 'createdAt'])
+      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications'])
+          && data.keys().hasAll(['prescribedOn', 'createdAt', 'medications'])
           && optionalString(data, 'prescribedBy', 100)
           && data.prescribedOn is timestamp
-          && data.createdAt is timestamp;
-    }
-
-    // Keep the limits in sync with Medication (MAX_TEXT_LENGTH, MAX_DURATION_DAYS) and
-    // Prescription (MAX_MEDICATIONS, for the position).
-    function isValidMedication(data) {
-      return data.keys().hasOnly(['prescriptionId', 'name', 'dosage', 'frequency', 'startDate',
-                                  'durationDays', 'position'])
-          && data.keys().hasAll(['prescriptionId', 'name', 'startDate', 'position'])
-          && data.prescriptionId is string
-          && data.prescriptionId.trim().size() > 0
-          && data.name is string
-          && data.name.trim().size() > 0
-          && data.name.size() <= 100
-          && optionalString(data, 'dosage', 100)
-          && optionalString(data, 'frequency', 100)
-          && data.startDate is timestamp
-          // No duration = no end date
-          && (data.get('durationDays', null) == null
-              || (data.durationDays is int && data.durationDays >= 1 && data.durationDays <= 3650))
-          // Rank of the medication in its prescription
-          && data.position is int
-          && data.position >= 0
-          && data.position < 20;
+          && data.createdAt is timestamp
+          && data.medications is list
+          && data.medications.size() >= 1
+          && data.medications.size() <= 20;
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY,
@@ -98,8 +81,9 @@ service cloud.firestore {
                     // access will depend on it)
                     && request.resource.data.role == resource.data.role;
 
-      // ---------- Prescriptions and medications ----------
-      // /users/{uid}/prescriptions/{prescriptionId}: what the medications of a prescription share.
+      // ---------- Prescriptions ----------
+      // /users/{uid}/prescriptions/{prescriptionId}: a prescription and the list of its
+      // medications, in one document. There is no medications collection.
       match /prescriptions/{prescriptionId} {
         allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
@@ -108,16 +92,6 @@ service cloud.firestore {
         allow update: if isOwner(uid)
                       && isValidPrescription(request.resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
-      }
-
-      // /users/{uid}/medications/{medicationId}: one per medication, linked to its prescription.
-      match /medications/{medicationId} {
-        allow read, delete: if isOwner(uid);
-        allow create: if isOwner(uid) && isValidMedication(request.resource.data);
-        allow update: if isOwner(uid)
-                      && isValidMedication(request.resource.data)
-                      // A medication stays in the prescription it was saved with
-                      && request.resource.data.prescriptionId == resource.data.prescriptionId;
       }
 
       // ---------- Symptoms ----------

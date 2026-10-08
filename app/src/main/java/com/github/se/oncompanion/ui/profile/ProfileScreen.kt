@@ -57,6 +57,7 @@ private val memberSinceFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Local
 fun ProfileScreen(
     onBack: () -> Unit,
     onSignedOut: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel { ProfileViewModel() },
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
@@ -75,6 +76,7 @@ fun ProfileScreen(
       onConfirmSignOut = {
         viewModel.confirmSignOut { credentialProvider.clearCredentialState(context) }
       },
+      onEdit = onEdit,
       modifier = modifier,
   )
 }
@@ -89,6 +91,7 @@ fun ProfileContent(
     onSignOut: () -> Unit,
     onCancelSignOut: () -> Unit,
     onConfirmSignOut: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val confirmation = uiState as? ProfileUiState.ConfirmingSignOut
@@ -185,6 +188,16 @@ fun ProfileContent(
           ProfileUiState.SignOutComplete -> Unit
         }
       }
+      if (profile is ProfileUiState.Loaded) {
+        Button(
+            onClick = onEdit,
+            enabled = !signingOut,
+            modifier =
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(C.Tag.profile_edit),
+        ) {
+          Text(stringResource(R.string.edit_profile_title))
+        }
+      }
       if (profile != ProfileUiState.SignedOut && profile != ProfileUiState.SignOutComplete) {
         TextButton(
             onClick = onSignOut,
@@ -199,7 +212,10 @@ fun ProfileContent(
 }
 
 @Composable
-private fun ProfileDetailsContent(details: ProfileDetails, modifier: Modifier = Modifier) {
+private fun ProfileDetailsContent(
+    details: ProfileDetails,
+    modifier: Modifier = Modifier,
+) {
   Column(
       modifier =
           modifier

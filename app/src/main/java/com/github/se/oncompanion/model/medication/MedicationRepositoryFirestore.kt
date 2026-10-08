@@ -15,22 +15,21 @@ import java.time.ZoneId
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
 /**
- * [MedicationRepository] backed by Cloud Firestore: what a prescription's medications share is at
- * `/users/{uid}/prescriptions/{id}`, and each medication at `/users/{uid}/medications/{id}`.
+ * [MedicationRepository] backed by Cloud Firestore: a prescription is one document at
+ * `/users/{uid}/prescriptions/{id}` that holds the list of its medications.
  *
- * A prescription and its medications are written in one batch, so they are saved together or not at
- * all. Writes return as soon as they are applied to the local cache, without waiting for the
+ * Saving, replacing or deleting a prescription is therefore a single write: its medications can't
+ * be half saved, and when two devices replace them, the last save to reach the server replaces the
+ * whole list. Writes return as soon as they are applied to the local cache, without waiting for the
  * server, so they never block the UI (offline, Firestore syncs them when the connection comes
- * back). What an update or a deletion needs to know first (whether the prescription was deleted,
- * which medications it has) is also taken from the local cache. If the server later rejects a write
- * (security rules, or an update of a prescription that doesn't exist), Firestore rolls the local
- * change back and the rejection is logged; [Prescription.isValid] mirrors the rules so the former
- * shouldn't happen.
+ * back). Whether a prescription was deleted, which an update needs to know first, is also taken
+ * from the local cache. If the server later rejects a write (security rules, or an update of a
+ * prescription that doesn't exist), Firestore rolls the local change back and the rejection is
+ * logged; [Prescription.isValid] mirrors the rules so the former shouldn't happen.
  */
 class MedicationRepositoryFirestore(
     dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
@@ -46,15 +45,9 @@ class MedicationRepositoryFirestore(
   override fun newId(): String = db.collection(USERS).document().id
 
   override fun observePrescriptions(uid: String): Flow<List<Prescription>> =
-      combine(prescriptions(uid).snapshots(), medications(uid).snapshots()) {
-          prescriptions,
-          medications ->
-        val medicationsByPrescription = medications.groupBy { it.getString(FIELD_PRESCRIPTION_ID) }
-        prescriptions
-            .mapNotNull { toPrescription(it, medicationsByPrescription[it.id].orEmpty()) }
-            // The two collections are listened to separately: a prescription can show up a moment
-            // before its medications, or stay a moment after them. It is left out meanwhile.
-            .filter { it.medications.isNotEmpty() }
+      prescriptions(uid).snapshots().map { documents ->
+        documents
+            .mapNotNull(::toPrescription)
             .sortedWith(
                 compareByDescending<Prescription> { it.prescribedOn }
                     // Not confirmed by the server yet: counts as the most recently saved
@@ -62,57 +55,42 @@ class MedicationRepositoryFirestore(
             )
       }
 
-  override suspend fun getPrescription(uid: String, id: String): Prescription? {
-    val prescription = existingPrescription(uid, id) ?: return null
-    return toPrescription(prescription, medicationsOf(uid, id))
-  }
+  override suspend fun getPrescription(uid: String, id: String): Prescription? =
+      existingPrescription(uid, id)?.let(::toPrescription)
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
-      medications(uid).snapshots().map { documents ->
-        documents.mapNotNull(::toMedication).sortedWith(compareBy({ it.startDate }, { it.name }))
+      prescriptions(uid).snapshots().map { documents ->
+        documents
+            .mapNotNull(::toPrescription)
+            .flatMap { it.medications }
+            .sortedWith(compareBy({ it.startDate }, { it.name }))
       }
 
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     require(prescription.isValid()) { "Invalid prescription" }
-    val batch = db.batch()
-    batch.set(
-        prescriptions(uid).document(prescription.id),
-        prescriptionFields(prescription) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()),
-    )
-    prescription.medications.forEachIndexed { position, medication ->
-      batch.set(medications(uid).document(medication.id), medicationFields(medication, position))
-    }
-    batch.commit().logServerRejection(prescription.id)
+    prescriptions(uid)
+        .document(prescription.id)
+        .set(prescriptionFields(prescription) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
+        .logServerRejection(prescription.id)
   }
 
   override suspend fun updatePrescription(uid: String, prescription: Prescription) {
     require(prescription.isValid()) { "Invalid prescription" }
     if (isKnownAsDeleted(uid, prescription.id)) return
-    val keptIds = prescription.medications.map { it.id }.toSet()
-    val batch = db.batch()
-    // update() and not set(): createdAt stays as it is, and the server rejects the whole batch if
-    // the prescription doesn't exist
-    batch.update(prescriptions(uid).document(prescription.id), prescriptionFields(prescription))
-    prescription.medications.forEachIndexed { position, medication ->
-      batch.set(medications(uid).document(medication.id), medicationFields(medication, position))
-    }
-    cachedMedicationsOf(uid, prescription.id)
-        .filter { it.id !in keptIds }
-        .forEach { batch.delete(it.reference) }
-    batch.commit().logServerRejection(prescription.id)
+    // update() and not set(): createdAt stays as it is, and the server rejects the write if the
+    // prescription doesn't exist. The list of medications is replaced as a whole.
+    prescriptions(uid)
+        .document(prescription.id)
+        .update(prescriptionFields(prescription))
+        .logServerRejection(prescription.id)
   }
 
   override suspend fun deletePrescription(uid: String, id: String) {
-    val batch = db.batch()
-    batch.delete(prescriptions(uid).document(id))
-    cachedMedicationsOf(uid, id).forEach { batch.delete(it.reference) }
-    batch.commit().logServerRejection(id)
+    prescriptions(uid).document(id).delete().logServerRejection(id)
   }
 
   private fun prescriptions(uid: String) =
       db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
-
-  private fun medications(uid: String) = db.collection(USERS).document(uid).collection(MEDICATIONS)
 
   /**
    * The document of prescription [id], or `null` if it doesn't exist, or if the device is offline
@@ -139,17 +117,6 @@ class MedicationRepositoryFirestore(
         // Not in the cache: Firestore can't tell whether it exists
         false
       }
-
-  /** The documents of the medications of prescription [id], in any order. */
-  private suspend fun medicationsOf(uid: String, id: String): List<DocumentSnapshot> =
-      medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get().await().documents
-
-  /**
-   * The medications of prescription [id] that this device has in its local cache, without waiting
-   * for the network.
-   */
-  private suspend fun cachedMedicationsOf(uid: String, id: String): List<DocumentSnapshot> =
-      medications(uid).whereEqualTo(FIELD_PRESCRIPTION_ID, id).get(Source.CACHE).await().documents
 
   /** Emits the documents of the collection now and every time they change. */
   private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> = callbackFlow {
@@ -180,73 +147,87 @@ class MedicationRepositoryFirestore(
       mapOf(
           FIELD_PRESCRIBED_BY to prescription.prescribedBy,
           FIELD_PRESCRIBED_ON to prescription.prescribedOn.toTimestamp(),
+          FIELD_MEDICATIONS to prescription.medications.map(::medicationFields),
       )
 
-  private fun medicationFields(medication: Medication, position: Int): Map<String, Any?> =
+  /** One entry of the list of medications; its prescription is the document it is stored in. */
+  private fun medicationFields(medication: Medication): Map<String, Any?> =
       mapOf(
-          FIELD_PRESCRIPTION_ID to medication.prescriptionId,
+          FIELD_ID to medication.id,
           FIELD_NAME to medication.name,
           FIELD_DOSAGE to medication.dosage,
           FIELD_FREQUENCY to medication.frequency,
           FIELD_START_DATE to medication.startDate.toTimestamp(),
           FIELD_DURATION_DAYS to medication.durationDays,
-          FIELD_POSITION to position,
       )
 
-  /** Builds a prescription from its document and the documents of its medications, in any order. */
-  private fun toPrescription(doc: DocumentSnapshot, medications: List<DocumentSnapshot>) =
+  /**
+   * Builds a prescription from its document. The security rules don't check the fields of each
+   * medication, so they are checked here: a medication that can't be read or is not
+   * [Medication.isValid] is left out, and so is one that repeats the ID of an earlier one. `null`
+   * if the document itself can't be read or none of its medications is kept.
+   */
+  private fun toPrescription(doc: DocumentSnapshot): Prescription? =
       try {
         Prescription(
-            id = doc.id,
-            prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
-            prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
-            medications =
-                medications.sortedBy { it.getLong(FIELD_POSITION) ?: 0 }.mapNotNull(::toMedication),
-            // Pending server timestamps read as null until the write reaches the server
-            createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
-        )
+                id = doc.id,
+                prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
+                prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
+                medications =
+                    (doc.get(FIELD_MEDICATIONS) as List<*>)
+                        .mapNotNull { toMedication(doc.id, it) }
+                        .distinctBy { it.id },
+                // Pending server timestamps read as null until the write reaches the server
+                createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
+            )
+            .takeIf { it.medications.isNotEmpty() }
       } catch (e: Exception) {
         Log.e(TAG, "Malformed prescription document ${doc.id}", e)
         null
       }
 
-  private fun toMedication(doc: DocumentSnapshot): Medication? =
+  /**
+   * Builds a medication from one entry of the list of medications of [prescriptionId], or `null` if
+   * the entry can't be read or its values are not [Medication.isValid].
+   */
+  private fun toMedication(prescriptionId: String, entry: Any?): Medication? =
       try {
+        val fields = entry as Map<*, *>
         Medication(
-            id = doc.id,
-            prescriptionId = doc.getString(FIELD_PRESCRIPTION_ID)!!,
-            name = doc.getString(FIELD_NAME)!!,
-            dosage = doc.getString(FIELD_DOSAGE),
-            frequency = doc.getString(FIELD_FREQUENCY),
-            startDate = doc.getTimestamp(FIELD_START_DATE)!!.toLocalDate(),
-            durationDays = doc.getLong(FIELD_DURATION_DAYS)?.toInt(),
-        )
+                id = fields[FIELD_ID] as String,
+                prescriptionId = prescriptionId,
+                name = fields[FIELD_NAME] as String,
+                dosage = fields[FIELD_DOSAGE] as String?,
+                frequency = fields[FIELD_FREQUENCY] as String?,
+                startDate = (fields[FIELD_START_DATE] as Timestamp).toLocalDate(),
+                // Only a whole number that fits in an Int: converting a decimal or a bigger number
+                // would turn it into a duration that looks valid
+                durationDays = (fields[FIELD_DURATION_DAYS] as Long?)?.let(Math::toIntExact),
+            )
+            .also { require(it.isValid()) { "Invalid values" } }
       } catch (e: Exception) {
-        Log.e(TAG, "Malformed medication document ${doc.id}", e)
+        Log.e(TAG, "Malformed medication in prescription document $prescriptionId", e)
         null
       }
 
   companion object {
     const val USERS = "users"
     const val PRESCRIPTIONS = "prescriptions"
-    const val MEDICATIONS = "medications"
 
     // Prescription fields
     const val FIELD_PRESCRIBED_BY = "prescribedBy"
     const val FIELD_PRESCRIBED_ON = "prescribedOn"
     const val FIELD_CREATED_AT = "createdAt"
+    /** The medications of the prescription, in the order they were saved. */
+    const val FIELD_MEDICATIONS = "medications"
 
-    // Medication fields
-    const val FIELD_PRESCRIPTION_ID = "prescriptionId"
+    // Fields of each medication of the list
+    const val FIELD_ID = "id"
     const val FIELD_NAME = "name"
     const val FIELD_DOSAGE = "dosage"
     const val FIELD_FREQUENCY = "frequency"
     const val FIELD_START_DATE = "startDate"
     const val FIELD_DURATION_DAYS = "durationDays"
-    /**
-     * Rank of the medication in its prescription, to read them back in the order they were saved.
-     */
-    const val FIELD_POSITION = "position"
 
     /**
      * The time zone used to store calendar days, see [FIELD_PRESCRIBED_ON] and [FIELD_START_DATE].

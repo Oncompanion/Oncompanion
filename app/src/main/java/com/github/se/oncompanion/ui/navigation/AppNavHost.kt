@@ -38,6 +38,8 @@ import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.profile.EditProfileScreen
+import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
@@ -142,9 +144,17 @@ fun AppNavHost(
       composable(Screen.PROFILE) {
         ProfileScreen(
             onBack = navigationActions::goBack,
+            onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
             onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
             viewModel = viewModel { ProfileViewModel(authRepository, profileRepository) },
             credentialProvider = credentialProvider,
+        )
+      }
+      composable(Screen.EDIT_PROFILE) {
+        EditProfileScreen(
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
+            viewModel = viewModel { EditProfileViewModel(authRepository, profileRepository) },
         )
       }
     }

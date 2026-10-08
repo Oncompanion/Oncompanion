@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryFirestore
@@ -75,15 +76,3 @@ class SymptomDetailViewModel(
     const val TAG = "SymptomDetailViewModel"
   }
 }
-
-/**
- * The signed-in user's uid, or `null` if nobody is signed in or the user can't be read (logged with
- * [tag]). Symptom screens are only reachable after signing in, so `null` is an error for them.
- */
-internal fun AuthRepository.signedInUid(tag: String): String? =
-    try {
-      currentUser?.uid
-    } catch (e: Exception) {
-      Log.w(tag, "Couldn't read the signed-in user", e)
-      null
-    }

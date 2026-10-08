@@ -1,11 +1,13 @@
 package com.github.se.oncompanion
 
+import android.content.ComponentName
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,5 +36,16 @@ class MainActivityTest {
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+  }
+
+  @Test
+  fun mainActivity_launchesWithSplashScreenTheme() {
+    val activity = composeTestRule.activity
+    val info =
+        activity.packageManager.getActivityInfo(
+            ComponentName(activity, MainActivity::class.java),
+            0,
+        )
+    assertEquals(R.style.Theme_oncompanion_Starting, info.theme)
   }
 }

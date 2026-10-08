@@ -11,6 +11,14 @@ interface UserProfileRepository {
    */
   suspend fun getProfile(uid: String): UserProfile?
 
+  /**
+   * Returns the profile of [uid] only if it is saved on this device, without asking the server, so
+   * it answers at once even on a slow connection ([getProfile] can wait for the server). Returns
+   * `null` when the device doesn't know: never loaded here, or only known as missing, which may be
+   * outdated. In that case, call [getProfile].
+   */
+  suspend fun getCachedProfile(uid: String): UserProfile? = null
+
   /** Emits the profile of [uid] (or `null`) now and every time it changes. */
   fun observeProfile(uid: String): Flow<UserProfile?>
 

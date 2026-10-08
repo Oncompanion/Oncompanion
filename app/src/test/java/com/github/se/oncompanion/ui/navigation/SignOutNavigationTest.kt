@@ -68,6 +68,39 @@ class SignOutNavigationTest {
   }
 
   @Test
+  fun editProfileAndSignOutRemainAvailableThroughTheCombinedFlow() {
+    content()
+    compose.onNodeWithTag(C.Tag.overview_shortcut_profile).performClick()
+    val edit = compose.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
+    val signOut = compose.onNodeWithTag(C.Tag.profile_sign_out).assertIsDisplayed()
+    assertTrue(
+        edit.fetchSemanticsNode().boundsInRoot.bottom <=
+            signOut.fetchSemanticsNode().boundsInRoot.top
+    )
+    edit.performClick()
+    compose.onNodeWithTag(C.Tag.edit_profile_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.edit_profile_family_name).performTextReplacement("Moreau")
+    compose.onNodeWithTag(C.Tag.edit_profile_save).performScrollTo().performClick()
+    compose.onNodeWithText("Moreau").assertExists()
+    compose.runOnIdle { assertEquals(Screen.PROFILE, actions.currentRoute()) }
+    compose.onNodeWithTag(C.Tag.profile_edit).performClick()
+    compose.onNodeWithTag(C.Tag.edit_profile_family_name).performTextReplacement("Discard")
+    compose.onNodeWithTag(C.Tag.edit_profile_cancel).performScrollTo().performClick()
+    compose.onNodeWithText("Moreau").assertExists()
+    compose.onNodeWithTag(C.Tag.profile_sign_out).performClick()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_dialog).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_cancel).performClick()
+    compose.runOnIdle { assertEquals(0, auth.signOutCalls) }
+    compose.onNodeWithTag(C.Tag.profile_sign_out).performClick()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
+    compose.runOnIdle {
+      assertEquals(1, auth.signOutCalls)
+      assertNull(nav.previousBackStackEntry)
+    }
+  }
+
+  @Test
   fun confirmedSignOutOpensLoginAndBackCannotRevealCachedProfileOrOverview() {
     content()
     signOut()

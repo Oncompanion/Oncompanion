@@ -37,6 +37,7 @@ class ProfileSignOutScreenTest {
           state.value,
           onBack = {},
           onRetry = {},
+          onEdit = {},
           onSignOut = {
             requests++
             state.value = ProfileUiState.ConfirmingSignOut(loaded)
@@ -75,6 +76,7 @@ class ProfileSignOutScreenTest {
           state.value,
           onBack = {},
           onRetry = {},
+          onEdit = {},
           onSignOut = {},
           onCancelSignOut = { cancels++ },
           onConfirmSignOut = {},
@@ -102,6 +104,7 @@ class ProfileSignOutScreenTest {
           state.value,
           onBack = {},
           onRetry = {},
+          onEdit = {},
           onSignOut = {},
           onCancelSignOut = {},
           onConfirmSignOut = {},
@@ -124,6 +127,7 @@ class ProfileSignOutScreenTest {
     compose.setContent {
       ProfileScreen(
           onBack = {},
+          onEdit = {},
           onSignedOut = { fail("Must stay signed in") },
           viewModel = vm,
           credentialProvider = FakeGoogleCredentialProvider(),
@@ -156,6 +160,7 @@ class ProfileSignOutScreenTest {
     compose.setContent {
       ProfileScreen(
           onBack = {},
+          onEdit = {},
           onSignedOut = { completions++ },
           viewModel = vm,
           credentialProvider = provider,
