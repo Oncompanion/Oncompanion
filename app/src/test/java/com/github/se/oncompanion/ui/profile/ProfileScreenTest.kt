@@ -44,7 +44,15 @@ class ProfileScreenTest {
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      ProfileContent(uiState = state, onBack = onBack, onRetry = onRetry, onEdit = {})
+      ProfileContent(
+          uiState = state,
+          onBack = onBack,
+          onRetry = onRetry,
+          onEdit = {},
+          onSignOut = {},
+          onCancelSignOut = {},
+          onConfirmSignOut = {},
+      )
     }
   }
 
@@ -118,7 +126,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
     composeTestRule.onNodeWithText("PATIENT").assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
-    composeTestRule.onNodeWithText("Sign out").assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_sign_out).assertIsDisplayed()
   }
 
   @Test
@@ -160,7 +168,9 @@ class ProfileScreenTest {
         }
     val viewModel = ProfileViewModel(ProfileScreenAuthRepository(user), profiles)
 
-    composeTestRule.setContent { ProfileScreen(onBack = {}, onEdit = {}, viewModel = viewModel) }
+    composeTestRule.setContent {
+      ProfileScreen(onBack = {}, onEdit = {}, onSignedOut = {}, viewModel = viewModel)
+    }
 
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()
@@ -212,6 +222,9 @@ class ProfileScreenTest {
           onBack = {},
           onRetry = {},
           onEdit = { edits++ },
+          onSignOut = {},
+          onCancelSignOut = {},
+          onConfirmSignOut = {},
       )
     }
     composeTestRule.onNodeWithTag(C.Tag.profile_edit).performClick()

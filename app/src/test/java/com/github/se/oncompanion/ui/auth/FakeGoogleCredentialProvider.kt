@@ -9,7 +9,11 @@ import android.content.Context
  */
 class FakeGoogleCredentialProvider(
     var onGetToken: suspend () -> String = { "fake-token" },
+    var onClear: suspend () -> Unit = {},
 ) : GoogleCredentialProvider {
+
+  /** Contexts used to clear the last chosen account. */
+  val clearRequests = mutableListOf<Context>()
 
   val tokenRequests = mutableListOf<Context>()
 
@@ -18,5 +22,8 @@ class FakeGoogleCredentialProvider(
     return onGetToken()
   }
 
-  override suspend fun clearCredentialState(context: Context) = Unit
+  override suspend fun clearCredentialState(context: Context) {
+    clearRequests += context
+    onClear()
+  }
 }

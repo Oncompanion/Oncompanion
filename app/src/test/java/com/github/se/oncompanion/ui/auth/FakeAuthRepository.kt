@@ -13,6 +13,13 @@ class FakeAuthRepository(
     var onSignIn: suspend (idToken: String) -> AuthUser = { AuthUser(uid = "uid-$it") },
 ) : AuthRepository {
 
+  /** Number of sign-out attempts, including failures. */
+  var signOutCalls = 0
+    private set
+
+  /** An immediate sign-out error; the session stays signed in. */
+  var signOutError: Exception? = null
+
   val signInTokens = mutableListOf<String>()
   private val user = MutableStateFlow<AuthUser?>(null)
 
@@ -29,6 +36,8 @@ class FakeAuthRepository(
   }
 
   override fun signOut() {
+    signOutCalls++
+    signOutError?.let { throw it }
     user.value = null
   }
 }

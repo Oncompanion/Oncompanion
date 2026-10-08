@@ -123,6 +123,34 @@ class PrescriptionFormViewModelTest {
     assertTrue(viewModel.state.canSave)
   }
 
+  @Test
+  fun textOfAGivenDraftIsCutToTheLimits() {
+    val tooLong = "a".repeat(200)
+    val draft =
+        PrescriptionDraft(
+            prescribedBy = tooLong,
+            prescribedOn = today,
+            medications =
+                listOf(
+                    MedicationDraft(
+                        name = tooLong,
+                        dosage = tooLong,
+                        frequency = tooLong,
+                        startDate = today,
+                    )
+                ),
+        )
+
+    val viewModel = viewModel(draft)
+
+    assertEquals(Prescription.MAX_PRESCRIBED_BY_LENGTH, viewModel.state.draft.prescribedBy.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.name.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.dosage.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.frequency.length)
+    assertTrue(viewModel.state.canSave)
+    assertTrue(viewModel.state.invalidMedications.isEmpty())
+  }
+
   // ---------- Editing ----------
 
   @Test
@@ -480,6 +508,52 @@ class PrescriptionFormViewModelTest {
         )
 
     assertEquals(listOf(true, true), PrescriptionFormUiState(draft).startDateChosen)
+  }
+
+  @Test
+  fun nameCountsAsTouchedOnceItIsEdited() {
+    val viewModel = viewModel()
+    assertEquals(listOf(false), viewModel.state.nameTouched)
+
+    viewModel.onMedicationNameChange("O")
+
+    assertEquals(listOf(true), viewModel.state.nameTouched)
+  }
+
+  @Test
+  fun nameCountsAsTouchedOnceItsMedicationIsLeftForAnother() {
+    val viewModel = viewModel()
+
+    viewModel.addMedication()
+    assertEquals(listOf(true, false), viewModel.state.nameTouched)
+
+    viewModel.openMedication(0)
+    assertEquals(listOf(true, true), viewModel.state.nameTouched)
+  }
+
+  @Test
+  fun touchedNamesFollowTheirMedicationWhenAnotherIsRemoved() {
+    val viewModel = viewModel()
+    viewModel.addMedication()
+    viewModel.addMedication()
+    assertEquals(listOf(true, true, false), viewModel.state.nameTouched)
+
+    viewModel.removeMedication(0)
+
+    assertEquals(listOf(true, false), viewModel.state.nameTouched)
+  }
+
+  @Test
+  fun everyNameOfAGivenDraftCountsAsTouched() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications =
+                listOf(MedicationDraft(startDate = today), MedicationDraft(startDate = today)),
+        )
+
+    assertEquals(listOf(true, true), viewModel(draft).state.nameTouched)
+    assertEquals(listOf(true, true), PrescriptionFormUiState(draft).nameTouched)
   }
 
   // ---------- Save enabled ----------

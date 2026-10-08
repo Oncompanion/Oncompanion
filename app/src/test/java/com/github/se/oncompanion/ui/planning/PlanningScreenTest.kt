@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalDate
@@ -34,7 +35,7 @@ class PlanningScreenTest {
   private val item =
       PlanningItem(
           PlanningSource.Appointment("test"),
-          date.atTime(9, 0).atZone(zone).toInstant(),
+          PlanningTiming.Timed(date.atTime(9, 0).atZone(zone).toInstant()),
           "Doctor consultation",
           "Room 3",
       )
@@ -70,7 +71,15 @@ class PlanningScreenTest {
       items: List<PlanningItem> = emptyList(),
       loading: Boolean = false,
       error: Boolean = false,
-  ) = PlanningUiState(date, LocalDate.of(2026, 9, 28), items, loading, error)
+  ) =
+      PlanningUiState(
+          date,
+          LocalDate.of(2026, 9, 28),
+          untimedItems = items.filter { it.timing is PlanningTiming.DateOnly },
+          scheduledItems = items.filter { it.timing is PlanningTiming.Timed },
+          isLoading = loading,
+          hasError = error,
+      )
 
   @Test
   fun emptyStateAndDates() {
@@ -227,6 +236,97 @@ class PlanningScreenTest {
       }
     }
     compose.onNodeWithTag(C.Tag.planningItem(item.key)).assertHasNoClickAction()
+  }
+
+  private fun medication(id: String = "med", frequency: String? = "Twice a day") =
+      PlanningItem(
+          PlanningSource.Medication("prescription", id),
+          PlanningTiming.DateOnly(date),
+          "Medication $id",
+          frequency = frequency,
+      )
+
+  @Test
+  fun mixedAgendaShowsFrequencyAndDifferentEntryTypesInOneList() {
+    val med = medication()
+    val event = item.copy(source = PlanningSource.Event("workshop"), title = "Support workshop")
+    render(state(listOf(med, item, event)))
+    compose.onNodeWithTag(C.Tag.planning_no_set_time).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertIsDisplayed()
+    val medRow = compose.onNodeWithTag(C.Tag.planningItem(med.key))
+    medRow.assertIsDisplayed()
+    medRow.assertTextEquals("Medication med", "Frequency: Twice a day")
+    compose.onNodeWithContentDescription("Medication", useUnmergedTree = true).assertExists()
+    compose.onNodeWithContentDescription("Appointment", useUnmergedTree = true).assertExists()
+    compose.onNodeWithContentDescription("Support event", useUnmergedTree = true).assertExists()
+    val medBounds = medRow.fetchSemanticsNode().boundsInRoot
+    val appointmentBounds =
+        compose.onNodeWithTag(C.Tag.planningItem(item.key)).fetchSemanticsNode().boundsInRoot
+    assertTrue(medBounds.bottom <= appointmentBounds.top)
+  }
+
+  @Test
+  fun medicationOnlyAgendaOmitsScheduledHeadingAndHandlesMissingFrequency() {
+    val entries = listOf(medication("absent", null), medication("blank", " "))
+    render(state(entries))
+    compose.onNodeWithTag(C.Tag.planning_no_set_time).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertDoesNotExist()
+    compose.onAllNodesWithText("Frequency not specified").assertCountEquals(2)
+    compose.onNodeWithTag(C.Tag.planning_empty).assertDoesNotExist()
+  }
+
+  @Test
+  fun eventOnlyAgendaShowsLocationAndOnlyScheduledHeading() {
+    val event = item.copy(source = PlanningSource.Event("event"), title = "Workshop")
+    render(state(listOf(event)))
+    compose.onNodeWithTag(C.Tag.planning_no_set_time).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertIsDisplayed()
+    compose.onNodeWithText("Workshop").assertIsDisplayed()
+    compose.onNodeWithText("Room 3").assertIsDisplayed()
+  }
+
+  @Test
+  fun emptyAgendaHasNeitherGroupHeading() {
+    render(state())
+    compose.onNodeWithText("Nothing planned for this day").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_no_set_time).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertDoesNotExist()
+  }
+
+  @Test
+  fun medicationFrequencyIsNotParsedOrReplacedByDosage() {
+    val med =
+        medication(frequency = "On Mondays and Thursdays, as recorded").copy(subtitle = "1 tablet")
+    render(state(listOf(med)))
+    compose.onNodeWithText("Frequency: On Mondays and Thursdays, as recorded").assertIsDisplayed()
+    compose.onNodeWithText("1 tablet").assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h800dp")
+  fun mixedLongTextAgendaRemainsScrollableWithLargeText() {
+    val med =
+        medication(frequency = "A long frequency recorded by the user without an exact intake time")
+            .copy(title = "A medication with a long recorded name")
+    val event =
+        item.copy(
+            source = PlanningSource.Event("event"),
+            title = "Support workshop with a long title",
+        )
+    render(state(listOf(med, item, event)), fontScale = 1.5f)
+    compose
+        .onNodeWithTag(C.Tag.planning_list)
+        .performScrollToNode(hasTestTag(C.Tag.planningItem(event.key)))
+    compose.onNodeWithTag(C.Tag.planningItem(event.key)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertIsDisplayed()
+    compose
+        .onNodeWithTag(C.Tag.planning_list)
+        .performScrollToNode(hasTestTag(C.Tag.planningItem(med.key)))
+    compose
+        .onNodeWithText(
+            "Frequency: A long frequency recorded by the user without an exact intake time"
+        )
+        .assertIsDisplayed()
   }
 
   private fun checkTimeFormat(setting: String, expected: String) {

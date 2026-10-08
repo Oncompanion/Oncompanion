@@ -4,6 +4,8 @@ package com.github.se.oncompanion.resources
 object C {
   object Tag {
     // Planning
+    const val planning_no_set_time = "planning_no_set_time"
+    const val planning_scheduled = "planning_scheduled"
     const val planning_week = "planning_week"
     const val planning_list = "planning_list"
     const val planning_previous = "planning_previous"
@@ -57,6 +59,28 @@ object C {
     const val bottom_navigation_tab_events = "bottom_navigation_tab_events"
     const val planning_screen = "planning_screen"
     const val events_screen = "events_screen"
+    const val events_title = "events_title"
+    const val events_empty_state = "events_empty_state"
+    const val events_list = "events_list"
+    const val events_loading = "events_loading"
+    const val events_error = "events_error"
+    const val events_retry = "events_retry"
+    const val event_detail_screen = "event_detail_screen"
+    const val event_detail_back = "event_detail_back"
+    const val event_detail_loading = "event_detail_loading"
+    const val event_detail_error = "event_detail_error"
+    const val event_detail_retry = "event_detail_retry"
+    const val event_detail_not_found = "event_detail_not_found"
+    const val event_detail_category = "event_detail_category"
+    const val event_detail_event_title = "event_detail_event_title"
+    const val event_detail_date_time = "event_detail_date_time"
+    const val event_detail_location = "event_detail_location"
+    const val event_detail_description = "event_detail_description"
+    const val events_refresh_error = "events_refresh_error"
+    const val events_refresh_retry = "events_refresh_retry"
+
+    fun eventCard(eventId: String) = "event_card_$eventId"
+
     const val symptoms_screen = "symptoms_screen"
     const val symptom_back_button = "symptom_back_button"
     const val symptom_journal_loading = "symptom_journal_loading"
@@ -75,6 +99,7 @@ object C {
     const val symptom_detail_notes = "symptom_detail_notes"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
+    // Profile
     const val profile_edit = "profile_edit"
     const val edit_profile_screen = "edit_profile_screen"
     const val edit_profile_back = "edit_profile_back"
@@ -104,6 +129,12 @@ object C {
     const val profile_family_name = "profile_family_name"
     const val profile_email = "profile_email"
     const val profile_cancer_type = "profile_cancer_type"
+    const val profile_sign_out = "profile_sign_out"
+    const val profile_sign_out_dialog = "profile_sign_out_dialog"
+    const val profile_sign_out_confirm = "profile_sign_out_confirm"
+    const val profile_sign_out_cancel = "profile_sign_out_cancel"
+    const val profile_sign_out_error = "profile_sign_out_error"
+    const val profile_signing_out = "profile_signing_out"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
     const val cancer_type_suggestion = "cancer_type_suggestion"
@@ -128,6 +159,7 @@ object C {
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
 
+<<<<<<< HEAD
     // Care circle member details
     const val care_circle_member_screen = "care_circle_member_screen"
     const val care_circle_member_back_button = "care_circle_member_back_button"
@@ -146,5 +178,29 @@ object C {
     /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
     fun careCircleMemberPermission(permissionName: String) =
         "care_circle_member_permission_$permissionName"
+=======
+    // Prescriptions
+    const val prescription_form_screen = "prescription_form_screen"
+    const val prescription_form_close_button = "prescription_form_close_button"
+    const val prescription_form_prescribed_by_field = "prescription_form_prescribed_by_field"
+    const val prescription_form_date_field = "prescription_form_date_field"
+    const val prescription_form_medication_title = "prescription_form_medication_title"
+    const val prescription_form_medication_name_field = "prescription_form_medication_name_field"
+    const val prescription_form_dosage_field = "prescription_form_dosage_field"
+    const val prescription_form_frequency_field = "prescription_form_frequency_field"
+    const val prescription_form_start_date_field = "prescription_form_start_date_field"
+    const val prescription_form_duration_field = "prescription_form_duration_field"
+    const val prescription_form_remove_medication_button =
+        "prescription_form_remove_medication_button"
+    const val prescription_form_add_medication_button = "prescription_form_add_medication_button"
+    const val prescription_form_save_button = "prescription_form_save_button"
+    const val prescription_form_saving = "prescription_form_saving"
+    const val prescription_form_date_picker = "prescription_form_date_picker"
+    const val prescription_form_date_picker_confirm = "prescription_form_date_picker_confirm"
+    const val prescription_form_date_picker_cancel = "prescription_form_date_picker_cancel"
+
+    /** The row of a medication that isn't open; [position] is its position in the form. */
+    fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
+>>>>>>> origin/main
   }
 }

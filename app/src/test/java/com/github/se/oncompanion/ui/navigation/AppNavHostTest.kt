@@ -30,6 +30,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -210,7 +211,12 @@ class AppNavHostTest {
               C.Tag.planning_screen,
               R.string.planning_title,
           ),
-          Destination(Route.EVENTS, Screen.EVENTS, C.Tag.events_screen, R.string.events_title),
+          Destination(
+              Route.EVENTS,
+              Screen.EVENTS,
+              C.Tag.events_screen,
+              R.string.events_screen_title,
+          ),
           Destination(
               Route.SYMPTOMS,
               Screen.SYMPTOMS,
@@ -424,7 +430,7 @@ class AppNavHostTest {
         (0 until 30).map {
           PlanningItem(
               PlanningSource.Appointment("item-$it"),
-              instant.plusSeconds(it.toLong()),
+              PlanningTiming.Timed(instant.plusSeconds(it.toLong())),
               "Appointment $it",
           )
         }
@@ -482,10 +488,27 @@ class AppNavHostTest {
   }
 
   @Test
+  fun prescriptionAddRoute_opensTheForm_andCloseReturns() {
+    setNavHost(Route.PRESCRIPTIONS)
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateTo(Screen.PRESCRIPTION_ADD)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_close_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+  }
+
+  @Test
   fun routeAndScreenConstants_haveExpectedValues() {
     assertEquals("auth", Route.AUTH)
     assertEquals("onboarding", Route.ONBOARDING)
     assertEquals("overview", Route.OVERVIEW)
+    assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
@@ -505,5 +528,26 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun eventCard_opensItsDetail_andBackReturnsToTheList() {
+    setNavHost(Route.EVENTS)
+    val first = FakeEventRepository.sampleEvents(LocalDate.now()).first()
+
+    composeTestRule.onNodeWithTag(C.Tag.eventCard(first.id)).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_screen).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_event_title)
+        .assertIsDisplayed()
+        .assertTextEquals(first.title)
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.EVENT_DETAIL, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 }

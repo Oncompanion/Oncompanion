@@ -1,6 +1,7 @@
 package com.github.se.oncompanion.ui.planning
 
 import android.text.format.DateFormat
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -293,7 +296,11 @@ internal fun PlanningAgenda(
         }
       }
     }
-    if (state.items.isEmpty() && !state.isLoading && !state.hasError) {
+    if (
+        (state.untimedItems.isEmpty() && state.scheduledItems.isEmpty()) &&
+            !state.isLoading &&
+            !state.hasError
+    ) {
       Column(
           Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.planning_empty),
           verticalArrangement = Arrangement.Center,
@@ -313,30 +320,83 @@ internal fun PlanningAgenda(
           state = listState,
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
-        items(state.items, key = { it.key }) { item ->
-          ListItem(
-              leadingContent = {
-                Icon(painterResource(R.drawable.ic_planning_event), contentDescription = null)
-              },
-              headlineContent = { Text(item.title) },
-              supportingContent = item.subtitle?.let { subtitle -> { Text(subtitle) } },
-              trailingContent = {
-                Text(
-                    item.scheduledAt
-                        .atZone(zoneId)
-                        .format(DateTimeFormatter.ofPattern(timePattern, locale)),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-              },
-              modifier =
-                  Modifier.testTag(C.Tag.planningItem(item.key))
-                      .then(
-                          if (onItemClick == null) Modifier
-                          else Modifier.clickable { onItemClick(item) }
-                      ),
-          )
+        // A single scrolling agenda keeps untimed medications before all timed entries.
+        if (state.untimedItems.isNotEmpty()) {
+          item(key = "section:no-time") {
+            AgendaHeading(R.string.planning_no_set_time, C.Tag.planning_no_set_time)
+          }
+          items(state.untimedItems, key = { it.key }) { item ->
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+          }
+        }
+        if (state.scheduledItems.isNotEmpty()) {
+          item(key = "section:scheduled") {
+            AgendaHeading(R.string.planning_scheduled, C.Tag.planning_scheduled)
+          }
+          items(state.scheduledItems, key = { it.key }) { item ->
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+          }
         }
       }
     }
   }
+}
+
+@Composable
+private fun AgendaHeading(@StringRes label: Int, tag: String) {
+  Text(
+      stringResource(label),
+      Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag(tag).semantics { heading() },
+      style = MaterialTheme.typography.titleSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+}
+
+@Composable
+private fun PlanningRow(
+    item: PlanningItem,
+    zoneId: ZoneId,
+    locale: Locale,
+    timePattern: String,
+    onItemClick: ((PlanningItem) -> Unit)?,
+) {
+  val (icon, typeLabel) =
+      when (item.source) {
+        is PlanningSource.Appointment ->
+            R.drawable.ic_calendar_month to R.string.planning_type_appointment
+        is PlanningSource.Event -> R.drawable.ic_event to R.string.planning_type_event
+        is PlanningSource.Medication ->
+            R.drawable.ic_medication to R.string.planning_type_medication
+      }
+  val supportingText =
+      if (item.source is PlanningSource.Medication) {
+        item.frequency
+            ?.takeIf { it.isNotBlank() }
+            ?.let { stringResource(R.string.planning_frequency, it) }
+            ?: stringResource(R.string.planning_frequency_unspecified)
+      } else item.subtitle
+  val timed = item.timing as? PlanningTiming.Timed
+  ListItem(
+      leadingContent = {
+        Icon(painterResource(icon), contentDescription = stringResource(typeLabel))
+      },
+      headlineContent = { Text(item.title) },
+      supportingContent = supportingText?.let { text -> { Text(text) } },
+      trailingContent =
+          timed?.let { value ->
+            {
+              Text(
+                  value.instant
+                      .atZone(zoneId)
+                      .format(DateTimeFormatter.ofPattern(timePattern, locale)),
+                  style = MaterialTheme.typography.labelSmall,
+              )
+            }
+          },
+      modifier =
+          Modifier.testTag(C.Tag.planningItem(item.key))
+              .then(
+                  if (onItemClick == null) Modifier else Modifier.clickable { onItemClick(item) }
+              ),
+  )
 }

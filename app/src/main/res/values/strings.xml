@@ -7,11 +7,18 @@
     <string name="planning_next_week">Next week</string>
     <string name="planning_go_today">Go to today</string>
     <string name="planning_add">Add appointment</string>
-    <string name="planning_empty">No appointments on this day</string>
+    <string name="planning_empty">Nothing planned for this day</string>
     <string name="planning_empty_hint">Tap + to add a doctor appointment.</string>
-    <string name="planning_loading">Loading appointments</string>
-    <string name="planning_error">We couldn’t load your appointments.</string>
+    <string name="planning_loading">Loading planning</string>
+    <string name="planning_error">We couldn’t load your planning.</string>
     <string name="planning_retry">Retry</string>
+    <string name="planning_no_set_time">No set time</string>
+    <string name="planning_scheduled">Scheduled</string>
+    <string name="planning_frequency">Frequency: %1$s</string>
+    <string name="planning_frequency_unspecified">Frequency not specified</string>
+    <string name="planning_type_appointment">Appointment</string>
+    <string name="planning_type_event">Support event</string>
+    <string name="planning_type_medication">Medication</string>
     <string name="planning_date_unavailable">Date outside supported range</string>
 
     <!-- Placeholder titles, replaced when each screen is implemented -->
@@ -22,6 +29,7 @@
     <string name="symptoms_title">Symptoms</string>
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
+    <!-- Profile -->
     <string name="profile_title">Profile</string>
     <string name="profile_screen_title">My profile</string>
     <string name="profile_back">Back</string>
@@ -35,6 +43,11 @@
     <string name="profile_missing">Your profile is not available yet.</string>
     <string name="profile_error">Couldn\'t load your profile. Check your connection and try again.</string>
     <string name="profile_retry">Retry</string>
+    <string name="profile_sign_out">Sign out</string>
+    <string name="profile_sign_out_title">Sign out?</string>
+    <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
+    <string name="profile_sign_out_cancel">Cancel</string>
+    <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>
     <string name="edit_profile_title">Edit profile</string>
     <string name="edit_profile_save">Save</string>
     <string name="edit_profile_cancel">Cancel</string>
@@ -126,6 +139,23 @@
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
 
+    <!-- Events -->
+    <string name="events_screen_title">Upcoming events</string>
+    <string name="events_empty_title">No events yet</string>
+    <string name="events_empty_supporting">Events organized by the Ligue will appear here.</string>
+    <string name="events_error_title">Couldn\'t load the events</string>
+    <string name="events_error_supporting">Check your connection and try again.</string>
+    <string name="events_retry">Retry</string>
+
+    <!-- Event detail -->
+    <string name="event_detail_title">Event details</string>
+    <string name="event_detail_back">Back</string>
+    <string name="event_detail_date_time">Date &amp; time</string>
+    <string name="event_detail_location">Location</string>
+    <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
+    <string name="event_detail_error">Couldn\'t load this event. Check your connection and try again.</string>
+    <string name="events_refresh_error">Couldn\'t refresh the events.</string>
+
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
     <string name="care_circle_intro">The people you trust can follow your care. You choose what each person can see.</string>
@@ -183,4 +213,38 @@
     <string name="permission_events_description">Activities you join</string>
     <string name="permission_symptoms_description">Your symptom log</string>
     <string name="permission_prescriptions_description">Your saved prescriptions</string>
+    <!-- Prescriptions -->
+    <string name="prescription_form_add_title">Add prescription</string>
+    <string name="prescription_form_close">Close</string>
+    <string name="prescription_form_prescribed_by">Prescribed by</string>
+    <string name="prescription_form_date">Date</string>
+    <string name="prescription_form_pick_date">Choose a date</string>
+    <string name="prescription_form_date_confirm">OK</string>
+    <string name="prescription_form_date_cancel">Cancel</string>
+    <!-- Title of a medication of the form, e.g. "Medication 2" -->
+    <string name="prescription_form_medication_title">Medication %1$d</string>
+    <string name="prescription_form_medication_name">Medication name</string>
+    <string name="prescription_form_required">*Required</string>
+    <string name="prescription_form_name_missing">Name missing</string>
+    <string name="prescription_form_dosage">Dosage</string>
+    <string name="prescription_form_frequency">Frequency</string>
+    <string name="prescription_form_start_date">Start date</string>
+    <string name="prescription_form_duration">Duration</string>
+    <plurals name="prescription_form_duration_unit">
+        <item quantity="one">day</item>
+        <item quantity="other">days</item>
+    </plurals>
+    <string name="prescription_form_duration_invalid">Leave it empty, or enter a number of days from 1 to %1$d</string>
+    <string name="prescription_form_duration_check">Check the duration</string>
+    <string name="prescription_form_medication_check">Check this medication</string>
+    <plurals name="prescription_form_duration_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="prescription_form_edit_medication">Edit %1$s</string>
+    <string name="prescription_form_remove_medication">Remove</string>
+    <string name="prescription_form_add_medication">Add medication</string>
+    <string name="prescription_form_save">Save prescription</string>
+    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
+    <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
 </resources>

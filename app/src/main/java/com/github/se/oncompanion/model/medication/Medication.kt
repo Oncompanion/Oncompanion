@@ -31,12 +31,15 @@ data class Medication(
           name.length <= MAX_TEXT_LENGTH &&
           (dosage == null || dosage.length <= MAX_TEXT_LENGTH) &&
           (frequency == null || frequency.length <= MAX_TEXT_LENGTH) &&
-          (durationDays == null || durationDays in 1..MAX_DURATION_DAYS)
+          isValidDuration(durationDays)
 
   companion object {
     /** Keep in sync with `firestore.rules`. */
     const val MAX_TEXT_LENGTH = 100
     /** Keep in sync with `firestore.rules`. */
     const val MAX_DURATION_DAYS = 3650
+
+    /** Whether a medication can last [days]: no end (`null`), or 1 to [MAX_DURATION_DAYS] days. */
+    fun isValidDuration(days: Int?): Boolean = days == null || days in 1..MAX_DURATION_DAYS
   }
 }

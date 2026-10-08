@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.ui.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,10 +29,13 @@ import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +44,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -49,15 +56,26 @@ private val memberSinceFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Local
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    onSignedOut: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel { ProfileViewModel() },
+    credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+  LaunchedEffect(uiState == ProfileUiState.SignOutComplete) {
+    if (uiState == ProfileUiState.SignOutComplete) onSignedOut()
+  }
   ProfileContent(
       uiState = uiState,
       onBack = onBack,
       onRetry = viewModel::retry,
+      onSignOut = viewModel::requestSignOut,
+      onCancelSignOut = viewModel::cancelSignOut,
+      onConfirmSignOut = {
+        viewModel.confirmSignOut { credentialProvider.clearCredentialState(context) }
+      },
       onEdit = onEdit,
       modifier = modifier,
   )
@@ -70,9 +88,56 @@ fun ProfileContent(
     uiState: ProfileUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onSignOut: () -> Unit,
+    onCancelSignOut: () -> Unit,
+    onConfirmSignOut: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  val confirmation = uiState as? ProfileUiState.ConfirmingSignOut
+  val profile = confirmation?.profile ?: uiState
+  val signingOut = confirmation?.isSigningOut == true
+  // Credential cleanup may suspend after Firebase sign-out; Back must not reveal the old session.
+  BackHandler(enabled = signingOut) {}
+  // All dialog dismissals keep the session; completion is owned by the ViewModel.
+  if (confirmation != null) {
+    AlertDialog(
+        onDismissRequest = { if (!signingOut) onCancelSignOut() },
+        modifier = Modifier.testTag(C.Tag.profile_sign_out_dialog),
+        title = { Text(stringResource(R.string.profile_sign_out_title)) },
+        text = {
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.profile_sign_out_message))
+            if (confirmation.failed) {
+              Text(
+                  stringResource(R.string.profile_sign_out_failed),
+                  color = MaterialTheme.colorScheme.error,
+                  modifier = Modifier.testTag(C.Tag.profile_sign_out_error),
+              )
+            }
+            if (signingOut) CircularProgressIndicator(Modifier.testTag(C.Tag.profile_signing_out))
+          }
+        },
+        confirmButton = {
+          TextButton(
+              onClick = onConfirmSignOut,
+              enabled = !signingOut,
+              modifier = Modifier.testTag(C.Tag.profile_sign_out_confirm),
+          ) {
+            Text(stringResource(R.string.profile_sign_out))
+          }
+        },
+        dismissButton = {
+          TextButton(
+              onClick = onCancelSignOut,
+              enabled = !signingOut,
+              modifier = Modifier.testTag(C.Tag.profile_sign_out_cancel),
+          ) {
+            Text(stringResource(R.string.profile_sign_out_cancel))
+          }
+        },
+    )
+  }
   Scaffold(
       modifier = modifier.testTag(C.Tag.profile_screen),
       topBar = {
@@ -81,6 +146,7 @@ fun ProfileContent(
             navigationIcon = {
               IconButton(
                   onClick = onBack,
+                  enabled = !signingOut,
                   modifier = Modifier.testTag(C.Tag.profile_back),
               ) {
                 Icon(
@@ -92,32 +158,55 @@ fun ProfileContent(
         )
       },
   ) { innerPadding ->
-    when (uiState) {
-      ProfileUiState.Loading ->
-          ProfileLoading(modifier = Modifier.fillMaxSize().padding(innerPadding))
-      ProfileUiState.SignedOut ->
-          ProfileMessage(
-              message = stringResource(R.string.profile_signed_out),
-              testTag = C.Tag.profile_signed_out,
-              modifier = Modifier.fillMaxSize().padding(innerPadding),
-          )
-      ProfileUiState.MissingProfile ->
-          ProfileMessage(
-              message = stringResource(R.string.profile_missing),
-              testTag = C.Tag.profile_missing,
-              modifier = Modifier.fillMaxSize().padding(innerPadding),
-          )
-      ProfileUiState.Error ->
-          ProfileError(
-              modifier = Modifier.fillMaxSize().padding(innerPadding),
-              onRetry = onRetry,
-          )
-      is ProfileUiState.Loaded ->
-          ProfileDetailsContent(
-              details = uiState.details,
-              onEdit = onEdit,
-              modifier = Modifier.fillMaxSize().padding(innerPadding),
-          )
+    Column(Modifier.fillMaxSize().padding(innerPadding)) {
+      Box(Modifier.weight(1f)) {
+        when (profile) {
+          ProfileUiState.Loading -> ProfileLoading(modifier = Modifier.fillMaxSize())
+          ProfileUiState.SignedOut ->
+              ProfileMessage(
+                  message = stringResource(R.string.profile_signed_out),
+                  testTag = C.Tag.profile_signed_out,
+                  modifier = Modifier.fillMaxSize(),
+              )
+          ProfileUiState.MissingProfile ->
+              ProfileMessage(
+                  message = stringResource(R.string.profile_missing),
+                  testTag = C.Tag.profile_missing,
+                  modifier = Modifier.fillMaxSize(),
+              )
+          ProfileUiState.Error ->
+              ProfileError(
+                  modifier = Modifier.fillMaxSize(),
+                  onRetry = onRetry,
+              )
+          is ProfileUiState.Loaded ->
+              ProfileDetailsContent(
+                  details = profile.details,
+                  modifier = Modifier.fillMaxSize(),
+              )
+          is ProfileUiState.ConfirmingSignOut,
+          ProfileUiState.SignOutComplete -> Unit
+        }
+      }
+      if (profile is ProfileUiState.Loaded) {
+        Button(
+            onClick = onEdit,
+            enabled = !signingOut,
+            modifier =
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(C.Tag.profile_edit),
+        ) {
+          Text(stringResource(R.string.edit_profile_title))
+        }
+      }
+      if (profile != ProfileUiState.SignedOut && profile != ProfileUiState.SignOutComplete) {
+        TextButton(
+            onClick = onSignOut,
+            enabled = !signingOut,
+            modifier = Modifier.fillMaxWidth().padding(16.dp).testTag(C.Tag.profile_sign_out),
+        ) {
+          Text(stringResource(R.string.profile_sign_out))
+        }
+      }
     }
   }
 }
@@ -125,7 +214,6 @@ fun ProfileContent(
 @Composable
 private fun ProfileDetailsContent(
     details: ProfileDetails,
-    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Column(
@@ -181,10 +269,6 @@ private fun ProfileDetailsContent(
           )
         }
       }
-    }
-
-    Button(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag(C.Tag.profile_edit)) {
-      Text(stringResource(R.string.edit_profile_title))
     }
 
     Column(
