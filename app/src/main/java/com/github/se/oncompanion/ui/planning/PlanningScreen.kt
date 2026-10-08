@@ -340,7 +340,7 @@ internal fun PlanningAgenda(
 }
 
 @Composable
-private fun AgendaHeading(label: Int, tag: String) {
+private fun AgendaHeading(@StringRes label: Int, tag: String) {
   Text(
       stringResource(label),
       Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag(tag).semantics { heading() },
