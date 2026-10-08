@@ -74,4 +74,14 @@ class MedicationTest {
     assertFalse(valid.copy(durationDays = -3).isValid())
     assertFalse(valid.copy(durationDays = Medication.MAX_DURATION_DAYS + 1).isValid())
   }
+
+  @Test
+  fun durationIsValidWithoutAnEndOrWithinTheLimits() {
+    assertTrue(Medication.isValidDuration(null))
+    assertTrue(Medication.isValidDuration(1))
+    assertTrue(Medication.isValidDuration(Medication.MAX_DURATION_DAYS))
+    assertFalse(Medication.isValidDuration(0))
+    assertFalse(Medication.isValidDuration(-1))
+    assertFalse(Medication.isValidDuration(Medication.MAX_DURATION_DAYS + 1))
+  }
 }

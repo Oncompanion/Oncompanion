@@ -1,13 +1,12 @@
 package com.github.se.oncompanion.ui.navigation
 
-import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,6 +36,8 @@ import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
+import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
@@ -50,7 +51,7 @@ import java.time.ZoneId
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
- * Every feature added with [placeholderGraph] is a placeholder until its PR lands.
+ * A feature shown with a [PlaceholderScreen] is a placeholder until its PR lands.
  */
 @Composable
 fun AppNavHost(
@@ -141,12 +142,24 @@ fun AppNavHost(
         )
       }
     }
-    placeholderGraph(
-        Route.PRESCRIPTIONS,
-        Screen.PRESCRIPTIONS,
-        R.string.prescriptions_title,
-        C.Tag.prescriptions_screen,
-    )
+    navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
+      // Placeholder until the prescriptions list is implemented
+      composable(Screen.PRESCRIPTIONS) {
+        PlaceholderScreen(
+            title = stringResource(R.string.prescriptions_title),
+            testTag = C.Tag.prescriptions_screen,
+        )
+      }
+      composable(Screen.PRESCRIPTION_ADD) {
+        PrescriptionFormScreen(
+            viewModel = viewModel { PrescriptionFormViewModel() },
+            // A second tap while the form is already leaving is dropped, so Back happens once
+            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the screen the form was opened from
+            onSaved = navigationActions::goBack,
+        )
+      }
+    }
     navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
       composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
     }
@@ -168,21 +181,6 @@ fun AppNavHost(
         )
       }
     }
-  }
-}
-
-/**
- * A feature graph with a single [PlaceholderScreen]. The feature's owner replaces this call with
- * their own `navigation(...)` block when they implement the real screens.
- */
-private fun NavGraphBuilder.placeholderGraph(
-    route: String,
-    screen: String,
-    @StringRes title: Int,
-    testTag: String,
-) {
-  navigation(startDestination = screen, route = route) {
-    composable(screen) { PlaceholderScreen(title = stringResource(title), testTag = testTag) }
   }
 }
 

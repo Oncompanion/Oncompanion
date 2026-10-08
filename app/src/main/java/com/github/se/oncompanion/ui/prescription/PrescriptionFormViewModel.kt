@@ -38,6 +38,8 @@ enum class PrescriptionFormError {
  * @property openMedication position in the draft of the medication open for editing
  * @property startDateChosen for each medication of the draft, in order: whether the user chose its
  *   start date. Until then it follows the date of the prescription.
+ * @property nameTouched for each medication of the draft, in order: whether the user edited its
+ *   name or left it for another medication. A missing name is only flagged from then on.
  * @property isSaving the prescription is being saved
  * @property isSaved the prescription is saved: the form is done
  */
@@ -45,6 +47,7 @@ data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
     val openMedication: Int = 0,
     val startDateChosen: List<Boolean> = draft.medications.map { true },
+    val nameTouched: List<Boolean> = draft.medications.map { true },
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val error: PrescriptionFormError? = null,
@@ -86,10 +89,14 @@ class PrescriptionFormViewModel(
   // A new form follows the date of the prescription; in a given draft every start date is chosen
   private val _uiState =
       MutableStateFlow(
-          if (initialDraft != null) PrescriptionFormUiState(initialDraft)
+          if (initialDraft != null) PrescriptionFormUiState(initialDraft.cutToLimits())
           else
               emptyDraft(LocalDate.now(clock)).let {
-                PrescriptionFormUiState(it, startDateChosen = listOf(false))
+                PrescriptionFormUiState(
+                    it,
+                    startDateChosen = listOf(false),
+                    nameTouched = listOf(false),
+                )
               }
       )
   val uiState: StateFlow<PrescriptionFormUiState> = _uiState.asStateFlow()
@@ -122,7 +129,11 @@ class PrescriptionFormViewModel(
 
   /** Text longer than a medication can store is cut. */
   fun onMedicationNameChange(value: String) {
-    editOpenMedication { it.copy(name = value.take(Medication.MAX_TEXT_LENGTH)) }
+    edit { state ->
+      state
+          .withOpenMedication { it.copy(name = value.take(Medication.MAX_TEXT_LENGTH)) }
+          .withOpenNameTouched()
+    }
   }
 
   /** Text longer than a medication can store is cut. */
@@ -173,6 +184,8 @@ class PrescriptionFormViewModel(
           draft = state.draft.copy(medications = state.draft.medications + added),
           openMedication = state.draft.medications.size,
           startDateChosen = state.startDateChosen + false,
+          // The medication the user leaves counts as touched, the new one doesn't yet
+          nameTouched = state.withOpenNameTouched().nameTouched + false,
       )
     }
   }
@@ -180,8 +193,10 @@ class PrescriptionFormViewModel(
   /** Opens the medication at [position] for editing. Ignores a position that doesn't exist. */
   fun openMedication(position: Int) {
     _uiState.update { state ->
-      if (position in state.draft.medications.indices) state.copy(openMedication = position)
-      else state
+      // The medication the user leaves counts as touched: a missing name is flagged from then on
+      if (position in state.draft.medications.indices) {
+        state.withOpenNameTouched().copy(openMedication = position)
+      } else state
     }
   }
 
@@ -203,6 +218,7 @@ class PrescriptionFormViewModel(
           draft = state.draft.copy(medications = remaining),
           openMedication = open.coerceAtMost(remaining.lastIndex),
           startDateChosen = state.startDateChosen.filterIndexed { index, _ -> index != position },
+          nameTouched = state.nameTouched.filterIndexed { index, _ -> index != position },
       )
     }
   }
@@ -255,6 +271,12 @@ class PrescriptionFormViewModel(
     edit { it.withOpenMedication(transform) }
   }
 
+  private fun PrescriptionFormUiState.withOpenNameTouched() =
+      copy(
+          nameTouched =
+              nameTouched.mapIndexed { position, touched -> touched || position == openMedication }
+      )
+
   private fun PrescriptionFormUiState.withDraft(
       transform: (PrescriptionDraft) -> PrescriptionDraft
   ) = copy(draft = transform(draft))
@@ -275,6 +297,24 @@ class PrescriptionFormViewModel(
 
     /** Enough digits for [Medication.MAX_DURATION_DAYS]. */
     const val MAX_DURATION_DIGITS = 4
+
+    /**
+     * The draft with its text cut to what a prescription can store, as typed text is. A draft the
+     * form is given (e.g. read from a scan) can be longer, and nothing on screen could say why Save
+     * is disabled.
+     */
+    fun PrescriptionDraft.cutToLimits() =
+        copy(
+            prescribedBy = prescribedBy.take(Prescription.MAX_PRESCRIBED_BY_LENGTH),
+            medications =
+                medications.map {
+                  it.copy(
+                      name = it.name.take(Medication.MAX_TEXT_LENGTH),
+                      dosage = it.dosage.take(Medication.MAX_TEXT_LENGTH),
+                      frequency = it.frequency.take(Medication.MAX_TEXT_LENGTH),
+                  )
+                },
+        )
 
     /** A prescription of [today] with one medication to fill in, starting the same day. */
     fun emptyDraft(today: LocalDate) =

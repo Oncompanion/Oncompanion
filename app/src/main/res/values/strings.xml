@@ -193,4 +193,39 @@
     <string name="relationship_friend">Friend</string>
     <string name="relationship_home_nurse">Home nurse</string>
     <string name="relationship_other">Other</string>
+
+    <!-- Prescriptions -->
+    <string name="prescription_form_add_title">Add prescription</string>
+    <string name="prescription_form_close">Close</string>
+    <string name="prescription_form_prescribed_by">Prescribed by</string>
+    <string name="prescription_form_date">Date</string>
+    <string name="prescription_form_pick_date">Choose a date</string>
+    <string name="prescription_form_date_confirm">OK</string>
+    <string name="prescription_form_date_cancel">Cancel</string>
+    <!-- Title of a medication of the form, e.g. "Medication 2" -->
+    <string name="prescription_form_medication_title">Medication %1$d</string>
+    <string name="prescription_form_medication_name">Medication name</string>
+    <string name="prescription_form_required">*Required</string>
+    <string name="prescription_form_name_missing">Name missing</string>
+    <string name="prescription_form_dosage">Dosage</string>
+    <string name="prescription_form_frequency">Frequency</string>
+    <string name="prescription_form_start_date">Start date</string>
+    <string name="prescription_form_duration">Duration</string>
+    <plurals name="prescription_form_duration_unit">
+        <item quantity="one">day</item>
+        <item quantity="other">days</item>
+    </plurals>
+    <string name="prescription_form_duration_invalid">Leave it empty, or enter a number of days from 1 to %1$d</string>
+    <string name="prescription_form_duration_check">Check the duration</string>
+    <string name="prescription_form_medication_check">Check this medication</string>
+    <plurals name="prescription_form_duration_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="prescription_form_edit_medication">Edit %1$s</string>
+    <string name="prescription_form_remove_medication">Remove</string>
+    <string name="prescription_form_add_medication">Add medication</string>
+    <string name="prescription_form_save">Save prescription</string>
+    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
+    <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
 </resources>
