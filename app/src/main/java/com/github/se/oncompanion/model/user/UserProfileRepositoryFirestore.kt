@@ -6,6 +6,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -32,6 +34,15 @@ class UserProfileRepositoryFirestore(
 
   override suspend fun getProfile(uid: String): UserProfile? =
       fromDocument(document(uid).get().await())
+
+  override suspend fun getCachedProfile(uid: String): UserProfile? =
+      try {
+        // A cached "doesn't exist" also reads as null: it may be outdated, the caller asks the
+        // server
+        fromDocument(document(uid).get(Source.CACHE).await())
+      } catch (e: FirebaseFirestoreException) {
+        null // UNAVAILABLE: nothing cached for this document
+      }
 
   override fun observeProfile(uid: String): Flow<UserProfile?> = callbackFlow {
     val registration =

@@ -173,6 +173,54 @@ class UserProfileRepositoryFirestoreTest {
     assertNull(repository.getProfile(aliceUid))
   }
 
+  // ---- cached read ----
+
+  @Test
+  fun getCachedProfileReturnsProfileSavedOnThisDevice_evenWithNetworkDisabled(): Unit =
+      runBlocking {
+        repository.createProfile(alice())
+        awaitServerAck()
+        val online = repository.getProfile(aliceUid)
+
+        db.disableNetwork().await()
+        try {
+          val elapsed = timed {
+            assertEquals(online, withTimeout(5_000) { repository.getCachedProfile(aliceUid) })
+          }
+          assertTrue("getCachedProfile took $elapsed ms", elapsed < 1_000)
+        } finally {
+          db.enableNetwork().await()
+        }
+      }
+
+  @Test
+  fun getCachedProfileReturnsNullWhenNothingIsCached(): Unit = runBlocking {
+    assertNull(repository.getCachedProfile(aliceUid))
+  }
+
+  @Test
+  fun getCachedProfileReturnsNullWhenTheCacheOnlyKnowsItIsMissing(): Unit = runBlocking {
+    // The server's "doesn't exist" is cached, but it may be outdated: the cache must not decide
+    assertNull(repository.getProfile(aliceUid))
+
+    assertNull(repository.getCachedProfile(aliceUid))
+  }
+
+  @Test
+  fun getCachedProfileReturnsNullForMalformedCachedDocument(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users",
+        aliceUid,
+        """{"role": {"stringValue": "PATIENT"},
+           "createdAt": {"timestampValue": "2024-01-01T00:00:00Z"}}""",
+    )
+    // Reading it from the server puts the malformed document in the cache
+    assertNull(repository.getProfile(aliceUid))
+    assertNotNull(cachedSnapshot(aliceUid))
+
+    assertNull(repository.getCachedProfile(aliceUid))
+  }
+
   // ---- update ----
 
   @Test

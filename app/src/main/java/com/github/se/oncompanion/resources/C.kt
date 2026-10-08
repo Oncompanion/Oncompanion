@@ -3,6 +3,7 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Planning
     const val planning_week = "planning_week"
     const val planning_list = "planning_list"
     const val planning_previous = "planning_previous"
@@ -74,6 +75,19 @@ object C {
     const val symptom_detail_notes = "symptom_detail_notes"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
+    const val profile_edit = "profile_edit"
+    const val edit_profile_screen = "edit_profile_screen"
+    const val edit_profile_back = "edit_profile_back"
+    const val edit_profile_cancel = "edit_profile_cancel"
+    const val edit_profile_first_name = "edit_profile_first_name"
+    const val edit_profile_family_name = "edit_profile_family_name"
+    const val edit_profile_save = "edit_profile_save"
+    const val edit_profile_saving = "edit_profile_saving"
+    const val edit_profile_save_error = "edit_profile_save_error"
+    const val edit_profile_loading = "edit_profile_loading"
+    const val edit_profile_unavailable = "edit_profile_unavailable"
+    const val edit_profile_load_error = "edit_profile_load_error"
+    const val edit_profile_retry = "edit_profile_retry"
     const val profile_screen = "profile_screen"
     const val profile_back = "profile_back"
     const val profile_loading = "profile_loading"

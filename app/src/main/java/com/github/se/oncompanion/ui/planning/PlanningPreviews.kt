@@ -43,7 +43,7 @@ private fun PlanningPreviewContent(
               ),
           )
   OncompanionTheme {
-    PlanningScreen(
+    PlanningContent(
         PlanningUiState(
             selected,
             selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),

@@ -30,6 +30,7 @@ import com.github.se.oncompanion.resources.C
  * @param value the current text
  * @param onValueChange called when the user types or picks a suggestion
  * @param suggestions what to suggest for [value]; defaults to [CancerTypes.suggest]
+ * @param enabled whether typing and suggestions are available
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,10 +39,11 @@ fun CancerTypeField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     suggestions: List<String> = CancerTypes.suggest(value),
+    enabled: Boolean = true,
 ) {
   // Whether the user wants the list open; it's only shown when there is something to suggest
   var open by remember { mutableStateOf(false) }
-  val expanded = open && suggestions.isNotEmpty()
+  val expanded = enabled && open && suggestions.isNotEmpty()
 
   ExposedDropdownMenuBox(
       expanded = expanded,
@@ -50,6 +52,7 @@ fun CancerTypeField(
   ) {
     OutlinedTextField(
         value = value,
+        enabled = enabled,
         onValueChange = {
           onValueChange(it)
           open = true

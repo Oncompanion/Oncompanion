@@ -4,9 +4,8 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * A prescription and the medications it lists. What the medications share is stored at
- * `/users/{uid}/prescriptions/{id}`; each of the [medications] is its own document, see
- * [Medication].
+ * A prescription and the medications it lists, stored as one document at
+ * `/users/{uid}/prescriptions/{id}`.
  *
  * @property id the document ID
  * @property prescribedBy optional free text
