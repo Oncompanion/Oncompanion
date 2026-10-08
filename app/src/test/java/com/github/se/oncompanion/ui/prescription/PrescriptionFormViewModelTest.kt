@@ -440,6 +440,48 @@ class PrescriptionFormViewModelTest {
     )
   }
 
+  @Test
+  fun stateSaysWhichStartDatesTheUserChose() {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    assertEquals(listOf(false, false), viewModel.state.startDateChosen)
+
+    viewModel.onStartDateChange(today.plusDays(2))
+    assertEquals(listOf(false, true), viewModel.state.startDateChosen)
+
+    viewModel.removeMedication(0)
+    assertEquals(listOf(true), viewModel.state.startDateChosen)
+  }
+
+  @Test
+  fun everyStartDateOfAGivenDraftCountsAsChosen() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications =
+                listOf(
+                    MedicationDraft(name = "Ondansetron", startDate = today),
+                    MedicationDraft(name = "Dexamethasone", startDate = today),
+                ),
+        )
+    val viewModel = viewModel(draft)
+    assertEquals(listOf(true, true), viewModel.state.startDateChosen)
+
+    viewModel.addMedication()
+    assertEquals(listOf(true, true, false), viewModel.state.startDateChosen)
+  }
+
+  @Test
+  fun stateBuiltFromADraftAloneCountsEveryStartDateAsChosen() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications =
+                listOf(MedicationDraft(startDate = today), MedicationDraft(startDate = today)),
+        )
+
+    assertEquals(listOf(true, true), PrescriptionFormUiState(draft).startDateChosen)
+  }
+
   // ---------- Save enabled ----------
 
   @Test
@@ -481,6 +523,33 @@ class PrescriptionFormViewModelTest {
 
     viewModel.onMedicationNameChange("Dexamethasone")
     assertTrue(viewModel.state.canSave)
+  }
+
+  @Test
+  fun stateSaysWhichMedicationsBlockSave() {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone", "Paracetamol")
+    assertTrue(viewModel.state.invalidMedications.isEmpty())
+
+    // No name for the first one, a duration of zero days for the third
+    viewModel.openMedication(0)
+    viewModel.onMedicationNameChange(" ")
+    viewModel.openMedication(2)
+    viewModel.onDurationChange("0")
+
+    assertEquals(setOf(0, 2), viewModel.state.invalidMedications)
+    assertFalse(viewModel.state.canSave)
+
+    viewModel.onDurationChange("3")
+    assertEquals(setOf(0), viewModel.state.invalidMedications)
+  }
+
+  @Test
+  fun newEmptyMedicationBlocksSave() {
+    val viewModel = viewModelWith("Ondansetron")
+
+    viewModel.addMedication()
+
+    assertEquals(setOf(1), viewModel.state.invalidMedications)
   }
 
   // ---------- Saving ----------
@@ -550,6 +619,65 @@ class PrescriptionFormViewModelTest {
 
     assertFalse(viewModel.state.isSaving)
     assertTrue(viewModel.state.isSaved)
+  }
+
+  /** Every change the user can make to the form. */
+  private fun PrescriptionFormViewModel.editEverything() {
+    onPrescribedByChange("Dr. House")
+    onPrescribedOnChange(today.minusDays(9))
+    onMedicationNameChange("Paracetamol")
+    onDosageChange("2 tablets")
+    onFrequencyChange("Daily")
+    onStartDateChange(today.plusDays(9))
+    onDurationChange("9")
+    addMedication()
+    removeMedication(0)
+  }
+
+  @Test
+  fun editsAreIgnoredWhileSaving() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    medications.gate = gate
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    viewModel.save()
+    advanceUntilIdle()
+    val saving = viewModel.state
+
+    viewModel.editEverything()
+
+    assertEquals(saving, viewModel.state)
+
+    gate.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(
+        listOf("Ondansetron", "Dexamethasone"),
+        fakeMedications.prescriptionsOf(uid).single().medications.map { it.name },
+    )
+  }
+
+  @Test
+  fun editsAreIgnoredOnceSaved() = runTest {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    viewModel.save()
+    advanceUntilIdle()
+    val saved = viewModel.state
+    assertTrue(saved.isSaved)
+
+    viewModel.editEverything()
+
+    assertEquals(saved, viewModel.state)
+  }
+
+  @Test
+  fun editsWorkAgainAfterAFailedSave() = runTest {
+    fakeMedications.writeError = IOException("disk full")
+    val viewModel = viewModelWith("Ondansetron")
+    viewModel.save()
+    advanceUntilIdle()
+
+    viewModel.onMedicationNameChange("Dexamethasone")
+
+    assertEquals("Dexamethasone", viewModel.medication.name)
   }
 
   @Test

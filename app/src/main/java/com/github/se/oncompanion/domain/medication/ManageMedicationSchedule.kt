@@ -16,9 +16,16 @@ class ManageMedicationSchedule(
    * Saves [draft] as a new prescription of [uid]. Returns once it is saved on the device, also
    * offline.
    *
-   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid]
+   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid], or if one of
+   *   its medications already has an ID: it comes from a saved prescription, which must be changed,
+   *   not added a second time
    */
   suspend operator fun invoke(uid: String, draft: PrescriptionDraft) {
+    // Adding a draft made from a saved prescription would leave two prescriptions sharing the
+    // same medication IDs, the old one next to the new one
+    require(draft.medications.all { it.id == null }) {
+      "A new prescription can't contain medications that are already saved: $draft"
+    }
     require(draft.isValid()) { "Invalid prescription draft: $draft" }
     // The repository creates the IDs on the device, so this also works offline
     val prescription =

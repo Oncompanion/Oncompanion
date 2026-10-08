@@ -8,9 +8,9 @@ import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.ui.symptom.signedInUid
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
@@ -24,7 +24,10 @@ import kotlinx.coroutines.launch
 enum class PrescriptionFormError {
   /** Nobody is signed in (e.g. the session expired): the user has to sign in again. */
   NOT_SIGNED_IN,
-  /** Anything else. */
+  /**
+   * Saving failed on the device. Never a refusal by the server, see
+   * [PrescriptionFormViewModel.save].
+   */
   SAVE_FAILED,
 }
 
@@ -33,12 +36,15 @@ enum class PrescriptionFormError {
  *
  * @property draft the prescription as typed so far
  * @property openMedication position in the draft of the medication open for editing
+ * @property startDateChosen for each medication of the draft, in order: whether the user chose its
+ *   start date. Until then it follows the date of the prescription.
  * @property isSaving the prescription is being saved
  * @property isSaved the prescription is saved: the form is done
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
     val openMedication: Int = 0,
+    val startDateChosen: List<Boolean> = draft.medications.map { true },
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val error: PrescriptionFormError? = null,
@@ -50,6 +56,13 @@ data class PrescriptionFormUiState(
   /** A medication can be removed: a prescription keeps at least one. */
   val canRemoveMedication: Boolean
     get() = draft.medications.size > 1
+
+  /**
+   * Positions of the medications that can't be saved as they are, so the screen can show which ones
+   * block Save, also when they aren't open.
+   */
+  val invalidMedications: Set<Int>
+    get() = draft.medications.indices.filterNot { draft.medications[it].isValid() }.toSet()
 
   /** The prescription can be saved: the draft is valid and nothing is being saved. */
   val canSave: Boolean
@@ -70,18 +83,22 @@ class PrescriptionFormViewModel(
     initialDraft: PrescriptionDraft? = null,
 ) : ViewModel() {
 
+  // A new form follows the date of the prescription; in a given draft every start date is chosen
   private val _uiState =
-      MutableStateFlow(PrescriptionFormUiState(initialDraft ?: emptyDraft(LocalDate.now(clock))))
+      MutableStateFlow(
+          if (initialDraft != null) PrescriptionFormUiState(initialDraft)
+          else
+              emptyDraft(LocalDate.now(clock)).let {
+                PrescriptionFormUiState(it, startDateChosen = listOf(false))
+              }
+      )
   val uiState: StateFlow<PrescriptionFormUiState> = _uiState.asStateFlow()
-
-  // For each medication of the draft, in order: whether the user chose its start date. Until then
-  // it follows the date of the prescription. In a given draft every start date counts as chosen.
-  private var startDateChosen: List<Boolean> =
-      _uiState.value.draft.medications.map { initialDraft != null }
 
   /** Text longer than the prescription can store is cut. */
   fun onPrescribedByChange(value: String) {
-    updateDraft { it.copy(prescribedBy = value.take(Prescription.MAX_PRESCRIBED_BY_LENGTH)) }
+    edit { state ->
+      state.withDraft { it.copy(prescribedBy = value.take(Prescription.MAX_PRESCRIBED_BY_LENGTH)) }
+    }
   }
 
   /**
@@ -89,30 +106,33 @@ class PrescriptionFormViewModel(
    * user hasn't chosen one.
    */
   fun onPrescribedOnChange(date: LocalDate) {
-    updateDraft { draft ->
-      draft.copy(
-          prescribedOn = date,
-          medications =
-              draft.medications.mapIndexed { position, medication ->
-                if (startDateChosen[position]) medication else medication.copy(startDate = date)
-              },
-      )
+    edit { state ->
+      state.withDraft { draft ->
+        draft.copy(
+            prescribedOn = date,
+            medications =
+                draft.medications.mapIndexed { position, medication ->
+                  if (state.startDateChosen[position]) medication
+                  else medication.copy(startDate = date)
+                },
+        )
+      }
     }
   }
 
   /** Text longer than a medication can store is cut. */
   fun onMedicationNameChange(value: String) {
-    updateOpenMedication { it.copy(name = value.take(Medication.MAX_TEXT_LENGTH)) }
+    editOpenMedication { it.copy(name = value.take(Medication.MAX_TEXT_LENGTH)) }
   }
 
   /** Text longer than a medication can store is cut. */
   fun onDosageChange(value: String) {
-    updateOpenMedication { it.copy(dosage = value.take(Medication.MAX_TEXT_LENGTH)) }
+    editOpenMedication { it.copy(dosage = value.take(Medication.MAX_TEXT_LENGTH)) }
   }
 
   /** Text longer than a medication can store is cut. */
   fun onFrequencyChange(value: String) {
-    updateOpenMedication { it.copy(frequency = value.take(Medication.MAX_TEXT_LENGTH)) }
+    editOpenMedication { it.copy(frequency = value.take(Medication.MAX_TEXT_LENGTH)) }
   }
 
   /**
@@ -120,9 +140,16 @@ class PrescriptionFormViewModel(
    * date of the prescription, even if the user chose the same day.
    */
   fun onStartDateChange(date: LocalDate) {
-    val open = _uiState.value.openMedication
-    startDateChosen = startDateChosen.mapIndexed { position, chosen -> chosen || position == open }
-    updateOpenMedication { it.copy(startDate = date) }
+    edit { state ->
+      state
+          .withOpenMedication { it.copy(startDate = date) }
+          .copy(
+              startDateChosen =
+                  state.startDateChosen.mapIndexed { position, chosen ->
+                    chosen || position == state.openMedication
+                  }
+          )
+    }
   }
 
   /**
@@ -131,7 +158,7 @@ class PrescriptionFormViewModel(
    */
   fun onDurationChange(value: String) {
     val days = value.filter(Char::isDigit).take(MAX_DURATION_DIGITS).toIntOrNull()
-    updateOpenMedication { it.copy(durationDays = days) }
+    editOpenMedication { it.copy(durationDays = days) }
   }
 
   /**
@@ -139,22 +166,23 @@ class PrescriptionFormViewModel(
    * Does nothing if the prescription is full.
    */
   fun addMedication() {
-    val state = _uiState.value
-    if (!state.canAddMedication) return
-    startDateChosen = startDateChosen + false
-    val added = MedicationDraft(startDate = state.draft.prescribedOn)
-    _uiState.update {
-      it.copy(
-          draft = it.draft.copy(medications = it.draft.medications + added),
-          openMedication = it.draft.medications.size,
+    edit { state ->
+      if (!state.canAddMedication) return@edit state
+      val added = MedicationDraft(startDate = state.draft.prescribedOn)
+      state.copy(
+          draft = state.draft.copy(medications = state.draft.medications + added),
+          openMedication = state.draft.medications.size,
+          startDateChosen = state.startDateChosen + false,
       )
     }
   }
 
   /** Opens the medication at [position] for editing. Ignores a position that doesn't exist. */
   fun openMedication(position: Int) {
-    if (position !in _uiState.value.draft.medications.indices) return
-    _uiState.update { it.copy(openMedication = position) }
+    _uiState.update { state ->
+      if (position in state.draft.medications.indices) state.copy(openMedication = position)
+      else state
+    }
   }
 
   /**
@@ -163,17 +191,18 @@ class PrescriptionFormViewModel(
    * the only medication or if the position doesn't exist.
    */
   fun removeMedication(position: Int) {
-    val state = _uiState.value
-    if (!state.canRemoveMedication || position !in state.draft.medications.indices) return
-    startDateChosen = startDateChosen.filterIndexed { index, _ -> index != position }
-    val remaining = state.draft.medications.filterIndexed { index, _ -> index != position }
-    // Medications after the removed one move up by one position
-    val open =
-        if (position < state.openMedication) state.openMedication - 1 else state.openMedication
-    _uiState.update {
-      it.copy(
-          draft = it.draft.copy(medications = remaining),
+    edit { state ->
+      if (!state.canRemoveMedication || position !in state.draft.medications.indices) {
+        return@edit state
+      }
+      val remaining = state.draft.medications.filterIndexed { index, _ -> index != position }
+      // Medications after the removed one move up by one position
+      val open =
+          if (position < state.openMedication) state.openMedication - 1 else state.openMedication
+      state.copy(
+          draft = state.draft.copy(medications = remaining),
           openMedication = open.coerceAtMost(remaining.lastIndex),
+          startDateChosen = state.startDateChosen.filterIndexed { index, _ -> index != position },
       )
     }
   }
@@ -182,6 +211,10 @@ class PrescriptionFormViewModel(
    * Saves the prescription through [ManageMedicationSchedule]. Does nothing unless
    * [PrescriptionFormUiState.canSave]. Saving returns as soon as the prescription is stored on the
    * device, also offline.
+   *
+   * [PrescriptionFormError.SAVE_FAILED] only covers what fails before that, on the device. If the
+   * server refuses the prescription later, the form isn't told: it has already reported the save as
+   * done, and Firestore then undoes the write. Don't rely on it for server errors.
    */
   fun save() {
     val state = _uiState.value
@@ -210,18 +243,31 @@ class PrescriptionFormViewModel(
     _uiState.update { it.copy(error = null) }
   }
 
-  private fun updateDraft(transform: (PrescriptionDraft) -> PrescriptionDraft) {
-    _uiState.update { it.copy(draft = transform(it.draft)) }
+  /**
+   * Applies a change the user made to the form. Ignored while the prescription is being saved and
+   * once it is saved: the form would no longer show what was saved.
+   */
+  private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
+    _uiState.update { state -> if (state.isSaving || state.isSaved) state else transform(state) }
   }
 
-  private fun updateOpenMedication(transform: (MedicationDraft) -> MedicationDraft) {
-    _uiState.update { state ->
-      val medications =
-          state.draft.medications.mapIndexed { position, medication ->
-            if (position == state.openMedication) transform(medication) else medication
-          }
-      state.copy(draft = state.draft.copy(medications = medications))
-    }
+  private fun editOpenMedication(transform: (MedicationDraft) -> MedicationDraft) {
+    edit { it.withOpenMedication(transform) }
+  }
+
+  private fun PrescriptionFormUiState.withDraft(
+      transform: (PrescriptionDraft) -> PrescriptionDraft
+  ) = copy(draft = transform(draft))
+
+  private fun PrescriptionFormUiState.withOpenMedication(
+      transform: (MedicationDraft) -> MedicationDraft
+  ) = withDraft { draft ->
+    draft.copy(
+        medications =
+            draft.medications.mapIndexed { position, medication ->
+              if (position == openMedication) transform(medication) else medication
+            }
+    )
   }
 
   private companion object {

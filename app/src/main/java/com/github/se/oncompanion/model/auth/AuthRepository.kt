@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.model.auth
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 
 /** The signed-in user, without Firebase types so ViewModels and tests don't depend on Firebase. */
@@ -42,3 +43,15 @@ interface AuthRepository {
   /** Signs out of Firebase. Does nothing if nobody is signed in. */
   fun signOut()
 }
+
+/**
+ * The signed-in user's uid, or `null` if nobody is signed in or the user can't be read (logged with
+ * [tag]). For screens that are only reachable after signing in, where `null` is an error.
+ */
+fun AuthRepository.signedInUid(tag: String): String? =
+    try {
+      currentUser?.uid
+    } catch (e: Exception) {
+      Log.w(tag, "Couldn't read the signed-in user", e)
+      null
+    }
