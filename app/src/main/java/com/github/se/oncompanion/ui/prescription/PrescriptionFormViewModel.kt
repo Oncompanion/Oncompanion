@@ -8,9 +8,9 @@ import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.ui.symptom.signedInUid
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
