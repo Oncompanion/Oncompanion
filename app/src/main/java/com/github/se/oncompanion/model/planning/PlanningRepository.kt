@@ -18,12 +18,10 @@ data class PlanningRange(
   }
 
   /** Inclusive boundary for future queries against timed sources. */
-  val startInclusive: Instant
-    get() = startDateInclusive.atStartOfDay(zoneId).toInstant()
+  val startInclusive: Instant = startDateInclusive.atStartOfDay(zoneId).toInstant()
 
   /** Exclusive boundary; calendar arithmetic also handles daylight-saving changes. */
-  val endExclusive: Instant
-    get() = endDateExclusive.atStartOfDay(zoneId).toInstant()
+  val endExclusive: Instant = endDateExclusive.atStartOfDay(zoneId).toInstant()
 
   /** Whether a timed source occurrence lies inside this range. */
   operator fun contains(instant: Instant): Boolean =
