@@ -86,7 +86,7 @@ class PrescriptionFormViewModel(
   // A new form follows the date of the prescription; in a given draft every start date is chosen
   private val _uiState =
       MutableStateFlow(
-          if (initialDraft != null) PrescriptionFormUiState(initialDraft)
+          if (initialDraft != null) PrescriptionFormUiState(initialDraft.cutToLimits())
           else
               emptyDraft(LocalDate.now(clock)).let {
                 PrescriptionFormUiState(it, startDateChosen = listOf(false))
@@ -275,6 +275,24 @@ class PrescriptionFormViewModel(
 
     /** Enough digits for [Medication.MAX_DURATION_DAYS]. */
     const val MAX_DURATION_DIGITS = 4
+
+    /**
+     * The draft with its text cut to what a prescription can store, as typed text is. A draft the
+     * form is given (e.g. read from a scan) can be longer, and nothing on screen could say why Save
+     * is disabled.
+     */
+    fun PrescriptionDraft.cutToLimits() =
+        copy(
+            prescribedBy = prescribedBy.take(Prescription.MAX_PRESCRIBED_BY_LENGTH),
+            medications =
+                medications.map {
+                  it.copy(
+                      name = it.name.take(Medication.MAX_TEXT_LENGTH),
+                      dosage = it.dosage.take(Medication.MAX_TEXT_LENGTH),
+                      frequency = it.frequency.take(Medication.MAX_TEXT_LENGTH),
+                  )
+                },
+        )
 
     /** A prescription of [today] with one medication to fill in, starting the same day. */
     fun emptyDraft(today: LocalDate) =

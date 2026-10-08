@@ -123,6 +123,34 @@ class PrescriptionFormViewModelTest {
     assertTrue(viewModel.state.canSave)
   }
 
+  @Test
+  fun textOfAGivenDraftIsCutToTheLimits() {
+    val tooLong = "a".repeat(200)
+    val draft =
+        PrescriptionDraft(
+            prescribedBy = tooLong,
+            prescribedOn = today,
+            medications =
+                listOf(
+                    MedicationDraft(
+                        name = tooLong,
+                        dosage = tooLong,
+                        frequency = tooLong,
+                        startDate = today,
+                    )
+                ),
+        )
+
+    val viewModel = viewModel(draft)
+
+    assertEquals(Prescription.MAX_PRESCRIBED_BY_LENGTH, viewModel.state.draft.prescribedBy.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.name.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.dosage.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.frequency.length)
+    assertTrue(viewModel.state.canSave)
+    assertTrue(viewModel.state.invalidMedications.isEmpty())
+  }
+
   // ---------- Editing ----------
 
   @Test
