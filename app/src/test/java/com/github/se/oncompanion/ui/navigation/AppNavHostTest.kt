@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -23,11 +24,19 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
+import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -45,6 +54,8 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
+      careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
+      authRepository: AuthRepository = FakeAuthRepository(),
   ) {
     composeTestRule.setContent {
       navController =
@@ -52,12 +63,19 @@ class AppNavHostTest {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
       if (startRoute == null)
-          AppNavHost(navController = navController, planningRepository = planningRepository)
+          AppNavHost(
+              navController = navController,
+              planningRepository = planningRepository,
+              careCircleRepository = careCircleRepository,
+              authRepository = authRepository,
+          )
       else
           AppNavHost(
               navController = navController,
               startRoute = startRoute,
               planningRepository = planningRepository,
+              careCircleRepository = careCircleRepository,
+              authRepository = authRepository,
           )
     }
   }
@@ -283,13 +301,27 @@ class AppNavHostTest {
 
   @Test
   fun careCircleMember_opensFromTheCircle_andBackReturnsToIt() {
-    setNavHost(Route.CARE_CIRCLE)
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val careCircle = FakeCareCircleRepository()
+    careCircle.setMembers(
+        "owner",
+        listOf(
+            CareCircleMember(uid = "sophie", firstName = "Sophie", familyName = "Dubois"),
+            CareCircleMember(
+                uid = "marc",
+                firstName = "Marc",
+                familyName = "Dubois",
+                relationship = Relationship.SON,
+            ),
+        ),
+    )
+    setNavHost(Route.CARE_CIRCLE, careCircleRepository = careCircle, authRepository = auth)
 
-    composeTestRule.runOnIdle {
-      NavigationActions(navController).navigateTo(Screen.careCircleMember("marc"))
-    }
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_screen).assertIsDisplayed()
+    // The route's argument must reach the destination's ViewModel: it shows Marc, not an error
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("marc")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_name).assertTextEquals("Marc Dubois")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_error).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.CARE_CIRCLE_MEMBER, NavigationActions(navController).currentRoute())
       assertEquals(

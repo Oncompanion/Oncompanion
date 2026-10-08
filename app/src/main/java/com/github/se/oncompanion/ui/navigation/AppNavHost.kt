@@ -19,13 +19,19 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
@@ -45,12 +51,17 @@ import java.time.ZoneId
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
  *
  * Every feature added with [placeholderGraph] is a placeholder until its PR lands.
+ *
+ * The repositories default to Firebase; tests pass fakes to check the screens together, e.g. that a
+ * route's argument reaches its ViewModel.
  */
 @Composable
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
     planningRepository: PlanningRepository = EmptyPlanningRepository,
+    careCircleRepository: CareCircleRepository = remember { CareCircleRepositoryFirestore() },
+    authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -128,13 +139,29 @@ fun AppNavHost(
         C.Tag.prescriptions_screen,
     )
     navigation(startDestination = Screen.CARE_CIRCLE, route = Route.CARE_CIRCLE) {
-      composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
+      composable(Screen.CARE_CIRCLE) {
+        CareCircleScreen(
+            navigationActions = navigationActions,
+            viewModel = viewModel { CareCircleViewModel(careCircleRepository, authRepository) },
+        )
+      }
       composable(
           Screen.CARE_CIRCLE_MEMBER,
           arguments =
               listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
       ) {
-        CareCircleMemberScreen(navigationActions)
+        CareCircleMemberScreen(
+            navigationActions = navigationActions,
+            // The SavedStateHandle holds the route's member uid
+            viewModel =
+                viewModel {
+                  CareCircleMemberViewModel(
+                      createSavedStateHandle(),
+                      careCircleRepository,
+                      authRepository,
+                  )
+                },
+        )
       }
     }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
