@@ -46,7 +46,9 @@ class CareCircleRepositoryFirestore(
               if (error != null) {
                 close(error)
               } else if (snapshot != null) {
-                // A missing document (never added or removed) is not malformed: no log
+                // null means either a missing document (never added or removed, not logged) or a
+                // malformed one (logged by fromDocument): callers can't tell them apart on purpose,
+                // as both mean there is no member to show
                 trySend(if (snapshot.exists()) fromDocument(snapshot) else null)
               }
             }
@@ -71,10 +73,23 @@ class CareCircleRepositoryFirestore(
         familyName = doc.getString(FIELD_FAMILY_NAME),
         relationship = Relationship.fromName(doc.getString(FIELD_RELATIONSHIP)),
         permissions = CarePermission.fromNames(permissions),
-        // Read leniently: a field of the wrong type is treated as missing
-        email = doc.get(FIELD_EMAIL) as? String,
-        addedAt = (doc.get(FIELD_ADDED_AT) as? Timestamp)?.toInstant(),
+        // Read leniently: a field of the wrong type is treated as missing (and logged)
+        email = doc.getLenient<String>(FIELD_EMAIL),
+        addedAt = doc.getLenient<Timestamp>(FIELD_ADDED_AT)?.toInstant(),
     )
+  }
+
+  /**
+   * Returns [field] as a [T], or null if it is missing or has another type. A wrong type is logged:
+   * the member is still shown, but the bad data shouldn't go unnoticed.
+   */
+  private inline fun <reified T> DocumentSnapshot.getLenient(field: String): T? {
+    val value = get(field) ?: return null
+    if (value !is T) {
+      Log.w(TAG, "Care circle member $id has a $field of the wrong type, ignored")
+      return null
+    }
+    return value
   }
 
   companion object {
