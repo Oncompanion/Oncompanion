@@ -159,6 +159,25 @@ object C {
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
 
+    // Care circle member details
+    const val care_circle_member_screen = "care_circle_member_screen"
+    const val care_circle_member_back_button = "care_circle_member_back_button"
+    const val care_circle_member_loading = "care_circle_member_loading"
+    const val care_circle_member_not_found = "care_circle_member_not_found"
+    const val care_circle_member_error = "care_circle_member_error"
+    const val care_circle_member_retry_button = "care_circle_member_retry_button"
+    const val care_circle_member_details = "care_circle_member_details"
+    const val care_circle_member_initial = "care_circle_member_initial"
+    const val care_circle_member_name = "care_circle_member_name"
+    const val care_circle_member_subtitle = "care_circle_member_subtitle"
+    const val care_circle_member_email = "care_circle_member_email"
+    const val care_circle_member_edit_button = "care_circle_member_edit_button"
+    const val care_circle_member_remove_button = "care_circle_member_remove_button"
+
+    /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
+    fun careCircleMemberPermission(permissionName: String) =
+        "care_circle_member_permission_$permissionName"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"

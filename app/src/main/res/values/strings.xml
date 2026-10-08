@@ -172,8 +172,7 @@
     <string name="care_circle_access_none">No access</string>
     <!-- Joins the last section to the others, e.g. "Planning, events & symptoms" -->
     <string name="care_circle_access_and">%1$s &amp; %2$s</string>
-    <!-- Temporary messages until the add member and member detail screens exist -->
-    <string name="care_circle_member_not_implemented">Member details aren\'t available yet. This will show %1$s\'s details and what they can see, and let you edit or remove them.</string>
+    <!-- Temporary message until the add member screen exists -->
     <string name="care_circle_add_member_not_implemented">Adding members isn\'t available yet. This will let you add someone and choose what they can see.</string>
 
     <string name="permission_planning">Planning</string>
@@ -194,6 +193,26 @@
     <string name="relationship_home_nurse">Home nurse</string>
     <string name="relationship_other">Other</string>
 
+    <!-- Care circle member details (US-14) -->
+    <string name="care_circle_member_title">Member</string>
+    <!-- Relationship · when they joined, e.g. "Son · Member since Aug 2026" -->
+    <string name="care_circle_member_since">%1$s · Member since %2$s</string>
+    <string name="care_circle_member_contact">Contact</string>
+    <string name="care_circle_member_email">Email</string>
+    <string name="care_circle_member_can_see">Can see</string>
+    <string name="care_circle_member_edit">Edit member</string>
+    <string name="care_circle_member_remove">Remove from circle</string>
+    <string name="care_circle_member_not_found">This person is no longer in your care circle.</string>
+    <string name="care_circle_member_error">Couldn\'t load this member.</string>
+    <!-- Temporary messages until editing and removing members exist -->
+    <string name="care_circle_member_edit_not_implemented">Editing members isn\'t available yet. It will be added in a later version and let you change %1$s\'s details and what they can see.</string>
+    <string name="care_circle_member_remove_not_implemented">Removing members isn\'t available yet. It will be added in a later version and let you take %1$s out of your circle.</string>
+
+    <!-- What each section shows a member -->
+    <string name="permission_planning_description">Treatments &amp; appointments</string>
+    <string name="permission_events_description">Activities you join</string>
+    <string name="permission_symptoms_description">Your symptom log</string>
+    <string name="permission_prescriptions_description">Your saved prescriptions</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>

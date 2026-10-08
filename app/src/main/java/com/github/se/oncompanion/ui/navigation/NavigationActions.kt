@@ -59,6 +59,13 @@ object Screen {
 
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"
+  /** Name of the [CARE_CIRCLE_MEMBER] argument holding the member's uid. */
+  const val CARE_CIRCLE_MEMBER_ARG = "memberUid"
+  /** One member's details. Navigate with [careCircleMember], not this pattern. */
+  const val CARE_CIRCLE_MEMBER = "care_circle_member/{$CARE_CIRCLE_MEMBER_ARG}"
+
+  /** The [CARE_CIRCLE_MEMBER] screen of [memberUid]. Firebase uids are safe in a route. */
+  fun careCircleMember(memberUid: String) = "care_circle_member/$memberUid"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"
