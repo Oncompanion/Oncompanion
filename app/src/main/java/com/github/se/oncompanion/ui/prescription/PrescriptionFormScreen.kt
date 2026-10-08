@@ -216,7 +216,12 @@ fun PrescriptionFormContent(
               onRemove = { onRemoveMedication(position) },
           )
         } else {
-          ClosedMedication(position, medication, onEdit = { onOpenMedication(position) })
+          ClosedMedication(
+              position = position,
+              medication = medication,
+              blocksSave = position in uiState.invalidMedications,
+              onEdit = { onOpenMedication(position) },
+          )
         }
       }
 
@@ -348,7 +353,12 @@ private fun OpenMedication(
  * saved. Tapping the row or its pencil opens it for editing.
  */
 @Composable
-private fun ClosedMedication(position: Int, medication: MedicationDraft, onEdit: () -> Unit) {
+private fun ClosedMedication(
+    position: Int,
+    medication: MedicationDraft,
+    blocksSave: Boolean,
+    onEdit: () -> Unit,
+) {
   // A medication the user hasn't named yet is shown by its number
   val name =
       medication.name.ifBlank {
@@ -358,10 +368,9 @@ private fun ClosedMedication(position: Int, medication: MedicationDraft, onEdit:
   // Save is disabled while a closed medication can't be saved: say which one and why
   val problem =
       when {
+        !blocksSave -> null
         medication.name.isBlank() -> R.string.prescription_form_name_missing
-        !Medication.isValidDuration(medication.durationDays) ->
-            R.string.prescription_form_duration_check
-        else -> null
+        else -> R.string.prescription_form_duration_check
       }
   val summary = medication.summary()
   ListItem(
