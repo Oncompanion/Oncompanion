@@ -24,7 +24,10 @@ import kotlinx.coroutines.launch
 enum class PrescriptionFormError {
   /** Nobody is signed in (e.g. the session expired): the user has to sign in again. */
   NOT_SIGNED_IN,
-  /** Anything else. */
+  /**
+   * Saving failed on the device. Never a refusal by the server, see
+   * [PrescriptionFormViewModel.save].
+   */
   SAVE_FAILED,
 }
 
@@ -208,6 +211,10 @@ class PrescriptionFormViewModel(
    * Saves the prescription through [ManageMedicationSchedule]. Does nothing unless
    * [PrescriptionFormUiState.canSave]. Saving returns as soon as the prescription is stored on the
    * device, also offline.
+   *
+   * [PrescriptionFormError.SAVE_FAILED] only covers what fails before that, on the device. If the
+   * server refuses the prescription later, the form isn't told: it has already reported the save as
+   * done, and Firestore then undoes the write. Don't rely on it for server errors.
    */
   fun save() {
     val state = _uiState.value
