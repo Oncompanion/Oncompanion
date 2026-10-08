@@ -83,6 +83,7 @@ object EmulatorTestData {
    */
   suspend fun deleteRawDocument(documentPath: String) {
     request("DELETE", "$FIRESTORE_REST/$documentPath")
+  }
 
   /**
    * Replaces a whole document bypassing security rules, like [createRawDocument]: what another
