@@ -361,7 +361,7 @@ private fun PlanningRow(
       when (item.source) {
         is PlanningSource.Appointment ->
             R.drawable.ic_calendar_month to R.string.planning_type_appointment
-        is PlanningSource.Event -> R.drawable.ic_care_circle to R.string.planning_type_event
+        is PlanningSource.Event -> R.drawable.ic_event to R.string.planning_type_event
         is PlanningSource.Medication ->
             R.drawable.ic_medication to R.string.planning_type_medication
       }
