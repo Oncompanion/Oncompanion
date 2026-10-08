@@ -161,8 +161,11 @@ fun PrescriptionFormContent(
         TopAppBar(
             title = { Text(stringResource(R.string.prescription_form_add_title)) },
             navigationIcon = {
+              // Not while saving or once saved: the form then leaves by itself, and a second way
+              // out would go back twice
               IconButton(
                   onClick = onClose,
+                  enabled = !uiState.isSaving && !uiState.isSaved,
                   modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
               ) {
                 Icon(

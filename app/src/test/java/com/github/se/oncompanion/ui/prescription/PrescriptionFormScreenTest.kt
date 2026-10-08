@@ -438,6 +438,27 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun closeIsDisabledWhileSaving() {
+    setContent(filled.copy(isSaving = true))
+
+    node(C.Tag.prescription_form_close_button).assertIsNotEnabled()
+  }
+
+  @Test
+  fun closeIsDisabledOnceSaved() {
+    setContent(filled.copy(isSaved = true))
+
+    node(C.Tag.prescription_form_close_button).assertIsNotEnabled()
+  }
+
+  @Test
+  fun closeIsEnabledWhileTheFormIsBeingFilled() {
+    setContent(empty)
+
+    node(C.Tag.prescription_form_close_button).assertIsEnabled()
+  }
+
+  @Test
   fun saveFailureIsShownOnce() {
     setContent(filled.copy(error = PrescriptionFormError.SAVE_FAILED))
     val message = string(R.string.prescription_form_error_save_failed)

@@ -3,6 +3,7 @@ package com.github.se.oncompanion.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
@@ -152,7 +153,8 @@ fun AppNavHost(
       composable(Screen.PRESCRIPTION_ADD) {
         PrescriptionFormScreen(
             viewModel = viewModel { PrescriptionFormViewModel() },
-            onClose = navigationActions::goBack,
+            // A second tap while the form is already leaving is dropped, so Back happens once
+            onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the screen the form was opened from
             onSaved = navigationActions::goBack,
         )
