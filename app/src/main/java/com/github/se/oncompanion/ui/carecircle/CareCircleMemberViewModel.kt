@@ -40,7 +40,7 @@ sealed interface CareCircleMemberUiState {
 }
 
 /**
- * Shows one member of the signed-in user's care circle (US-15). The member's uid is the
+ * Shows one member of the signed-in user's care circle (US-14). The member's uid is the
  * [Screen.CARE_CIRCLE_MEMBER_ARG] navigation argument, read from [savedStateHandle].
  */
 class CareCircleMemberViewModel(

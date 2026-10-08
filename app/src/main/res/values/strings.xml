@@ -163,7 +163,7 @@
     <string name="relationship_home_nurse">Home nurse</string>
     <string name="relationship_other">Other</string>
 
-    <!-- Care circle member details (US-15) -->
+    <!-- Care circle member details (US-14) -->
     <string name="care_circle_member_title">Member</string>
     <!-- Relationship · when they joined, e.g. "Son · Member since Aug 2026" -->
     <string name="care_circle_member_since">%1$s · Member since %2$s</string>

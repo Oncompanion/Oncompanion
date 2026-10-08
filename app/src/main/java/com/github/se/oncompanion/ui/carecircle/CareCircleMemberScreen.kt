@@ -65,7 +65,7 @@ import java.util.Locale
 private val addedAtFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 
 /**
- * One member of the signed-in user's care circle (US-15), following the "US-15 / Member detail"
+ * One member of the signed-in user's care circle (US-14), following the "US-15 / Member detail"
  * Figma mockup: who they are, how to reach them and what they can see.
  *
  * Editing and removing the member come in later PRs: for now both buttons show a toast.
@@ -87,13 +87,13 @@ fun CareCircleMemberScreen(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onEdit = { member ->
-        // TODO: open the edit member screen (US-15) instead of this toast
+        // TODO: open the edit member screen (US-14) instead of this toast
         val message =
             resources.getString(R.string.care_circle_member_edit_not_implemented, member.firstName)
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
       },
       onRemove = { member ->
-        // TODO: ask for confirmation, then remove the member (US-15) instead of this toast
+        // TODO: ask for confirmation, then remove the member (US-14) instead of this toast
         val message =
             resources.getString(
                 R.string.care_circle_member_remove_not_implemented,
@@ -296,7 +296,7 @@ private fun PermissionItem(permission: CarePermission, granted: Boolean) {
   ListItem(
       headlineContent = { Text(stringResource(permission.label)) },
       supportingContent = { Text(stringResource(permission.description)) },
-      // TODO: let the patient change access from the edit member screen (US-15). Until then the
+      // TODO: let the patient change access from the edit member screen (US-14). Until then the
       //  switch only shows the current access: onCheckedChange = null makes it read-only.
       trailingContent = { Switch(checked = granted, onCheckedChange = null) },
       modifier =
