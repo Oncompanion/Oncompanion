@@ -22,6 +22,7 @@
     <string name="symptoms_title">Symptoms</string>
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
+    <!-- Profile -->
     <string name="profile_title">Profile</string>
     <string name="profile_screen_title">My profile</string>
     <string name="profile_back">Back</string>
@@ -35,6 +36,11 @@
     <string name="profile_missing">Your profile is not available yet.</string>
     <string name="profile_error">Couldn\'t load your profile. Check your connection and try again.</string>
     <string name="profile_retry">Retry</string>
+    <string name="profile_sign_out">Sign out</string>
+    <string name="profile_sign_out_title">Sign out?</string>
+    <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
+    <string name="profile_sign_out_cancel">Cancel</string>
+    <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>
     <string name="edit_profile_title">Edit profile</string>
     <string name="edit_profile_save">Save</string>
     <string name="edit_profile_cancel">Cancel</string>

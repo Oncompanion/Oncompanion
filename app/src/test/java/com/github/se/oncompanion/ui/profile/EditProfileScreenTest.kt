@@ -232,6 +232,7 @@ class EditProfileScreenTest {
           ProfileScreen(
               onBack = actions::goBack,
               onEdit = { actions.navigateTo(Screen.EDIT_PROFILE) },
+              onSignedOut = {},
               viewModel = viewModel { ProfileViewModel(auth, profiles) },
           )
         }
