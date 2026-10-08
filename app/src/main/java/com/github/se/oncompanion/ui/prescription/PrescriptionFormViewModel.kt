@@ -229,9 +229,12 @@ class PrescriptionFormViewModel(
     _uiState.update { it.copy(error = null) }
   }
 
-  /** Applies a change the user made to the form. */
+  /**
+   * Applies a change the user made to the form. Ignored while the prescription is being saved and
+   * once it is saved: the form would no longer show what was saved.
+   */
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
-    _uiState.update(transform)
+    _uiState.update { state -> if (state.isSaving || state.isSaved) state else transform(state) }
   }
 
   private fun editOpenMedication(transform: (MedicationDraft) -> MedicationDraft) {

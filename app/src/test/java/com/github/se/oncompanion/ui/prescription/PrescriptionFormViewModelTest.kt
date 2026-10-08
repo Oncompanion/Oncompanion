@@ -594,6 +594,65 @@ class PrescriptionFormViewModelTest {
     assertTrue(viewModel.state.isSaved)
   }
 
+  /** Every change the user can make to the form. */
+  private fun PrescriptionFormViewModel.editEverything() {
+    onPrescribedByChange("Dr. House")
+    onPrescribedOnChange(today.minusDays(9))
+    onMedicationNameChange("Paracetamol")
+    onDosageChange("2 tablets")
+    onFrequencyChange("Daily")
+    onStartDateChange(today.plusDays(9))
+    onDurationChange("9")
+    addMedication()
+    removeMedication(0)
+  }
+
+  @Test
+  fun editsAreIgnoredWhileSaving() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    medications.gate = gate
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    viewModel.save()
+    advanceUntilIdle()
+    val saving = viewModel.state
+
+    viewModel.editEverything()
+
+    assertEquals(saving, viewModel.state)
+
+    gate.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(
+        listOf("Ondansetron", "Dexamethasone"),
+        fakeMedications.prescriptionsOf(uid).single().medications.map { it.name },
+    )
+  }
+
+  @Test
+  fun editsAreIgnoredOnceSaved() = runTest {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    viewModel.save()
+    advanceUntilIdle()
+    val saved = viewModel.state
+    assertTrue(saved.isSaved)
+
+    viewModel.editEverything()
+
+    assertEquals(saved, viewModel.state)
+  }
+
+  @Test
+  fun editsWorkAgainAfterAFailedSave() = runTest {
+    fakeMedications.writeError = IOException("disk full")
+    val viewModel = viewModelWith("Ondansetron")
+    viewModel.save()
+    advanceUntilIdle()
+
+    viewModel.onMedicationNameChange("Dexamethasone")
+
+    assertEquals("Dexamethasone", viewModel.medication.name)
+  }
+
   @Test
   fun savingTwiceStoresOnePrescription() = runTest {
     val gate = CompletableDeferred<Unit>()
