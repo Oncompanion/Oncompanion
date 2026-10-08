@@ -440,6 +440,48 @@ class PrescriptionFormViewModelTest {
     )
   }
 
+  @Test
+  fun stateSaysWhichStartDatesTheUserChose() {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone")
+    assertEquals(listOf(false, false), viewModel.state.startDateChosen)
+
+    viewModel.onStartDateChange(today.plusDays(2))
+    assertEquals(listOf(false, true), viewModel.state.startDateChosen)
+
+    viewModel.removeMedication(0)
+    assertEquals(listOf(true), viewModel.state.startDateChosen)
+  }
+
+  @Test
+  fun everyStartDateOfAGivenDraftCountsAsChosen() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications =
+                listOf(
+                    MedicationDraft(name = "Ondansetron", startDate = today),
+                    MedicationDraft(name = "Dexamethasone", startDate = today),
+                ),
+        )
+    val viewModel = viewModel(draft)
+    assertEquals(listOf(true, true), viewModel.state.startDateChosen)
+
+    viewModel.addMedication()
+    assertEquals(listOf(true, true, false), viewModel.state.startDateChosen)
+  }
+
+  @Test
+  fun stateBuiltFromADraftAloneCountsEveryStartDateAsChosen() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications =
+                listOf(MedicationDraft(startDate = today), MedicationDraft(startDate = today)),
+        )
+
+    assertEquals(listOf(true, true), PrescriptionFormUiState(draft).startDateChosen)
+  }
+
   // ---------- Save enabled ----------
 
   @Test
