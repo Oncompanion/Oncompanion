@@ -545,7 +545,8 @@ class PrescriptionFormScreenTest {
     field(C.Tag.prescription_form_duration_field).performTextInput("5")
     node(C.Tag.prescription_form_save_button).assertIsEnabled().performClick()
 
-    composeTestRule.waitUntil(5_000) { "saved" in events }
+    // Saving runs on the main thread: once Compose is idle, the form has left
+    composeTestRule.waitForIdle()
     val saved = medications.prescriptionsOf(uid).single()
     assertEquals("Dr. Martin", saved.prescribedBy)
     assertEquals(date, saved.prescribedOn)
