@@ -22,6 +22,7 @@
     <string name="symptoms_title">Symptoms</string>
     <string name="prescriptions_title">Prescriptions</string>
     <string name="care_circle_title">Care circle</string>
+    <!-- Profile -->
     <string name="profile_title">Profile</string>
     <string name="profile_screen_title">My profile</string>
     <string name="profile_back">Back</string>
@@ -35,6 +36,15 @@
     <string name="profile_missing">Your profile is not available yet.</string>
     <string name="profile_error">Couldn\'t load your profile. Check your connection and try again.</string>
     <string name="profile_retry">Retry</string>
+    <string name="profile_sign_out">Sign out</string>
+    <string name="profile_sign_out_title">Sign out?</string>
+    <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
+    <string name="profile_sign_out_cancel">Cancel</string>
+    <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>
+    <string name="edit_profile_title">Edit profile</string>
+    <string name="edit_profile_save">Save</string>
+    <string name="edit_profile_cancel">Cancel</string>
+    <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>
@@ -121,6 +131,23 @@
 
     <!-- Bottom navigation bar (Planning and Events use their screen titles) -->
     <string name="tab_overview">Overview</string>
+
+    <!-- Events -->
+    <string name="events_screen_title">Upcoming events</string>
+    <string name="events_empty_title">No events yet</string>
+    <string name="events_empty_supporting">Events organized by the Ligue will appear here.</string>
+    <string name="events_error_title">Couldn\'t load the events</string>
+    <string name="events_error_supporting">Check your connection and try again.</string>
+    <string name="events_retry">Retry</string>
+
+    <!-- Event detail -->
+    <string name="event_detail_title">Event details</string>
+    <string name="event_detail_back">Back</string>
+    <string name="event_detail_date_time">Date &amp; time</string>
+    <string name="event_detail_location">Location</string>
+    <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
+    <string name="event_detail_error">Couldn\'t load this event. Check your connection and try again.</string>
+    <string name="events_refresh_error">Couldn\'t refresh the events.</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>

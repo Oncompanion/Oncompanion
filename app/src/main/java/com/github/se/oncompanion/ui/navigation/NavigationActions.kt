@@ -1,5 +1,6 @@
 package com.github.se.oncompanion.ui.navigation
 
+import android.net.Uri
 import androidx.navigation.NavHostController
 
 /**
@@ -37,6 +38,12 @@ object Screen {
 
   // Route.EVENTS
   const val EVENTS = "events_home"
+  /** The event's id, argument of [EVENT_DETAIL]. */
+  const val EVENT_ID = "eventId"
+  const val EVENT_DETAIL = "event_detail/{$EVENT_ID}"
+
+  /** The [EVENT_DETAIL] route of the event [eventId]. */
+  fun eventDetail(eventId: String) = "event_detail/${Uri.encode(eventId)}"
 
   // Route.SYMPTOMS
   const val SYMPTOMS = "symptoms_home"
@@ -55,6 +62,7 @@ object Screen {
 
   // Route.PROFILE
   const val PROFILE = "profile_home"
+  const val EDIT_PROFILE = "edit_profile"
 }
 
 /** Navigation helpers shared by all screens, so screens never use the NavController directly. */
@@ -71,6 +79,10 @@ open class NavigationActions(private val navController: NavHostController) {
    * should keep each tab's state.
    */
   open fun navigateAndClearBackStack(route: String) {
+    // Saved tab stacks also own ViewModels; never carry them across authentication flows.
+    listOf(Route.OVERVIEW, Route.PLANNING, Route.EVENTS).forEach { tab ->
+      navController.clearBackStack(tab)
+    }
     navController.navigate(route) {
       popUpTo(navController.graph.id) { inclusive = true }
       launchSingleTop = true

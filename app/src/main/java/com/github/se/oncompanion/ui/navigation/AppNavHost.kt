@@ -1,15 +1,11 @@
 package com.github.se.oncompanion.ui.navigation
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -18,13 +14,21 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
+import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
+import com.github.se.oncompanion.ui.events.EventDetailScreen
+import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
@@ -33,7 +37,10 @@ import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
+import com.github.se.oncompanion.ui.profile.EditProfileScreen
+import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
+import com.github.se.oncompanion.ui.profile.ProfileViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
@@ -50,6 +57,9 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
     planningRepository: PlanningRepository = EmptyPlanningRepository,
+    authRepository: AuthRepository = AuthRepositoryFirebase(),
+    profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
+    credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -103,7 +113,18 @@ fun AppNavHost(
         PlanningScreen(navigationActions, planningViewModel)
       }
     }
-    tabPlaceholderGraph(Tab.EVENTS, Screen.EVENTS, C.Tag.events_screen, navigationActions)
+    navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
+      composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+      composable(
+          Screen.EVENT_DETAIL,
+          arguments = listOf(navArgument(Screen.EVENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        EventDetailScreen(
+            eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty(),
+            onBack = navigationActions::goBack,
+        )
+      }
+    }
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
@@ -141,35 +162,20 @@ fun AppNavHost(
       composable(Screen.CARE_CIRCLE) { CareCircleScreen(navigationActions) }
     }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
-      composable(Screen.PROFILE) { ProfileScreen(onBack = navigationActions::goBack) }
-    }
-  }
-}
-
-/**
- * A feature graph with a single [PlaceholderScreen] for a bottom-bar [tab]: the placeholder is
- * shown with the bottom bar, and its title is the tab's label.
- */
-private fun NavGraphBuilder.tabPlaceholderGraph(
-    tab: Tab,
-    screen: String,
-    testTag: String,
-    navigationActions: NavigationActions,
-) {
-  navigation(startDestination = screen, route = tab.route) {
-    composable(screen) {
-      Scaffold(
-          bottomBar = {
-            BottomNavigationBar(
-                selectedTab = tab,
-                onTabSelected = { selected -> navigationActions.navigateToTab(selected.route) },
-            )
-          }
-      ) { innerPadding ->
-        PlaceholderScreen(
-            title = stringResource(tab.label),
-            testTag = testTag,
-            modifier = Modifier.padding(innerPadding),
+      composable(Screen.PROFILE) {
+        ProfileScreen(
+            onBack = navigationActions::goBack,
+            onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            viewModel = viewModel { ProfileViewModel(authRepository, profileRepository) },
+            credentialProvider = credentialProvider,
+        )
+      }
+      composable(Screen.EDIT_PROFILE) {
+        EditProfileScreen(
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
+            viewModel = viewModel { EditProfileViewModel(authRepository, profileRepository) },
         )
       }
     }

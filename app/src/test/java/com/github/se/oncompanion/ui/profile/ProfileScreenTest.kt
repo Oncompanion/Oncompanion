@@ -44,7 +44,15 @@ class ProfileScreenTest {
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      ProfileContent(uiState = state, onBack = onBack, onRetry = onRetry)
+      ProfileContent(
+          uiState = state,
+          onBack = onBack,
+          onRetry = onRetry,
+          onEdit = {},
+          onSignOut = {},
+          onCancelSignOut = {},
+          onConfirmSignOut = {},
+      )
     }
   }
 
@@ -64,6 +72,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_signed_out).assertIsDisplayed()
     composeTestRule.onNodeWithText("Sign in to view your profile.").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_information).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertDoesNotExist()
   }
 
   @Test
@@ -87,7 +96,7 @@ class ProfileScreenTest {
   }
 
   @Test
-  fun loadedProfile_displaysNameEmailMemberSinceAndCancerType_withoutRoleOrEditControls() {
+  fun loadedProfile_displaysNameEmailMemberSinceAndCancerType_withoutRole() {
     setContent(
         ProfileUiState.Loaded(
             ProfileDetails(
@@ -116,8 +125,8 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithText("Cancer type").assertIsDisplayed()
     composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
     composeTestRule.onNodeWithText("PATIENT").assertDoesNotExist()
-    composeTestRule.onNodeWithText("Edit profile").assertDoesNotExist()
-    composeTestRule.onNodeWithText("Sign out").assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.profile_sign_out).assertIsDisplayed()
   }
 
   @Test
@@ -159,7 +168,9 @@ class ProfileScreenTest {
         }
     val viewModel = ProfileViewModel(ProfileScreenAuthRepository(user), profiles)
 
-    composeTestRule.setContent { ProfileScreen(onBack = {}, viewModel = viewModel) }
+    composeTestRule.setContent {
+      ProfileScreen(onBack = {}, onEdit = {}, onSignedOut = {}, viewModel = viewModel)
+    }
 
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()
@@ -200,5 +211,23 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
 
     composeTestRule.runOnIdle { assertEquals(1, backCount) }
+  }
+
+  @Test
+  fun editAction_callsCallbackOnlyForLoadedProfile() {
+    var edits = 0
+    composeTestRule.setContent {
+      ProfileContent(
+          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null)),
+          onBack = {},
+          onRetry = {},
+          onEdit = { edits++ },
+          onSignOut = {},
+          onCancelSignOut = {},
+          onConfirmSignOut = {},
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.profile_edit).performClick()
+    composeTestRule.runOnIdle { assertEquals(1, edits) }
   }
 }

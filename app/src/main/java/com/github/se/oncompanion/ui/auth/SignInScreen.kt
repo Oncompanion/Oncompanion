@@ -62,7 +62,7 @@ fun SignInScreen(
 
 /** The default [GoogleCredentialProvider], using the Firebase web client ID. */
 @Composable
-private fun rememberGoogleCredentialProvider(): GoogleCredentialProvider {
+internal fun rememberGoogleCredentialProvider(): GoogleCredentialProvider {
   val serverClientId = stringResource(R.string.default_web_client_id)
   return remember(serverClientId) { CredentialManagerGoogleCredentialProvider(serverClientId) }
 }
