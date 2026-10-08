@@ -81,6 +81,40 @@ class ManageMedicationScheduleTest {
   }
 
   @Test
+  fun draftMadeFromASavedPrescriptionIsRefused() = runTest {
+    // A first prescription, then a draft with its medication IDs sent to be added again
+    manageMedicationSchedule(uid, draft)
+    val first = repository.prescriptionsOf(uid).single()
+    val fromSaved =
+        draft.copy(
+            medications =
+                draft.medications.mapIndexed { position, medication ->
+                  medication.copy(id = first.medications[position].id)
+                }
+        )
+
+    val result = runCatching { manageMedicationSchedule(uid, fromSaved) }
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertEquals(listOf(first), repository.prescriptionsOf(uid))
+  }
+
+  @Test
+  fun draftWithOneMedicationThatAlreadyHasAnIdIsRefused() = runTest {
+    val mixed =
+        draft.copy(
+            medications = listOf(draft.medications[0], draft.medications[1].copy(id = "med-7"))
+        )
+
+    val result = runCatching { manageMedicationSchedule(uid, mixed) }
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertTrue(repository.prescriptionsOf(uid).isEmpty())
+    // The fake numbers its IDs: none was used
+    assertEquals("id-1", repository.newId())
+  }
+
+  @Test
   fun savesOnlyForTheGivenUser() = runTest {
     manageMedicationSchedule(uid, draft)
 
