@@ -210,6 +210,7 @@
     </plurals>
     <string name="prescription_form_duration_invalid">Leave it empty, or enter a number of days from 1 to %1$d</string>
     <string name="prescription_form_duration_check">Check the duration</string>
+    <string name="prescription_form_medication_check">Check this medication</string>
     <plurals name="prescription_form_duration_days">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>

@@ -373,7 +373,10 @@ private fun ClosedMedication(
       when {
         !blocksSave -> null
         medication.name.isBlank() -> R.string.prescription_form_name_missing
-        else -> R.string.prescription_form_duration_check
+        !Medication.isValidDuration(medication.durationDays) ->
+            R.string.prescription_form_duration_check
+        // Anything else the model refuses: don't point at a field that is fine
+        else -> R.string.prescription_form_medication_check
       }
   val summary = medication.summary()
   ListItem(

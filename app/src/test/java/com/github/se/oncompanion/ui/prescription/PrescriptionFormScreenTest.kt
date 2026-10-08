@@ -384,6 +384,22 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun closedMedicationBlockedByAnotherFieldDoesNotBlameTheDuration() {
+    val longDosage = ondansetron.copy(dosage = "a".repeat(Medication.MAX_TEXT_LENGTH + 1))
+    setContent(
+        twoMedications.copy(
+            draft = twoMedications.draft.copy(medications = listOf(longDosage, dexamethasone))
+        )
+    )
+
+    field(C.Tag.prescriptionFormMedicationRow(0))
+        .assertTextContains(string(R.string.prescription_form_medication_check))
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_duration_check))
+        .assertDoesNotExist()
+  }
+
+  @Test
   fun editButtonOfAClosedMedicationReportsItsPosition() {
     setContent(twoMedications.copy(openMedication = 0))
 
