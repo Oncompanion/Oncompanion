@@ -16,14 +16,18 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
+import java.time.LocalDate
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -38,14 +42,23 @@ class AppNavHostTest {
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
-  private fun setNavHost(startRoute: String? = null) {
+  private fun setNavHost(
+      startRoute: String? = null,
+      planningRepository: PlanningRepository = EmptyPlanningRepository,
+  ) {
     composeTestRule.setContent {
       navController =
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      if (startRoute == null) AppNavHost(navController = navController)
-      else AppNavHost(navController = navController, startRoute = startRoute)
+      if (startRoute == null)
+          AppNavHost(navController = navController, planningRepository = planningRepository)
+      else
+          AppNavHost(
+              navController = navController,
+              startRoute = startRoute,
+              planningRepository = planningRepository,
+          )
     }
   }
 
@@ -223,7 +236,8 @@ class AppNavHostTest {
       composeTestRule
           .onNode(
               hasText(context.getString(destination.titleRes)) and
-                  hasAnyAncestor(hasTestTag(destination.testTag))
+                  hasAnyAncestor(hasTestTag(destination.testTag)) and
+                  !hasAnyAncestor(hasTestTag(C.Tag.bottom_navigation_bar))
           )
           .assertIsDisplayed()
       composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
@@ -324,6 +338,60 @@ class AppNavHostTest {
   }
 
   @Test
+  fun planningTabOpensRealCalendarAndRetainsSelectionBetweenTabs() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+    val heading =
+        composeTestRule
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_heading).assertTextContains(heading.single().text)
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+  }
+
+  @Test
+  fun overviewPlanningLinksOpenRealCalendar() {
+    setNavHost(Route.OVERVIEW)
+    listOf(C.Tag.overview_no_appointment, C.Tag.overview_see_planning).forEach { tag ->
+      composeTestRule.onNodeWithTag(tag).performScrollTo().performClick()
+      composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    }
+  }
+
+  @Test
+  fun planningAgendaKeepsScrollAndSingleObservationAcrossTabs() {
+    val repository = FakePlanningRepository()
+    val instant = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+    val entries =
+        (0 until 30).map {
+          PlanningItem(
+              PlanningSource.Appointment("item-$it"),
+              instant.plusSeconds(it.toLong()),
+              "Appointment $it",
+          )
+        }
+    repository.items.value = entries
+    setNavHost(Route.OVERVIEW, repository)
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.planning_list)
+        .performScrollToNode(hasTestTag(C.Tag.planningItem(entries.last().key)))
+    composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(1, repository.ranges.size) }
+  }
+
+  @Test
   fun symptomsShortcut_opensTheJournal_andBackReturnsToOverview() {
     setNavHost(Route.OVERVIEW)
     composeTestRule
@@ -373,5 +441,20 @@ class AppNavHostTest {
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
     assertEquals("overview_home", Screen.OVERVIEW)
+  }
+
+  @Test
+  fun editProfile_isDistinctDestination_andBackReturnsThroughProfileToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).performClick()
+    composeTestRule.runOnIdle { NavigationActions(navController).navigateTo(Screen.EDIT_PROFILE) }
+    composeTestRule.onNodeWithTag(C.Tag.edit_profile_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.EDIT_PROFILE, navController.currentDestination?.route)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.edit_profile_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.profile_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
   }
 }

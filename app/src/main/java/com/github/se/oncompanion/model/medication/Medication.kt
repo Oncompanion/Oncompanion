@@ -3,10 +3,10 @@ package com.github.se.oncompanion.model.medication
 import java.time.LocalDate
 
 /**
- * One medication of a [Prescription], stored at `/users/{uid}/medications/{id}`. Everything is
+ * One medication of a [Prescription], stored in the document of its prescription. Everything is
  * entered or confirmed by the user: the app only records it.
  *
- * @property id the document ID
+ * @property id a unique ID, see [MedicationRepository.newId]
  * @property prescriptionId the [Prescription] this medication belongs to
  * @property name required, see [isValid]
  * @property dosage optional free text (e.g. "1 tablet")

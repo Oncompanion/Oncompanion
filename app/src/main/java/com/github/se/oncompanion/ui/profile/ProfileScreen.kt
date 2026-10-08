@@ -49,6 +49,7 @@ private val memberSinceFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Local
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel { ProfileViewModel() },
 ) {
@@ -57,6 +58,7 @@ fun ProfileScreen(
       uiState = uiState,
       onBack = onBack,
       onRetry = viewModel::retry,
+      onEdit = onEdit,
       modifier = modifier,
   )
 }
@@ -68,6 +70,7 @@ fun ProfileContent(
     uiState: ProfileUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
@@ -112,6 +115,7 @@ fun ProfileContent(
       is ProfileUiState.Loaded ->
           ProfileDetailsContent(
               details = uiState.details,
+              onEdit = onEdit,
               modifier = Modifier.fillMaxSize().padding(innerPadding),
           )
     }
@@ -119,7 +123,11 @@ fun ProfileContent(
 }
 
 @Composable
-private fun ProfileDetailsContent(details: ProfileDetails, modifier: Modifier = Modifier) {
+private fun ProfileDetailsContent(
+    details: ProfileDetails,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
   Column(
       modifier =
           modifier
@@ -173,6 +181,10 @@ private fun ProfileDetailsContent(details: ProfileDetails, modifier: Modifier = 
           )
         }
       }
+    }
+
+    Button(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag(C.Tag.profile_edit)) {
+      Text(stringResource(R.string.edit_profile_title))
     }
 
     Column(
