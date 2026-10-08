@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -63,8 +65,10 @@ class PrescriptionFormScreenTest {
           PrescriptionDraft(
               prescribedOn = date,
               medications = listOf(MedicationDraft(startDate = date)),
-          )
+          ),
+          nameTouched = listOf(false),
       )
+
   private val filled =
       PrescriptionFormUiState(
           PrescriptionDraft(
@@ -106,6 +110,13 @@ class PrescriptionFormScreenTest {
           onMedicationNameChange = { name ->
             events += "name=$name"
             editOpenMedication { it.copy(name = name) }
+            uiState =
+                uiState.copy(
+                    nameTouched =
+                        uiState.nameTouched.mapIndexed { position, touched ->
+                          touched || position == uiState.openMedication
+                        }
+                )
           },
           onDosageChange = { dosage ->
             events += "dosage=$dosage"
@@ -548,6 +559,22 @@ class PrescriptionFormScreenTest {
     field(C.Tag.prescription_form_medication_name_field).assertTextContains("Ondansetron")
     node(C.Tag.prescription_form_remove_medication_button).assertDoesNotExist()
     node(C.Tag.prescription_form_save_button).assertIsEnabled()
+  }
+
+  @Test
+  fun screen_blankNameIsStillFlaggedAfterOpeningAnotherMedication() {
+    setScreen()
+    val missing = string(R.string.prescription_form_name_missing)
+    field(C.Tag.prescription_form_medication_name_field).performTextInput("Ond")
+    field(C.Tag.prescription_form_medication_name_field).performTextClearance()
+
+    // Leaves the first medication for a new one, then comes back to it
+    field(C.Tag.prescription_form_add_medication_button).performClick()
+    field(C.Tag.prescriptionFormMedicationRow(0)).performClick()
+
+    // Both the open medication and the closed new one say their name is missing
+    composeTestRule.onAllNodesWithText(missing).assertCountEquals(2)
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_required)).assertDoesNotExist()
   }
 
   @Test

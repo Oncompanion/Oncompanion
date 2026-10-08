@@ -210,6 +210,8 @@ fun PrescriptionFormContent(
           OpenMedication(
               number = position + 1,
               medication = medication,
+              // A state without a flag for this medication counts its name as touched
+              nameTouched = uiState.nameTouched.getOrElse(position) { true },
               canRemove = uiState.canRemoveMedication,
               onNameChange = onMedicationNameChange,
               onDosageChange = onDosageChange,
@@ -246,6 +248,7 @@ fun PrescriptionFormContent(
 private fun OpenMedication(
     number: Int,
     medication: MedicationDraft,
+    nameTouched: Boolean,
     canRemove: Boolean,
     onNameChange: (String) -> Unit,
     onDosageChange: (String) -> Unit,
@@ -276,15 +279,11 @@ private fun OpenMedication(
       }
     }
 
-    // The name is required: "*Required" below it, or a warning once it has been left empty
-    var nameEdited by rememberSaveable(number) { mutableStateOf(false) }
-    val nameMissing = nameEdited && medication.name.isBlank()
+    // The name is required: "*Required" below it, or a warning once it was edited or left empty
+    val nameMissing = nameTouched && medication.name.isBlank()
     OutlinedTextField(
         value = medication.name,
-        onValueChange = {
-          nameEdited = true
-          onNameChange(it)
-        },
+        onValueChange = onNameChange,
         label = { Text(stringResource(R.string.prescription_form_medication_name)) },
         supportingText = {
           Text(
