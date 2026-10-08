@@ -114,5 +114,32 @@ object C {
     const val care_circle_add_member_fab = "care_circle_add_member_fab"
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
+
+    // Prescriptions
+    const val prescription_form_screen = "prescription_form_screen"
+    const val prescription_form_close_button = "prescription_form_close_button"
+    const val prescription_form_prescribed_by_field = "prescription_form_prescribed_by_field"
+    const val prescription_form_date_field = "prescription_form_date_field"
+    const val prescription_form_medication_title = "prescription_form_medication_title"
+    const val prescription_form_medication_name_field = "prescription_form_medication_name_field"
+    const val prescription_form_dosage_field = "prescription_form_dosage_field"
+    const val prescription_form_frequency_field = "prescription_form_frequency_field"
+    const val prescription_form_start_date_field = "prescription_form_start_date_field"
+    const val prescription_form_duration_field = "prescription_form_duration_field"
+    const val prescription_form_remove_medication_button =
+        "prescription_form_remove_medication_button"
+    const val prescription_form_add_medication_button = "prescription_form_add_medication_button"
+    const val prescription_form_save_button = "prescription_form_save_button"
+    const val prescription_form_saving = "prescription_form_saving"
+    const val prescription_form_date_picker = "prescription_form_date_picker"
+    const val prescription_form_date_picker_confirm = "prescription_form_date_picker_confirm"
+    const val prescription_form_date_picker_cancel = "prescription_form_date_picker_cancel"
+
+    /** The row of a medication that isn't open; [position] is its position in the form. */
+    fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
+
+    /** The button that opens the medication at [position] for editing. */
+    fun prescriptionFormEditMedication(position: Int) =
+        "prescription_form_edit_medication_$position"
   }
 }

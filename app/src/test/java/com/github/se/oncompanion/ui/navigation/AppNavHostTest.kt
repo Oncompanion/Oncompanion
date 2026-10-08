@@ -428,10 +428,27 @@ class AppNavHostTest {
   }
 
   @Test
+  fun prescriptionAddRoute_opensTheForm_andCloseReturns() {
+    setNavHost(Route.PRESCRIPTIONS)
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateTo(Screen.PRESCRIPTION_ADD)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_close_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+  }
+
+  @Test
   fun routeAndScreenConstants_haveExpectedValues() {
     assertEquals("auth", Route.AUTH)
     assertEquals("onboarding", Route.ONBOARDING)
     assertEquals("overview", Route.OVERVIEW)
+    assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
