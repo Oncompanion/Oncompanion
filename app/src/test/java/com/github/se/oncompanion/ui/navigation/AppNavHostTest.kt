@@ -377,7 +377,7 @@ class AppNavHostTest {
         (0 until 30).map {
           PlanningItem(
               PlanningSource.Appointment("item-$it"),
-              instant.plusSeconds(it.toLong()),
+              PlanningTiming.Timed(instant.plusSeconds(it.toLong())),
               "Appointment $it",
           )
         }

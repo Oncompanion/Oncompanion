@@ -4,6 +4,8 @@ package com.github.se.oncompanion.resources
 object C {
   object Tag {
     // Planning
+    const val planning_no_set_time = "planning_no_set_time"
+    const val planning_scheduled = "planning_scheduled"
     const val planning_week = "planning_week"
     const val planning_list = "planning_list"
     const val planning_previous = "planning_previous"

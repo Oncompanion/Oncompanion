@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningTiming
+import java.text.Collator
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -22,11 +24,16 @@ import kotlinx.coroutines.launch
 data class PlanningUiState(
     val selectedDate: LocalDate,
     val weekStart: LocalDate,
-    val items: List<PlanningItem> = emptyList(),
+    val untimedItems: List<PlanningItem> = emptyList(),
+    val scheduledItems: List<PlanningItem> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     val today: LocalDate = selectedDate,
 ) {
+  /** The complete agenda in section order, derived from the two displayed sections. */
+  val items: List<PlanningItem>
+    get() = untimedItems + scheduledItems
+
   val canGoToPreviousWeek: Boolean
     get() = PlanningDates.isSupported(selectedDate.minusWeeks(1))
 
@@ -100,13 +107,14 @@ class PlanningViewModel(
     val week = mutableState.value.weekStart
     val range =
         PlanningRange(
-            week.atStartOfDay(zoneId).toInstant(),
-            week.plusWeeks(1).atStartOfDay(zoneId).toInstant(),
+            week,
+            week.plusWeeks(1),
+            zoneId,
         )
     observation = viewModelScope.launch {
       try {
         repository.observeItems(range).collect { items ->
-          weekItems = items.filter { it.scheduledAt in range }
+          weekItems = items.filter { it.timing in range }
           mutableState.value = mutableState.value.copy(isLoading = false, hasError = false)
           publishItems()
         }
@@ -120,12 +128,24 @@ class PlanningViewModel(
 
   private fun publishItems() {
     val selected = mutableState.value.selectedDate
+    // Compare medication names using the phone's locale, including case and accents.
+    val titleCollator = Collator.getInstance()
+    // Group by timing once so the view renders the same sections that define ordering.
+    val (untimed, scheduled) =
+        weekItems
+            .filter { it.timing.dateIn(zoneId) == selected }
+            .partition { it.timing is PlanningTiming.DateOnly }
     mutableState.value =
         mutableState.value.copy(
-            items =
-                weekItems
-                    .filter { it.scheduledAt.atZone(zoneId).toLocalDate() == selected }
-                    .sortedWith(compareBy<PlanningItem> { it.scheduledAt }.thenBy { it.key })
+            untimedItems =
+                untimed.sortedWith(
+                    compareBy<PlanningItem, String>(titleCollator) { it.title }.thenBy { it.key }
+                ),
+            scheduledItems =
+                scheduled.sortedWith(
+                    compareBy<PlanningItem> { (it.timing as PlanningTiming.Timed).instant }
+                        .thenBy { it.key }
+                ),
         )
   }
 
