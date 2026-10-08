@@ -9,6 +9,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -285,6 +286,38 @@ class PlanningViewModelTest {
         vm.selectDate(date.plusDays(1))
         assertEquals(listOf(nextDay), vm.uiState.value.items)
         assertEquals(1, repository.ranges.size)
+      }
+
+  /** Keeps medication names in locale order and identical titles in stable identity order. */
+  @Test
+  fun medicationNamesFollowLocaleOrderWithStableIdentityTies() =
+      runTest(dispatcher) {
+        val previousLocale = Locale.getDefault()
+        try {
+          // Fix the locale so case and accent ordering is independent of the test machine.
+          Locale.setDefault(Locale.FRENCH)
+          fun medication(id: String, title: String) =
+              PlanningItem(
+                  PlanningSource.Medication("prescription", id),
+                  PlanningTiming.DateOnly(LocalDate.of(2026, 10, 2)),
+                  title,
+              )
+          val lower = medication("a", "aspirine")
+          val upper = medication("b", "Aspirine")
+          val plain = medication("c", "eclair")
+          val accented = medication("d", "éclair")
+          val tie = medication("e", "éclair")
+          val last = medication("f", "Zinc")
+          val repository =
+              FakePlanningRepository().apply {
+                items.value = listOf(last, tie, upper, accented, plain, lower)
+              }
+          val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+          drain()
+          assertEquals(listOf(lower, upper, plain, accented, tie, last), vm.uiState.value.items)
+        } finally {
+          Locale.setDefault(previousLocale)
+        }
       }
 
   @Test

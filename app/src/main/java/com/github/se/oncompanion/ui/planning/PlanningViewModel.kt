@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import java.text.Collator
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -122,6 +123,8 @@ class PlanningViewModel(
 
   private fun publishItems() {
     val selected = mutableState.value.selectedDate
+    // Compare medication names using the phone's locale, including case and accents.
+    val titleCollator = Collator.getInstance()
     mutableState.value =
         mutableState.value.copy(
             items =
@@ -130,7 +133,9 @@ class PlanningViewModel(
                     .sortedWith(
                         compareBy<PlanningItem> { it.timing is PlanningTiming.Timed }
                             .thenBy { (it.timing as? PlanningTiming.Timed)?.instant }
-                            .thenBy { if (it.timing is PlanningTiming.DateOnly) it.title else "" }
+                            .thenBy(titleCollator) {
+                              if (it.timing is PlanningTiming.DateOnly) it.title else ""
+                            }
                             .thenBy { it.key }
                     )
         )
