@@ -54,6 +54,13 @@ data class PrescriptionFormUiState(
   val canRemoveMedication: Boolean
     get() = draft.medications.size > 1
 
+  /**
+   * Positions of the medications that can't be saved as they are, so the screen can show which ones
+   * block Save, also when they aren't open.
+   */
+  val invalidMedications: Set<Int>
+    get() = draft.medications.indices.filterNot { draft.medications[it].isValid() }.toSet()
+
   /** The prescription can be saved: the draft is valid and nothing is being saved. */
   val canSave: Boolean
     get() = draft.isValid() && !isSaving && !isSaved

@@ -525,6 +525,33 @@ class PrescriptionFormViewModelTest {
     assertTrue(viewModel.state.canSave)
   }
 
+  @Test
+  fun stateSaysWhichMedicationsBlockSave() {
+    val viewModel = viewModelWith("Ondansetron", "Dexamethasone", "Paracetamol")
+    assertTrue(viewModel.state.invalidMedications.isEmpty())
+
+    // No name for the first one, a duration of zero days for the third
+    viewModel.openMedication(0)
+    viewModel.onMedicationNameChange(" ")
+    viewModel.openMedication(2)
+    viewModel.onDurationChange("0")
+
+    assertEquals(setOf(0, 2), viewModel.state.invalidMedications)
+    assertFalse(viewModel.state.canSave)
+
+    viewModel.onDurationChange("3")
+    assertEquals(setOf(0), viewModel.state.invalidMedications)
+  }
+
+  @Test
+  fun newEmptyMedicationBlocksSave() {
+    val viewModel = viewModelWith("Ondansetron")
+
+    viewModel.addMedication()
+
+    assertEquals(setOf(1), viewModel.state.invalidMedications)
+  }
+
   // ---------- Saving ----------
 
   @Test
