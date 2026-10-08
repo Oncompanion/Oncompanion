@@ -352,7 +352,7 @@ private fun OpenMedication(
 
 /**
  * One row for a medication that isn't open: its name and a summary, or what stops it from being
- * saved. Tapping the row or its pencil opens it for editing.
+ * saved. Tapping the row opens it for editing.
  */
 @Composable
 private fun ClosedMedication(
@@ -390,14 +390,8 @@ private fun ClosedMedication(
             }
             else -> null
           },
-      trailingContent = {
-        IconButton(
-            onClick = onEdit,
-            modifier = Modifier.testTag(C.Tag.prescriptionFormEditMedication(position)),
-        ) {
-          Icon(imageVector = Icons.Default.Edit, contentDescription = editLabel)
-        }
-      },
+      // The pencil only shows that the row can be edited: the row is the button
+      trailingContent = { Icon(imageVector = Icons.Default.Edit, contentDescription = null) },
       colors = ListItemDefaults.colors(containerColor = Color.Transparent),
       modifier =
           Modifier.testTag(C.Tag.prescriptionFormMedicationRow(position))

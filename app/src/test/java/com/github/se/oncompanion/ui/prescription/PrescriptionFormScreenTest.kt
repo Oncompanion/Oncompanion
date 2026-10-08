@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -11,6 +15,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -411,12 +416,18 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
-  fun editButtonOfAClosedMedicationReportsItsPosition() {
-    setContent(twoMedications.copy(openMedication = 0))
+  fun closedMedicationIsOneButtonForScreenReaders() {
+    setContent(twoMedications)
+    val label = context.getString(R.string.prescription_form_edit_medication, "Ondansetron 8 mg")
 
-    field(C.Tag.prescriptionFormEditMedication(1)).performClick()
-
-    assertEquals(listOf("open=1"), events)
+    // The row itself is the button; the pencil is no longer a second one doing the same
+    field(C.Tag.prescriptionFormMedicationRow(0))
+        .assert(
+            SemanticsMatcher("opens the medication when activated") {
+              it.config.getOrNull(SemanticsActions.OnClick)?.label == label
+            }
+        )
+    composeTestRule.onNodeWithContentDescription(label).assertDoesNotExist()
   }
 
   @Test

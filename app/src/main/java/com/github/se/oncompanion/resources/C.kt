@@ -179,9 +179,5 @@ object C {
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
-
-    /** The button that opens the medication at [position] for editing. */
-    fun prescriptionFormEditMedication(position: Int) =
-        "prescription_form_edit_medication_$position"
   }
 }
