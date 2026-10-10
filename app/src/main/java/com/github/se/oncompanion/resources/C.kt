@@ -212,5 +212,8 @@ object C {
     const val prescription_scan_camera_off = "prescription_scan_camera_off"
     const val prescription_scan_enter_manually_button = "prescription_scan_enter_manually_button"
     const val prescription_scan_open_settings_button = "prescription_scan_open_settings_button"
+    const val prescription_scan_capture_button = "prescription_scan_capture_button"
+    const val prescription_scan_capturing = "prescription_scan_capturing"
+    const val prescription_scan_framing_guide = "prescription_scan_framing_guide"
   }
 }

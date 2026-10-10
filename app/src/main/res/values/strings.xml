@@ -256,4 +256,9 @@
     <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
+    <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
+    <string name="prescription_scan_camera_unavailable_explanation">oncompanion couldn\'t turn on your phone\'s camera. You can enter the prescription yourself instead.</string>
+    <string name="prescription_scan_take_photo">Take a photo</string>
+    <string name="prescription_scan_photo_taken">Photo taken</string>
+    <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
 </resources>
