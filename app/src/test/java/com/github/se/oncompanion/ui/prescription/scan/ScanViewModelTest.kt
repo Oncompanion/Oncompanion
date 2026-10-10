@@ -250,6 +250,44 @@ class ScanViewModelTest {
       }
 
   @Test
+  fun usePhoto_deletesIt_andSaysReadingIsComingSoon() =
+      runTest(dispatcher) {
+        cameraReady()
+        viewModel.capture(writePhoto)
+        advanceUntilIdle()
+
+        viewModel.usePhoto()
+
+        // Nothing reads prescriptions yet (#62): the photo must not be kept for nothing
+        assertTrue(photosOnDisk.isEmpty())
+        assertNull(state.photo)
+        assertTrue(state.readingComingSoon)
+        assertTrue(state.canCapture)
+      }
+
+  @Test
+  fun usePhoto_withoutAPhoto_doesNothing() {
+    cameraReady()
+
+    viewModel.usePhoto()
+
+    assertFalse(state.readingComingSoon)
+  }
+
+  @Test
+  fun readingComingSoonMessageShown_isForgotten() =
+      runTest(dispatcher) {
+        cameraReady()
+        viewModel.capture(writePhoto)
+        advanceUntilIdle()
+        viewModel.usePhoto()
+
+        viewModel.onMessageShown()
+
+        assertFalse(state.readingComingSoon)
+      }
+
+  @Test
   fun failedCaptureMessageShown_isForgotten() =
       runTest(dispatcher) {
         cameraReady()

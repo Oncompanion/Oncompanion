@@ -43,6 +43,7 @@ class ScanContentTest {
   private var captures = 0
   private var messagesShown = 0
   private var retakes = 0
+  private var usedPhotos = 0
 
   @get:Rule val temporaryFolder = TemporaryFolder()
 
@@ -69,6 +70,7 @@ class ScanContentTest {
           onCapture = { captures++ },
           onMessageShown = { messagesShown++ },
           onRetake = { retakes++ },
+          onUsePhoto = { usedPhotos++ },
           viewfinder = { camera.Viewfinder(it) },
       )
     }
@@ -203,6 +205,7 @@ class ScanContentTest {
     compose.onNodeWithText(string(R.string.prescription_scan_check_title)).assertIsDisplayed()
     compose.onNodeWithText(string(R.string.prescription_scan_check_hint)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertDoesNotExist()
     compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertDoesNotExist()
   }
@@ -214,6 +217,31 @@ class ScanContentTest {
     compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
 
     assertEquals(1, retakes)
+  }
+
+  @Test
+  fun usePhoto_isSentToTheViewModel() {
+    show(granted().copy(photo = photoFile()))
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+
+    assertEquals(1, usedPhotos)
+    assertEquals(0, retakes)
+  }
+
+  @Test
+  fun readingComingSoon_isSaid_withManualEntryAsTheWayForward() {
+    show(granted().copy(readingComingSoon = true))
+
+    compose
+        .onNodeWithText(string(R.string.prescription_scan_reading_coming_soon))
+        .assertIsDisplayed()
+    // The snackbar's action
+    compose.onNodeWithText(string(R.string.prescription_scan_enter_manually)).performClick()
+    compose.waitForIdle()
+
+    assertEquals(1, manualEntries)
+    assertEquals(1, messagesShown)
   }
 
   @Test

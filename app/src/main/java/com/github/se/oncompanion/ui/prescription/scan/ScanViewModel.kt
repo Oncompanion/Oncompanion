@@ -45,6 +45,8 @@ enum class CameraStatus {
  * @property photo the photo just taken, shown so the user checks it before it's used; `null` while
  *   the camera is shown
  * @property captureFailed the last photo couldn't be taken (message to show once)
+ * @property readingComingSoon the user chose to use the photo, but reading prescriptions doesn't
+ *   exist yet (message to show once, with a way to enter the prescription manually)
  */
 data class ScanUiState(
     val permission: CameraPermission = CameraPermission.UNKNOWN,
@@ -53,6 +55,7 @@ data class ScanUiState(
     val isCapturing: Boolean = false,
     val photo: File? = null,
     val captureFailed: Boolean = false,
+    val readingComingSoon: Boolean = false,
 ) {
   /**
    * A photo can be taken: the camera is allowed and on, no photo is being taken, and the last one
@@ -141,9 +144,20 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
     }
   }
 
-  /** The message about the failed photo has been shown. */
+  /** The message about the last photo has been shown. */
   fun onMessageShown() {
-    _uiState.update { it.copy(captureFailed = false) }
+    _uiState.update { it.copy(captureFailed = false, readingComingSoon = false) }
+  }
+
+  /**
+   * The user wants to use the photo. Reading the prescription (#62) doesn't exist yet: until then,
+   * the photo is deleted, the camera is shown again and the user is told it's coming soon, with
+   * manual entry as the way forward.
+   */
+  fun usePhoto() {
+    if (_uiState.value.photo == null) return
+    deletePhoto()
+    _uiState.update { it.copy(readingComingSoon = true) }
   }
 
   /** The photo isn't good enough: it's deleted and the camera is shown again. */

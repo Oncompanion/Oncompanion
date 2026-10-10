@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -41,8 +42,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -168,6 +171,7 @@ fun ScanScreen(
       onCapture = { viewModel.capture { file -> camera.takePhoto(context, file) } },
       onMessageShown = viewModel::onMessageShown,
       onRetake = viewModel::retake,
+      onUsePhoto = viewModel::usePhoto,
       viewfinder = { camera.Viewfinder(it) },
       modifier = modifier,
   )
@@ -188,6 +192,7 @@ private fun scanViewModel(): ScanViewModel {
  * @param onCapture takes a photo
  * @param onMessageShown called once the message about the failed photo is gone
  * @param onRetake deletes the photo being checked and shows the camera again
+ * @param onUsePhoto uses the photo being checked
  * @param viewfinder what the camera sees
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -200,17 +205,31 @@ fun ScanContent(
     onCapture: () -> Unit = {},
     onMessageShown: () -> Unit = {},
     onRetake: () -> Unit = {},
+    onUsePhoto: () -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-  // Said once when a photo couldn't be taken, then the view model forgets it
+  // One message at a time about the last photo, then the view model forgets it
   val snackbarHostState = remember { SnackbarHostState() }
   val captureFailed = stringResource(R.string.prescription_scan_capture_failed)
-  LaunchedEffect(uiState.captureFailed) {
-    if (uiState.captureFailed) {
-      snackbarHostState.showSnackbar(captureFailed)
-      onMessageShown()
+  val readingComingSoon = stringResource(R.string.prescription_scan_reading_coming_soon)
+  val enterManually = stringResource(R.string.prescription_scan_enter_manually)
+  LaunchedEffect(uiState.captureFailed, uiState.readingComingSoon) {
+    when {
+      uiState.captureFailed -> snackbarHostState.showSnackbar(captureFailed)
+      // Until prescriptions can be read, manual entry is the way forward (US-24)
+      uiState.readingComingSoon -> {
+        val result =
+            snackbarHostState.showSnackbar(
+                readingComingSoon,
+                actionLabel = enterManually,
+                duration = SnackbarDuration.Long,
+            )
+        if (result == SnackbarResult.ActionPerformed) onEnterManually()
+      }
+      else -> return@LaunchedEffect
     }
+    onMessageShown()
   }
 
   val cameraOff =
@@ -275,7 +294,7 @@ fun ScanContent(
                 R.string.prescription_scan_camera_unavailable_title,
                 R.string.prescription_scan_camera_unavailable_explanation,
             )
-        uiState.photo != null -> PhotoPreview(uiState.photo, onRetake, content)
+        uiState.photo != null -> PhotoPreview(uiState.photo, onRetake, onUsePhoto, content)
         else -> CameraView(uiState, onCapture, viewfinder, content)
       }
     }
@@ -373,7 +392,12 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
  * / Scan – Photo preview").
  */
 @Composable
-private fun PhotoPreview(photo: File, onRetake: () -> Unit, modifier: Modifier) {
+private fun PhotoPreview(
+    photo: File,
+    onRetake: () -> Unit,
+    onUsePhoto: () -> Unit,
+    modifier: Modifier,
+) {
   Column(
       modifier = modifier.testTag(C.Tag.prescription_scan_photo_preview),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -401,6 +425,16 @@ private fun PhotoPreview(photo: File, onRetake: () -> Unit, modifier: Modifier) 
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
+    // "Use this photo" first, as in the mockup: it's the expected next step
+    Button(
+        onClick = onUsePhoto,
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                .testTag(C.Tag.prescription_scan_use_photo_button),
+    ) {
+      Text(stringResource(R.string.prescription_scan_use_photo))
+    }
     OutlinedButton(
         onClick = onRetake,
         modifier =

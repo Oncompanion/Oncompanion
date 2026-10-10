@@ -239,6 +239,27 @@ class ScanScreenTest {
   }
 
   @Test
+  fun usePhoto_deletesIt_andOffersManualEntry() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitForIdle()
+
+    assertTrue(photosOnDisk.isEmpty())
+    compose
+        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_reading_coming_soon))
+        .assertIsDisplayed()
+    compose
+        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_enter_manually))
+        .performClick()
+    compose.waitForIdle()
+    assertEquals(1, manualEntries)
+  }
+
+  @Test
   fun failedPhoto_isSaid_andLeavesNoFile() {
     grantCamera()
     camera.photoError = IOException("camera error")

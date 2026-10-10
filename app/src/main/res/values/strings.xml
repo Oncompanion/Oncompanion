@@ -262,6 +262,8 @@
     <string name="prescription_scan_check_title">Check the photo</string>
     <string name="prescription_scan_check_hint">Is all the text sharp and inside the photo?</string>
     <string name="prescription_scan_retake">Retake</string>
+    <string name="prescription_scan_use_photo">Use this photo</string>
+    <string name="prescription_scan_reading_coming_soon">Reading the prescription is coming soon</string>
     <string name="prescription_scan_photo_description">Photo of the prescription</string>
     <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
