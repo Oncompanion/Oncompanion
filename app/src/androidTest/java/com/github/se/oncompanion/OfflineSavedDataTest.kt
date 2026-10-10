@@ -124,6 +124,8 @@ class OfflineSavedDataTest {
       UserProfileRepositoryFirestore(before).createProfile(savedProfile(restartUid))
       withTimeout(TIMEOUT_MS) { before.waitForPendingWrites().await() }
       val saved = UserProfileRepositoryFirestore(before).getProfile(restartUid)
+      // The profile must really exist, otherwise null == null below would prove nothing
+      assertEquals("Sam", saved?.firstName)
 
       // "Close the app": the Firestore instance is stopped, only its disk cache remains
       before.terminate().await()
