@@ -21,6 +21,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -141,8 +143,25 @@ class ScanViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, photosOnDisk.size)
-        assertTrue(state.photoTaken)
+        // The photo is shown for the user to check
+        assertEquals(photosOnDisk.single().absoluteFile, state.photo?.absoluteFile)
         assertFalse(state.isCapturing)
+      }
+
+  @Test
+  fun whileThePhotoIsChecked_noOtherPhotoCanBeTaken() =
+      runTest(dispatcher) {
+        cameraReady()
+        viewModel.capture(writePhoto)
+        advanceUntilIdle()
+        var calls = 0
+
+        viewModel.capture { calls++ }
+        advanceUntilIdle()
+
+        assertFalse(state.canCapture)
+        assertEquals(0, calls)
+        assertEquals(1, photosOnDisk.size)
       }
 
   @Test
@@ -194,35 +213,51 @@ class ScanViewModelTest {
 
         assertTrue(photosOnDisk.isEmpty())
         assertTrue(state.captureFailed)
-        assertFalse(state.photoTaken)
+        assertNull(state.photo)
         assertTrue(state.canCapture)
       }
 
   @Test
-  fun aNewPhoto_replacesThePreviousOne() =
+  fun retake_deletesThePhoto_andShowsTheCameraAgain() =
       runTest(dispatcher) {
         cameraReady()
         viewModel.capture(writePhoto)
         advanceUntilIdle()
         val first = photosOnDisk.single()
 
+        viewModel.retake()
+
+        assertFalse(first.exists())
+        assertNull(state.photo)
+        assertTrue(state.canCapture)
+      }
+
+  @Test
+  fun retake_thenANewPhoto_keepsOnlyTheNewOne() =
+      runTest(dispatcher) {
+        cameraReady()
+        viewModel.capture(writePhoto)
+        advanceUntilIdle()
+        val first = photosOnDisk.single()
+
+        viewModel.retake()
         viewModel.capture(writePhoto)
         advanceUntilIdle()
 
         assertFalse(first.exists())
         assertEquals(1, photosOnDisk.size)
+        assertEquals(photosOnDisk.single().absoluteFile, state.photo?.absoluteFile)
       }
 
   @Test
-  fun messageShown_isForgotten() =
+  fun failedCaptureMessageShown_isForgotten() =
       runTest(dispatcher) {
         cameraReady()
-        viewModel.capture(writePhoto)
+        viewModel.capture { throw IOException("camera error") }
         advanceUntilIdle()
 
         viewModel.onMessageShown()
 
-        assertFalse(state.photoTaken)
         assertFalse(state.captureFailed)
       }
 
@@ -257,7 +292,7 @@ class ScanViewModelTest {
         advanceUntilIdle()
 
         assertTrue(photosOnDisk.isEmpty())
-        assertFalse(state.photoTaken)
+        assertNull(state.photo)
         assertFalse(state.isCapturing)
       }
 
@@ -336,10 +371,10 @@ class ScanViewModelTest {
 
         // The old error isn't shown while the new photo is being taken
         assertFalse(state.captureFailed)
-        assertFalse(state.photoTaken)
+        assertNull(state.photo)
         shutter.complete(Unit)
         advanceUntilIdle()
-        assertTrue(state.photoTaken)
+        assertNotNull(state.photo)
       }
 
   @Test

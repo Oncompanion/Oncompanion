@@ -259,6 +259,10 @@
     <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
     <string name="prescription_scan_camera_unavailable_explanation">oncompanion couldn\'t turn on your phone\'s camera. You can enter the prescription yourself instead.</string>
     <string name="prescription_scan_take_photo">Take a photo</string>
-    <string name="prescription_scan_photo_taken">Photo taken</string>
+    <string name="prescription_scan_check_title">Check the photo</string>
+    <string name="prescription_scan_check_hint">Is all the text sharp and inside the photo?</string>
+    <string name="prescription_scan_retake">Retake</string>
+    <string name="prescription_scan_photo_description">Photo of the prescription</string>
+    <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
 </resources>

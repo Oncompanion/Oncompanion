@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.ui.prescription.scan
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,10 +23,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
@@ -38,6 +42,18 @@ class ScanContentTest {
   private var settingsOpened = 0
   private var captures = 0
   private var messagesShown = 0
+  private var retakes = 0
+
+  @get:Rule val temporaryFolder = TemporaryFolder()
+
+  /** A real JPEG, as the camera would write it. */
+  private fun photoFile(width: Int = 40, height: Int = 60): File =
+      temporaryFolder.newFile().apply {
+        outputStream().use {
+          Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+              .compress(Bitmap.CompressFormat.JPEG, 90, it)
+        }
+      }
 
   private val camera = FakeScanCamera()
 
@@ -52,6 +68,7 @@ class ScanContentTest {
           onOpenSettings = { settingsOpened++ },
           onCapture = { captures++ },
           onMessageShown = { messagesShown++ },
+          onRetake = { retakes++ },
           viewfinder = { camera.Viewfinder(it) },
       )
     }
@@ -167,20 +184,90 @@ class ScanContentTest {
   // ---- messages ----
 
   @Test
-  fun photoTaken_isSaidOnce() {
-    show(granted().copy(photoTaken = true))
+  fun failedCapture_isSaidOnce() {
+    show(granted().copy(captureFailed = true))
 
-    compose.onNodeWithText(string(R.string.prescription_scan_photo_taken)).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_capture_failed)).assertIsDisplayed()
     compose.mainClock.advanceTimeBy(10_000)
     compose.waitForIdle()
     assertEquals(1, messagesShown)
   }
 
-  @Test
-  fun failedCapture_isSaid() {
-    show(granted().copy(captureFailed = true))
+  // ---- photo preview ----
 
-    compose.onNodeWithText(string(R.string.prescription_scan_capture_failed)).assertIsDisplayed()
+  @Test
+  fun photoTaken_isShownToBeChecked_insteadOfTheCamera() {
+    show(granted().copy(photo = photoFile()))
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo_preview).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_check_title)).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_check_hint)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertDoesNotExist()
+    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertDoesNotExist()
+  }
+
+  @Test
+  fun retake_isSentToTheViewModel() {
+    show(granted().copy(photo = photoFile()))
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
+
+    assertEquals(1, retakes)
+  }
+
+  @Test
+  fun photoThatCantBeRead_asksToRetakeIt() {
+    show(granted().copy(photo = temporaryFolder.newFile("broken.jpg").apply { writeText("x") }))
+
+    compose.waitUntil(5_000) {
+      compose
+          .onAllNodesWithTag(C.Tag.prescription_scan_photo_unreadable)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+  }
+
+  @Test
+  fun photoThatIsGone_asksToRetakeIt() {
+    show(granted().copy(photo = File(temporaryFolder.root, "missing.jpg")))
+
+    compose.waitUntil(5_000) {
+      compose
+          .onAllNodesWithTag(C.Tag.prescription_scan_photo_unreadable)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun photo_isShown_evenAFullSizeOne() {
+    var shown by mutableStateOf(photoFile())
+    compose.setContent {
+      ScanContent(
+          uiState = granted().copy(photo = shown),
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+      )
+    }
+
+    // A small photo, then a 12-megapixel one as a phone camera takes it
+    for (photo in listOf(shown, photoFile(width = 4000, height = 3000))) {
+      shown = photo
+
+      compose.waitUntil(5_000) {
+        compose.onAllNodesWithTag(C.Tag.prescription_scan_photo).fetchSemanticsNodes().isNotEmpty()
+      }
+      compose
+          .onNodeWithContentDescription(string(R.string.prescription_scan_photo_description))
+          .assertIsDisplayed()
+      compose.onNodeWithTag(C.Tag.prescription_scan_photo_unreadable).assertDoesNotExist()
+    }
   }
 
   // ---- leaving ----
@@ -194,6 +281,7 @@ class ScanContentTest {
             granted(CameraStatus.STARTING),
             granted(),
             granted(CameraStatus.UNAVAILABLE),
+            granted().copy(photo = photoFile()),
         )
     var state by mutableStateOf(states.first())
     compose.setContent {

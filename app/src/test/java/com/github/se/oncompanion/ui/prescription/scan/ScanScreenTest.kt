@@ -219,9 +219,23 @@ class ScanScreenTest {
 
     assertEquals(photosOnDisk, camera.photos)
     assertEquals(1, photosOnDisk.size)
-    compose
-        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_photo_taken))
-        .assertIsDisplayed()
+    // The photo is shown to be checked, instead of the camera
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo_preview).assertIsDisplayed()
+  }
+
+  @Test
+  fun retake_deletesThePhoto_andShowsTheCameraAgain() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
+    compose.waitForIdle()
+
+    assertTrue(photosOnDisk.isEmpty())
+    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsDisplayed()
   }
 
   @Test
