@@ -247,4 +247,13 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+
+    <!-- Prescription scan (US-10) -->
+    <string name="scan_title">Scan prescription</string>
+    <string name="scan_close">Close</string>
+    <string name="scan_frame_hint">Place the prescription inside the frame</string>
+    <string name="scan_camera_off_title">Camera access is off</string>
+    <string name="scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
+    <string name="scan_enter_manually">Enter manually</string>
+    <string name="scan_open_settings">Open settings</string>
 </resources>
