@@ -32,7 +32,9 @@ class AppointmentTest {
   /** Rejects titles that cannot identify an appointment. */
   @Test
   fun titleIsRequiredAndCannotContainOnlyWhitespace() {
-    listOf("", " ", "\t\n").forEach { assertFalse(appointment.copy(title = it).isValid()) }
+    listOf("", " ", "\t\n", "\u00a0", "\u2003", "\u202f", "\u3000").forEach {
+      assertFalse(appointment.copy(title = it).isValid())
+    }
   }
 
   /** Enforces the agreed title boundary. */

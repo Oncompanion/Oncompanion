@@ -213,7 +213,19 @@ class AppointmentSecurityRulesTest {
   /** Rejects unusable titles, wrong types and over-limit text. */
   @Test
   fun invalidTitlesAreDenied(): Unit = runBlocking {
-    for (title in listOf("", " ", "\t\n", "t".repeat(101), null, 42)) {
+    for (title in
+        listOf(
+            "",
+            " ",
+            "\t\n",
+            "\u00a0",
+            "\u2003",
+            "\u202f",
+            "\u3000",
+            "t".repeat(101),
+            null,
+            42,
+        )) {
       deniedCreate(validFields().apply { put("title", title) })
     }
   }
