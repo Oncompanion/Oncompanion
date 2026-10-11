@@ -34,10 +34,15 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   fun appointments(uid: String): List<Appointment> = store.value[uid].orEmpty().values.toList()
 
   /**
-   * Inserts or replaces [appointments] with their supplied IDs, bypassing validation for test
-   * setup.
+   * Inserts or replaces [appointments] with their supplied nonblank IDs, bypassing patient-field
+   * validation for test setup.
+   *
+   * @throws IllegalArgumentException if any appointment ID is blank; storage remains unchanged
    */
   fun seed(uid: String, vararg appointments: Appointment) {
+    require(appointments.all { it.id.isNotBlank() }) {
+      "Seeded appointments must have nonblank IDs"
+    }
     store.update { current ->
       current + (uid to (current[uid].orEmpty() + appointments.associateBy { it.id }))
     }

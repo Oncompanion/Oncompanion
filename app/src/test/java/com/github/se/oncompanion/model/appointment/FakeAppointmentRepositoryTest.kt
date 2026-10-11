@@ -141,6 +141,36 @@ class FakeAppointmentRepositoryTest {
     assertEquals(listOf(updated), repository.appointments("alice"))
   }
 
+  /** Catches missing fixture identities instead of silently collapsing appointments. */
+  @Test
+  fun seedRejectsBlankIdsWithoutStoringAppointments() {
+    for (id in listOf("", " ", "\t\n")) {
+      val failure = runCatching { repository.seed("alice", appointment(id = id)) }.exceptionOrNull()
+      assertTrue(failure is IllegalArgumentException)
+      assertTrue(repository.appointments("alice").isEmpty())
+    }
+  }
+
+  /** Rejects the complete batch without replacing existing fixtures or inserting new ones. */
+  @Test
+  fun invalidSeedBatchLeavesExistingStorageUnchanged() {
+    val original = appointment(id = "fixture")
+    repository.seed("alice", original)
+
+    val failure = runCatching {
+      repository.seed(
+          "alice",
+          original.copy(title = "Changed consultation"),
+          appointment(id = "new-fixture"),
+          appointment(),
+      )
+    }
+        .exceptionOrNull()
+
+    assertTrue(failure is IllegalArgumentException)
+    assertEquals(listOf(original), repository.appointments("alice"))
+  }
+
   /** Rejects invalid input without leaving partial test data. */
   @Test
   fun invalidAdditionStoresNothing() = runTest {
