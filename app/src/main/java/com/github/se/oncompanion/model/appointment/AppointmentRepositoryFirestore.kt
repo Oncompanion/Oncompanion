@@ -36,11 +36,7 @@ class AppointmentRepositoryFirestore(
                   close(error)
                 } else {
                   val appointments = snapshot?.documents?.mapNotNull(::fromDocument).orEmpty()
-                  trySend(
-                      appointments.sortedWith(
-                          compareBy<Appointment> { it.scheduledAt }.thenBy { it.id }
-                      )
-                  )
+                  trySend(appointments)
                 }
               }
       awaitClose { registration.remove() }
