@@ -34,30 +34,7 @@ Firestore's local cache is the offline store: writes are applied locally right a
 
 ## Appointment storage
 
-`AppointmentRepository` reads and creates appointments under `/users/{uid}/appointments/{id}`.
-`AppointmentRepositoryFirestore` accesses Firebase lazily and observes all locally available
-appointments through a snapshot listener, ordered by `scheduledAt` and then document ID. The
-caller supplies the patient's uid and must cancel or replace observations when the account changes.
-The Planning adapter and appointment form are separate follow-up work; production Planning still
-uses the empty source.
-
-Each document contains the required `title` (nonblank, at most 100 characters), `scheduledAt`
-(timestamp), `type` (`TREATMENT`, `CONSULTATION`, or `OTHER`) and `createdAt` (server timestamp).
-`location` and `notes` are optional strings, at most 200 and 1000 characters respectively. The
-appointment ID and owner are taken from the path rather than duplicated as fields.
-`scheduledAt` represents an actual instant, displayed in the phone's time zone, rather than a
-calendar-only date normalized to midnight in Europe/Zurich. Past and future appointments are valid.
-
-Adding an appointment validates its input, generates a fresh ID and enqueues one document write.
-It returns without awaiting server acknowledgement, including offline; the returned ID confirms
-submission to the SDK, not server acceptance or an independently verified disk flush. Pending
-creation timestamps are read as null. Cached appointments remain readable offline; a single
-uncached document read may fail and is not treated as an absent document. Malformed documents are
-logged without their personal field values and skipped; query/read failures propagate to callers.
-
-Rules allow owner reads and validated creates only, requiring a server-assigned `createdAt`.
-Updates, deletion and caregiver access remain denied until their corresponding features add
-explicit permissions. Repository and rules tests run against the Firebase emulators.
+Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 
 ## Sign-out
 
