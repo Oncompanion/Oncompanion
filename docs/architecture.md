@@ -1,3 +1,5 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+
 # Architecture
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
@@ -32,6 +34,39 @@ To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) o
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
+## Care circle invitations
+
+A patient adds someone to their circle before that person has an account, but member documents are keyed by the member's uid (`/users/{uid}/circle/{memberUid}`), which only exists once they sign in. So **a pending member is an invitation, and a member is someone who accepted one**:
+
+- `/invites/{inviteCode}` holds what the patient decided about the person (first name, family name, relationship, permissions) and the email to send the invitation to. The patient creates it, offline if needed.
+- `/users/{patientUid}/circle/{caregiverUid}` is created **only when the caregiver redeems the code**, as a copy of the invite. `memberUid` keeps meaning the member's uid, so rules can still check `circle/{request.auth.uid}` with a single `get()`.
+- `/users/{caregiverUid}/patients/{patientUid}` is the caregiver's own list of the circles they joined, created in the same write.
+
+We didn't store pending members in `circle/` and move them on join (the document ID would change, and a caregiver would have to create and delete docs in the patient's circle), or give members a generated ID plus a separate uid link (every collection's rules would need two lookups).
+
+**What each side sees.** Each user can only read their own profile, so what the other side needs is copied:
+
+| When | What is copied | From → to | Why |
+|---|---|---|---|
+| Invite created | the patient's first name | profile → `invites/{inviteCode}.ownerFirstName` | The caregiver must know whose circle they are joining, and can't read the patient's profile |
+| Code redeemed | name, relationship and permissions | invite → `circle/{caregiverUid}` | The patient keeps seeing the name they typed, like a phone contact |
+| Code redeemed | the caregiver's account email | `request.auth.token.email` → `circle/{caregiverUid}.email` | A reliable contact that the rules check, so it can't be faked |
+| Code redeemed | `ownerFirstName` | invite → `patients/{patientUid}.patientFirstName` | The caregiver lists their patients without reading their profiles |
+
+There are two emails: `invites/{inviteCode}.email` is where the patient sends the invitation (typed, optional, editable while pending), and `circle/{memberUid}.email` is the caregiver's Google account email, set when they join and read-only for the patient. Before joining there is no account to read it from, and after joining the account email is the one to trust. The caregiver's join screen tells them that the patient will see their email.
+
+**Invite codes.** The code is the document ID: 10 characters from an alphabet without 0, O, 1, I and L (they are read aloud and typed), generated on the phone with `SecureRandom`, and shown as `ABCDE-FGHJK`. Anyone signed in may `get` an invite by its code, but only its owner may `list` theirs, so codes can't be enumerated. A code is valid for 7 days from the **server** `createdAt` and can be used once: `redeemerUid` goes from null to the caregiver's uid, and never changes after that. Invalid, used and expired codes give the same error. Joining requires a profile with role `CAREGIVER`.
+
+**Redeeming is the one write that needs the network.** Only the server knows whether a code is valid, unused and unexpired, and a local "you joined" that the server later rejects would show someone's data and then take it away. So the caregiver's repository reads the invite from the server and commits one batch, waiting for the server to confirm it: the new `circle/{caregiverUid}` doc, `redeemerUid` on the invite, and the new `patients/{patientUid}` doc. The rules check each of these against the others (`get` for the invite before the batch, `getAfter`/`existsAfter` for the result). Everything else (creating, editing or cancelling an invite, editing or removing a member) works offline. An invite created offline only exists on the patient's phone until it syncs, so the app says the code will work once the phone reconnects (`hasPendingWrites()`).
+
+**Removing a member** is one batch written by the patient: it deletes `circle/{memberUid}`, the caregiver's `patients/{patientUid}` doc and the used invite, so neither a stale link nor the typed name and email are left behind. Cancelling a pending invite deletes it; renewing an expired one creates a new invite with the same details and deletes the old one.
+
+Known limitations:
+- Revoking access while the patient is offline only takes effect once their phone syncs.
+- If the patient changes their first name, caregivers keep the old one. It's a display label, and updating it would need writes into other users' data.
+- Someone with a patient account can't join a circle; they would need to sign in with another Google account.
+- An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.
+
 ## Sign-out
 
 Profile asks for confirmation before reusing `AuthRepository.signOut()`. Its ViewModel drops profile details and cancels the profile listener as soon as Firebase sign-out returns, then asks the existing Google credential provider to clear the account-picker state. Credential cleanup is best effort, as in sign-in; an immediate authentication error keeps the user on Profile with retry available.
@@ -49,7 +84,8 @@ Firestore disk persistence is retained, including pending offline writes. Signin
 /users/{uid}/appointments/{id}
 /users/{uid}/questions/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
-/invites/{code}                       pending care-circle invites
+/users/{uid}/patients/{patientUid}    circles this caregiver joined
+/invites/{inviteCode}                 pending care-circle members (invitations)
 /directory/{contacts|programs|events}/items/{id}   read: signed in, write: staff
 ```
 
