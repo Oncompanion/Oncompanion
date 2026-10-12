@@ -7,6 +7,20 @@ import org.junit.Test
 
 class FakeHospitalRepositoryTest {
   @Test
+  fun repositorySupportsSuspendLambdaImplementations() = runTest {
+    val hospital = Hospital("way/1", "Hospital", "Geneva", 46.2, 6.1)
+    val repository = HospitalRepository { query ->
+      if (query == "Geneva") HospitalSearchResult.Success(listOf(hospital))
+      else HospitalSearchResult.Success(emptyList())
+    }
+    assertEquals(
+        HospitalSearchResult.Success(listOf(hospital)),
+        repository.searchHospitals("Geneva"),
+    )
+    assertEquals(HospitalSearchResult.Success(emptyList()), repository.searchHospitals("Unknown"))
+  }
+
+  @Test
   fun suppliesSuccessfulEmptyAndErrorOutcomesForConsumers() = runTest {
     val fake = FakeHospitalRepository()
     assertEquals(HospitalSearchResult.Success(emptyList()), fake.searchHospitals("Geneva"))

@@ -27,7 +27,7 @@ enum class HospitalSearchError {
 }
 
 /** Hospital lookup boundary for ViewModels; contains no patient data or persistence. */
-interface HospitalRepository {
+fun interface HospitalRepository {
   /**
    * Searches only on explicit user submission, never on each keystroke. Blank text returns an empty
    * success without a request. Expected failures return [HospitalSearchResult.Error]; coroutine

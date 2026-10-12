@@ -7,6 +7,7 @@ import java.net.URLEncoder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -48,42 +49,59 @@ internal constructor(
   private val cache = linkedMapOf<String, HospitalSearchResult.Success>()
 
   override suspend fun searchHospitals(searchText: String): HospitalSearchResult {
+    // Normalize surrounding whitespace so equivalent submissions share a cache entry.
     val query = searchText.trim()
     if (query.isEmpty()) return HospitalSearchResult.Success(emptyList())
+    // Blocking HTTP and JSON parsing stay off the UI thread; tests inject a virtual dispatcher.
     return withContext(dispatcher) {
-      // The shared lock also coalesces identical concurrent searches within this repository.
+      // Hold the process-wide lock through completion to serialize requests across instances.
       requestGate.mutex.withLock {
-        cache[query]?.let {
-          return@withLock it
-        }
-        requestGate.awaitRequest()
-        try {
-          ensureActive()
-          val encoded = URLEncoder.encode("$query [hospital]", "UTF-8")
-          val response = transport.get(URL("$searchEndpoint?q=$encoded&format=jsonv2&limit=10"))
-          ensureActive()
-          when {
-            response.status == 429 -> HospitalSearchResult.Error(HospitalSearchError.RATE_LIMITED)
-            response.status !in 200..299 -> HospitalSearchResult.Error(HospitalSearchError.SERVICE)
-            else ->
-                parse(response.body).also { result ->
-                  cache[query] = result
-                  if (cache.size > 50) cache.remove(cache.keys.first())
-                }
-          }
-        } catch (cancelled: CancellationException) {
-          throw cancelled
-        } catch (_: IOException) {
-          HospitalSearchResult.Error(HospitalSearchError.NETWORK)
-        } catch (_: JSONException) {
-          HospitalSearchResult.Error(HospitalSearchError.INVALID_RESPONSE)
-        } catch (_: IllegalArgumentException) {
-          HospitalSearchResult.Error(HospitalSearchError.INVALID_RESPONSE)
-        } finally {
-          requestGate.hasRequested = true
-        }
+        // Recheck inside the lock so duplicate concurrent searches reuse results without delay.
+        cache[query] ?: requestHospitals(query).also { cacheSuccess(query, it) }
       }
     }
+  }
+
+  private suspend fun requestHospitals(query: String): HospitalSearchResult {
+    // Only cache misses wait; cancellation during the gap never reaches the transport.
+    requestGate.awaitRequest()
+    try {
+      currentCoroutineContext().ensureActive()
+      // The hospital phrase narrows matches; encode user text so it cannot add URL parameters.
+      val encoded = URLEncoder.encode("$query [hospital]", "UTF-8")
+      val response = transport.get(URL("$searchEndpoint?q=$encoded&format=jsonv2&limit=10"))
+      // A blocking transport may finish after cancellation; discard that response before caching.
+      currentCoroutineContext().ensureActive()
+      return handleResponse(response)
+    } catch (cancelled: CancellationException) {
+      // Cancellation belongs to the caller's lifecycle, not a recoverable search failure.
+      throw cancelled
+    } catch (_: IOException) {
+      return HospitalSearchResult.Error(HospitalSearchError.NETWORK)
+    } catch (_: JSONException) {
+      return HospitalSearchResult.Error(HospitalSearchError.INVALID_RESPONSE)
+    } catch (_: IllegalArgumentException) {
+      // Invalid coordinates, identities and oversized responses are also malformed service data.
+      return HospitalSearchResult.Error(HospitalSearchError.INVALID_RESPONSE)
+    } finally {
+      // Failed or cancelled attempts also require a gap before the next request.
+      requestGate.hasRequested = true
+    }
+  }
+
+  private fun handleResponse(response: HospitalHttpResponse): HospitalSearchResult =
+      // Parse only successful responses; expose throttling separately so callers can explain it.
+      when {
+        response.status == 429 -> HospitalSearchResult.Error(HospitalSearchError.RATE_LIMITED)
+        response.status !in 200..299 -> HospitalSearchResult.Error(HospitalSearchError.SERVICE)
+        else -> parse(response.body)
+      }
+
+  private fun cacheSuccess(query: String, result: HospitalSearchResult) {
+    // Cache empty successes too, but let failures retry; bound memory by evicting the oldest query.
+    if (result !is HospitalSearchResult.Success) return
+    cache[query] = result
+    if (cache.size > 50) cache.remove(cache.keys.first())
   }
 
   private fun parse(body: String): HospitalSearchResult.Success {
