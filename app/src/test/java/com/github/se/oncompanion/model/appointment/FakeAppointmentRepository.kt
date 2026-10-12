@@ -21,11 +21,8 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   private val store = MutableStateFlow<Map<String, Map<String, Appointment>>>(emptyMap())
   private var nextId = 1
 
-  /** When set, a newly collected appointment observation fails with this exception. */
+  /** When set, either observation fails with this exception when collection starts. */
   var observeError: Exception? = null
-
-  /** When set, a single-appointment read fails with this exception. */
-  var readError: Exception? = null
 
   /** When set, adding an appointment fails without changing storage. */
   var writeError: Exception? = null
@@ -68,11 +65,13 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     }
   }
 
-  override suspend fun getAppointment(uid: String, id: String): Appointment? {
+  override fun observeAppointment(uid: String, id: String): Flow<Appointment?> {
     requirePathSegment(uid)
     requirePathSegment(id)
-    readError?.let { throw it }
-    return store.value[uid]?.get(id)
+    return flow {
+      observeError?.let { throw it }
+      emitAll(store.map { it[uid]?.get(id) }.distinctUntilChanged())
+    }
   }
 
   override suspend fun addAppointment(uid: String, appointment: Appointment): String {

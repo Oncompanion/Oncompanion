@@ -34,6 +34,24 @@ class AppointmentRepositoryFirestoreConstructionTest {
         assertTrue(requested)
       }
 
+  /** Single-record observation also waits for collection before asking for Firebase. */
+  @Test
+  fun singleObservationAccessesFirebaseOnlyWhenCollected() =
+      runTest(StandardTestDispatcher()) {
+        var requested = false
+        val failure = IllegalStateException("Provider invoked")
+        val repository = AppointmentRepositoryFirestore {
+          requested = true
+          throw failure
+        }
+        val source = repository.observeAppointment("alice", "entry")
+        assertFalse(requested)
+        val error = runCatching { source.first() }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertEquals(failure.message, error?.message)
+        assertTrue(requested)
+      }
+
   /** Rejects invalid user/document paths and appointments before asking for Firebase. */
   @Test
   fun invalidInputDoesNotInitializeFirebase() =
@@ -51,7 +69,7 @@ class AppointmentRepositoryFirestoreConstructionTest {
                   is IllegalArgumentException
           )
           assertTrue(
-              runCatching { repository.getAppointment(uid, "entry") }.exceptionOrNull()
+              runCatching { repository.observeAppointment(uid, "entry") }.exceptionOrNull()
                   is IllegalArgumentException
           )
           assertTrue(
@@ -61,7 +79,7 @@ class AppointmentRepositoryFirestoreConstructionTest {
         }
         for (id in listOf("", " ", "entry/nested")) {
           assertTrue(
-              runCatching { repository.getAppointment("alice", id) }.exceptionOrNull()
+              runCatching { repository.observeAppointment("alice", id) }.exceptionOrNull()
                   is IllegalArgumentException
           )
         }

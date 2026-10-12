@@ -33,9 +33,9 @@ class FakeAppointmentRepositoryTest {
 
   /** Distinguishes an empty collection from an existing appointment. */
   @Test
-  fun emptyStoreEmitsAnEmptyListAndMissingReadReturnsNull() = runTest {
+  fun emptyStoreEmitsAnEmptyListAndMissingObservationEmitsNull() = runTest {
     assertEquals(emptyList<Appointment>(), repository.observeAppointments("alice").first())
-    assertNull(repository.getAppointment("alice", "missing"))
+    assertNull(repository.observeAppointment("alice", "missing").first())
   }
 
   /** Assigns fresh identity and creation time without losing patient fields. */
@@ -54,8 +54,11 @@ class FakeAppointmentRepositoryTest {
 
     assertEquals("appointment-1", first)
     assertEquals("appointment-2", second)
-    assertEquals(input.copy(id = first, createdAt = now), repository.getAppointment("alice", first))
-    assertNull(repository.getAppointment("alice", "ignored"))
+    assertEquals(
+        input.copy(id = first, createdAt = now),
+        repository.observeAppointment("alice", first).first(),
+    )
+    assertNull(repository.observeAppointment("alice", "ignored").first())
   }
 
   /** Protects existing test fixtures when adding new appointments. */
@@ -64,7 +67,7 @@ class FakeAppointmentRepositoryTest {
     val seeded = appointment(id = "appointment-1")
     repository.seed("alice", seeded)
     assertEquals("appointment-2", repository.addAppointment("alice", appointment()))
-    assertEquals(seeded, repository.getAppointment("alice", seeded.id))
+    assertEquals(seeded, repository.observeAppointment("alice", seeded.id).first())
     assertEquals(2, repository.appointments("alice").size)
   }
 
@@ -81,7 +84,7 @@ class FakeAppointmentRepositoryTest {
 
   /** Prevents one patient from receiving another patients appointments. */
   @Test
-  fun readsAndObservationsKeepUsersSeparated() = runTest {
+  fun observationsKeepUsersSeparated() = runTest {
     val alice = appointment(id = "alice-entry")
     val bob = appointment(id = "bob-entry")
     repository.seed("alice", alice)
@@ -89,8 +92,8 @@ class FakeAppointmentRepositoryTest {
 
     assertEquals(listOf(alice), repository.observeAppointments("alice").first())
     assertEquals(listOf(bob), repository.observeAppointments("bob").first())
-    assertNull(repository.getAppointment("bob", alice.id))
-    assertNull(repository.getAppointment("alice", bob.id))
+    assertNull(repository.observeAppointment("bob", alice.id).first())
+    assertNull(repository.observeAppointment("alice", bob.id).first())
     assertEquals(emptyList<Appointment>(), repository.appointments("nobody"))
   }
 
@@ -129,6 +132,40 @@ class FakeAppointmentRepositoryTest {
     repository.addAppointment("alice", appointment())
     runCurrent()
     assertEquals(listOf(emptyList<Appointment>()), emissions)
+  }
+
+  /** Keeps the selected record current without emitting unrelated writes or duplicate values. */
+  @Test
+  fun singleObservationReceivesChangesAndStopsAfterCancellation() = runTest {
+    val emissions = mutableListOf<Appointment?>()
+    val job =
+        launch(StandardTestDispatcher(testScheduler)) {
+          repository.observeAppointment("alice", "fixture").toList(emissions)
+        }
+    runCurrent()
+    assertEquals(listOf<Appointment?>(null), emissions)
+
+    val original = appointment(id = "fixture")
+    repository.seed("alice", original)
+    runCurrent()
+    assertEquals(listOf(null, original), emissions)
+
+    repository.seed("alice", original)
+    repository.seed("alice", appointment(id = "other"))
+    repository.seed("bob", original.copy(title = "Another patient"))
+    runCurrent()
+    assertEquals(listOf(null, original), emissions)
+
+    val updated = original.copy(title = "Rescheduled consultation")
+    repository.seed("alice", updated)
+    runCurrent()
+    assertEquals(listOf(null, original, updated), emissions)
+
+    job.cancel()
+    runCurrent()
+    repository.seed("alice", original)
+    runCurrent()
+    assertEquals(listOf(null, original, updated), emissions)
   }
 
   /** Allows tests to prepare changed data under the same identity. */
@@ -191,7 +228,7 @@ class FakeAppointmentRepositoryTest {
               is IllegalArgumentException
       )
       assertTrue(
-          runCatching { repository.getAppointment(uid, "entry") }.exceptionOrNull()
+          runCatching { repository.observeAppointment(uid, "entry") }.exceptionOrNull()
               is IllegalArgumentException
       )
       assertTrue(
@@ -206,7 +243,7 @@ class FakeAppointmentRepositoryTest {
   fun invalidDocumentIdsAreRejected() = runTest {
     for (id in listOf("", " ", "entry/nested")) {
       assertTrue(
-          runCatching { repository.getAppointment("alice", id) }.exceptionOrNull()
+          runCatching { repository.observeAppointment("alice", id) }.exceptionOrNull()
               is IllegalArgumentException
       )
     }
@@ -223,13 +260,13 @@ class FakeAppointmentRepositoryTest {
 
   /** Keeps a failed read distinguishable from an absent appointment. */
   @Test
-  fun singleReadFailureIsNotReportedAsMissing() = runTest {
+  fun singleObservationFailureIsNotReportedAsMissing() = runTest {
     val failure = IllegalStateException("Read failed")
-    repository.readError = failure
-    assertSame(
-        failure,
-        runCatching { repository.getAppointment("alice", "missing") }.exceptionOrNull(),
-    )
+    val source = repository.observeAppointment("alice", "missing")
+    repository.observeError = failure
+    assertSame(failure, runCatching { source.first() }.exceptionOrNull())
+    repository.observeError = null
+    assertNull(source.first())
   }
 
   /** Preserves storage on failure and allows the caller to retry. */
@@ -247,7 +284,7 @@ class FakeAppointmentRepositoryTest {
     val id = repository.addAppointment("alice", appointment())
     assertEquals(
         appointment().copy(id = id, createdAt = now),
-        repository.getAppointment("alice", id),
+        repository.observeAppointment("alice", id).first(),
     )
   }
 }

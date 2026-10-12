@@ -17,13 +17,15 @@ interface AppointmentRepository {
   fun observeAppointments(uid: String): Flow<List<Appointment>>
 
   /**
-   * Returns appointment [id] for [uid], or null when it does not exist. Cached appointments remain
-   * readable offline. An uncached document may fail to load offline; a read failure is thrown,
-   * never reported as a missing appointment.
+   * Emits the locally available appointment [id] for [uid], then each change. Emits null when the
+   * snapshot has no readable appointment, including missing or malformed documents and an empty
+   * offline cache; null does not confirm server-side deletion. Cached appointments remain available
+   * offline. Listener failures propagate through the flow; stopping collection releases its
+   * listener.
    *
    * @throws IllegalArgumentException if [uid] or [id] is blank or contains a path separator
    */
-  suspend fun getAppointment(uid: String, id: String): Appointment?
+  fun observeAppointment(uid: String, id: String): Flow<Appointment?>
 
   /**
    * Enqueues a new appointment for [uid] and returns its generated ID without waiting for server

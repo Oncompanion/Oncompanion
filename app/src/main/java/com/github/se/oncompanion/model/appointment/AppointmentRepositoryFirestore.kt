@@ -9,7 +9,6 @@ import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
 
 /**
  * Appointment storage at `/users/{uid}/appointments/{id}`, using Firestore's offline cache. Writes
@@ -43,11 +42,20 @@ class AppointmentRepositoryFirestore(
     }
   }
 
-  override suspend fun getAppointment(uid: String, id: String): Appointment? {
+  override fun observeAppointment(uid: String, id: String): Flow<Appointment?> {
     requirePathSegment(uid)
     requirePathSegment(id)
-    // The default source falls back to cached data offline; uncached read errors propagate.
-    return fromDocument(collection(uid).document(id).get().await())
+    return callbackFlow {
+      val registration =
+          collection(uid).document(id).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+              close(error)
+            } else {
+              trySend(snapshot?.let(::fromDocument))
+            }
+          }
+      awaitClose { registration.remove() }
+    }
   }
 
   override suspend fun addAppointment(uid: String, appointment: Appointment): String {

@@ -67,7 +67,7 @@ class AppointmentRepositoryFirestoreTest {
       withTimeout(10_000) { collection().document(id).get(Source.SERVER).await() }
 
   private suspend fun storedAppointment(id: String): Appointment? =
-      withTimeout(10_000) { repository.getAppointment(uid, id) }
+      withTimeout(10_000) { repository.observeAppointment(uid, id).first() }
 
   private fun assertContent(expected: Appointment, actual: Appointment?) {
     assertNotNull(actual)
@@ -96,7 +96,7 @@ class AppointmentRepositoryFirestoreTest {
 
   /** Preserves patient information while assigning fresh identity and server creation time. */
   @Test
-  fun addAndGetRoundTripWithServerAssignedMetadata(): Unit = runBlocking {
+  fun addAndObserveRoundTripWithServerAssignedMetadata(): Unit = runBlocking {
     val input = appointment().copy(id = "ignored", createdAt = Instant.EPOCH)
     val id = repository.addAppointment(uid, input)
     assertTrue(id.isNotBlank())
@@ -153,6 +153,7 @@ class AppointmentRepositoryFirestoreTest {
   @Test
   fun omittedOptionalFieldsLoadAsNull(): Unit = runBlocking {
     rawAppointment("minimal", rawFields())
+    serverDocument("minimal")
     val saved = storedAppointment("minimal")
     assertNotNull(saved)
     assertNull(saved!!.location)
@@ -243,6 +244,7 @@ class AppointmentRepositoryFirestoreTest {
     for ((index, fields) in malformed.withIndex()) {
       val id = "malformed-$index"
       rawAppointment(id, fields)
+      serverDocument(id)
       assertNull(storedAppointment(id))
     }
     val validId = repository.addAppointment(uid, appointment())
@@ -271,14 +273,15 @@ class AppointmentRepositoryFirestoreTest {
     )
   }
 
-  /** Keeps an unauthorized single read distinguishable from a missing appointment. */
+  /** Keeps an unauthorized single observation distinguishable from a missing appointment. */
   @Test
-  fun unauthorizedSingleReadFails(): Unit = runBlocking {
+  fun unauthorizedSingleObservationFails(): Unit = runBlocking {
     val otherUid = EmulatorTestData.createUser("other-appointment-owner")
     EmulatorTestData.signIn("appointment-owner")
     val error =
         withTimeout(10_000) {
-          runCatching { repository.getAppointment(otherUid, "not-cached") }.exceptionOrNull()
+          runCatching { repository.observeAppointment(otherUid, "not-cached").collect {} }
+              .exceptionOrNull()
         }
     assertTrue(error is FirebaseFirestoreException)
     assertEquals(
@@ -332,22 +335,54 @@ class AppointmentRepositoryFirestoreTest {
     }
   }
 
-  /** Does not report an uncached offline document as an authoritative missing appointment. */
+  /** An empty offline cache emits null, then the same listener loads data after reconnecting. */
   @Test
-  fun uncachedOfflineReadFails(): Unit = runBlocking {
+  fun uncachedOfflineObservationEmitsNullAndLoadsAfterReconnecting(): Unit = runBlocking {
+    rawAppointment("not-cached", rawFields())
+    val emissions = Channel<Appointment?>(Channel.UNLIMITED)
     db.disableNetwork().await()
+    val observation = launch {
+      repository.observeAppointment(uid, "not-cached").collect { emissions.send(it) }
+    }
     try {
-      val error =
-          withTimeout(10_000) {
-            runCatching { repository.getAppointment(uid, "never-cached") }.exceptionOrNull()
-          }
-      assertTrue(error is FirebaseFirestoreException)
-      assertEquals(
-          FirebaseFirestoreException.Code.UNAVAILABLE,
-          (error as FirebaseFirestoreException).code,
-      )
+      withTimeout(10_000) {
+        assertNull(emissions.receive())
+        db.enableNetwork().await()
+        val loaded = emissions.receive()
+        assertNotNull(loaded)
+        assertEquals("not-cached", loaded!!.id)
+        assertEquals("Consultation", loaded.title)
+      }
     } finally {
+      observation.cancel()
       db.enableNetwork().await()
+    }
+  }
+
+  /** A live detail receives edits and deletion without creating another observation. */
+  @Test
+  fun singleObservationReceivesReplacementAndDeletion(): Unit = runBlocking {
+    rawAppointment("live-detail", rawFields())
+    // Prime the cache so the initial event is the fixture rather than an empty local snapshot.
+    serverDocument("live-detail")
+    val emissions = Channel<Appointment?>(Channel.UNLIMITED)
+    val observation = launch {
+      repository.observeAppointment(uid, "live-detail").collect { emissions.send(it) }
+    }
+    try {
+      withTimeout(10_000) {
+        assertEquals("Consultation", emissions.receive()!!.title)
+        EmulatorTestData.replaceRawDocument(
+            "users/$uid/appointments",
+            "live-detail",
+            rawFields().put("title", JSONObject().put("stringValue", "Rescheduled")).toString(),
+        )
+        assertEquals("Rescheduled", emissions.receive()!!.title)
+        EmulatorTestData.deleteRawDocument("users/$uid/appointments/live-detail")
+        assertNull(emissions.receive())
+      }
+    } finally {
+      observation.cancel()
     }
   }
 
