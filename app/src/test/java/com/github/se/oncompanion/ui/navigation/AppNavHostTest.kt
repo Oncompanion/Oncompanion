@@ -31,6 +31,8 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -57,6 +59,7 @@ class AppNavHostTest {
       planningRepository: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
+      medicationRepository: MedicationRepository = FakeMedicationRepository(),
   ) {
     composeTestRule.setContent {
       navController =
@@ -69,6 +72,7 @@ class AppNavHostTest {
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
               authRepository = authRepository,
+              medicationRepository = medicationRepository,
           )
       else
           AppNavHost(
@@ -77,6 +81,7 @@ class AppNavHostTest {
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
               authRepository = authRepository,
+              medicationRepository = medicationRepository,
           )
     }
   }
@@ -227,7 +232,7 @@ class AppNavHostTest {
               Route.PRESCRIPTIONS,
               Screen.PRESCRIPTIONS,
               C.Tag.prescriptions_screen,
-              R.string.prescriptions_title,
+              R.string.prescriptions_list_title,
           ),
           Destination(
               Route.CARE_CIRCLE,
@@ -487,20 +492,96 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
+  /** Opens the prescriptions list from its Overview shortcut, as the user does. */
+  private fun openPrescriptionsFromOverview(medicationRepository: MedicationRepository) {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    setNavHost(Route.OVERVIEW, authRepository = auth, medicationRepository = medicationRepository)
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+  }
+
   @Test
-  fun prescriptionAddRoute_opensTheForm_andCloseReturns() {
-    setNavHost(Route.PRESCRIPTIONS)
+  fun prescriptionsShortcut_opensTheList_andBackArrowReturnsToOverview() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
     composeTestRule.runOnIdle {
-      NavigationActions(navController).navigateTo(Screen.PRESCRIPTION_ADD)
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
     }
 
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionsEnterManually_opensTheForm_andCloseReturnsToTheList() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+
     composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.PRESCRIPTION_ADD, NavigationActions(navController).currentRoute())
     }
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_form_close_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun prescriptionsScan_staysOnTheList_untilTheScanScreenIsMerged() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun savingAPrescription_returnsToTheList_whichShowsIt() {
+    val medications = FakeMedicationRepository()
+    openPrescriptionsFromOverview(medications)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_medication_name_field)
+        .performScrollTo()
+        .performTextInput("Ondansetron 8 mg")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // The form and the list share the repository: the list shows what was just saved
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertDoesNotExist()
+    val saved = medications.prescriptionsOf("owner").single()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem(saved.id)).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText("Ondansetron 8 mg") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem(saved.id))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+
+    // Back from the list returns to Overview, not to the form
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
   }
 
   @Test

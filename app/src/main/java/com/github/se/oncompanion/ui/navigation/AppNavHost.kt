@@ -2,7 +2,6 @@ package com.github.se.oncompanion.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,16 +13,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.github.se.oncompanion.R
+import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
+import com.github.se.oncompanion.model.medication.MedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
-import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -32,7 +32,6 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
-import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventsScreen
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
@@ -43,6 +42,8 @@ import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
+import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
+import com.github.se.oncompanion.ui.prescription.PrescriptionsViewModel
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
@@ -70,6 +71,7 @@ fun AppNavHost(
     authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
     profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
+    medicationRepository: MedicationRepository = remember { MedicationRepositoryFirestore() },
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -152,16 +154,26 @@ fun AppNavHost(
       }
     }
     navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
-      // Placeholder until the prescriptions list is implemented
       composable(Screen.PRESCRIPTIONS) {
-        PlaceholderScreen(
-            title = stringResource(R.string.prescriptions_title),
-            testTag = C.Tag.prescriptions_screen,
+        PrescriptionsScreen(
+            viewModel = viewModel { PrescriptionsViewModel(authRepository, medicationRepository) },
+            onBack = navigationActions::goBack,
+            // A second tap while the form is already opening is dropped, so it opens once
+            onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
+            // Defined once the scan screen is merged
+            onScan = {},
         )
       }
       composable(Screen.PRESCRIPTION_ADD) {
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel() },
+            // Saves to the repository the list observes, so the list shows the new prescription
+            viewModel =
+                viewModel {
+                  PrescriptionFormViewModel(
+                      authRepository,
+                      ManageMedicationSchedule(medicationRepository),
+                  )
+                },
             // A second tap while the form is already leaving is dropped, so Back happens once
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the screen the form was opened from
