@@ -144,7 +144,7 @@
     <string name="events_empty_title">No events yet</string>
     <string name="events_empty_supporting">Events organized by the Ligue will appear here.</string>
     <string name="events_error_title">Couldn\'t load the events</string>
-    <string name="events_error_supporting">Check your connection and try again.</string>
+    <string name="events_error_supporting">Please try again.</string>
     <string name="events_retry">Retry</string>
 
     <!-- Event detail -->
@@ -153,7 +153,7 @@
     <string name="event_detail_date_time">Date &amp; time</string>
     <string name="event_detail_location">Location</string>
     <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
-    <string name="event_detail_error">Couldn\'t load this event. Check your connection and try again.</string>
+    <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
 
     <!-- Care circle -->

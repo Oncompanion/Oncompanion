@@ -30,6 +30,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
@@ -56,6 +57,7 @@ class AppNavHostTest {
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
+      eventRepository: EventRepository = FakeEventRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
   ) {
     composeTestRule.setContent {
@@ -68,6 +70,7 @@ class AppNavHostTest {
               navController = navController,
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
+              eventRepository = eventRepository,
               authRepository = authRepository,
           )
       else
@@ -76,6 +79,7 @@ class AppNavHostTest {
               startRoute = startRoute,
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
+              eventRepository = eventRepository,
               authRepository = authRepository,
           )
     }
