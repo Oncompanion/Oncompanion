@@ -115,6 +115,13 @@ service cloud.firestore {
       // with its own `match` above. There is no catch-all rule: a collection without one is denied.
     }
 
+    // ---------- Ligue events ----------
+    // /events/{eventId}: the Ligue's support events, the same for every user. They are added from
+    // the Firebase console for now, so the app can only read them.
+    match /events/{eventId} {
+      allow read: if signedIn();
+    }
+
     // ---------- Everything else ----------
     // No rule matches = denied. Add one explicit `match` per new collection.
   }

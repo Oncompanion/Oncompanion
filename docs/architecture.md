@@ -50,7 +50,8 @@ Firestore disk persistence is retained, including pending offline writes. Signin
 /users/{uid}/questions/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /invites/{code}                       pending care-circle invites
-/directory/{contacts|programs|events}/items/{id}   read: signed in, write: staff
+/events/{id}                          Ligue events, read: signed in, write: nobody from the app
+/directory/{contacts|programs}/items/{id}   read: signed in, write: staff
 ```
 
 Care-circle members read a patient's data through rules that check `/users/{uid}/circle/{request.auth.uid}`. Staff status comes from a custom claim set by the team, never from a field users can write.
