@@ -2,11 +2,13 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-![Oncompanion architecture](architecture.svg)
+The overview shows every part of the app in its layer. Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
 
-Green = screens and repositories, blue = use cases, yellow = device service interfaces (wrapping ML Kit and Android APIs), grey = backend and SDKs, red dashed = P2 stretch goals.
+![Oncompanion architecture overview](architecture-overview.svg)
 
-To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite `architecture.svg`. Commit both files in the same PR as the code change.
+Solid green = in the code, dashed green = partly built, grey dotted = a fake or empty stand-in for now, dashed white = planned. In the feature diagrams, solid arrows are calls the code makes today and dotted arrows are planned ones.
+
+To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Commit both files in the same PR as the code change, and update the markings when something planned gets built.
 
 ## Layers
 
@@ -27,6 +29,38 @@ To edit the diagram, open [`architecture.excalidraw`](architecture.excalidraw) o
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
 
 **Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
+
+## Feature diagrams
+
+`ResolveCareCircleAccess` is drawn in the Care circle diagram. The other diagrams show it as one planned box, linked to every screen that shows patient data.
+
+### Account
+
+![Account: sign-in, onboarding and profile](architecture-account.svg)
+
+### Care circle
+
+![Care circle](architecture-care-circle.svg)
+
+### Symptoms
+
+![Symptoms](architecture-symptoms.svg)
+
+### Medications
+
+![Medications](architecture-medications.svg)
+
+### Planning and Overview
+
+![Planning and Overview](architecture-planning.svg)
+
+### Appointments and summary
+
+![Appointments and summary](architecture-appointments.svg)
+
+### Ligue events and directory
+
+![Ligue events and directory](architecture-ligue.svg)
 
 ## Offline mode
 
