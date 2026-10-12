@@ -69,6 +69,29 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
+    // ---------- Appointments ----------
+    // Schema: title (required nonblank string, at most 100), scheduledAt (timestamp),
+    // type (recorded category), location (optional string, 200), notes (optional string, 1000),
+    // createdAt (server timestamp). Identity and ownership come from the document path.
+    function hasAppointmentTitleText(title) {
+      // Match Kotlin Char.isWhitespace, including Unicode spaces that Rules trim() preserves.
+      return title.matches('(?s).*[^\\x{0009}-\\x{000D}\\x{001C}-\\x{0020}\\x{00A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}].*');
+    }
+
+    // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
+    function isValidAppointment(data) {
+      return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt'])
+          && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
+          && data.title is string
+          && hasAppointmentTitleText(data.title)
+          && data.title.size() <= 100
+          && data.scheduledAt is timestamp
+          && data.type in ['TREATMENT', 'CONSULTATION', 'OTHER']
+          && optionalString(data, 'location', 200)
+          && optionalString(data, 'notes', 1000)
+          && data.createdAt is timestamp;
+    }
+
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -100,6 +123,16 @@ service cloud.firestore {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidSymptom(request.resource.data)
+                      && request.resource.data.createdAt == request.time;
+      }
+
+      // ---------- Appointments ----------
+      // /users/{uid}/appointments/{appointmentId}: only the owner can read and create.
+      // Editing, deletion and caregiver access stay denied until their features are implemented.
+      match /appointments/{appointmentId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && isValidAppointment(request.resource.data)
                       && request.resource.data.createdAt == request.time;
       }
 
