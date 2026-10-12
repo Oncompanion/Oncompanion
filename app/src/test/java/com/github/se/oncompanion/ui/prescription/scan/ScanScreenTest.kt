@@ -6,6 +6,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -99,6 +100,24 @@ class ScanScreenTest {
     val request = shadowOf(compose.activity).lastRequestedPermission
     assertEquals(listOf(Manifest.permission.CAMERA), request?.requestedPermissions?.toList())
     assertTrue(viewModel.uiState.value.permissionRequested)
+    compose.onNodeWithTag(C.Tag.prescription_scan_permission_pending).assertExists()
+  }
+
+  @Test
+  fun phoneRotated_whileTheDialogIsOpen_doesNotAskAgain() {
+    showScreen()
+    assertNotNull(shadowOf(compose.activity).lastRequestedPermission)
+
+    // Rotating recreates the activity, but the screen's ViewModel survives it
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread {
+      compose.activity.setContent {
+        ScanScreen(onEnterManually = {}, onBack = {}, viewModel = viewModel)
+      }
+    }
+    compose.waitForIdle()
+
+    assertNull(shadowOf(compose.activity).lastRequestedPermission)
     compose.onNodeWithTag(C.Tag.prescription_scan_permission_pending).assertExists()
   }
 
