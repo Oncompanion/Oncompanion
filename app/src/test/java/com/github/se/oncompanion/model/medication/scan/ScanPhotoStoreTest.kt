@@ -1,6 +1,6 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
-package com.github.se.oncompanion.model.scan
+package com.github.se.oncompanion.model.medication.scan
 
 import java.io.File
 import org.junit.Assert.assertEquals
