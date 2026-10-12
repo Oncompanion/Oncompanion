@@ -30,6 +30,40 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 
 **Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
 
+## External hospital search (issue #142)
+
+`model/hospital/HospitalRepository` accepts explicitly submitted search text and returns
+`HospitalSearchResult`: a list of hospitals (possibly empty), or a typed network, service,
+rate-limit or invalid-response error. Future ViewModels inject this interface; screens never
+access HTTP. `HospitalRepositoryNominatim` uses platform `HttpURLConnection` on the IO
+dispatcher and Android JSON parsing, with no new dependency. `FakeHospitalRepository` in
+`app/src/test/.../model/hospital` supplies configurable outcomes and records submitted queries.
+Hospital identities use OSM object type and ID rather than provider-specific place IDs.
+
+The [official Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
+prohibits autocomplete. The future field (#143) must use an explicit Search button, with no
+keystroke, background, periodic or automatic nearest-hospital requests. Only public hospital
+names and locations may be submitted; never include patient details or confidential data.
+Every results view must display `© OpenStreetMap contributors`, linked to
+[the copyright and ODbL information](https://www.openstreetmap.org/copyright), including cached
+results. The repository exposes attribution constants for consumers; #142 adds no UI.
+
+The HTTP implementation identifies itself as `Oncompanion/1.0` with the project URL, sets
+10-second connection/read timeouts, disables redirects and automatic retries, and bounds
+response size. All repository instances share a process-wide mutex with a conservative
+one-second gap after a request completes (including failures). Each instance caches the last
+50 successful distinct queries, including empty results, for its lifetime. Failures are not
+cached and cancellation propagates. Cache misses require connectivity; this is not a Firestore
+store and does not change essential offline features.
+
+**Deployment prerequisite:** the public service's maximum of one request per second applies
+to aggregate traffic across all app users, not each device. A local throttle cannot enforce
+that limit. The constructor therefore requires an HTTPS search endpoint instead of defaulting
+to the public service. Before wiring this into a released UI, supply a deployment-configured
+proxy that enforces the aggregate limit, caches requests and can switch its upstream provider
+without an app update, as the policy requires. Proxy deployment/configuration is outside #142;
+the repository is not yet wired into production. No profile fields, Firestore rules, hospital
+field UI (#143), or profile integration (#144) are added.
 ## Feature diagrams
 
 `ResolveCareCircleAccess` is drawn in the Care circle diagram. The other diagrams show it as one planned box, linked to every screen that shows patient data.
