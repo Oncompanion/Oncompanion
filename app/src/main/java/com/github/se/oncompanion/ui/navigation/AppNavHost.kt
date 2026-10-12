@@ -19,6 +19,8 @@ import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
+import com.github.se.oncompanion.model.event.EventRepository
+import com.github.se.oncompanion.model.event.EventRepositoryFirestore
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.user.UserProfileRepository
@@ -34,7 +36,9 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
 import com.github.se.oncompanion.ui.common.PlaceholderScreen
 import com.github.se.oncompanion.ui.events.EventDetailScreen
+import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
+import com.github.se.oncompanion.ui.events.EventsViewModel
 import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
@@ -67,6 +71,7 @@ fun AppNavHost(
     startRoute: String = Route.AUTH,
     planningRepository: PlanningRepository = EmptyPlanningRepository,
     careCircleRepository: CareCircleRepository = remember { CareCircleRepositoryFirestore() },
+    eventRepository: EventRepository = remember { EventRepositoryFirestore() },
     authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
     profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
@@ -124,14 +129,18 @@ fun AppNavHost(
       }
     }
     navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
-      composable(Screen.EVENTS) { EventsScreen(navigationActions) }
+      composable(Screen.EVENTS) {
+        EventsScreen(navigationActions, viewModel = viewModel { EventsViewModel(eventRepository) })
+      }
       composable(
           Screen.EVENT_DETAIL,
           arguments = listOf(navArgument(Screen.EVENT_ID) { type = NavType.StringType }),
       ) { entry ->
+        val eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty()
         EventDetailScreen(
-            eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty(),
+            eventId = eventId,
             onBack = navigationActions::goBack,
+            viewModel = viewModel { EventDetailViewModel(eventId, eventRepository) },
         )
       }
     }
