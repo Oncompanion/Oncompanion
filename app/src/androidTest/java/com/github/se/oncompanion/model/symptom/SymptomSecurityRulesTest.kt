@@ -51,8 +51,7 @@ class SymptomSecurityRulesTest {
 
   private fun validSymptom(): MutableMap<String, Any?> =
       mutableMapOf(
-          "type" to "FATIGUE",
-          "otherLabel" to null,
+          "types" to listOf("FATIGUE"),
           "intensity" to 6,
           "occurredAt" to Timestamp.now(),
           "notes" to "After the walk",
@@ -61,8 +60,8 @@ class SymptomSecurityRulesTest {
 
   private fun validOther(): MutableMap<String, Any?> =
       validSymptom().apply {
-        put("type", "OTHER")
-        put("otherLabel", "Hiccups")
+        put("types", listOf("OTHER"))
+        put("notes", "Hiccups")
       }
 
   private suspend fun <T> allowed(task: Task<T>): T = withTimeout(10_000) { task.await() }
@@ -74,6 +73,10 @@ class SymptomSecurityRulesTest {
     } catch (e: FirebaseFirestoreException) {
       assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
     }
+  }
+
+  private fun assertCreateAllowed(data: Map<String, Any?>) = runBlocking {
+    allowed(symptoms(aliceUid).document().set(data))
   }
 
   private fun assertCreateDenied(data: Map<String, Any?>) = runBlocking {
@@ -91,42 +94,55 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun ownerCanCreateEveryType(): Unit = runBlocking {
+  fun ownerCanCreateEveryListedTypeAlone_withoutNotes() {
     for (type in SymptomType.entries.filter { it != SymptomType.OTHER }) {
-      allowed(symptoms(aliceUid).document().set(validSymptom().apply { put("type", type.name) }))
+      assertCreateAllowed(
+          validSymptom().apply {
+            put("types", listOf(type.name))
+            remove("notes")
+          }
+      )
     }
-    allowed(symptoms(aliceUid).document().set(validOther()))
   }
 
   @Test
-  fun ownerCanCreateWithOnlyRequiredFields(): Unit = runBlocking {
-    allowed(
-        symptoms(aliceUid)
-            .document()
-            .set(
-                mapOf(
-                    "type" to "PAIN",
-                    "intensity" to 1,
-                    "occurredAt" to Timestamp.now(),
-                    "createdAt" to FieldValue.serverTimestamp(),
-                )
-            )
+  fun ownerCanCreateSeveralTypes() {
+    assertCreateAllowed(validSymptom().apply { put("types", listOf("FEVER", "HEADACHE")) })
+    assertCreateAllowed(validOther().apply { put("types", SymptomType.entries.map { it.name }) })
+  }
+
+  @Test
+  fun ownerCanCreateWithOnlyRequiredFields() {
+    assertCreateAllowed(
+        mapOf(
+            "types" to listOf("PAIN"),
+            "occurredAt" to Timestamp.now(),
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
     )
   }
 
   @Test
-  fun ownerCanCreateWithBoundaryValues(): Unit = runBlocking {
-    allowed(symptoms(aliceUid).document().set(validSymptom().apply { put("intensity", 10) }))
-    allowed(
-        symptoms(aliceUid)
-            .document()
-            .set(
-                validOther().apply {
-                  put("otherLabel", "a".repeat(50))
-                  put("notes", "n".repeat(1000))
-                }
-            )
+  fun intensityAndNotesCanBeNull() {
+    assertCreateAllowed(
+        validSymptom().apply {
+          put("intensity", null)
+          put("notes", null)
+        }
     )
+  }
+
+  @Test
+  fun ownerCanCreateWithBoundaryValues() {
+    assertCreateAllowed(validSymptom().apply { put("intensity", 1) })
+    assertCreateAllowed(validSymptom().apply { put("intensity", 10) })
+    assertCreateAllowed(validOther().apply { put("notes", "n".repeat(1000)) })
+  }
+
+  @Test
+  fun otherWithNotesIsAllowed_aloneOrWithOtherSymptoms() {
+    assertCreateAllowed(validOther())
+    assertCreateAllowed(validOther().apply { put("types", listOf("FATIGUE", "OTHER")) })
   }
 
   @Test
@@ -155,17 +171,39 @@ class SymptomSecurityRulesTest {
   @Test
   fun createWithMissingOrExtraFieldsIsDenied() {
     assertCreateDenied(validSymptom().apply { put("isUrgent", true) })
-    assertCreateDenied(validSymptom().apply { remove("type") })
-    assertCreateDenied(validSymptom().apply { remove("intensity") })
+    assertCreateDenied(validSymptom().apply { remove("types") })
     assertCreateDenied(validSymptom().apply { remove("occurredAt") })
     assertCreateDenied(validSymptom().apply { remove("createdAt") })
   }
 
   @Test
-  fun createWithInvalidTypeIsDenied() {
-    assertCreateDenied(validSymptom().apply { put("type", "fatigue") })
-    assertCreateDenied(validSymptom().apply { put("type", "COUGH") })
-    assertCreateDenied(validSymptom().apply { put("type", 1) })
+  fun createWithTheOldSingleTypeFieldsIsDenied() {
+    assertCreateDenied(validSymptom().apply { put("type", "FATIGUE") })
+    assertCreateDenied(validOther().apply { put("otherLabel", "Hiccups") })
+    assertCreateDenied(
+        validSymptom().apply {
+          remove("types")
+          put("type", "FATIGUE")
+        }
+    )
+  }
+
+  @Test
+  fun createWithoutAnySymptomIsDenied() {
+    assertCreateDenied(validSymptom().apply { put("types", emptyList<String>()) })
+  }
+
+  @Test
+  fun createWithTheSameSymptomTwiceIsDenied() {
+    assertCreateDenied(validSymptom().apply { put("types", listOf("PAIN", "PAIN")) })
+  }
+
+  @Test
+  fun createWithInvalidTypesIsDenied() {
+    assertCreateDenied(validSymptom().apply { put("types", listOf("fatigue")) })
+    assertCreateDenied(validSymptom().apply { put("types", listOf("FATIGUE", "COUGH")) })
+    assertCreateDenied(validSymptom().apply { put("types", listOf(1)) })
+    assertCreateDenied(validSymptom().apply { put("types", "FATIGUE") })
   }
 
   @Test
@@ -177,12 +215,22 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun otherWithoutValidLabelIsDenied() {
-    assertCreateDenied(validOther().apply { remove("otherLabel") })
-    assertCreateDenied(validOther().apply { put("otherLabel", null) })
-    assertCreateDenied(validOther().apply { put("otherLabel", "  ") })
-    assertCreateDenied(validOther().apply { put("otherLabel", "a".repeat(51)) })
-    assertCreateDenied(validOther().apply { put("otherLabel", 42) })
+  fun otherWithoutNotesIsDenied() {
+    assertCreateDenied(validOther().apply { remove("notes") })
+    assertCreateDenied(validOther().apply { put("notes", null) })
+    assertCreateDenied(validOther().apply { put("notes", "") })
+    assertCreateDenied(validOther().apply { put("notes", "  ") })
+    assertCreateDenied(validOther().apply { put("notes", 42) })
+  }
+
+  @Test
+  fun otherAmongSeveralSymptomsWithoutNotesIsDenied() {
+    assertCreateDenied(
+        validOther().apply {
+          put("types", listOf("FATIGUE", "OTHER"))
+          remove("notes")
+        }
+    )
   }
 
   @Test
@@ -193,19 +241,15 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun createInThePastIsAllowed(): Unit = runBlocking {
+  fun createInThePastIsAllowed() {
     val lastYear = Timestamp(Instant.now().minus(Duration.ofDays(365)))
-    allowed(symptoms(aliceUid).document().set(validSymptom().apply { put("occurredAt", lastYear) }))
-  }
-
-  @Test
-  fun listedTypeWithLabelIsDenied() {
-    assertCreateDenied(validSymptom().apply { put("otherLabel", "Hiccups") })
+    assertCreateAllowed(validSymptom().apply { put("occurredAt", lastYear) })
   }
 
   @Test
   fun createWithInvalidNotesOrDatesIsDenied() {
     assertCreateDenied(validSymptom().apply { put("notes", "n".repeat(1001)) })
+    assertCreateDenied(validOther().apply { put("notes", "n".repeat(1001)) })
     assertCreateDenied(validSymptom().apply { put("notes", 42) })
     assertCreateDenied(validSymptom().apply { put("occurredAt", "2026-10-05") })
     assertCreateDenied(validSymptom().apply { put("createdAt", Timestamp.now()) })
@@ -223,7 +267,7 @@ class SymptomSecurityRulesTest {
   }
 
   @Test
-  fun createWithUnrelatedDataIsDenied(): Unit = runBlocking {
+  fun createWithUnrelatedDataIsDenied() {
     // No other rule allows writes under the user, whatever the data
     assertCreateDenied(mapOf("anything" to true))
   }

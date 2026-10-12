@@ -62,8 +62,7 @@ class SymptomRepositoryFirestore(
     document
         .set(
             mapOf(
-                FIELD_TYPE to entry.type.name,
-                FIELD_OTHER_LABEL to entry.otherLabel,
+                FIELD_TYPES to entry.types.map { it.name },
                 FIELD_INTENSITY to entry.intensity,
                 FIELD_OCCURRED_AT to Timestamp(entry.occurredAt),
                 FIELD_NOTES to entry.notes,
@@ -84,9 +83,9 @@ class SymptomRepositoryFirestore(
     return try {
       SymptomEntry(
           id = doc.id,
-          type = SymptomType.valueOf(doc.getString(FIELD_TYPE)!!),
-          otherLabel = doc.getString(FIELD_OTHER_LABEL),
-          intensity = doc.getLong(FIELD_INTENSITY)!!.toInt(),
+          // Entries saved before several symptoms could be logged have no types: they are skipped
+          types = (doc.get(FIELD_TYPES) as List<*>).map { SymptomType.valueOf(it as String) },
+          intensity = doc.getLong(FIELD_INTENSITY)?.toInt(),
           occurredAt = doc.getTimestamp(FIELD_OCCURRED_AT)!!.toInstant(),
           notes = doc.getString(FIELD_NOTES),
           // Pending server timestamps read as null until the write reaches the server
@@ -101,8 +100,7 @@ class SymptomRepositoryFirestore(
   companion object {
     const val USERS_COLLECTION = "users"
     const val COLLECTION = "symptoms"
-    const val FIELD_TYPE = "type"
-    const val FIELD_OTHER_LABEL = "otherLabel"
+    const val FIELD_TYPES = "types"
     const val FIELD_INTENSITY = "intensity"
     const val FIELD_OCCURRED_AT = "occurredAt"
     const val FIELD_NOTES = "notes"

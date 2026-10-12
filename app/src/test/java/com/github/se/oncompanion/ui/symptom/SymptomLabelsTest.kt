@@ -23,7 +23,7 @@ class SymptomLabelsTest {
   private val context: Context = ApplicationProvider.getApplicationContext()
 
   private val fatigue =
-      SymptomEntry(type = SymptomType.FATIGUE, intensity = 3, occurredAt = Instant.EPOCH)
+      SymptomEntry(types = listOf(SymptomType.FATIGUE), intensity = 3, occurredAt = Instant.EPOCH)
 
   @Test
   fun everyTypeHasItsOwnLabel() {
@@ -60,16 +60,18 @@ class SymptomLabelsTest {
   }
 
   @Test
-  fun title_ofOther_isTheLabelTheUserTyped() {
+  fun title_ofSeveralSymptoms_listsTheirLabelsInOrder() {
     composeTestRule.setContent {
-      Text(fatigue.copy(type = SymptomType.OTHER, otherLabel = "Hiccups").title())
+      Text(fatigue.copy(types = listOf(SymptomType.HEADACHE, SymptomType.FATIGUE)).title())
     }
-    composeTestRule.onNodeWithText("Hiccups").assertExists()
+    composeTestRule.onNodeWithText("Headache, Fatigue").assertExists()
   }
 
   @Test
-  fun title_ofOtherWithoutLabel_fallsBackToOther() {
-    composeTestRule.setContent { Text(fatigue.copy(type = SymptomType.OTHER).title()) }
+  fun title_ofOther_isOther_theNotesSayWhichSymptom() {
+    composeTestRule.setContent {
+      Text(fatigue.copy(types = listOf(SymptomType.OTHER), notes = "Hiccups").title())
+    }
     composeTestRule.onNodeWithText("Other").assertExists()
   }
 }

@@ -159,7 +159,7 @@ private fun DayHeader(date: LocalDate, today: LocalDate) {
   )
 }
 
-/** One entry: what it was, its severity in words and the time. */
+/** One entry: what it was, its severity in words (if given) and the time. */
 @Composable
 private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
   val entry = journalEntry.entry
@@ -172,7 +172,8 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(entry.title(), style = MaterialTheme.typography.titleMedium) },
         // The severity in words (Figma: "Symptoms – History"), as entered: no colour, no advice
-        supportingContent = { Text(stringResource(entry.severity.label)) },
+        supportingContent =
+            entry.severity?.let { severity -> { Text(stringResource(severity.label)) } },
         trailingContent = {
           Text(
               text = journalEntry.time.format(timeFormatter),

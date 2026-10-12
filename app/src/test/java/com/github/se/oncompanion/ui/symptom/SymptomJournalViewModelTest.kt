@@ -47,7 +47,7 @@ class SymptomJournalViewModelTest {
   private fun entry(id: String, occurredAt: String) =
       SymptomEntry(
           id = id,
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 5,
           occurredAt = Instant.parse(occurredAt),
       )

@@ -34,8 +34,6 @@ val Severity.label: Int
         Severity.SEVERE -> R.string.symptom_severity_severe
       }
 
-/** What the entry is about: the label the user typed for "Other", or else the type's label. */
+/** What the entry is about: the labels of its symptoms, e.g. "Fatigue, Headache". */
 @Composable
-fun SymptomEntry.title(): String =
-    otherLabel?.takeIf { type == SymptomType.OTHER && it.isNotBlank() }
-        ?: stringResource(type.label)
+fun SymptomEntry.title(): String = types.map { stringResource(it.label) }.joinToString(", ")

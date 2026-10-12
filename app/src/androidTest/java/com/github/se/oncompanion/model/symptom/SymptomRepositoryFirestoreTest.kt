@@ -52,18 +52,18 @@ class SymptomRepositoryFirestoreTest {
 
   private fun fatigue(occurredAt: String = "2026-10-05T08:00:00Z") =
       SymptomEntry(
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 7,
           occurredAt = Instant.parse(occurredAt),
           notes = "After the walk",
       )
 
+  /** "Other" with the notes saying which symptom, and no intensity. */
   private fun hiccups() =
       SymptomEntry(
-          type = SymptomType.OTHER,
-          otherLabel = "Hiccups",
-          intensity = 2,
+          types = listOf(SymptomType.HEADACHE, SymptomType.OTHER),
           occurredAt = Instant.parse("2026-10-04T18:30:00Z"),
+          notes = "Hiccups",
       )
 
   private fun assertSameContent(expected: SymptomEntry, actual: SymptomEntry?) {
@@ -112,13 +112,14 @@ class SymptomRepositoryFirestoreTest {
   }
 
   @Test
-  fun otherWithLabelAndNoNotesRoundTrips(): Unit = runBlocking {
+  fun severalTypesWithOtherAndNoIntensityRoundTrip(): Unit = runBlocking {
     val id = repository.addSymptom(aliceUid, hiccups())
     awaitServerAck()
 
     val stored = observeOnce(id)
     assertSameContent(hiccups(), stored)
-    assertNull(stored!!.notes)
+    assertEquals(listOf(SymptomType.HEADACHE, SymptomType.OTHER), stored!!.types)
+    assertNull(stored.intensity)
   }
 
   @Test
@@ -130,14 +131,13 @@ class SymptomRepositoryFirestoreTest {
         withTimeout(10_000) {
           db.collection(symptomsPath(aliceUid)).document(id).get(Source.SERVER).await()
         }
-    assertEquals("FATIGUE", snapshot.getString(SymptomRepositoryFirestore.FIELD_TYPE))
+    assertEquals(listOf("FATIGUE"), snapshot.get(SymptomRepositoryFirestore.FIELD_TYPES))
     assertEquals(7L, snapshot.getLong(SymptomRepositoryFirestore.FIELD_INTENSITY))
     assertEquals(
         Instant.parse("2026-10-05T08:00:00Z"),
         snapshot.getTimestamp(SymptomRepositoryFirestore.FIELD_OCCURRED_AT)!!.toInstant(),
     )
     assertEquals("After the walk", snapshot.getString(SymptomRepositoryFirestore.FIELD_NOTES))
-    assertNull(snapshot.getString(SymptomRepositoryFirestore.FIELD_OTHER_LABEL))
     assertNotNull(snapshot.getTimestamp(SymptomRepositoryFirestore.FIELD_CREATED_AT))
   }
 
@@ -145,8 +145,7 @@ class SymptomRepositoryFirestoreTest {
   fun collectionAndFieldConstantsMatchSpec() {
     assertEquals("users", SymptomRepositoryFirestore.USERS_COLLECTION)
     assertEquals("symptoms", SymptomRepositoryFirestore.COLLECTION)
-    assertEquals("type", SymptomRepositoryFirestore.FIELD_TYPE)
-    assertEquals("otherLabel", SymptomRepositoryFirestore.FIELD_OTHER_LABEL)
+    assertEquals("types", SymptomRepositoryFirestore.FIELD_TYPES)
     assertEquals("intensity", SymptomRepositoryFirestore.FIELD_INTENSITY)
     assertEquals("occurredAt", SymptomRepositoryFirestore.FIELD_OCCURRED_AT)
     assertEquals("notes", SymptomRepositoryFirestore.FIELD_NOTES)
@@ -254,8 +253,9 @@ class SymptomRepositoryFirestoreTest {
         listOf(
             fatigue().copy(intensity = 0),
             fatigue().copy(intensity = 11),
-            fatigue().copy(otherLabel = "Hiccups"),
-            hiccups().copy(otherLabel = " "),
+            fatigue().copy(types = emptyList()),
+            fatigue().copy(types = listOf(SymptomType.PAIN, SymptomType.PAIN)),
+            hiccups().copy(notes = " "),
             fatigue().copy(notes = "n".repeat(1001)),
             fatigue().copy(occurredAt = Instant.now().plusSeconds(3600)),
         )
@@ -277,14 +277,16 @@ class SymptomRepositoryFirestoreTest {
     EmulatorTestData.createRawDocument(
         symptomsPath(aliceUid),
         "unknownType",
-        """{"type": {"stringValue": "COUGH"}, "intensity": {"integerValue": "3"},
+        """{"types": {"arrayValue": {"values": [{"stringValue": "COUGH"}]}},
+           "intensity": {"integerValue": "3"},
            "occurredAt": {"timestampValue": "2026-10-01T00:00:00Z"},
            "createdAt": {"timestampValue": "2026-10-01T00:00:00Z"}}""",
     )
+    // Saved before several symptoms could be logged: one "type" and no "types"
     EmulatorTestData.createRawDocument(
         symptomsPath(aliceUid),
-        "noIntensity",
-        """{"type": {"stringValue": "PAIN"},
+        "singleType",
+        """{"type": {"stringValue": "PAIN"}, "intensity": {"integerValue": "3"},
            "occurredAt": {"timestampValue": "2026-10-02T00:00:00Z"},
            "createdAt": {"timestampValue": "2026-10-02T00:00:00Z"}}""",
     )
@@ -293,7 +295,7 @@ class SymptomRepositoryFirestoreTest {
 
     assertEquals(listOf(valid), observeListOnce().map { it.id })
     assertNull(observeOnce("unknownType"))
-    assertNull(observeOnce("noIntensity"))
+    assertNull(observeOnce("singleType"))
   }
 
   // ---- offline ----
