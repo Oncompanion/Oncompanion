@@ -16,6 +16,8 @@ val SymptomType.label: Int
         SymptomType.FATIGUE -> R.string.symptom_type_fatigue
         SymptomType.NAUSEA -> R.string.symptom_type_nausea
         SymptomType.PAIN -> R.string.symptom_type_pain
+        SymptomType.FEVER -> R.string.symptom_type_fever
+        SymptomType.HEADACHE -> R.string.symptom_type_headache
         SymptomType.APPETITE_LOSS -> R.string.symptom_type_appetite_loss
         SymptomType.SLEEP_PROBLEMS -> R.string.symptom_type_sleep_problems
         SymptomType.BREATHLESSNESS -> R.string.symptom_type_breathlessness

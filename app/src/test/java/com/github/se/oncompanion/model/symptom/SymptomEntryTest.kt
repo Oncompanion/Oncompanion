@@ -43,6 +43,8 @@ class SymptomEntryTest {
             SymptomType.FATIGUE,
             SymptomType.NAUSEA,
             SymptomType.PAIN,
+            SymptomType.FEVER,
+            SymptomType.HEADACHE,
             SymptomType.APPETITE_LOSS,
             SymptomType.SLEEP_PROBLEMS,
             SymptomType.BREATHLESSNESS,

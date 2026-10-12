@@ -34,6 +34,8 @@ class SymptomLabelsTest {
             "Fatigue",
             "Nausea",
             "Pain",
+            "Fever",
+            "Headache",
             "Loss of appetite",
             "Sleep problems",
             "Breathlessness",

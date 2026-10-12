@@ -8,6 +8,8 @@ enum class SymptomType {
   FATIGUE,
   NAUSEA,
   PAIN,
+  FEVER,
+  HEADACHE,
   APPETITE_LOSS,
   SLEEP_PROBLEMS,
   BREATHLESSNESS,

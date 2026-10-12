@@ -49,8 +49,8 @@ service cloud.firestore {
     function isValidSymptom(data) {
       return data.keys().hasOnly(['type', 'otherLabel', 'intensity', 'occurredAt', 'notes', 'createdAt'])
           && data.keys().hasAll(['type', 'intensity', 'occurredAt', 'createdAt'])
-          && data.type in ['FATIGUE', 'NAUSEA', 'PAIN', 'APPETITE_LOSS', 'SLEEP_PROBLEMS',
-                           'BREATHLESSNESS', 'OTHER']
+          && data.type in ['FATIGUE', 'NAUSEA', 'PAIN', 'FEVER', 'HEADACHE', 'APPETITE_LOSS',
+                           'SLEEP_PROBLEMS', 'BREATHLESSNESS', 'OTHER']
           // "Other" needs a label; the listed types have none
           && (data.type == 'OTHER'
               ? data.get('otherLabel', null) is string

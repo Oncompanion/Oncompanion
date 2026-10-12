@@ -84,6 +84,8 @@
     <string name="symptom_type_fatigue">Fatigue</string>
     <string name="symptom_type_nausea">Nausea</string>
     <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_fever">Fever</string>
+    <string name="symptom_type_headache">Headache</string>
     <string name="symptom_type_appetite_loss">Loss of appetite</string>
     <string name="symptom_type_sleep_problems">Sleep problems</string>
     <string name="symptom_type_breathlessness">Breathlessness</string>
