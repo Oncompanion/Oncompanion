@@ -1,3 +1,5 @@
+# Co-authored-by: Claude Code <noreply@anthropic.com>
+
 name: Deploy Firestore rules
 
 # Firebase doesn't read the rules from the repo: they have to be published to the project. This

@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.profile
 
 import com.github.se.oncompanion.model.auth.AuthRepository

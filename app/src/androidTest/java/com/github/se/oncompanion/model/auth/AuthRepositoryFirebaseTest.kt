@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4

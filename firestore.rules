@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
