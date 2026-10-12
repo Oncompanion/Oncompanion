@@ -51,43 +51,43 @@ class ScanContentTest {
   fun whileThePermissionIsAsked_onlyTheTopBarIsShown() {
     show(CameraPermission.UNKNOWN)
 
-    compose.onNodeWithText(string(R.string.scan_title)).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_permission_pending).assertExists()
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.scan_camera_off).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.scan_enter_manually_button).assertDoesNotExist()
+    compose.onNodeWithText(string(R.string.prescription_scan_title)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_permission_pending).assertExists()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_off).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).assertDoesNotExist()
   }
 
   @Test
   fun cameraAllowed_showsTheViewfinderStarting_withTheFramingHint() {
     show(CameraPermission.GRANTED)
 
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_camera_starting).assertIsDisplayed()
-    compose.onNodeWithText(string(R.string.scan_frame_hint)).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_camera_off).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.scan_open_settings_button).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_starting).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_frame_hint)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_off).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_open_settings_button).assertDoesNotExist()
   }
 
   @Test
   fun cameraRefused_explainsWhy_andOffersBothWaysForward() {
     show(CameraPermission.REFUSED)
 
-    compose.onNodeWithTag(C.Tag.scan_camera_off).assertIsDisplayed()
-    compose.onNodeWithText(string(R.string.scan_camera_off_title)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_off).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_camera_off_title)).assertIsDisplayed()
     compose
-        .onNodeWithText(string(R.string.scan_camera_off_explanation), substring = true)
+        .onNodeWithText(string(R.string.prescription_scan_camera_off_explanation), substring = true)
         .assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_enter_manually_button).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_open_settings_button).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_open_settings_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertDoesNotExist()
   }
 
   @Test
   fun cameraRefused_enterManually_opensManualEntry() {
     show(CameraPermission.REFUSED)
 
-    compose.onNodeWithTag(C.Tag.scan_enter_manually_button).performClick()
+    compose.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).performClick()
 
     assertEquals(1, manualEntries)
     assertEquals(0, settingsOpened)
@@ -97,7 +97,7 @@ class ScanContentTest {
   fun cameraRefused_openSettings_opensTheSettings() {
     show(CameraPermission.REFUSED)
 
-    compose.onNodeWithTag(C.Tag.scan_open_settings_button).performClick()
+    compose.onNodeWithTag(C.Tag.prescription_scan_open_settings_button).performClick()
 
     assertEquals(1, settingsOpened)
     assertEquals(0, manualEntries)
@@ -117,7 +117,7 @@ class ScanContentTest {
 
     for ((index, state) in CameraPermission.entries.withIndex()) {
       permission = state
-      compose.onNodeWithTag(C.Tag.scan_close_button).performClick()
+      compose.onNodeWithTag(C.Tag.prescription_scan_close_button).performClick()
       assertEquals("close in state $state", index + 1, backs)
     }
   }
@@ -137,7 +137,7 @@ class ScanContentTest {
     }
 
     // Average luminance of the rendered screen, from 0 (black) to 1 (white)
-    val pixels = compose.onNodeWithTag(C.Tag.scan_screen).captureToImage().toPixelMap()
+    val pixels = compose.onNodeWithTag(C.Tag.prescription_scan_screen).captureToImage().toPixelMap()
     var sum = 0.0
     var count = 0
     for (x in 0 until pixels.width step 4) {

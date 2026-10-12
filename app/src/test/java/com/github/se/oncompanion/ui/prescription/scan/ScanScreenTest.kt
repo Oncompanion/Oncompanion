@@ -68,7 +68,7 @@ class ScanScreenTest {
 
     showScreen()
 
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertIsDisplayed()
     assertNull(shadowOf(compose.activity).lastRequestedPermission)
   }
 
@@ -99,7 +99,7 @@ class ScanScreenTest {
     val request = shadowOf(compose.activity).lastRequestedPermission
     assertEquals(listOf(Manifest.permission.CAMERA), request?.requestedPermissions?.toList())
     assertTrue(viewModel.uiState.value.permissionRequested)
-    compose.onNodeWithTag(C.Tag.scan_permission_pending).assertExists()
+    compose.onNodeWithTag(C.Tag.prescription_scan_permission_pending).assertExists()
   }
 
   @Test
@@ -108,7 +108,7 @@ class ScanScreenTest {
 
     answerDialog(granted = true)
 
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertIsDisplayed()
   }
 
   @Test
@@ -117,8 +117,8 @@ class ScanScreenTest {
 
     answerDialog(granted = false)
 
-    compose.onNodeWithTag(C.Tag.scan_camera_off).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.scan_enter_manually_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_off).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).assertIsDisplayed()
   }
 
   @Test
@@ -126,7 +126,7 @@ class ScanScreenTest {
     showScreen()
     answerDialog(granted = false)
 
-    compose.onNodeWithTag(C.Tag.scan_open_settings_button).performClick()
+    compose.onNodeWithTag(C.Tag.prescription_scan_open_settings_button).performClick()
 
     val intent = shadowOf(compose.activity).nextStartedActivity
     assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
@@ -144,7 +144,7 @@ class ScanScreenTest {
     compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
     compose.waitForIdle()
 
-    compose.onNodeWithTag(C.Tag.scan_viewfinder).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).assertIsDisplayed()
   }
 
   @Test
@@ -156,7 +156,7 @@ class ScanScreenTest {
     compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
     compose.waitForIdle()
 
-    compose.onNodeWithTag(C.Tag.scan_camera_off).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_camera_off).assertIsDisplayed()
     assertEquals(CameraPermission.REFUSED, viewModel.uiState.value.permission)
   }
 }

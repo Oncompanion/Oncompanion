@@ -202,13 +202,13 @@ object C {
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
 
     // Prescription scan
-    const val scan_screen = "scan_screen"
-    const val scan_close_button = "scan_close_button"
-    const val scan_permission_pending = "scan_permission_pending"
-    const val scan_viewfinder = "scan_viewfinder"
-    const val scan_camera_starting = "scan_camera_starting"
-    const val scan_camera_off = "scan_camera_off"
-    const val scan_enter_manually_button = "scan_enter_manually_button"
-    const val scan_open_settings_button = "scan_open_settings_button"
+    const val prescription_scan_screen = "prescription_scan_screen"
+    const val prescription_scan_close_button = "prescription_scan_close_button"
+    const val prescription_scan_permission_pending = "prescription_scan_permission_pending"
+    const val prescription_scan_viewfinder = "prescription_scan_viewfinder"
+    const val prescription_scan_camera_starting = "prescription_scan_camera_starting"
+    const val prescription_scan_camera_off = "prescription_scan_camera_off"
+    const val prescription_scan_enter_manually_button = "prescription_scan_enter_manually_button"
+    const val prescription_scan_open_settings_button = "prescription_scan_open_settings_button"
   }
 }

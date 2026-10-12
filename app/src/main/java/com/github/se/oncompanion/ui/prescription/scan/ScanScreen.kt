@@ -138,13 +138,19 @@ fun ScanContent(
   // judge on a dark background
   OncompanionTheme(darkTheme = true) {
     Scaffold(
-        modifier = modifier.testTag(C.Tag.scan_screen),
+        modifier = modifier.testTag(C.Tag.prescription_scan_screen),
         topBar = {
           TopAppBar(
-              title = { Text(stringResource(R.string.scan_title)) },
+              title = { Text(stringResource(R.string.prescription_scan_title)) },
               navigationIcon = {
-                IconButton(onClick = onBack, modifier = Modifier.testTag(C.Tag.scan_close_button)) {
-                  Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.scan_close))
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag(C.Tag.prescription_scan_close_button),
+                ) {
+                  Icon(
+                      Icons.Filled.Close,
+                      contentDescription = stringResource(R.string.prescription_scan_close),
+                  )
                 }
               },
           )
@@ -159,7 +165,7 @@ fun ScanContent(
       val content = Modifier.fillMaxSize().padding(padding)
       when (uiState.permission) {
         // Android's dialog is on top: nothing to show behind it
-        CameraPermission.UNKNOWN -> Box(content.testTag(C.Tag.scan_permission_pending))
+        CameraPermission.UNKNOWN -> Box(content.testTag(C.Tag.prescription_scan_permission_pending))
         CameraPermission.GRANTED -> CameraStarting(content)
         CameraPermission.REFUSED -> CameraOff(content)
       }
@@ -172,13 +178,13 @@ fun ScanContent(
 private fun CameraStarting(modifier: Modifier) {
   Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
-        modifier = Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.scan_viewfinder),
+        modifier = Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.prescription_scan_viewfinder),
         contentAlignment = Alignment.Center,
     ) {
-      CircularProgressIndicator(Modifier.testTag(C.Tag.scan_camera_starting))
+      CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_scan_camera_starting))
     }
     Text(
-        text = stringResource(R.string.scan_frame_hint),
+        text = stringResource(R.string.prescription_scan_frame_hint),
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(16.dp),
     )
@@ -190,7 +196,7 @@ private fun CameraStarting(modifier: Modifier) {
 private fun CameraOff(modifier: Modifier) {
   Box(modifier = modifier.padding(horizontal = 32.dp), contentAlignment = Alignment.Center) {
     Column(
-        modifier = Modifier.testTag(C.Tag.scan_camera_off),
+        modifier = Modifier.testTag(C.Tag.prescription_scan_camera_off),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Icon(
@@ -201,13 +207,13 @@ private fun CameraOff(modifier: Modifier) {
       )
       Spacer(Modifier.height(16.dp))
       Text(
-          text = stringResource(R.string.scan_camera_off_title),
+          text = stringResource(R.string.prescription_scan_camera_off_title),
           style = MaterialTheme.typography.titleLarge,
           textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(12.dp))
       Text(
-          text = stringResource(R.string.scan_camera_off_explanation),
+          text = stringResource(R.string.prescription_scan_camera_off_explanation),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,
@@ -225,17 +231,20 @@ private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: () -> 
   ) {
     FilledTonalButton(
         onClick = onEnterManually,
-        modifier = Modifier.weight(1f).testTag(C.Tag.scan_enter_manually_button),
+        modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_enter_manually_button),
     ) {
       Icon(Icons.Filled.Edit, contentDescription = null)
-      Text(stringResource(R.string.scan_enter_manually), Modifier.padding(start = 8.dp))
+      Text(
+          stringResource(R.string.prescription_scan_enter_manually),
+          Modifier.padding(start = 8.dp),
+      )
     }
     FilledTonalButton(
         onClick = onOpenSettings,
-        modifier = Modifier.weight(1f).testTag(C.Tag.scan_open_settings_button),
+        modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_open_settings_button),
     ) {
       Icon(Icons.Filled.Settings, contentDescription = null)
-      Text(stringResource(R.string.scan_open_settings), Modifier.padding(start = 8.dp))
+      Text(stringResource(R.string.prescription_scan_open_settings), Modifier.padding(start = 8.dp))
     }
   }
 }
