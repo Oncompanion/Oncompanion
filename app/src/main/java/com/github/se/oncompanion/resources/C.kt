@@ -124,6 +124,7 @@ object C {
     const val symptom_add_time_picker = "symptom_add_time_picker"
     const val symptom_add_picker_confirm = "symptom_add_picker_confirm"
     const val symptom_add_picker_cancel = "symptom_add_picker_cancel"
+    const val symptom_journal_add = "symptom_journal_add"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile

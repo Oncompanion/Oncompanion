@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -42,7 +45,8 @@ import java.time.LocalDate
 
 /**
  * The symptom journal (US-8 "Review my symptom journal"): the user's symptoms grouped by day,
- * newest first (Figma: "Symptoms – History"). Tapping one opens its detail.
+ * newest first (Figma: "Symptoms – History"). Tapping one opens its detail, and the add button
+ * opens the add symptom screen.
  */
 @Composable
 fun SymptomJournalScreen(
@@ -60,6 +64,7 @@ fun SymptomJournalScreen(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onEntryClick = { id -> navigationActions.navigateTo(Screen.symptomDetail(id)) },
+      onAddClick = { navigationActions.navigateTo(Screen.SYMPTOM_ADD) },
       onRetry = viewModel::load,
       modifier = modifier,
   )
@@ -69,6 +74,7 @@ fun SymptomJournalScreen(
  * Stateless content of the journal, so each state can be tested without a ViewModel.
  *
  * @param onEntryClick opens the entry with the given ID
+ * @param onAddClick opens the add symptom screen
  * @param onRetry reloads the journal after an error
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +83,7 @@ fun SymptomJournalContent(
     uiState: SymptomJournalUiState,
     onBack: () -> Unit,
     onEntryClick: (String) -> Unit,
+    onAddClick: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -86,6 +93,14 @@ fun SymptomJournalContent(
         TopAppBar(
             title = { Text(stringResource(R.string.symptoms_title)) },
             navigationIcon = { BackButton(onBack) },
+        )
+      },
+      floatingActionButton = {
+        ExtendedFloatingActionButton(
+            text = { Text(stringResource(R.string.symptom_add_title)) },
+            icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+            onClick = onAddClick,
+            modifier = Modifier.testTag(C.Tag.symptom_journal_add),
         )
       },
   ) { innerPadding ->
@@ -119,7 +134,8 @@ fun SymptomJournalContent(
 private fun JournalList(days: List<JournalDay>, today: LocalDate, onEntryClick: (String) -> Unit) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.symptom_journal_list),
-      contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+      // The bottom padding keeps the last entry above the add button
+      contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     days.forEach { day ->
