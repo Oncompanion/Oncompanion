@@ -145,6 +145,7 @@ class PlanningScreenIntegrationTest {
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
+            auth,
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
@@ -180,9 +181,14 @@ class PlanningScreenIntegrationTest {
       )
     }
     compose.onNodeWithText("Treatment appointment").assertIsDisplayed()
+    compose.runOnIdle {
+      appointments.failActiveObservations(IllegalStateException("Live read failed"))
+    }
+    compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
     compose.runOnIdle { auth.signOut() }
     compose.onNodeWithText("Oncology consultation").assertDoesNotExist()
     compose.onNodeWithText("Treatment appointment").assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
   }
 }

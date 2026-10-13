@@ -134,6 +134,7 @@ fun AppNavHost(
               Clock.systemDefaultZone(),
               ZoneId.systemDefault(),
               createSavedStateHandle(),
+              authRepository,
           )
         }
         PlanningScreen(navigationActions, planningViewModel)
