@@ -26,4 +26,5 @@ Closes #
 `./gradlew ktfmtFormat check` passes locally.
 
 ## AI usage
+<!-- Every AI that wrote code is credited at the top of the file: `// Co-authored-by: <AI name>` (see AGENTS.md). -->
 Implemented with AI. Reviewed by me.

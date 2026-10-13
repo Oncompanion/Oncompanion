@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {

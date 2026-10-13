@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
