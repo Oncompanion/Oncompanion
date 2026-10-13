@@ -75,16 +75,19 @@ class FakeMedicationRepositoryTest {
   }
 
   @Test
-  fun getUnknownPrescriptionReturnsNull() = runTest {
-    assertNull(repository.getPrescription("alice", "nothing"))
+  fun observeUnknownPrescriptionEmitsNull() = runTest {
+    assertNull(repository.observePrescription("alice", "nothing").first())
     assertTrue(repository.prescriptionsOf("alice").isEmpty())
   }
 
   @Test
-  fun addThenGetReturnsPrescriptionWithClockCreatedAt() = runTest {
+  fun addThenObserveEmitsPrescriptionWithClockCreatedAt() = runTest {
     repository.addPrescription("alice", recent.copy(createdAt = Instant.EPOCH))
 
-    assertEquals(recent.copy(createdAt = now), repository.getPrescription("alice", "recent"))
+    assertEquals(
+        recent.copy(createdAt = now),
+        repository.observePrescription("alice", "recent").first(),
+    )
   }
 
   @Test
@@ -94,7 +97,7 @@ class FakeMedicationRepositoryTest {
     defaultRepository.addPrescription("alice", recent)
     val after = Instant.now()
 
-    val createdAt = defaultRepository.getPrescription("alice", "recent")!!.createdAt!!
+    val createdAt = defaultRepository.observePrescription("alice", "recent").first()!!.createdAt!!
     assertTrue(!createdAt.isBefore(before) && !createdAt.isAfter(after))
   }
 
@@ -111,7 +114,7 @@ class FakeMedicationRepositoryTest {
   fun prescriptionsAreKeptPerUser() = runTest {
     repository.addPrescription("alice", recent)
 
-    assertNull(repository.getPrescription("bob", "recent"))
+    assertNull(repository.observePrescription("bob", "recent").first())
     assertTrue(repository.observePrescriptions("bob").first().isEmpty())
     assertTrue(repository.observeMedications("bob").first().isEmpty())
   }
@@ -147,7 +150,7 @@ class FakeMedicationRepositoryTest {
 
     assertEquals(
         listOf("ondansetron", "dexamethasone"),
-        repository.getPrescription("alice", "recent")!!.medications.map { it.id },
+        repository.observePrescription("alice", "recent").first()!!.medications.map { it.id },
     )
   }
 
@@ -180,6 +183,26 @@ class FakeMedicationRepositoryTest {
       }
 
   @Test
+  fun observePrescriptionEmitsCurrentValueThenChanges() =
+      runTest(UnconfinedTestDispatcher()) {
+        val emissions = mutableListOf<String?>()
+        val job = launch {
+          repository.observePrescription("alice", "recent").take(4).toList().mapTo(emissions) {
+            it?.prescribedBy
+          }
+        }
+
+        repository.addPrescription("alice", recent)
+        repository.updatePrescription("alice", recent.copy(prescribedBy = "Dr. Leroy"))
+        // A change to another prescription is not emitted
+        repository.addPrescription("alice", older)
+        repository.deletePrescription("alice", "recent")
+        job.join()
+
+        assertEquals(listOf(null, "Dr. Martin", "Dr. Leroy", null), emissions)
+      }
+
+  @Test
   fun updateReplacesContentButKeepsCreatedAt() = runTest {
     repository.seed("alice", recent.copy(createdAt = Instant.EPOCH))
     val edited =
@@ -195,7 +218,7 @@ class FakeMedicationRepositoryTest {
 
     assertEquals(
         edited.copy(createdAt = Instant.EPOCH),
-        repository.getPrescription("alice", "recent"),
+        repository.observePrescription("alice", "recent").first(),
     )
     // The medication left out of the update is gone
     assertEquals(
@@ -219,7 +242,10 @@ class FakeMedicationRepositoryTest {
       repository.updatePrescription("alice", recent.copy(medications = emptyList()))
     }
 
-    assertEquals(recent.copy(createdAt = now), repository.getPrescription("alice", "recent"))
+    assertEquals(
+        recent.copy(createdAt = now),
+        repository.observePrescription("alice", "recent").first(),
+    )
   }
 
   @Test
@@ -229,7 +255,7 @@ class FakeMedicationRepositoryTest {
 
     repository.deletePrescription("alice", "recent")
 
-    assertNull(repository.getPrescription("alice", "recent"))
+    assertNull(repository.observePrescription("alice", "recent").first())
     assertEquals(listOf("older"), repository.prescriptionsOf("alice").map { it.id })
     assertEquals(
         listOf("paracetamol"),
@@ -248,13 +274,13 @@ class FakeMedicationRepositoryTest {
   }
 
   @Test
-  fun readErrorIsThrownByGetAndObserve() = runTest {
+  fun readErrorFailsEveryStream() = runTest {
     val error = IllegalStateException("boom")
     repository.readError = error
 
     val thrown =
         listOf<suspend () -> Unit>(
-                { repository.getPrescription("alice", "recent") },
+                { repository.observePrescription("alice", "recent").first() },
                 { repository.observePrescriptions("alice").first() },
                 { repository.observeMedications("alice").first() },
             )

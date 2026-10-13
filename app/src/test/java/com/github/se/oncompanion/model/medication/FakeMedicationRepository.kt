@@ -20,7 +20,8 @@ import kotlinx.coroutines.flow.update
  * - [updatePrescription] requires [Prescription.isValid] and replaces everything but `createdAt`.
  *   It does nothing if the prescription doesn't exist.
  * - [deletePrescription] removes the prescription and its medications.
- * - [observePrescriptions] and [observeMedications] emit the current value, then every change.
+ * - [observePrescriptions], [observePrescription] and [observeMedications] emit the current value,
+ *   then every change.
  *
  * Test hooks: [readError] and [writeError] simulate unexpected failures, [prescriptionsOf] exposes
  * a snapshot of the stored data, and [newId] returns "id-1", "id-2", ...
@@ -35,8 +36,8 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
   private var lastId = 0
 
   /**
-   * When non-null, [getPrescription] throws it, and [observePrescriptions] and [observeMedications]
-   * fail with it (checked when collection starts).
+   * When non-null, [observePrescriptions], [observePrescription] and [observeMedications] fail with
+   * it (checked when collection starts).
    */
   var readError: Exception? = null
 
@@ -58,9 +59,9 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
     emitAll(store.map { sorted(it[uid]) }.distinctUntilChanged())
   }
 
-  override suspend fun getPrescription(uid: String, id: String): Prescription? {
+  override fun observePrescription(uid: String, id: String): Flow<Prescription?> = flow {
     readError?.let { throw it }
-    return store.value[uid]?.get(id)
+    emitAll(store.map { it[uid]?.get(id) }.distinctUntilChanged())
   }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> = flow {
