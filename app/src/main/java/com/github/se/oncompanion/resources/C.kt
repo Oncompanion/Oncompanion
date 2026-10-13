@@ -110,6 +110,20 @@ object C {
     const val symptom_detail_when = "symptom_detail_when"
     const val symptom_detail_intensity = "symptom_detail_intensity"
     const val symptom_detail_notes = "symptom_detail_notes"
+    const val symptom_add_screen = "symptom_add_screen"
+    const val symptom_add_close = "symptom_add_close"
+    const val symptom_add_intensity = "symptom_add_intensity"
+    const val symptom_add_intensity_value = "symptom_add_intensity_value"
+    const val symptom_add_intensity_clear = "symptom_add_intensity_clear"
+    const val symptom_add_intensity_track = "symptom_add_intensity_track"
+    const val symptom_add_when = "symptom_add_when"
+    const val symptom_add_notes = "symptom_add_notes"
+    const val symptom_add_save = "symptom_add_save"
+    const val symptom_add_saving = "symptom_add_saving"
+    const val symptom_add_date_picker = "symptom_add_date_picker"
+    const val symptom_add_time_picker = "symptom_add_time_picker"
+    const val symptom_add_picker_confirm = "symptom_add_picker_confirm"
+    const val symptom_add_picker_cancel = "symptom_add_picker_cancel"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
@@ -158,6 +172,9 @@ object C {
 
     /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
     fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
+
+    /** The chip of a symptom type on the add screen; [type] is its enum name, e.g. `FATIGUE`. */
+    fun symptomAddType(type: String) = "symptom_add_type_$type"
 
     // Care circle
     const val care_circle_back_button = "care_circle_back_button"

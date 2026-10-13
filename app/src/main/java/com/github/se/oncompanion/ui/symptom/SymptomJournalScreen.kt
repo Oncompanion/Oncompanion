@@ -39,17 +39,6 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-/** "Mon 28 Sep", as in the mockup. The app's UI is in English. */
-private val dayFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
-
-/** "Mon 28 Sep 2025", for days of another year. */
-private val dayWithYearFormatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH)
-
-/** "14:30". */
-private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 
 /**
  * The symptom journal (US-8 "Review my symptom journal"): the user's symptoms grouped by day,
@@ -145,15 +134,8 @@ private fun JournalList(days: List<JournalDay>, today: LocalDate, onEntryClick: 
 /** "Today", "Yesterday" or the date, above the entries of that day. */
 @Composable
 private fun DayHeader(date: LocalDate, today: LocalDate) {
-  val text =
-      when {
-        date == today -> stringResource(R.string.symptom_journal_today)
-        date == today.minusDays(1) -> stringResource(R.string.symptom_journal_yesterday)
-        date.year == today.year -> date.format(dayFormatter)
-        else -> date.format(dayWithYearFormatter)
-      }
   Text(
-      text = text,
+      text = dayLabel(date, today),
       style = MaterialTheme.typography.titleSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier =
@@ -182,7 +164,7 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
             },
         trailingContent = {
           Text(
-              text = journalEntry.time.format(timeFormatter),
+              text = journalEntry.time.format(symptomTimeFormatter),
               style = MaterialTheme.typography.labelMedium,
           )
         },
