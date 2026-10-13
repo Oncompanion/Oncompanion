@@ -80,6 +80,10 @@
         {
           "type": "arrow",
           "id": "ar2"
+        },
+        {
+          "id": "hospital_integration",
+          "type": "arrow"
         }
       ],
       "updated": 1791100000000,
@@ -1414,6 +1418,558 @@
       "containerId": null,
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "hospital_field",
+      "type": "rectangle",
+      "x": 1000,
+      "y": 20,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 901901,
+      "version": 1,
+      "versionNonce": 1109131,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "hospital_field_t",
+          "type": "text"
+        },
+        {
+          "id": "hospital_integration",
+          "type": "arrow"
+        },
+        {
+          "id": "hospital_field_model",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a900"
+    },
+    {
+      "id": "hospital_field_t",
+      "type": "text",
+      "x": 1010,
+      "y": 45.0,
+      "width": 300,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 902902,
+      "version": 1,
+      "versionNonce": 1110362,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a901",
+      "text": "HospitalField\nui/common",
+      "originalText": "HospitalField\nui/common",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "hospital_field",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "hospital_viewmodel",
+      "type": "rectangle",
+      "x": 1000,
+      "y": 200,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 903903,
+      "version": 1,
+      "versionNonce": 1111593,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "hospital_viewmodel_t",
+          "type": "text"
+        },
+        {
+          "id": "hospital_field_model",
+          "type": "arrow"
+        },
+        {
+          "id": "hospital_model_repo",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a902"
+    },
+    {
+      "id": "hospital_viewmodel_t",
+      "type": "text",
+      "x": 1010,
+      "y": 237.5,
+      "width": 300,
+      "height": 25,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 904904,
+      "version": 1,
+      "versionNonce": 1112824,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a903",
+      "text": "HospitalFieldViewModel",
+      "originalText": "HospitalFieldViewModel",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "hospital_viewmodel",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "hospital_repository",
+      "type": "rectangle",
+      "x": 1000,
+      "y": 380,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 905905,
+      "version": 1,
+      "versionNonce": 1114055,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "hospital_repository_t",
+          "type": "text"
+        },
+        {
+          "id": "hospital_model_repo",
+          "type": "arrow"
+        },
+        {
+          "id": "hospital_repo_service",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a904"
+    },
+    {
+      "id": "hospital_repository_t",
+      "type": "text",
+      "x": 1010,
+      "y": 405.0,
+      "width": 300,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 906906,
+      "version": 1,
+      "versionNonce": 1115286,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a905",
+      "text": "HospitalRepository\nNominatim HTTP",
+      "originalText": "HospitalRepository\nNominatim HTTP",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "hospital_repository",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "hospital_service",
+      "type": "rectangle",
+      "x": 1000,
+      "y": 560,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 907907,
+      "version": 1,
+      "versionNonce": 1116517,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "hospital_service_t",
+          "type": "text"
+        },
+        {
+          "id": "hospital_repo_service",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a906"
+    },
+    {
+      "id": "hospital_service_t",
+      "type": "text",
+      "x": 1010,
+      "y": 572.5,
+      "width": 300,
+      "height": 75,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 908908,
+      "version": 1,
+      "versionNonce": 1117748,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a907",
+      "text": "Nominatim-compatible\nHTTPS endpoint\n(proxy required)",
+      "originalText": "Nominatim-compatible\nHTTPS endpoint\n(proxy required)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "hospital_service",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "hospital_integration",
+      "type": "arrow",
+      "x": 926,
+      "y": 70.0,
+      "width": 68,
+      "height": 0.0,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 909909,
+      "version": 1,
+      "versionNonce": 1118979,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a908",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          68,
+          0.0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "screens",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_field",
+        "fixedPoint": [
+          0,
+          0.5
+        ]
+      }
+    },
+    {
+      "id": "hospital_field_model",
+      "type": "arrow",
+      "x": 1160.0,
+      "y": 126,
+      "width": 0.0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 910910,
+      "version": 1,
+      "versionNonce": 1120210,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a909",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_field",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_viewmodel",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "hospital_model_repo",
+      "type": "arrow",
+      "x": 1160.0,
+      "y": 306,
+      "width": 0.0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 911911,
+      "version": 1,
+      "versionNonce": 1121441,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a910",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_viewmodel",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_repository",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "hospital_repo_service",
+      "type": "arrow",
+      "x": 1160.0,
+      "y": 486,
+      "width": 0.0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 912912,
+      "version": 1,
+      "versionNonce": 1122672,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791840000000,
+      "link": null,
+      "locked": false,
+      "index": "a911",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_repository",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "hospital_service",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
     }
   ],
   "appState": {

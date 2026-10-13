@@ -1,3 +1,4 @@
+// Co-authored-by: Codex
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.resources
@@ -5,6 +6,16 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Hospital field
+    const val hospital_field = "hospital_field"
+    const val hospital_search = "hospital_search"
+    const val hospital_loading = "hospital_loading"
+    const val hospital_results = "hospital_results"
+    const val hospital_result = "hospital_result"
+    const val hospital_empty = "hospital_empty"
+    const val hospital_error = "hospital_error"
+    const val hospital_attribution = "hospital_attribution"
+
     // Planning
     const val planning_no_set_time = "planning_no_set_time"
     const val planning_scheduled = "planning_scheduled"
