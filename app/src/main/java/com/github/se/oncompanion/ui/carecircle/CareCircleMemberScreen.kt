@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.carecircle
 
 import android.widget.Toast
@@ -209,7 +211,7 @@ private fun MemberDetails(
     ) {
       MemberHeader(member)
 
-      // Contact: hidden when the patient didn't give an email
+      // Contact: the member's account email, hidden if their account has none
       member.email
           ?.takeIf { it.isNotBlank() }
           ?.let { email ->

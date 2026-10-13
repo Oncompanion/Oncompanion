@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.carecircle
 
 import java.time.Instant
@@ -48,7 +50,8 @@ enum class CarePermission {
  * @property familyName optional, as typed by the patient
  * @property relationship what the member is to the patient
  * @property permissions what the member can see, read-only
- * @property email optional contact email, as typed by the patient
+ * @property email the member's Google account email, copied from their sign-in when they join;
+ *   never typed or edited by the patient (see docs/architecture.md, "Care circle invitations")
  * @property addedAt when the member joined the circle, or null if unknown
  */
 data class CareCircleMember(
