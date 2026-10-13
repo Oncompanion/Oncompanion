@@ -1,10 +1,12 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -20,6 +22,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** Selected calendar day and the agenda currently available for it. */
@@ -49,6 +53,7 @@ class PlanningViewModel(
     private val clock: Clock,
     val zoneId: ZoneId,
     private val savedStateHandle: SavedStateHandle,
+    private val authRepository: AuthRepository? = null,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
   private val initialDate =
@@ -63,7 +68,18 @@ class PlanningViewModel(
 
   init {
     savedStateHandle[SELECTED_DATE] = initialDate.toString()
-    observeWeek()
+    if (authRepository == null) {
+      observeWeek()
+    } else {
+      // Session observation must survive an agenda read failure to clear the previous patient.
+      viewModelScope.launch {
+        authRepository
+            .observeCurrentUser()
+            .map { it?.uid }
+            .distinctUntilChanged()
+            .collect { observeWeek() }
+      }
+    }
   }
 
   /** Selects a day, observing a new week only when necessary. */

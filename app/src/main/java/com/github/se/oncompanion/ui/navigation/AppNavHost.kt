@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.navigation
 
@@ -16,6 +17,9 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
+import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
+import com.github.se.oncompanion.model.appointment.AppointmentRepository
+import com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
@@ -24,7 +28,6 @@ import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryFirestore
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
-import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
@@ -73,10 +76,14 @@ import java.time.ZoneId
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
-    planningRepository: PlanningRepository = EmptyPlanningRepository,
     careCircleRepository: CareCircleRepository = remember { CareCircleRepositoryFirestore() },
     eventRepository: EventRepository = remember { EventRepositoryFirestore() },
     authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
+    appointmentRepository: AppointmentRepository = remember { AppointmentRepositoryFirestore() },
+    planningRepository: PlanningRepository =
+        remember(appointmentRepository, authRepository) {
+          AppointmentPlanningSource(appointmentRepository, authRepository)
+        },
     profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
     medicationRepository: MedicationRepository = remember { MedicationRepositoryFirestore() },
@@ -128,6 +135,7 @@ fun AppNavHost(
               Clock.systemDefaultZone(),
               ZoneId.systemDefault(),
               createSavedStateHandle(),
+              authRepository,
           )
         }
         PlanningScreen(navigationActions, planningViewModel)
