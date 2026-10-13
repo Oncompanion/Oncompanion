@@ -110,6 +110,8 @@
     <string name="symptom_detail_error_title">Couldn\'t load this symptom</string>
     <string name="symptom_detail_not_found_title">This symptom no longer exists</string>
     <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
+    <!-- Severity · start of the notes, under a journal entry, e.g. "Moderate · Hiccups since lunch" -->
+    <string name="symptom_journal_summary">%1$s · %2$s</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>

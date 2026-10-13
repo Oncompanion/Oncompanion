@@ -193,6 +193,49 @@ class SymptomJournalScreenTest {
     }
   }
 
+  /** Shows only [entry], today at 14:30. */
+  private fun setSingleEntry(entry: SymptomEntry) =
+      setContent(loaded.copy(days = listOf(day(today, entry to "14:30"))))
+
+  @Test
+  fun entryWithSeverityAndNotes_showsBoth() {
+    setSingleEntry(fatigue.copy(notes = "After the walk"))
+
+    assertTextInside("Severe · After the walk", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun entryWithNotesButNoIntensity_showsOnlyTheNotes() {
+    setSingleEntry(fatigue.copy(intensity = null, notes = "After the walk"))
+
+    assertTextInside("After the walk", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun otherEntry_showsWhichSymptomFromItsNotes() {
+    setSingleEntry(
+        fatigue.copy(types = listOf(SymptomType.FATIGUE, SymptomType.OTHER), notes = "Hiccups")
+    )
+
+    val fatigueTag = C.Tag.symptomJournalItem("fatigue")
+    assertTextInside("Fatigue, Other", fatigueTag)
+    assertTextInside("Severe · Hiccups", fatigueTag)
+  }
+
+  @Test
+  fun notes_showOnlyTheirFirstNonBlankLine() {
+    setSingleEntry(fatigue.copy(notes = "\n  Hiccups since lunch  \nThey stopped at 3 pm"))
+
+    assertTextInside("Severe · Hiccups since lunch", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun blankNotes_areNotShown() {
+    setSingleEntry(fatigue.copy(notes = "   "))
+
+    assertTextInside("Severe", C.Tag.symptomJournalItem("fatigue"))
+  }
+
   @Test
   fun days_areTodayYesterdayOrTheirDate_inTheGivenOrder() {
     val entries = (1..5).map { fatigue.copy(id = "s$it") }
