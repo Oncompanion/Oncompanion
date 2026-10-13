@@ -1,0 +1,13 @@
+<!-- "icon/document_scanner" exported from the Figma mockup (24x24, stroke) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M3,7V3H7M17,3H21V7M21,17V21H17M7,21H3V17M8,9H16M8,12H16M8,15H13"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

@@ -58,6 +58,7 @@ object Screen {
   // Route.PRESCRIPTIONS
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"
+  const val PRESCRIPTION_SCAN = "prescriptions_scan"
 
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"

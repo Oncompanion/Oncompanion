@@ -214,6 +214,20 @@ object C {
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
 
+    const val prescriptions_back_button = "prescriptions_back_button"
+    const val prescriptions_loading = "prescriptions_loading"
+    const val prescriptions_error = "prescriptions_error"
+    const val prescriptions_retry_button = "prescriptions_retry_button"
+    const val prescriptions_empty = "prescriptions_empty"
+    const val prescriptions_list = "prescriptions_list"
+    const val prescriptions_this_month_header = "prescriptions_this_month_header"
+    const val prescriptions_earlier_header = "prescriptions_earlier_header"
+    const val prescriptions_enter_manually_button = "prescriptions_enter_manually_button"
+    const val prescriptions_scan_button = "prescriptions_scan_button"
+
+    /** One prescription of the list. */
+    fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
+
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
     const val prescription_scan_close_button = "prescription_scan_close_button"

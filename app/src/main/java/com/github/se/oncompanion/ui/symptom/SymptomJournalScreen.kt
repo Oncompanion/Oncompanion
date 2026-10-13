@@ -27,11 +27,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.severity
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -161,10 +163,11 @@ private fun DayHeader(date: LocalDate, today: LocalDate) {
   )
 }
 
-/** One entry: what it was, its severity in words and the time. */
+/** One entry: what it was, its severity and the start of its notes (if given) and the time. */
 @Composable
 private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
   val entry = journalEntry.entry
+  val summary = entry.summary()
   Surface(
       onClick = onClick,
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptomJournalItem(entry.id)),
@@ -173,8 +176,10 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
   ) {
     ListItem(
         headlineContent = { Text(entry.title(), style = MaterialTheme.typography.titleMedium) },
-        // The severity in words (Figma: "Symptoms – History"), as entered: no colour, no advice
-        supportingContent = { Text(stringResource(entry.severity.label)) },
+        supportingContent =
+            summary?.let { text ->
+              { Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            },
         trailingContent = {
           Text(
               text = journalEntry.time.format(timeFormatter),
@@ -182,5 +187,21 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
           )
         },
     )
+  }
+}
+
+/**
+ * The severity in words (Figma: "Symptoms – History"), as entered: no colour, no advice, then the
+ * first line of the notes, so an "Other" entry shows which symptom it was without opening it.
+ * `null` when the entry has neither.
+ */
+@Composable
+private fun SymptomEntry.summary(): String? {
+  val severity = severity?.let { stringResource(it.label) }
+  val notes = notes?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
+  return if (severity != null && notes != null) {
+    stringResource(R.string.symptom_journal_summary, severity, notes)
+  } else {
+    severity ?: notes
   }
 }
