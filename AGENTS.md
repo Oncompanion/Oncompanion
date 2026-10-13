@@ -25,7 +25,7 @@ Follow MVVM, one feature per package:
 
 ```
 com.github.se.oncompanion/
-  model/<feature>/   data classes + repository interface + Firestore implementation
+  model/<feature>/   data classes + repository interface + Firestore implementation + provider
   domain/<feature>/  use cases, only when the logic combines several repositories (see architecture.md)
   ui/<feature>/      @Composable screens + their ViewModel
   ui/common/         composables shared by several features
@@ -35,7 +35,7 @@ com.github.se.oncompanion/
 ```
 
 - **Model**: plain data classes. Repositories hide Firebase behind an interface (e.g. `SymptomRepository` / `SymptomRepositoryFirestore`) so ViewModels can be tested with a fake.
-  - Repositories access Firebase **lazily** (`by lazy`), never in their constructor: ViewModels create them as default parameters, and Firebase isn't initialized in Robolectric tests.
+  - Repositories access Firebase **lazily** (`by lazy`), never in their constructor: their providers build them as soon as a ViewModel is created, and Firebase isn't initialized in Robolectric tests.
 - **ViewModel**: exposes UI state as one `StateFlow<XUiState>`, takes its repositories in the constructor, no Android `Context` and no Compose imports.
 - **View**: each screen is split in two:
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
@@ -45,7 +45,12 @@ com.github.se.oncompanion/
   - Screens receive callbacks (`onBack`, `onSaved`...) or a `NavigationActions`, never the `NavController`.
   - A screen opened from another screen has a back arrow in its top bar (`onBack = navigationActions::goBack`).
   - Use `navigateAndClearBackStack` when Back must not return to the previous flow (e.g. after sign-in or onboarding).
-- **Dependency injection** is manual: ViewModels take their repositories as plain constructor parameters with the Firebase implementation as default (`repo: XRepository = XRepositoryFirestore()`), so tests can pass fakes. No Hilt, no lambdas.
+- **Dependency injection** is manual, through one provider object per repository:
+  - Every repository comes with its provider, next to the interface: `object XRepositoryProvider { var repository: XRepository = XRepositoryFirestore() }`. Add it in the PR that adds the repository. (If the default is built in `domain/`, the provider lives there.)
+  - ViewModels and use cases take their repositories as plain constructor parameters with the provider's as default (`repo: XRepository = XRepositoryProvider.repository`). Only a provider names an implementation: never build `XRepositoryFirestore()` in a ViewModel, a use case or a composable.
+  - `AppNavHost` takes no repositories: its ViewModels use their defaults.
+  - Tests pass fakes to the constructor. A test that can't reach the constructor (e.g. one showing `AppNavHost`) sets the provider's `repository` and puts the original back in `@After`.
+  - No Hilt, no lambdas.
 
 ## Code style
 
