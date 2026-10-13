@@ -20,11 +20,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 /**
  * [CareCircleInviteRepository] backed by Cloud Firestore, documents at `/invites/{inviteCode}`.
  *
- * Like [com.github.se.oncompanion.model.symptom.SymptomRepositoryFirestore], writes return as soon
- * as they are applied to the local cache, so inviting works offline. If the server later rejects a
- * write, Firestore rolls it back and the rejection is logged; [CareCircleMemberDetails.isValid]
- * mirrors the rules so this shouldn't happen. The detail fields have the same names as on a
- * [CareCircleMember], so the rules can check a member copies its invite.
+ * Writes don't await Firestore's tasks on purpose: those only complete once the server confirms,
+ * which would block offline. Each write is queued on the device, where reads and listeners see it
+ * at once, and the function returns. If the server later rejects it, Firestore rolls it back and
+ * the rejection is only logged; [CareCircleMemberDetails.isValid] mirrors the rules so this
+ * shouldn't happen. The detail fields have the same names as on a [CareCircleMember], so the rules
+ * can check a member copies its invite.
  */
 class CareCircleInviteRepositoryFirestore(
     dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },

@@ -7,13 +7,18 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Pending care circle members (invitations), created by the patient. Use
  * [CareCircleInviteRepositoryFirestore] in the app.
+ *
+ * Writes return right away, without waiting for the server, so they never block the UI: the write
+ * is queued on this device and shown at once by reads and listeners, also offline. It reaches the
+ * server later; if the server rejects it, Firestore undoes it and the failure is only logged, the
+ * caller isn't told.
  */
 interface CareCircleInviteRepository {
 
   /**
    * Creates an invitation to [ownerUid]'s circle for [details], to be sent to [email], and returns
-   * it with its new invite code. Returns once saved on the device (also offline); the invite code
-   * works once it reaches the server ([CareCircleInvite.isSynced]).
+   * it with its new invite code. Returns right away (see the class documentation); the invite code
+   * only works on another phone once the server has it, which [CareCircleInvite.isSynced] tells.
    *
    * @param ownerFirstName the patient's first name, shown to the person before they join
    * @throws IllegalArgumentException if [details] is not valid or [email] is not a valid email
@@ -39,22 +44,23 @@ interface CareCircleInviteRepository {
   fun observeInvite(inviteCode: String): Flow<CareCircleInvite?>
 
   /**
-   * Replaces the details and email of an unused invitation. Returns once saved on the device.
+   * Replaces the details and email of an unused invitation. Returns right away (see the class
+   * documentation).
    *
    * @throws IllegalArgumentException if [details] is not valid or [email] is not a valid email
    */
   suspend fun updateInvite(inviteCode: String, details: CareCircleMemberDetails, email: String?)
 
   /**
-   * Deletes the invitation; its invite code stops working. Returns once saved on the device. If the
-   * person redeems it before the deletion reaches the server, they still join and the patient can
-   * remove them.
+   * Deletes the invitation; its invite code stops working. Returns right away (see the class
+   * documentation). If the person redeems it before the deletion reaches the server, they still
+   * join and the patient can remove them.
    */
   suspend fun cancelInvite(inviteCode: String)
 
   /**
    * Replaces an expired invitation with a new invite code for the same person, in one write.
-   * Returns the new invitation once saved on the device.
+   * Returns the new invitation right away (see the class documentation).
    */
   suspend fun renewInvite(expired: CareCircleInvite): CareCircleInvite
 }
