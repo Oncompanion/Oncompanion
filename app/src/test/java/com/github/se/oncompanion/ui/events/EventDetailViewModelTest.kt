@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.events
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -74,8 +76,12 @@ class EventDetailViewModelTest {
   }
 
   @Test
-  fun defaultRepository_findsTheSampleEvents() {
-    assertEquals("gentle-yoga", EventDetailViewModel("gentle-yoga").uiState.value.event?.id)
+  fun defaultRepository_readsFirestore() {
+    // Firebase isn't initialized in unit tests: reaching Firestore fails, which a fake wouldn't
+    val viewModel = EventDetailViewModel("gentle-yoga")
+    ShadowLooper.idleMainLooper()
+
+    assertTrue(viewModel.uiState.value.hasError)
   }
 
   @Test

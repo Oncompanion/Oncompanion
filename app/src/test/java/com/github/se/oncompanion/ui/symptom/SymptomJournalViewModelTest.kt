@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -47,7 +49,7 @@ class SymptomJournalViewModelTest {
   private fun entry(id: String, occurredAt: String) =
       SymptomEntry(
           id = id,
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 5,
           occurredAt = Instant.parse(occurredAt),
       )

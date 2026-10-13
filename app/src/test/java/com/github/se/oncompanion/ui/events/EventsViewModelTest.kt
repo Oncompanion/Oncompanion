@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.events
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -8,9 +10,7 @@ import java.time.LocalDateTime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -66,12 +66,12 @@ class EventsViewModelTest {
   }
 
   @Test
-  fun defaultRepository_showsTheSampleEvents() = runBlocking {
-    val state = EventsViewModel().uiState.value
+  fun defaultRepository_readsFirestore() {
+    // Firebase isn't initialized in unit tests: reaching Firestore fails, which a fake wouldn't
+    val viewModel = EventsViewModel()
+    ShadowLooper.idleMainLooper()
 
-    assertFalse(state.isLoading)
-    assertFalse(state.hasError)
-    assertEquals(FakeEventRepository().getUpcomingEvents().first(), state.events)
+    assertTrue(viewModel.uiState.value.hasError)
   }
 
   @Test

@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.symptom
 
 /**
@@ -31,6 +33,6 @@ enum class Severity {
   }
 }
 
-/** The [Severity] of this entry's intensity. */
-val SymptomEntry.severity: Severity
-  get() = Severity.of(intensity)
+/** The [Severity] of this entry's intensity, or `null` if the user didn't give one. */
+val SymptomEntry.severity: Severity?
+  get() = intensity?.let(Severity::of)

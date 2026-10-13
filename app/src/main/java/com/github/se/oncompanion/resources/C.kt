@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.resources
 
 // Like R, but C
@@ -214,5 +216,15 @@ object C {
 
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
+
+    // Prescription scan
+    const val prescription_scan_screen = "prescription_scan_screen"
+    const val prescription_scan_close_button = "prescription_scan_close_button"
+    const val prescription_scan_permission_pending = "prescription_scan_permission_pending"
+    const val prescription_scan_viewfinder = "prescription_scan_viewfinder"
+    const val prescription_scan_camera_starting = "prescription_scan_camera_starting"
+    const val prescription_scan_camera_off = "prescription_scan_camera_off"
+    const val prescription_scan_enter_manually_button = "prescription_scan_enter_manually_button"
+    const val prescription_scan_open_settings_button = "prescription_scan_open_settings_button"
   }
 }

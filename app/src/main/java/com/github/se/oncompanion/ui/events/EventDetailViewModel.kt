@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.events
 
 import android.util.Log
@@ -5,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
-import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.event.EventRepositoryFirestore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +32,7 @@ data class EventDetailUiState(
 /** Loads one of the Ligue's events for its detail screen. */
 class EventDetailViewModel(
     private val eventId: String,
-    private val repository: EventRepository = FakeEventRepository(),
+    private val repository: EventRepository = EventRepositoryFirestore(),
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(EventDetailUiState())

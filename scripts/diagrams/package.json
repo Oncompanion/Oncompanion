@@ -1,0 +1,13 @@
+{
+  "name": "oncompanion-diagrams",
+  "private": true,
+  "description": "Exports the architecture diagrams in docs/ from .excalidraw to .svg without a browser",
+  "type": "module",
+  "scripts": {
+    "export": "node export-svg.mjs"
+  },
+  "dependencies": {
+    "@excalidraw/utils": "0.1.5",
+    "jsdom": "24.1.3"
+  }
+}

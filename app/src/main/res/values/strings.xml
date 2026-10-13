@@ -84,6 +84,8 @@
     <string name="symptom_type_fatigue">Fatigue</string>
     <string name="symptom_type_nausea">Nausea</string>
     <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_fever">Fever</string>
+    <string name="symptom_type_headache">Headache</string>
     <string name="symptom_type_appetite_loss">Loss of appetite</string>
     <string name="symptom_type_sleep_problems">Sleep problems</string>
     <string name="symptom_type_breathlessness">Breathlessness</string>
@@ -108,6 +110,8 @@
     <string name="symptom_detail_error_title">Couldn\'t load this symptom</string>
     <string name="symptom_detail_not_found_title">This symptom no longer exists</string>
     <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
+    <!-- Severity · start of the notes, under a journal entry, e.g. "Moderate · Hiccups since lunch" -->
+    <string name="symptom_journal_summary">%1$s · %2$s</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -144,7 +148,7 @@
     <string name="events_empty_title">No events yet</string>
     <string name="events_empty_supporting">Events organized by the Ligue will appear here.</string>
     <string name="events_error_title">Couldn\'t load the events</string>
-    <string name="events_error_supporting">Check your connection and try again.</string>
+    <string name="events_error_supporting">Please try again.</string>
     <string name="events_retry">Retry</string>
 
     <!-- Event detail -->
@@ -153,7 +157,7 @@
     <string name="event_detail_date_time">Date &amp; time</string>
     <string name="event_detail_location">Location</string>
     <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
-    <string name="event_detail_error">Couldn\'t load this event. Check your connection and try again.</string>
+    <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
 
     <!-- Care circle -->
@@ -261,4 +265,13 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+
+    <!-- Prescription scan (US-10) -->
+    <string name="prescription_scan_title">Scan prescription</string>
+    <string name="prescription_scan_close">Close</string>
+    <string name="prescription_scan_frame_hint">Place the prescription inside the frame</string>
+    <string name="prescription_scan_camera_off_title">Camera access is off</string>
+    <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
+    <string name="prescription_scan_enter_manually">Enter manually</string>
+    <string name="prescription_scan_open_settings">Open settings</string>
 </resources>

@@ -1,7 +1,10 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.symptom
 
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SeverityTest {
@@ -37,9 +40,21 @@ class SeverityTest {
 
   @Test
   fun entrySeverity_comesFromItsIntensity() {
-    val entry = SymptomEntry(type = SymptomType.PAIN, intensity = 8, occurredAt = Instant.EPOCH)
+    val entry =
+        SymptomEntry(
+            types = listOf(SymptomType.PAIN),
+            intensity = 8,
+            occurredAt = Instant.EPOCH,
+        )
 
     assertEquals(Severity.SEVERE, entry.severity)
     assertEquals(Severity.MILD, entry.copy(intensity = 1).severity)
+  }
+
+  @Test
+  fun entryWithoutIntensity_hasNoSeverity() {
+    val entry = SymptomEntry(types = listOf(SymptomType.PAIN), occurredAt = Instant.EPOCH)
+
+    assertNull(entry.severity)
   }
 }

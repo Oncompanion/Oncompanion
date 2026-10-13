@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.symptom
 
 import java.time.Instant
@@ -21,7 +23,7 @@ class FakeSymptomRepositoryTest {
   private val repository = FakeSymptomRepository(clock = { now })
 
   private fun entry(occurredAt: String, type: SymptomType = SymptomType.FATIGUE) =
-      SymptomEntry(type = type, intensity = 4, occurredAt = Instant.parse(occurredAt))
+      SymptomEntry(types = listOf(type), intensity = 4, occurredAt = Instant.parse(occurredAt))
 
   @Test
   fun addReturnsNewIdsAndStoresWithClockCreatedAt() = runTest {

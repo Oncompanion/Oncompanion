@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
@@ -48,15 +50,14 @@ class SymptomJournalScreenTest {
   private val fatigue =
       SymptomEntry(
           id = "fatigue",
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 7,
           occurredAt = Instant.parse("2026-10-05T14:30:00Z"),
       )
-  private val hiccups =
+  private val fever =
       SymptomEntry(
-          id = "hiccups",
-          type = SymptomType.OTHER,
-          otherLabel = "Hiccups",
+          id = "fever",
+          types = listOf(SymptomType.FEVER, SymptomType.HEADACHE),
           intensity = 2,
           occurredAt = Instant.parse("2026-10-03T08:05:00Z"),
       )
@@ -69,13 +70,13 @@ class SymptomJournalScreenTest {
   private fun day(date: LocalDate, vararg entries: Pair<SymptomEntry, String>) =
       JournalDay(date, entries.map { (entry, time) -> JournalEntry(entry, LocalTime.parse(time)) })
 
-  /** Fatigue today at 14:30, hiccups on Saturday at 08:05. */
+  /** Fatigue today at 14:30, fever and headache on Saturday at 08:05. */
   private val filled =
       loaded.copy(
           days =
               listOf(
                   day(today, fatigue to "14:30"),
-                  day(LocalDate.of(2026, 10, 3), hiccups to "08:05"),
+                  day(LocalDate.of(2026, 10, 3), fever to "08:05"),
               )
       )
 
@@ -168,13 +169,73 @@ class SymptomJournalScreenTest {
         .onNode(hasText("7/10") and hasAnyAncestor(hasTestTag(fatigueTag)), useUnmergedTree = true)
         .assertDoesNotExist()
 
-    val hiccupsTag = C.Tag.symptomJournalItem("hiccups")
-    assertTextInside("Hiccups", hiccupsTag)
-    assertTextInside("08:05", hiccupsTag)
-    assertTextInside("Mild", hiccupsTag)
+    val feverTag = C.Tag.symptomJournalItem("fever")
+    assertTextInside("Fever, Headache", feverTag)
+    assertTextInside("08:05", feverTag)
+    assertTextInside("Mild", feverTag)
 
     composeTestRule.onAllNodesWithTag(fatigueTag).assertCountEquals(1)
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_empty).assertDoesNotExist()
+  }
+
+  @Test
+  fun entryWithoutIntensity_showsNoSeverity() {
+    setContent(loaded.copy(days = listOf(day(today, fatigue.copy(intensity = null) to "14:30"))))
+
+    val fatigueTag = C.Tag.symptomJournalItem("fatigue")
+    assertTextInside("Fatigue", fatigueTag)
+    assertTextInside("14:30", fatigueTag)
+    listOf("Mild", "Moderate", "Severe").forEach { severity ->
+      composeTestRule
+          .onNode(
+              hasText(severity) and hasAnyAncestor(hasTestTag(fatigueTag)),
+              useUnmergedTree = true,
+          )
+          .assertDoesNotExist()
+    }
+  }
+
+  /** Shows only [entry], today at 14:30. */
+  private fun setSingleEntry(entry: SymptomEntry) =
+      setContent(loaded.copy(days = listOf(day(today, entry to "14:30"))))
+
+  @Test
+  fun entryWithSeverityAndNotes_showsBoth() {
+    setSingleEntry(fatigue.copy(notes = "After the walk"))
+
+    assertTextInside("Severe · After the walk", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun entryWithNotesButNoIntensity_showsOnlyTheNotes() {
+    setSingleEntry(fatigue.copy(intensity = null, notes = "After the walk"))
+
+    assertTextInside("After the walk", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun otherEntry_showsWhichSymptomFromItsNotes() {
+    setSingleEntry(
+        fatigue.copy(types = listOf(SymptomType.FATIGUE, SymptomType.OTHER), notes = "Hiccups")
+    )
+
+    val fatigueTag = C.Tag.symptomJournalItem("fatigue")
+    assertTextInside("Fatigue, Other", fatigueTag)
+    assertTextInside("Severe · Hiccups", fatigueTag)
+  }
+
+  @Test
+  fun notes_showOnlyTheirFirstNonBlankLine() {
+    setSingleEntry(fatigue.copy(notes = "\n  Hiccups since lunch  \nThey stopped at 3 pm"))
+
+    assertTextInside("Severe · Hiccups since lunch", C.Tag.symptomJournalItem("fatigue"))
+  }
+
+  @Test
+  fun blankNotes_areNotShown() {
+    setSingleEntry(fatigue.copy(notes = "   "))
+
+    assertTextInside("Severe", C.Tag.symptomJournalItem("fatigue"))
   }
 
   @Test
@@ -225,9 +286,9 @@ class SymptomJournalScreenTest {
     val clicked = mutableListOf<String>()
     setContent(filled, onEntryClick = { clicked += it })
 
-    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("hiccups")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fever")).performClick()
 
-    assertEquals(listOf("hiccups"), clicked)
+    assertEquals(listOf("fever"), clicked)
   }
 
   @Test

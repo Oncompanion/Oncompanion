@@ -49,6 +49,16 @@ com.github.se.oncompanion/
 
 ## Code style
 
+- **AI acknowledgment (required by the course)**: an AI that writes code is a contributor, so credit it at the top of the file, above `package`, with one `Co-authored-by` line per AI. This applies to every source file (Kotlin, Gradle scripts, `firestore.rules`, workflows; `#` instead of `//` in YAML). A missing line counts as plagiarism.
+  - Template: `// Co-authored-by: <AI name> <contact email, if any>`
+  - When you create a file, or change one with an AI that isn't credited yet, add its line. Examples:
+    ```kotlin
+    // Co-authored-by: Claude Code <noreply@anthropic.com>
+    // Co-authored-by: ChatGPT <noreply@openai.com>
+    // Co-authored-by: GitHub Copilot <copilot@github.com>
+
+    package com.github.se.oncompanion
+    ```
 - KDoc on every public class and function: what it does and why, not how.
 - A short one-line comment above each non-obvious block (what this part of the screen or function does), so reviewers can find their way quickly. No comments that repeat the code.
 - All user-visible text goes in `res/values/strings.xml`, in English. Escape apostrophes: `Couldn\'t`.
@@ -108,6 +118,13 @@ Run these before every push and make sure they pass:
 - Keep PRs small and focused on one task from the Scrum board: about **400 lines of production code** at most, tests not counted. Split the data layer (model, repository, rules) from the UI when a task needs both.
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
+- If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram and the overview in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)).
+  - Agents update the diagrams themselves by editing the `.excalidraw` JSON:
+    - Copy an existing box, label or arrow that already has the style you need (see the legend in architecture.md), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
+    - A box's label is a separate `text` element whose `containerId` is the box: `x` = box `x` + 10, `width` = box width − 20, `height` = number of lines × 25, centered vertically in the box. Set both `text` and `originalText`.
+    - Arrows point to boxes with `startBinding` / `endBinding`, and their `points` are relative to the arrow's `x`, `y`. Every box lists its label and arrows in `boundElements`; keep both sides in sync when you add or remove one.
+    - Regenerate the SVGs with `npm ci && npm run export` in `scripts/diagrams`, render the changed ones to an image and look at them (text inside its box, nothing overlapping) before committing.
+    - Say in the PR which diagrams changed, so the reviewer checks them.
 
 ### Avoiding merge conflicts
 

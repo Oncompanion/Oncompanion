@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,7 +28,7 @@ class SymptomDetailViewModelTest {
   private val fatigue =
       SymptomEntry(
           id = "s1",
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 7,
           occurredAt = Instant.parse("2026-10-05T08:00:00Z"),
           notes = "After the walk",

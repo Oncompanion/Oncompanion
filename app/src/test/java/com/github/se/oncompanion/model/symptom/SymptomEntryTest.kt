@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.symptom
 
 import java.time.Duration
@@ -12,18 +14,16 @@ class SymptomEntryTest {
 
   private val valid =
       SymptomEntry(
-          type = SymptomType.FATIGUE,
-          intensity = 5,
+          types = listOf(SymptomType.FATIGUE),
           occurredAt = Instant.parse("2026-10-05T08:00:00Z"),
       )
 
-  private val other = valid.copy(type = SymptomType.OTHER, otherLabel = "Hiccups")
+  private val other = valid.copy(types = listOf(SymptomType.OTHER), notes = "Hiccups")
 
   @Test
   fun constantsHaveSpecifiedValues() {
     assertEquals(1, SymptomEntry.MIN_INTENSITY)
     assertEquals(10, SymptomEntry.MAX_INTENSITY)
-    assertEquals(50, SymptomEntry.MAX_OTHER_LABEL_LENGTH)
     assertEquals(1000, SymptomEntry.MAX_NOTES_LENGTH)
     assertEquals(Duration.ofMinutes(5), SymptomEntry.MAX_CLOCK_DRIFT)
   }
@@ -31,7 +31,7 @@ class SymptomEntryTest {
   @Test
   fun optionalFieldsDefaultToEmpty() {
     assertEquals("", valid.id)
-    assertNull(valid.otherLabel)
+    assertNull(valid.intensity)
     assertNull(valid.notes)
     assertNull(valid.createdAt)
   }
@@ -43,6 +43,8 @@ class SymptomEntryTest {
             SymptomType.FATIGUE,
             SymptomType.NAUSEA,
             SymptomType.PAIN,
+            SymptomType.FEVER,
+            SymptomType.HEADACHE,
             SymptomType.APPETITE_LOSS,
             SymptomType.SLEEP_PROBLEMS,
             SymptomType.BREATHLESSNESS,
@@ -53,19 +55,40 @@ class SymptomEntryTest {
   }
 
   @Test
-  fun everyListedTypeWithoutLabelIsValid() {
+  fun everyListedTypeAloneIsValid_withoutIntensityOrNotes() {
     SymptomType.entries
         .filter { it != SymptomType.OTHER }
-        .forEach { assertTrue("$it", valid.copy(type = it).isValid()) }
+        .forEach { assertTrue("$it", valid.copy(types = listOf(it)).isValid()) }
+  }
+
+  @Test
+  fun severalSymptomsAreValid() {
+    assertTrue(valid.copy(types = listOf(SymptomType.FATIGUE, SymptomType.HEADACHE)).isValid())
+    assertTrue(valid.copy(types = SymptomType.entries.toList(), notes = "And hiccups").isValid())
+  }
+
+  @Test
+  fun atLeastOneSymptomIsNeeded() {
+    assertFalse(valid.copy(types = emptyList()).isValid())
+  }
+
+  @Test
+  fun aSymptomCantBeListedTwice() {
+    assertFalse(valid.copy(types = listOf(SymptomType.PAIN, SymptomType.PAIN)).isValid())
   }
 
   @Test
   fun fullEntryIsValid() {
-    assertTrue(valid.copy(id = "s1", notes = "After lunch", createdAt = Instant.now()).isValid())
+    assertTrue(
+        valid
+            .copy(id = "s1", intensity = 5, notes = "After lunch", createdAt = Instant.now())
+            .isValid()
+    )
   }
 
   @Test
-  fun intensityBoundaries() {
+  fun intensityIsOptional_butWithinBoundsWhenGiven() {
+    assertTrue(valid.copy(intensity = null).isValid())
     assertTrue(valid.copy(intensity = 1).isValid())
     assertTrue(valid.copy(intensity = 10).isValid())
     assertFalse(valid.copy(intensity = 0).isValid())
@@ -74,23 +97,25 @@ class SymptomEntryTest {
   }
 
   @Test
-  fun otherNeedsANonBlankLabel() {
+  fun notesAreOptional_withoutOther() {
+    assertTrue(valid.copy(notes = null).isValid())
+    assertTrue(valid.copy(notes = "").isValid())
+    assertTrue(valid.copy(notes = "   ").isValid())
+  }
+
+  @Test
+  fun otherNeedsNotesSayingWhichSymptom() {
     assertTrue(other.isValid())
-    assertFalse(other.copy(otherLabel = null).isValid())
-    assertFalse(other.copy(otherLabel = "").isValid())
-    assertFalse(other.copy(otherLabel = "   ").isValid())
+    assertFalse(other.copy(notes = null).isValid())
+    assertFalse(other.copy(notes = "").isValid())
+    assertFalse(other.copy(notes = "   ").isValid())
   }
 
   @Test
-  fun otherLabelLengthBoundary() {
-    assertTrue(other.copy(otherLabel = "a".repeat(50)).isValid())
-    assertFalse(other.copy(otherLabel = "a".repeat(51)).isValid())
-  }
-
-  @Test
-  fun listedTypeWithLabelIsInvalid() {
-    assertFalse(valid.copy(otherLabel = "Hiccups").isValid())
-    assertFalse(valid.copy(otherLabel = "").isValid())
+  fun otherAmongSeveralSymptomsStillNeedsNotes() {
+    val fatigueAndOther = valid.copy(types = listOf(SymptomType.FATIGUE, SymptomType.OTHER))
+    assertFalse(fatigueAndOther.isValid())
+    assertTrue(fatigueAndOther.copy(notes = "Hiccups").isValid())
   }
 
   @Test
@@ -114,5 +139,7 @@ class SymptomEntryTest {
   fun notesLengthBoundary() {
     assertTrue(valid.copy(notes = "n".repeat(1000)).isValid())
     assertFalse(valid.copy(notes = "n".repeat(1001)).isValid())
+    assertTrue(other.copy(notes = "n".repeat(1000)).isValid())
+    assertFalse(other.copy(notes = "n".repeat(1001)).isValid())
   }
 }

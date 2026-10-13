@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.annotation.StringRes
@@ -16,6 +18,8 @@ val SymptomType.label: Int
         SymptomType.FATIGUE -> R.string.symptom_type_fatigue
         SymptomType.NAUSEA -> R.string.symptom_type_nausea
         SymptomType.PAIN -> R.string.symptom_type_pain
+        SymptomType.FEVER -> R.string.symptom_type_fever
+        SymptomType.HEADACHE -> R.string.symptom_type_headache
         SymptomType.APPETITE_LOSS -> R.string.symptom_type_appetite_loss
         SymptomType.SLEEP_PROBLEMS -> R.string.symptom_type_sleep_problems
         SymptomType.BREATHLESSNESS -> R.string.symptom_type_breathlessness
@@ -32,8 +36,6 @@ val Severity.label: Int
         Severity.SEVERE -> R.string.symptom_severity_severe
       }
 
-/** What the entry is about: the label the user typed for "Other", or else the type's label. */
+/** What the entry is about: the labels of its symptoms, e.g. "Fatigue, Headache". */
 @Composable
-fun SymptomEntry.title(): String =
-    otherLabel?.takeIf { type == SymptomType.OTHER && it.isNotBlank() }
-        ?: stringResource(type.label)
+fun SymptomEntry.title(): String = types.map { stringResource(it.label) }.joinToString(", ")

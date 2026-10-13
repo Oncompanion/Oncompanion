@@ -4,6 +4,12 @@
 
     <!-- Sign-in checks for a connection before opening Google's dialog -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Scanning a prescription (US-10). Not required: phones without a camera can still enter
+         prescriptions manually -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
 
     <application
         android:allowBackup="false"

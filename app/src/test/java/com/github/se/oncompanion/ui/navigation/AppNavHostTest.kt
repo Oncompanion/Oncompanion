@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.navigation
 
 import android.content.Context
@@ -30,6 +32,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepository
@@ -58,6 +61,7 @@ class AppNavHostTest {
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
+      eventRepository: EventRepository = FakeEventRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
   ) {
@@ -71,6 +75,7 @@ class AppNavHostTest {
               navController = navController,
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
+              eventRepository = eventRepository,
               authRepository = authRepository,
               medicationRepository = medicationRepository,
           )
@@ -80,6 +85,7 @@ class AppNavHostTest {
               startRoute = startRoute,
               planningRepository = planningRepository,
               careCircleRepository = careCircleRepository,
+              eventRepository = eventRepository,
               authRepository = authRepository,
               medicationRepository = medicationRepository,
           )

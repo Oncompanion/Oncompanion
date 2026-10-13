@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
@@ -40,7 +42,7 @@ class SymptomDetailScreenTest {
   private val fatigue =
       SymptomEntry(
           id = "s1",
-          type = SymptomType.FATIGUE,
+          types = listOf(SymptomType.FATIGUE),
           intensity = 7,
           occurredAt = Instant.parse("2026-10-05T14:30:00Z"),
           notes = "After the walk",
@@ -139,15 +141,31 @@ class SymptomDetailScreenTest {
   }
 
   @Test
-  fun otherEntryWithoutNotes_showsItsLabel_andNoNotesField() {
+  fun severalSymptoms_showAllTheirLabelsInTheTitle() {
     setContent(
-        loaded.copy(
-            entry = fatigue.copy(type = SymptomType.OTHER, otherLabel = "Hiccups", notes = null)
-        )
+        loaded.copy(entry = fatigue.copy(types = listOf(SymptomType.FATIGUE, SymptomType.HEADACHE)))
     )
 
-    assertTextInside("Hiccups", C.Tag.symptom_detail_screen)
+    assertTextInside("Fatigue, Headache", C.Tag.symptom_detail_screen)
+  }
+
+  @Test
+  fun otherEntry_showsTheNotesSayingWhichSymptom() {
+    setContent(
+        loaded.copy(entry = fatigue.copy(types = listOf(SymptomType.OTHER), notes = "Hiccups"))
+    )
+
+    assertTextInside("Other", C.Tag.symptom_detail_screen)
+    assertTextInside("Hiccups", C.Tag.symptom_detail_notes)
+  }
+
+  @Test
+  fun entryWithoutIntensityOrNotes_showsOnlyTheDate() {
+    setContent(loaded.copy(entry = fatigue.copy(intensity = null, notes = null)))
+
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_when).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_intensity).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_notes).assertDoesNotExist()
   }
 
