@@ -50,6 +50,7 @@ import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionsViewModel
+import com.github.se.oncompanion.ui.prescription.scan.ScanScreen
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
@@ -171,8 +172,18 @@ fun AppNavHost(
             onBack = navigationActions::goBack,
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
-            // Defined once the scan screen is merged
-            onScan = {},
+            onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
+        )
+      }
+      composable(Screen.PRESCRIPTION_SCAN) {
+        ScanScreen(
+            // The form replaces the scan screen, so closing or saving it returns to the list
+            onEnterManually =
+                dropUnlessResumed {
+                  navigationActions.goBack()
+                  navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
+                },
+            onBack = dropUnlessResumed { navigationActions.goBack() },
         )
       }
       composable(Screen.PRESCRIPTION_ADD) {
