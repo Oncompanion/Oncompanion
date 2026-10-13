@@ -84,6 +84,8 @@
     <string name="symptom_type_fatigue">Fatigue</string>
     <string name="symptom_type_nausea">Nausea</string>
     <string name="symptom_type_pain">Pain</string>
+    <string name="symptom_type_fever">Fever</string>
+    <string name="symptom_type_headache">Headache</string>
     <string name="symptom_type_appetite_loss">Loss of appetite</string>
     <string name="symptom_type_sleep_problems">Sleep problems</string>
     <string name="symptom_type_breathlessness">Breathlessness</string>
@@ -108,6 +110,8 @@
     <string name="symptom_detail_error_title">Couldn\'t load this symptom</string>
     <string name="symptom_detail_not_found_title">This symptom no longer exists</string>
     <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
+    <!-- Severity · start of the notes, under a journal entry, e.g. "Moderate · Hiccups since lunch" -->
+    <string name="symptom_journal_summary">%1$s · %2$s</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -247,6 +251,20 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <!-- Title of the prescriptions list; "prescriptions_title" is the Overview shortcut -->
+    <string name="prescriptions_list_title">My prescriptions</string>
+    <string name="prescriptions_back">Back</string>
+    <string name="prescriptions_enter_manually">Enter manually</string>
+    <string name="prescriptions_this_month">This month</string>
+    <string name="prescriptions_earlier">Earlier</string>
+    <!-- Who prescribed it · when, e.g. "Dr. Martin · 29 Sep 2026" -->
+    <string name="prescriptions_item_supporting">%1$s · %2$s</string>
+    <string name="prescriptions_empty_title">No prescriptions yet</string>
+    <string name="prescriptions_empty_hint">Scan a prescription or enter it manually to keep it here.</string>
+    <string name="prescriptions_error_title">Couldn\'t load your prescriptions</string>
+    <string name="prescriptions_error_hint">Please try again.</string>
+    <string name="prescriptions_retry">Retry</string>
+    <string name="prescriptions_scan">Scan</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -256,4 +274,11 @@
     <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
+    <!-- Hospital field -->
+    <string name="hospital_field_label">Hospital or location</string>
+    <string name="hospital_field_hint">Enter a hospital name or another location</string>
+    <string name="hospital_search">Search</string>
+    <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
+    <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
+    <string name="hospital_attribution">© OpenStreetMap contributors</string>
 </resources>

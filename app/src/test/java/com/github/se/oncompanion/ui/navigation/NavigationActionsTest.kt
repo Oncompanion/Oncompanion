@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.navigation
 
@@ -12,6 +13,7 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -28,12 +30,13 @@ class NavigationActionsTest {
   private lateinit var navigationActions: NavigationActions
 
   private fun setNavHost(startRoute: String) {
+    val auth = FakeAuthRepository()
     composeTestRule.setContent {
       navController =
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      AppNavHost(navController = navController, startRoute = startRoute)
+      AppNavHost(navController = navController, startRoute = startRoute, authRepository = auth)
     }
     composeTestRule.runOnIdle { navigationActions = NavigationActions(navController) }
   }
