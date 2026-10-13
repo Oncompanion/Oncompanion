@@ -251,6 +251,20 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <!-- Title of the prescriptions list; "prescriptions_title" is the Overview shortcut -->
+    <string name="prescriptions_list_title">My prescriptions</string>
+    <string name="prescriptions_back">Back</string>
+    <string name="prescriptions_enter_manually">Enter manually</string>
+    <string name="prescriptions_this_month">This month</string>
+    <string name="prescriptions_earlier">Earlier</string>
+    <!-- Who prescribed it · when, e.g. "Dr. Martin · 29 Sep 2026" -->
+    <string name="prescriptions_item_supporting">%1$s · %2$s</string>
+    <string name="prescriptions_empty_title">No prescriptions yet</string>
+    <string name="prescriptions_empty_hint">Scan a prescription or enter it manually to keep it here.</string>
+    <string name="prescriptions_error_title">Couldn\'t load your prescriptions</string>
+    <string name="prescriptions_error_hint">Please try again.</string>
+    <string name="prescriptions_retry">Retry</string>
+    <string name="prescriptions_scan">Scan</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
