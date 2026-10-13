@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
 
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -38,7 +40,9 @@ class PlanningNavigationTest {
   fun planningIsReachableAndFitsAboveBottomBarWithLargeText() {
     compose.setContent {
       CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
-        OncompanionTheme { AppNavHost(startRoute = Route.OVERVIEW) }
+        OncompanionTheme {
+          AppNavHost(startRoute = Route.OVERVIEW, planningRepository = EmptyPlanningRepository)
+        }
       }
     }
     compose.onNodeWithTag(Tab.PLANNING.testTag).performClick()

@@ -1,3 +1,5 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepository

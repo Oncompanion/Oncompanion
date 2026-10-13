@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.navigation
 
@@ -26,6 +27,9 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentType
+import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
@@ -41,6 +45,7 @@ import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -555,5 +560,31 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
+  }
+
+  /** Verifies production source selection without overriding the Planning contract. */
+  @Test
+  fun defaultPlanningSourceUsesInjectedAppointmentAndAuthRepositories() {
+    val auth = FakeAuthRepository()
+    runTest { auth.signInWithGoogle("planning-owner") }
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        auth.currentUser!!.uid,
+        Appointment(
+            id = "saved",
+            title = "Saved consultation",
+            scheduledAt = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            type = AppointmentType.CONSULTATION,
+        ),
+    )
+    composeTestRule.setContent {
+      AppNavHost(
+          startRoute = Route.PLANNING,
+          authRepository = auth,
+          appointmentRepository = appointments,
+      )
+    }
+    composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
   }
 }
