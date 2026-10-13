@@ -1,3 +1,5 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+
 # Architecture
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
@@ -104,6 +106,39 @@ Firestore's local cache is the offline store: writes are applied locally right a
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 
+## Care circle invitations
+
+A patient adds someone to their circle before that person has an account, but member documents are keyed by the member's uid (`/users/{uid}/circle/{memberUid}`), which only exists once they sign in. So **a pending member is an invitation, and a member is someone who accepted one**:
+
+- `/invites/{inviteCode}` holds what the patient decided about the person (first name, family name, relationship, permissions) and the email to send the invitation to. The patient creates it, offline if needed.
+- `/users/{patientUid}/circle/{caregiverUid}` is created **only when the caregiver redeems the code**, as a copy of the invite, and the invite is deleted in the same write. `memberUid` keeps meaning the member's uid, so rules can still check `circle/{request.auth.uid}` with a single `get()`.
+- `/users/{caregiverUid}/patients/{patientUid}` is the caregiver's own list of the circles they joined, created in the same write.
+
+We didn't store pending members in `circle/` and move them on join (the document ID would change, and a caregiver would have to create and delete docs in the patient's circle), or give members a generated ID plus a separate uid link (every collection's rules would need two lookups).
+
+**What each side sees.** Each user can only read their own profile, so what the other side needs is copied:
+
+| When | What is copied | From → to | Why |
+|---|---|---|---|
+| Invite created | the patient's first name | profile → `invites/{inviteCode}.ownerFirstName` | The caregiver must know whose circle they are joining, and can't read the patient's profile |
+| Code redeemed | name, relationship and permissions | invite → `circle/{caregiverUid}` | The patient keeps seeing the name they typed, like a phone contact |
+| Code redeemed | the caregiver's account email | `request.auth.token.email` → `circle/{caregiverUid}.email` | A reliable contact that the rules check, so it can't be faked |
+| Code redeemed | `ownerFirstName` | invite → `patients/{patientUid}.patientFirstName` | The caregiver lists their patients without reading their profiles |
+
+There are two emails: `invites/{inviteCode}.email` is where the patient sends the invitation (typed, optional, editable while pending), and `circle/{memberUid}.email` is the caregiver's Google account email, set when they join and read-only for the patient. Before joining there is no account to read it from, and after joining the account email is the one to trust. The caregiver's join screen tells them that the patient will see their email.
+
+**Invite codes.** The code is the document ID: 10 characters from an alphabet without 0, O, 1, I and L (they are read aloud and typed), generated on the phone with `SecureRandom`, and shown as `ABCDE-FGHJK`. Anyone signed in may `get` an invite by its code while it is valid; once it has expired, only the patient can, so they can still renew or cancel it. This means that while an invite is pending, anyone holding the code can read its details. Only the patient may `list` their invites, so codes can't be enumerated. A code is valid for 7 days from the **server** `createdAt`. Redeeming deletes the invite, so a code works once, and a removed caregiver can't rejoin with their old one. Invalid, used and expired codes look the same to a caregiver: the app shows one error, and Firestore refuses to read all three (a used invite is deleted, an expired one is readable only by the patient). Joining requires a profile with role `CAREGIVER`.
+
+**Redeeming is the one write that needs the network.** Only the server knows whether a code is valid, unused and unexpired, and a local "you joined" that the server later rejects would show someone's data and then take it away. So redeeming is one `runTransaction`, not a batch: a batch is applied to the local cache first, so a dropped connection could show the circle and then take it away. A transaction needs the network and is never queued offline: if it fails, nothing is written to the phone's local storage, and the join screen says why (no connection, or the code can't be used). It reads the invite and the caregiver's `circle/{caregiverUid}` doc (to detect an existing member), then creates the `circle/{caregiverUid}` and `patients/{patientUid}` docs and deletes the invite. The rules check the invite as it was before the transaction (`get`) and the new docs after it (`existsAfter`). Everything else (creating, editing or cancelling an invite, editing or removing a member) works offline. An invite created offline only exists on the patient's phone until it syncs, so the app says the code will work once the phone reconnects (`hasPendingWrites()`).
+
+**Removing a member** is one batch written by the patient: it deletes `circle/{memberUid}` and the caregiver's `patients/{patientUid}` doc, so no stale link is left behind (the invite was already deleted when they joined). This is the only write a patient makes into another user's data, allowed because a patient must always be able to take themselves off a caregiver's list: the rules let a patient delete exactly the `patients/{patientUid}` doc about themselves, nothing else. A caregiver leaves a circle the same way: one batch deleting their `circle/{caregiverUid}` doc in the patient's circle and their own `patients/{patientUid}` doc. Cancelling a pending invite deletes it; renewing an expired one creates a new invite with the same details and deletes the old one.
+
+Known limitations:
+- Revoking access while the patient is offline only takes effect once their phone syncs.
+- If the patient changes their first name, caregivers keep the old one: a patient makes no other writes into caregivers' data, so the new name isn't pushed into each caregiver's `patients` list.
+- Someone with a patient account can't join a circle; they would need to sign in with another Google account.
+- An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.
+
 ## Sign-out
 
 Profile asks for confirmation before reusing `AuthRepository.signOut()`. Its ViewModel drops profile details and cancels the profile listener as soon as Firebase sign-out returns, then asks the existing Google credential provider to clear the account-picker state. Credential cleanup is best effort, as in sign-in; an immediate authentication error keeps the user on Profile with retry available.
@@ -120,7 +155,8 @@ Firestore disk persistence is retained, including pending offline writes. Signin
 /users/{uid}/prescriptions/{id}       doctor, date and the list of its medications
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
-/invites/{code}                       pending care-circle invites
+/users/{uid}/patients/{patientUid}    circles this caregiver joined
+/invites/{inviteCode}                 pending care-circle members (invitations), deleted when redeemed
 /events/{id}                          Ligue events, read: signed in, write: nobody from the app
 /directory/{contacts|programs}/items/{id}   read: signed in, write: staff
 ```
