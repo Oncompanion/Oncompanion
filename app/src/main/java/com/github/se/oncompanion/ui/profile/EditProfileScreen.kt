@@ -6,8 +6,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
 
 /** Owns no navigation controller: save and cancellation return through the host's callbacks. */
@@ -81,96 +85,89 @@ fun EditProfileContent(
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
   BackHandler { if (!state.isSaving) onBack() }
+  // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
+  // keyboard open, a fixed one would leave no room for the field being typed
+  val topBarScrolls = isCompactHeight() && state.status == EditProfileStatus.READY
   Scaffold(
-      modifier = modifier.testTag(C.Tag.edit_profile_screen),
-      topBar = {
-        MediumTopAppBar(
-            title = { Text(stringResource(R.string.edit_profile_title)) },
-            navigationIcon = {
-              IconButton(
-                  onClick = onBack,
-                  enabled = !state.isSaving,
-                  modifier = Modifier.testTag(C.Tag.edit_profile_back),
-              ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.profile_back))
-              }
-            },
-        )
-      },
+      // Ends the screen at the keyboard (the activity is adjustResize): Save can be scrolled to
+      modifier = modifier.testTag(C.Tag.edit_profile_screen).imePadding(),
+      topBar = { if (!topBarScrolls) EditProfileTopBar(state, onBack) },
   ) { padding ->
     if (state.status == EditProfileStatus.READY) {
       Column(
-          modifier =
-              Modifier.fillMaxSize()
-                  .padding(padding)
-                  .verticalScroll(rememberScrollState())
-                  .padding(24.dp),
-          verticalArrangement = Arrangement.spacedBy(16.dp),
+          modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
       ) {
-        val missing = state.firstName.isBlank()
-        OutlinedTextField(
-            value = state.firstName,
-            onValueChange = onFirstNameChange,
-            enabled = state.canEdit,
-            label = { Text(stringResource(R.string.onboarding_first_name)) },
-            supportingText = {
-              Text(
-                  stringResource(
-                      if (missing) R.string.onboarding_first_name_missing
-                      else R.string.onboarding_required
-                  )
-              )
-            },
-            isError = missing,
-            singleLine = true,
-            keyboardOptions =
-                KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Next,
-                ),
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_first_name),
-        )
-        OutlinedTextField(
-            value = state.familyName,
-            onValueChange = onFamilyNameChange,
-            enabled = state.canEdit,
-            label = { Text(stringResource(R.string.profile_family_name)) },
-            singleLine = true,
-            keyboardOptions =
-                KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Next,
-                ),
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_family_name),
-        )
-        CancerTypeField(
-            value = state.cancerType,
-            onValueChange = onCancerTypeChange,
-            enabled = state.canEdit,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (state.saveFailed) {
-          Text(
-              stringResource(R.string.edit_profile_save_failed),
-              color = MaterialTheme.colorScheme.error,
-              modifier = Modifier.testTag(C.Tag.edit_profile_save_error),
+        // The Scaffold already keeps the content clear of the status bar
+        if (topBarScrolls) EditProfileTopBar(state, onBack, WindowInsets(0))
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+          val missing = state.firstName.isBlank()
+          OutlinedTextField(
+              value = state.firstName,
+              onValueChange = onFirstNameChange,
+              enabled = state.canEdit,
+              label = { Text(stringResource(R.string.onboarding_first_name)) },
+              supportingText = {
+                Text(
+                    stringResource(
+                        if (missing) R.string.onboarding_first_name_missing
+                        else R.string.onboarding_required
+                    )
+                )
+              },
+              isError = missing,
+              singleLine = true,
+              keyboardOptions =
+                  KeyboardOptions(
+                      capitalization = KeyboardCapitalization.Words,
+                      imeAction = ImeAction.Next,
+                  ),
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_first_name),
           )
-        }
-        Button(
-            onClick = onSave,
-            enabled = state.canSave,
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_save),
-        ) {
-          if (state.isSaving)
-              CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.edit_profile_saving))
-          else Text(stringResource(R.string.edit_profile_save))
-        }
-        TextButton(
-            onClick = onBack,
-            enabled = !state.isSaving,
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_cancel),
-        ) {
-          Text(stringResource(R.string.edit_profile_cancel))
+          OutlinedTextField(
+              value = state.familyName,
+              onValueChange = onFamilyNameChange,
+              enabled = state.canEdit,
+              label = { Text(stringResource(R.string.profile_family_name)) },
+              singleLine = true,
+              keyboardOptions =
+                  KeyboardOptions(
+                      capitalization = KeyboardCapitalization.Words,
+                      imeAction = ImeAction.Next,
+                  ),
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_family_name),
+          )
+          CancerTypeField(
+              value = state.cancerType,
+              onValueChange = onCancerTypeChange,
+              enabled = state.canEdit,
+              modifier = Modifier.fillMaxWidth(),
+          )
+          if (state.saveFailed) {
+            Text(
+                stringResource(R.string.edit_profile_save_failed),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(C.Tag.edit_profile_save_error),
+            )
+          }
+          Button(
+              onClick = onSave,
+              enabled = state.canSave,
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_save),
+          ) {
+            if (state.isSaving)
+                CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.edit_profile_saving))
+            else Text(stringResource(R.string.edit_profile_save))
+          }
+          TextButton(
+              onClick = onBack,
+              enabled = !state.isSaving,
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_cancel),
+          ) {
+            Text(stringResource(R.string.edit_profile_cancel))
+          }
         }
       }
     } else {
@@ -206,4 +203,27 @@ fun EditProfileContent(
       }
     }
   }
+}
+
+/** The title and the back arrow, which is disabled while the profile is being saved. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditProfileTopBar(
+    state: EditProfileUiState,
+    onBack: () -> Unit,
+    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
+) {
+  MediumTopAppBar(
+      title = { Text(stringResource(R.string.edit_profile_title)) },
+      navigationIcon = {
+        IconButton(
+            onClick = onBack,
+            enabled = !state.isSaving,
+            modifier = Modifier.testTag(C.Tag.edit_profile_back),
+        ) {
+          Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.profile_back))
+        }
+      },
+      windowInsets = windowInsets,
+  )
 }
