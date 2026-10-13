@@ -16,21 +16,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
-import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
-import com.github.se.oncompanion.model.appointment.AppointmentRepository
-import com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore
-import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
-import com.github.se.oncompanion.model.carecircle.CareCircleRepository
-import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
-import com.github.se.oncompanion.model.event.EventRepository
-import com.github.se.oncompanion.model.event.EventRepositoryFirestore
-import com.github.se.oncompanion.model.medication.MedicationRepository
-import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
-import com.github.se.oncompanion.model.planning.PlanningRepository
-import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -69,24 +56,14 @@ import java.time.ZoneId
  *
  * Every feature added with [placeholderGraph] is a placeholder until its PR lands.
  *
- * The repositories default to Firebase; tests pass fakes to check the screens together, e.g. that a
- * route's argument reaches its ViewModel.
+ * The ViewModels take their repositories from the providers; tests put fakes there to check the
+ * screens together, e.g. that a route's argument reaches its ViewModel.
  */
 @Composable
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
-    careCircleRepository: CareCircleRepository = remember { CareCircleRepositoryFirestore() },
-    eventRepository: EventRepository = remember { EventRepositoryFirestore() },
-    authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
-    appointmentRepository: AppointmentRepository = remember { AppointmentRepositoryFirestore() },
-    planningRepository: PlanningRepository =
-        remember(appointmentRepository, authRepository) {
-          AppointmentPlanningSource(appointmentRepository, authRepository)
-        },
-    profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
-    medicationRepository: MedicationRepository = remember { MedicationRepositoryFirestore() },
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -131,11 +108,11 @@ fun AppNavHost(
       composable(Screen.PLANNING) {
         val planningViewModel: PlanningViewModel = viewModel {
           PlanningViewModel(
-              planningRepository,
+              PlanningRepositoryProvider.repository,
               Clock.systemDefaultZone(),
               ZoneId.systemDefault(),
               createSavedStateHandle(),
-              authRepository,
+              AuthRepositoryProvider.repository,
           )
         }
         PlanningScreen(navigationActions, planningViewModel)
@@ -143,7 +120,7 @@ fun AppNavHost(
     }
     navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
       composable(Screen.EVENTS) {
-        EventsScreen(navigationActions, viewModel = viewModel { EventsViewModel(eventRepository) })
+        EventsScreen(navigationActions, viewModel = viewModel { EventsViewModel() })
       }
       composable(
           Screen.EVENT_DETAIL,
@@ -153,7 +130,7 @@ fun AppNavHost(
         EventDetailScreen(
             eventId = eventId,
             onBack = navigationActions::goBack,
-            viewModel = viewModel { EventDetailViewModel(eventId, eventRepository) },
+            viewModel = viewModel { EventDetailViewModel(eventId) },
         )
       }
     }
@@ -176,7 +153,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
       composable(Screen.PRESCRIPTIONS) {
         PrescriptionsScreen(
-            viewModel = viewModel { PrescriptionsViewModel(authRepository, medicationRepository) },
+            viewModel = viewModel { PrescriptionsViewModel() },
             onBack = navigationActions::goBack,
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
@@ -196,14 +173,7 @@ fun AppNavHost(
       }
       composable(Screen.PRESCRIPTION_ADD) {
         PrescriptionFormScreen(
-            // Saves to the repository the list observes, so the list shows the new prescription
-            viewModel =
-                viewModel {
-                  PrescriptionFormViewModel(
-                      authRepository,
-                      ManageMedicationSchedule(medicationRepository),
-                  )
-                },
+            viewModel = viewModel { PrescriptionFormViewModel() },
             // A second tap while the form is already leaving is dropped, so Back happens once
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the screen the form was opened from
@@ -215,7 +185,7 @@ fun AppNavHost(
       composable(Screen.CARE_CIRCLE) {
         CareCircleScreen(
             navigationActions = navigationActions,
-            viewModel = viewModel { CareCircleViewModel(careCircleRepository, authRepository) },
+            viewModel = viewModel { CareCircleViewModel() },
         )
       }
       composable(
@@ -226,14 +196,7 @@ fun AppNavHost(
         CareCircleMemberScreen(
             navigationActions = navigationActions,
             // The SavedStateHandle holds the route's member uid
-            viewModel =
-                viewModel {
-                  CareCircleMemberViewModel(
-                      createSavedStateHandle(),
-                      careCircleRepository,
-                      authRepository,
-                  )
-                },
+            viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
         )
       }
     }
@@ -243,7 +206,7 @@ fun AppNavHost(
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
             onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
-            viewModel = viewModel { ProfileViewModel(authRepository, profileRepository) },
+            viewModel = viewModel { ProfileViewModel() },
             credentialProvider = credentialProvider,
         )
       }
@@ -251,7 +214,7 @@ fun AppNavHost(
         EditProfileScreen(
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
-            viewModel = viewModel { EditProfileViewModel(authRepository, profileRepository) },
+            viewModel = viewModel { EditProfileViewModel() },
         )
       }
     }
