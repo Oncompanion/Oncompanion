@@ -3,7 +3,10 @@
 
 package com.github.se.oncompanion.ui.navigation
 
+import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -38,6 +41,8 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -47,9 +52,11 @@ import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(AndroidJUnit4::class)
 class AppNavHostTest {
@@ -57,6 +64,9 @@ class AppNavHostTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private lateinit var navController: TestNavHostController
+
+  /** The activity showing the NavHost, to answer the permission dialogs its screens open. */
+  private lateinit var activity: Activity
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -66,8 +76,10 @@ class AppNavHostTest {
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
+      medicationRepository: MedicationRepository = FakeMedicationRepository(),
   ) {
     composeTestRule.setContent {
+      activity = checkNotNull(LocalActivity.current)
       navController =
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
@@ -79,6 +91,7 @@ class AppNavHostTest {
               careCircleRepository = careCircleRepository,
               eventRepository = eventRepository,
               authRepository = authRepository,
+              medicationRepository = medicationRepository,
           )
       else
           AppNavHost(
@@ -88,6 +101,7 @@ class AppNavHostTest {
               careCircleRepository = careCircleRepository,
               eventRepository = eventRepository,
               authRepository = authRepository,
+              medicationRepository = medicationRepository,
           )
     }
   }
@@ -238,7 +252,7 @@ class AppNavHostTest {
               Route.PRESCRIPTIONS,
               Screen.PRESCRIPTIONS,
               C.Tag.prescriptions_screen,
-              R.string.prescriptions_title,
+              R.string.prescriptions_list_title,
           ),
           Destination(
               Route.CARE_CIRCLE,
@@ -498,20 +512,142 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
+  /** Opens the prescriptions list from its Overview shortcut, as the user does. */
+  private fun openPrescriptionsFromOverview(medicationRepository: MedicationRepository) {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    setNavHost(Route.OVERVIEW, authRepository = auth, medicationRepository = medicationRepository)
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+  }
+
   @Test
-  fun prescriptionAddRoute_opensTheForm_andCloseReturns() {
-    setNavHost(Route.PRESCRIPTIONS)
+  fun prescriptionsShortcut_opensTheList_andBackArrowReturnsToOverview() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
     composeTestRule.runOnIdle {
-      NavigationActions(navController).navigateTo(Screen.PRESCRIPTION_ADD)
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
     }
 
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionsEnterManually_opensTheForm_andCloseReturnsToTheList() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+
     composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.PRESCRIPTION_ADD, NavigationActions(navController).currentRoute())
     }
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_form_close_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  /** Refuses the camera in Android's permission dialog, which the scan screen opened. */
+  private fun refuseCamera() {
+    // The scan screen asks once it is shown
+    composeTestRule.waitForIdle()
+    val request = shadowOf(activity).lastRequestedPermission
+    assertNotNull("the scan screen should have asked for the camera", request)
+    composeTestRule.runOnUiThread {
+      @Suppress("DEPRECATION")
+      activity.onRequestPermissionsResult(
+          request!!.requestCode,
+          request.requestedPermissions,
+          intArrayOf(PackageManager.PERMISSION_DENIED),
+      )
+    }
+    composeTestRule.waitForIdle()
+  }
+
+  @Test
+  fun prescriptionsScan_opensTheScanScreen_andCloseReturnsToTheList() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_SCAN, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_close_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun scanEnterManually_opensTheForm_andCloseReturnsToTheList() {
+    openPrescriptionsFromOverview(FakeMedicationRepository())
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).performClick()
+    refuseCamera()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    // The form replaced the scan screen: leaving it doesn't return to "Camera access is off"
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_close_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_screen).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun savingAPrescription_returnsToTheList_whichShowsIt() {
+    val medications = FakeMedicationRepository()
+    openPrescriptionsFromOverview(medications)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_medication_name_field)
+        .performScrollTo()
+        .performTextInput("Ondansetron 8 mg")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // The form and the list share the repository: the list shows what was just saved
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertDoesNotExist()
+    val saved = medications.prescriptionsOf("owner").single()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem(saved.id)).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText("Ondansetron 8 mg") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem(saved.id))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+
+    // Back from the list returns to Overview, not to the form
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
   }
 
   @Test
@@ -520,6 +656,7 @@ class AppNavHostTest {
     assertEquals("onboarding", Route.ONBOARDING)
     assertEquals("overview", Route.OVERVIEW)
     assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
+    assertEquals("prescriptions_scan", Screen.PRESCRIPTION_SCAN)
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)

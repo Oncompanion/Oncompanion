@@ -124,8 +124,12 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
           style = MaterialTheme.typography.bodyLarge,
       )
     }
-    Field(stringResource(R.string.symptom_detail_intensity), C.Tag.symptom_detail_intensity) {
-      IntensityBadge(entry.intensity)
+    // The intensity is optional: no field when the user didn't give one
+    val intensity = entry.intensity
+    if (intensity != null) {
+      Field(stringResource(R.string.symptom_detail_intensity), C.Tag.symptom_detail_intensity) {
+        IntensityBadge(intensity)
+      }
     }
     val notes = entry.notes?.takeIf { it.isNotBlank() }
     if (notes != null) {
