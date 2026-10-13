@@ -108,6 +108,8 @@ Run these before every push and make sure they pass:
 - Keep PRs small and focused on one task from the Scrum board: about **400 lines of production code** at most, tests not counted. Split the data layer (model, repository, rules) from the UI when a task needs both.
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
+- If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram and the overview in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)).
+  - Agents: don't edit the `.excalidraw` files by hand; list the diagram changes needed in the PR's "For the team" section so the author updates them on excalidraw.com.
 
 ### Avoiding merge conflicts
 
