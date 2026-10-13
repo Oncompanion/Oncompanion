@@ -62,17 +62,21 @@ data class CareCircleMember(
     val email: String? = null,
     val addedAt: Instant? = null,
 ) {
+  /** What the patient decided about this member: name, relationship and permissions. */
+  val details: CareCircleMemberDetails
+    get() = CareCircleMemberDetails(firstName, familyName, relationship, permissions)
+
   /** First and family name, e.g. "Sophie Dubois". */
   val fullName: String
-    get() = listOfNotNull(firstName, familyName?.takeIf { it.isNotBlank() }).joinToString(" ")
+    get() = details.fullName
 
   /** The member's initial, shown in their avatar. */
   val initial: String
-    get() = firstName.trim().take(1).uppercase()
+    get() = details.initial
 
   /** Whether the member can see every section. */
   val hasFullAccess: Boolean
-    get() = permissions.containsAll(CarePermission.entries)
+    get() = details.hasFullAccess
 
   companion object {
     /**

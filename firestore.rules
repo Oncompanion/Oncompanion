@@ -94,6 +94,28 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
 
+    // ---------- Care circle helpers ----------
+    // What the patient decides about someone in their circle, on an invite and on a member.
+    // Keep in sync with CareCircleMemberDetails.MAX_NAME_LENGTH, Relationship and CarePermission.
+    function isValidCareCircleMemberDetails(data) {
+      return data.firstName is string
+          && data.firstName.trim().size() > 0
+          && data.firstName.size() <= 50
+          && optionalString(data, 'familyName', 50)
+          && data.relationship in ['WIFE', 'HUSBAND', 'PARTNER', 'MOTHER', 'FATHER', 'DAUGHTER',
+                                   'SON', 'SISTER', 'BROTHER', 'FRIEND', 'HOME_NURSE', 'OTHER']
+          && data.permissions is list
+          && data.permissions.size() <= 4
+          && data.permissions.hasOnly(['PLANNING', 'EVENTS', 'SYMPTOMS', 'PRESCRIPTIONS']);
+    }
+    // What the patient can change on a member; an invite also has its email.
+    function detailKeys() {
+      return ['firstName', 'familyName', 'relationship', 'permissions'];
+    }
+    function invitePath(inviteCode) {
+      return /databases/$(database)/documents/invites/$(inviteCode);
+    }
+
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -155,6 +177,37 @@ service cloud.firestore {
     // the Firebase console for now, so the app can only read them.
     match /events/{eventId} {
       allow read: if signedIn();
+    }
+
+    // ---------- Care circle invites ----------
+    // /invites/{inviteCode}: a pending care circle member. The invite code is the secret: anyone
+    // signed in can get one invite by its code, only the owner can list theirs. Keep the invite
+    // code format in sync with CareCircleInvite and the email limit with MAX_EMAIL_LENGTH.
+    match /invites/{inviteCode} {
+      allow get: if signedIn();
+      allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn()
+                    && inviteCode.matches('^[A-HJKMNP-Z2-9]{10}$')
+                    && request.resource.data.keys().hasOnly(detailKeys().concat(
+                           ['email', 'ownerUid', 'ownerFirstName', 'createdAt', 'redeemerUid']))
+                    && request.resource.data.keys().hasAll(
+                           ['ownerUid', 'ownerFirstName', 'firstName', 'relationship',
+                            'permissions', 'createdAt', 'redeemerUid'])
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.ownerFirstName is string
+                    && request.resource.data.ownerFirstName.size() <= 50
+                    && optionalString(request.resource.data, 'email', 254)
+                    && request.resource.data.redeemerUid == null
+                    && request.resource.data.createdAt == request.time
+                    && isValidCareCircleMemberDetails(request.resource.data);
+      // The patient edits an invite that hasn't been used. Redeeming it comes with the join flow.
+      allow update: if isOwner(resource.data.ownerUid)
+                    && resource.data.redeemerUid == null
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(detailKeys().concat(['email']))
+                    && optionalString(request.resource.data, 'email', 254)
+                    && isValidCareCircleMemberDetails(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerUid);
     }
 
     // ---------- Everything else ----------
