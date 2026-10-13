@@ -17,6 +17,7 @@ object PlanningRepositoryProvider {
    * The signed-in patient's appointments by default. The appointment and auth providers are read on
    * each observation, so replacing them also reaches Planning.
    */
+  @Volatile
   var repository: PlanningRepository = PlanningRepository { range ->
     AppointmentPlanningSource(
             AppointmentRepositoryProvider.repository,

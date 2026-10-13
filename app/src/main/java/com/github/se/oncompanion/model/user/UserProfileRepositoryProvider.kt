@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.user
  */
 object UserProfileRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: UserProfileRepository = UserProfileRepositoryFirestore()
+  @Volatile var repository: UserProfileRepository = UserProfileRepositoryFirestore()
 }

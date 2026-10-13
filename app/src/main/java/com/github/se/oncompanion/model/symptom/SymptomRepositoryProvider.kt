@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.symptom
  */
 object SymptomRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: SymptomRepository = SymptomRepositoryFirestore()
+  @Volatile var repository: SymptomRepository = SymptomRepositoryFirestore()
 }

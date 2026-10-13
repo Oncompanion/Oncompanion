@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.medication
  */
 object MedicationRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: MedicationRepository = MedicationRepositoryFirestore()
+  @Volatile var repository: MedicationRepository = MedicationRepositoryFirestore()
 }

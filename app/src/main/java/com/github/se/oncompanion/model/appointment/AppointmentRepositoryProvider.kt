@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.appointment
  */
 object AppointmentRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: AppointmentRepository = AppointmentRepositoryFirestore()
+  @Volatile var repository: AppointmentRepository = AppointmentRepositoryFirestore()
 }

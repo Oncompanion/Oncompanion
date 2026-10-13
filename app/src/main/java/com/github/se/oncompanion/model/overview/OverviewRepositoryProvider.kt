@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.overview
  */
 object OverviewRepositoryProvider {
   /** An empty stand-in until an implementation reads the planning data. */
-  var repository: OverviewRepository = FakeOverviewRepository()
+  @Volatile var repository: OverviewRepository = FakeOverviewRepository()
 }

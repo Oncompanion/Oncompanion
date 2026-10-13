@@ -65,15 +65,11 @@ data class OverviewUiState(
  * Loads the user's day for the Overview (US-23): their first name, their next appointment and
  * today's items.
  *
- * @param profileRepository creates the profile repository; it is only called when a user is signed
- *   in, so the Overview also works where Firebase isn't available
  * @param clock the current time
  */
 class OverviewViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
-    private val profileRepository: () -> UserProfileRepository = {
-      UserProfileRepositoryProvider.repository
-    },
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
     private val overviewRepository: OverviewRepository = OverviewRepositoryProvider.repository,
     private val clock: () -> LocalDateTime = LocalDateTime::now,
 ) : ViewModel() {
@@ -147,7 +143,7 @@ class OverviewViewModel(
     _uiState.update { it.copy(firstName = user.firstNameGuess()) }
     viewModelScope.launch {
       try {
-        profileRepository().observeProfile(user.uid).collect { profile ->
+        profileRepository.observeProfile(user.uid).collect { profile ->
           val name = profile?.firstName?.takeIf { it.isNotBlank() } ?: return@collect
           _uiState.update { it.copy(firstName = name) }
         }

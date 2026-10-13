@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.carecircle
  */
 object CareCircleInviteRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: CareCircleInviteRepository = CareCircleInviteRepositoryFirestore()
+  @Volatile var repository: CareCircleInviteRepository = CareCircleInviteRepositoryFirestore()
 }

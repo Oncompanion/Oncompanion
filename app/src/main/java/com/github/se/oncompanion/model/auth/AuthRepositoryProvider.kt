@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.auth
  */
 object AuthRepositoryProvider {
   /** Firebase Authentication by default; Firebase is only reached when it is first used. */
-  var repository: AuthRepository = AuthRepositoryFirebase()
+  @Volatile var repository: AuthRepository = AuthRepositoryFirebase()
 }

@@ -8,5 +8,5 @@ package com.github.se.oncompanion.model.event
  */
 object EventRepositoryProvider {
   /** Firestore by default; Firebase is only reached when the repository is first used. */
-  var repository: EventRepository = EventRepositoryFirestore()
+  @Volatile var repository: EventRepository = EventRepositoryFirestore()
 }
