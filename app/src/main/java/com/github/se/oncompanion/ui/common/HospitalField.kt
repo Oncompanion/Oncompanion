@@ -1,4 +1,5 @@
 // Co-authored-by: Codex
+// Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
@@ -21,23 +22,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.hospital.Hospital
 import com.github.se.oncompanion.model.hospital.HospitalRepository
 import com.github.se.oncompanion.resources.C
 
 /**
  * Reusable location field with optional, explicitly requested hospital search. The form owns
- * [value]; only typing or selecting a result calls [onValueChange]. Supply a separate lifecycle
- * scoped [viewModel] per field, using a stable repository instance to retain cached results. Search
- * feedback is cleared when the text changes, the field is disabled or it leaves composition.
+ * [value] and the selected hospital. Selecting a result calls [onValueChange] with its name, then
+ * [onHospitalSelected] with the complete existing object. Manual edits call [onHospitalSelected]
+ * with null before [onValueChange], invalidating the form's structured selection even for empty or
+ * unmatched text. The form decides what to persist and clears selection on external text changes.
+ * Supply a separate lifecycle scoped [viewModel] per field, using a stable repository instance to
+ * retain cached results. Search feedback is cleared when the text changes, the field is disabled or
+ * it leaves composition.
  */
 @Composable
 fun HospitalField(
     value: String,
     onValueChange: (String) -> Unit,
     viewModel: HospitalFieldViewModel,
+    onHospitalSelected: (Hospital?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
@@ -51,6 +59,7 @@ fun HospitalField(
         viewModel.clearSearch()
         onValueChange(it)
       },
+      onHospitalSelected = onHospitalSelected,
       uiState = uiState,
       onSearch = { viewModel.search(value) },
       modifier = modifier,
@@ -58,20 +67,27 @@ fun HospitalField(
   )
 }
 
-/** Stateless field and search feedback, reusable in forms and testable without any service. */
+/**
+ * Stateless field and search feedback. Selection sends the name through [onValueChange], then the
+ * complete object through [onHospitalSelected]; manual edits first send null to clear selection.
+ */
 @Composable
 fun HospitalFieldContent(
     value: String,
     onValueChange: (String) -> Unit,
     uiState: HospitalFieldUiState,
     onSearch: () -> Unit,
+    onHospitalSelected: (Hospital?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedTextField(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = {
+          onHospitalSelected(null)
+          onValueChange(it)
+        },
         enabled = enabled,
         singleLine = true,
         label = { Text(stringResource(R.string.hospital_field_label)) },
@@ -85,12 +101,19 @@ fun HospitalFieldContent(
     ) {
       Text(stringResource(R.string.hospital_search))
     }
-    if (enabled) HospitalSearchFeedback(uiState, onValueChange)
+    if (enabled)
+        HospitalSearchFeedback(uiState) { hospital ->
+          onValueChange(hospital.name)
+          onHospitalSelected(hospital)
+        }
   }
 }
 
 @Composable
-private fun HospitalSearchFeedback(uiState: HospitalFieldUiState, onValueChange: (String) -> Unit) {
+private fun HospitalSearchFeedback(
+    uiState: HospitalFieldUiState,
+    onHospitalSelected: (Hospital) -> Unit,
+) {
   when (uiState) {
     HospitalFieldUiState.Idle -> Unit
     HospitalFieldUiState.Loading ->
@@ -114,7 +137,7 @@ private fun HospitalSearchFeedback(uiState: HospitalFieldUiState, onValueChange:
         ) {
           uiState.hospitals.forEach { hospital ->
             TextButton(
-                onClick = { onValueChange(hospital.name) },
+                onClick = { onHospitalSelected(hospital) },
                 modifier = Modifier.fillMaxWidth().testTag(C.Tag.hospital_result),
             ) {
               Column(Modifier.fillMaxWidth()) {
@@ -134,5 +157,19 @@ private fun HospitalSearchFeedback(uiState: HospitalFieldUiState, onValueChange:
         Text(stringResource(R.string.hospital_attribution))
       }
     }
+  }
+}
+
+@Preview
+@Composable
+private fun HospitalFieldPreview() {
+  MaterialTheme {
+    HospitalFieldContent(
+        value = "",
+        onValueChange = {},
+        uiState = HospitalFieldUiState.Idle,
+        onSearch = {},
+        onHospitalSelected = {},
+    )
   }
 }

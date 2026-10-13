@@ -68,9 +68,13 @@ field UI (#143), or profile integration (#144) are added.
 ## Reusable hospital field (issue #143)
 
 `ui/common/HospitalField` is an outlined free-text location field with an explicit Search button.
-The form owns its text and receives edits and selected hospital names through `onValueChange`;
-search outcomes never replace that text. `HospitalFieldContent` renders idle, loading, results,
-empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
+The form owns its text and structured selection. `onValueChange(String)` supports unrestricted
+manual entry. Selecting a result sends its name through `onValueChange`, then the complete existing
+`Hospital` through `onHospitalSelected(Hospital?)`. Manual edits send `null` before the text callback
+so the parent clears any previous structured selection, including for empty or unmatched text.
+Parents also clear their selection when changing text externally and decide which hospital details
+to persist. Search outcomes never replace text or emit a selection. `HospitalFieldContent` renders
+idle, loading, results, empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
 receives a `HospitalRepository`; each field needs its own lifecycle-scoped ViewModel and a stable
 repository instance. It never checks connectivity before searching, so repository cache hits
 remain available offline. Cache misses report a short error while manual entry stays usable.

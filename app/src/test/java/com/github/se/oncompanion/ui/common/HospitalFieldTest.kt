@@ -1,4 +1,5 @@
 // Co-authored-by: Codex
+// Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,12 +14,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.hospital.*
 import com.github.se.oncompanion.resources.C
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class HospitalFieldTest {
   @get:Rule val compose = createComposeRule()
@@ -32,6 +38,8 @@ class HospitalFieldTest {
   private var enabled by mutableStateOf(true)
   private var visible by mutableStateOf(true)
   private val changes = mutableListOf<String>()
+  private val selections = mutableListOf<Hospital?>()
+  private var selected: Hospital? = null
 
   private fun field(
       repository: HospitalRepository = fake,
@@ -48,6 +56,10 @@ class HospitalFieldTest {
                 changes.add(it)
               },
               vm,
+              onHospitalSelected = {
+                selected = it
+                selections.add(it)
+              },
               enabled = enabled,
           )
     }
@@ -100,7 +112,118 @@ class HospitalFieldTest {
     node(C.Tag.hospital_results).assertDoesNotExist()
     compose.runOnIdle {
       assertEquals(listOf("Other Hospital"), changes)
+      assertEquals(listOf(hospitals[1]), selections)
+      assertSame(hospitals[1], selected)
       assertEquals(1, fake.queries.size)
+    }
+  }
+
+  @Test
+  fun manualEditAfterSelectionInvalidatesHospitalIncludingEmptyInput() {
+    fake.result = HospitalSearchResult.Success(hospitals)
+    field(initial = "Geneva")
+    search()
+    compose.onAllNodesWithTag(C.Tag.hospital_result)[0].performClick()
+    compose.runOnIdle { assertSame(hospitals[0], selected) }
+    node(C.Tag.hospital_field).performTextReplacement("Home")
+    compose.runOnIdle {
+      assertNull(selected)
+      assertEquals(listOf(hospitals[0], null), selections)
+      assertEquals("Home", value)
+    }
+    node(C.Tag.hospital_field).performTextClearance()
+    compose.runOnIdle {
+      assertNull(selected)
+      assertEquals("", value)
+      assertEquals(listOf("Geneva"), fake.queries)
+    }
+  }
+
+  @Test
+  fun disabledFieldRejectsLateSearchResultsEvenAfterReenabled() = runTest {
+    val pending = CompletableDeferred<HospitalSearchResult>()
+    fake.pendingResult = pending
+    fake.ignoreCancellation = true
+    val vm = field(initial = "Geneva")
+    search()
+    node(C.Tag.hospital_loading).assertIsDisplayed()
+    compose.runOnIdle { enabled = false }
+    compose.waitForIdle()
+    pending.complete(HospitalSearchResult.Success(hospitals))
+    advanceUntilIdle()
+    node(C.Tag.hospital_field).assertIsNotEnabled().assertTextContains("Geneva")
+    assertNoLateFeedback(vm)
+    compose.runOnIdle { enabled = true }
+    assertNoLateFeedback(vm)
+  }
+
+  @Test
+  fun removedFieldRejectsLateSearchResultsAndCallbacks() = runTest {
+    val pending = CompletableDeferred<HospitalSearchResult>()
+    fake.pendingResult = pending
+    fake.ignoreCancellation = true
+    val vm = field(initial = "Geneva")
+    search()
+    node(C.Tag.hospital_loading).assertIsDisplayed()
+    compose.runOnIdle { visible = false }
+    compose.waitForIdle()
+    pending.complete(HospitalSearchResult.Success(hospitals))
+    advanceUntilIdle()
+    node(C.Tag.hospital_field).assertDoesNotExist()
+    assertNoLateFeedback(vm)
+    compose.runOnIdle { visible = true }
+    node(C.Tag.hospital_field).assertTextContains("Geneva")
+    assertNoLateFeedback(vm)
+  }
+
+  @Test
+  fun manualEditRejectsLateResultsWithoutOverwritingTextOrSelectingHospital() = runTest {
+    val pending = CompletableDeferred<HospitalSearchResult>()
+    fake.pendingResult = pending
+    fake.ignoreCancellation = true
+    val vm = field(initial = "Geneva")
+    search()
+    node(C.Tag.hospital_field).performTextReplacement("Home")
+    pending.complete(HospitalSearchResult.Success(hospitals))
+    advanceUntilIdle()
+    node(C.Tag.hospital_field).assertTextContains("Home")
+    node(C.Tag.hospital_results).assertDoesNotExist()
+    compose.runOnIdle {
+      assertEquals(HospitalFieldUiState.Idle, vm.uiState.value)
+      assertEquals(listOf("Geneva"), fake.completedQueries)
+      assertEquals(listOf("Home"), changes)
+      assertEquals(listOf<Hospital?>(null), selections)
+    }
+  }
+
+  @Test
+  fun disablingFieldCancelsCooperativePendingSearch() = runTest {
+    val pending = CompletableDeferred<HospitalSearchResult>()
+    fake.pendingResult = pending
+    val vm = field(initial = "Geneva")
+    search()
+    compose.runOnIdle { enabled = false }
+    compose.waitForIdle()
+    pending.complete(HospitalSearchResult.Success(hospitals))
+    advanceUntilIdle()
+    assertNoLateFeedback(vm)
+    compose.runOnIdle {
+      assertEquals(listOf("Geneva"), fake.cancelledQueries)
+      assertTrue(fake.completedQueries.isEmpty())
+    }
+  }
+
+  private fun assertNoLateFeedback(vm: HospitalFieldViewModel) {
+    node(C.Tag.hospital_results).assertDoesNotExist()
+    node(C.Tag.hospital_loading).assertDoesNotExist()
+    node(C.Tag.hospital_attribution).assertDoesNotExist()
+    compose.runOnIdle {
+      assertEquals(listOf("Geneva"), fake.queries)
+      if (fake.ignoreCancellation) assertEquals(listOf("Geneva"), fake.completedQueries)
+      assertEquals(HospitalFieldUiState.Idle, vm.uiState.value)
+      assertEquals("Geneva", value)
+      assertTrue(changes.isEmpty())
+      assertTrue(selections.isEmpty())
     }
   }
 
@@ -232,7 +355,7 @@ class HospitalFieldTest {
                 }
               }
       ) {
-        HospitalFieldContent("Geneva", {}, HospitalFieldUiState.Results(hospitals), {})
+        HospitalFieldContent("Geneva", {}, HospitalFieldUiState.Results(hospitals), {}, {})
       }
     }
     node(C.Tag.hospital_attribution)
@@ -244,7 +367,7 @@ class HospitalFieldTest {
   @Test
   fun statelessContentRendersLoadingEmptyErrorAndIdle() {
     var state by mutableStateOf<HospitalFieldUiState>(HospitalFieldUiState.Loading)
-    compose.setContent { HospitalFieldContent("Draft", {}, state, {}) }
+    compose.setContent { HospitalFieldContent("Draft", {}, state, {}, {}) }
     node(C.Tag.hospital_loading).assertIsDisplayed()
     node(C.Tag.hospital_search).assertIsNotEnabled()
     compose.runOnIdle { state = HospitalFieldUiState.Results(emptyList()) }
