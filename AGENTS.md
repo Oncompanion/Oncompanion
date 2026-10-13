@@ -41,6 +41,8 @@ com.github.se.oncompanion/
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
   - No Firebase calls from composables.
+  - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
+    - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
   - Screens receive callbacks (`onBack`, `onSaved`...) or a `NavigationActions`, never the `NavController`.
   - A screen opened from another screen has a back arrow in its top bar (`onBack = navigationActions::goBack`).
@@ -83,6 +85,7 @@ com.github.se.oncompanion/
 - Where tests go:
   - Unit and Robolectric tests in `app/src/test`; instrumented Kaspresso/Compose and emulator tests in `app/src/androidTest`.
   - One fake per repository, shared by every test: `app/src/test/.../model/<feature>/Fake<Name>Repository.kt`. Reuse it rather than writing a local one.
+- A screen with text fields gets a test with the keyboard open, in portrait and landscape (`showKeyboard` and `LANDSCAPE_PHONE` in `app/src/test/.../ui/KeyboardInsets.kt`).
 - Coroutines: use `StandardTestDispatcher` with `runTest` and virtual time (`advanceTimeBy`, `advanceUntilIdle`). Never `Thread.sleep` or real delays.
 - While working, run only the tests you touch (`./gradlew testDebugUnitTest --tests '*Symptom*'`). The full checks below take about 10 minutes; run them before pushing.
 

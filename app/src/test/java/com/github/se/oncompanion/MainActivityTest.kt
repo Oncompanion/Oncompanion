@@ -3,6 +3,7 @@
 package com.github.se.oncompanion
 
 import android.content.ComponentName
+import android.view.WindowManager
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -49,5 +50,14 @@ class MainActivityTest {
             0,
         )
     assertEquals(R.style.Theme_oncompanion_Starting, info.theme)
+  }
+
+  @Test
+  fun mainActivity_resizesForTheKeyboardInsteadOfSlidingTheWindowUp() {
+    val softInputMode = composeTestRule.activity.window.attributes.softInputMode
+    assertEquals(
+        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+        softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST,
+    )
   }
 }

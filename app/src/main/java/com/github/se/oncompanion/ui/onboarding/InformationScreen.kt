@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -94,15 +95,18 @@ fun InformationContent(
   val firstNameMissing = firstNameEdited && uiState.firstName.isBlank()
 
   Scaffold(
-      modifier = modifier.testTag(C.Tag.onboarding_information_screen),
+      // Ends the screen at the keyboard (the activity is adjustResize): Continue can be scrolled to
+      modifier = modifier.testTag(C.Tag.onboarding_information_screen).imePadding(),
       snackbarHost = { SnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     Column(
         modifier =
             Modifier.fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                // The margins scroll with the content: fixed ones would take half of the height
+                // left above the keyboard on a small phone held sideways
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
     ) {
       // Title and subtitle
       Text(
