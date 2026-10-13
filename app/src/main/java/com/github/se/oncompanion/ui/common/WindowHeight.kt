@@ -7,7 +7,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 
-/** Material's limit for a "compact" window height: under it, a phone is held sideways. */
+/**
+ * Material's limit for a "compact" window height: under it, a phone is held sideways. Same value as
+ * `WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND` in `androidx.window:window-core`.
+ */
 private val COMPACT_HEIGHT = 480.dp
 
 /**
