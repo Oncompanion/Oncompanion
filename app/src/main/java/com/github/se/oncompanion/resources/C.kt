@@ -202,5 +202,15 @@ object C {
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
+
+    // Prescription scan
+    const val prescription_scan_screen = "prescription_scan_screen"
+    const val prescription_scan_close_button = "prescription_scan_close_button"
+    const val prescription_scan_permission_pending = "prescription_scan_permission_pending"
+    const val prescription_scan_viewfinder = "prescription_scan_viewfinder"
+    const val prescription_scan_camera_starting = "prescription_scan_camera_starting"
+    const val prescription_scan_camera_off = "prescription_scan_camera_off"
+    const val prescription_scan_enter_manually_button = "prescription_scan_enter_manually_button"
+    const val prescription_scan_open_settings_button = "prescription_scan_open_settings_button"
   }
 }
