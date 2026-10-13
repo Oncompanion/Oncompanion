@@ -74,19 +74,17 @@ import java.time.ZoneId
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startRoute: String = Route.AUTH,
-    planningRepository: PlanningRepository? = null,
     careCircleRepository: CareCircleRepository = remember { CareCircleRepositoryFirestore() },
     eventRepository: EventRepository = remember { EventRepositoryFirestore() },
     authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
+    appointmentRepository: AppointmentRepository = remember { AppointmentRepositoryFirestore() },
+    planningRepository: PlanningRepository =
+        remember(appointmentRepository, authRepository) {
+          AppointmentPlanningSource(appointmentRepository, authRepository)
+        },
     profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
-    appointmentRepository: AppointmentRepository = remember { AppointmentRepositoryFirestore() },
 ) {
-  val resolvedPlanningRepository =
-      planningRepository
-          ?: remember(appointmentRepository, authRepository) {
-            AppointmentPlanningSource(appointmentRepository, authRepository)
-          }
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
   NavHost(navController = navController, startDestination = startRoute) {
@@ -130,7 +128,7 @@ fun AppNavHost(
       composable(Screen.PLANNING) {
         val planningViewModel: PlanningViewModel = viewModel {
           PlanningViewModel(
-              resolvedPlanningRepository,
+              planningRepository,
               Clock.systemDefaultZone(),
               ZoneId.systemDefault(),
               createSavedStateHandle(),
