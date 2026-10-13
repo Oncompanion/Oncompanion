@@ -6,10 +6,10 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.MedicationRepository
-import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import java.time.Clock
 import java.time.LocalDate
@@ -57,8 +57,9 @@ data class PrescriptionsUiState(
  * @param clock the current date, which decides what counts as "This month"
  */
 class PrescriptionsViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val medicationRepository: MedicationRepository = MedicationRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val medicationRepository: MedicationRepository =
+        MedicationRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 

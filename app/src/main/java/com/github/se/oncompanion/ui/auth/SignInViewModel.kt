@@ -5,11 +5,11 @@ package com.github.se.oncompanion.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.auth.isNetworkError
 import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,8 +50,8 @@ data class SignInUiState(
 
 /** Signs the user in with Google (US-1, US-2). */
 class SignInViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(SignInUiState())
