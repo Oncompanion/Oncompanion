@@ -30,9 +30,9 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepository
@@ -82,6 +82,7 @@ class AppNavHostTest {
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
   private val appAuthRepository = AuthRepositoryProvider.repository
+  private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appMedicationRepository = MedicationRepositoryProvider.repository
 
   @After
@@ -90,6 +91,7 @@ class AppNavHostTest {
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     EventRepositoryProvider.repository = appEventRepository
     AuthRepositoryProvider.repository = appAuthRepository
+    AppointmentRepositoryProvider.repository = appAppointmentRepository
     MedicationRepositoryProvider.repository = appMedicationRepository
   }
 
@@ -711,9 +713,9 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 
-  /** Verifies the production Planning source reaches the screen through its provider. */
+  /** Verifies the default Planning source reads the appointment and auth providers. */
   @Test
-  fun planningShowsTheAppointmentsOfItsProvidersSource() {
+  fun defaultPlanningSourceUsesTheAppointmentAndAuthProviders() {
     val auth = FakeAuthRepository()
     runTest { auth.signInWithGoogle("planning-owner") }
     val appointments = FakeAppointmentRepository()
@@ -726,11 +728,9 @@ class AppNavHostTest {
             type = AppointmentType.CONSULTATION,
         ),
     )
-    setNavHost(
-        Route.PLANNING,
-        planningRepository = AppointmentPlanningSource(appointments, auth),
-        authRepository = auth,
-    )
+    AppointmentRepositoryProvider.repository = appointments
+    // The planning provider keeps its default, so the appointment can only come through it
+    setNavHost(Route.PLANNING, planningRepository = appPlanningRepository, authRepository = auth)
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
   }

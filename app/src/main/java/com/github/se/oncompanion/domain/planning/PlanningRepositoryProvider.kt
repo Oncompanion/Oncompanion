@@ -13,10 +13,15 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
  * It lives here and not next to the interface because its default is built in this layer.
  */
 object PlanningRepositoryProvider {
-  /** The signed-in patient's appointments by default, read through the app's repositories. */
-  var repository: PlanningRepository =
-      AppointmentPlanningSource(
-          AppointmentRepositoryProvider.repository,
-          AuthRepositoryProvider.repository,
-      )
+  /**
+   * The signed-in patient's appointments by default. The appointment and auth providers are read on
+   * each observation, so replacing them also reaches Planning.
+   */
+  var repository: PlanningRepository = PlanningRepository { range ->
+    AppointmentPlanningSource(
+            AppointmentRepositoryProvider.repository,
+            AuthRepositoryProvider.repository,
+        )
+        .observeItems(range)
+  }
 }
