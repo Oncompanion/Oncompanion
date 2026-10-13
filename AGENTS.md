@@ -49,6 +49,16 @@ com.github.se.oncompanion/
 
 ## Code style
 
+- **AI acknowledgment (required by the course)**: an AI that writes code is a contributor, so credit it at the top of the file, above `package`, with one `Co-authored-by` line per AI. This applies to every source file (Kotlin, Gradle scripts, `firestore.rules`, workflows; `#` instead of `//` in YAML). A missing line counts as plagiarism.
+  - Template: `// Co-authored-by: <AI name> <contact email, if any>`
+  - When you create a file, or change one with an AI that isn't credited yet, add its line. Examples:
+    ```kotlin
+    // Co-authored-by: Claude Code <noreply@anthropic.com>
+    // Co-authored-by: ChatGPT <noreply@openai.com>
+    // Co-authored-by: GitHub Copilot <copilot@github.com>
+
+    package com.github.se.oncompanion
+    ```
 - KDoc on every public class and function: what it does and why, not how.
 - A short one-line comment above each non-obvious block (what this part of the screen or function does), so reviewers can find their way quickly. No comments that repeat the code.
 - All user-visible text goes in `res/values/strings.xml`, in English. Escape apostrophes: `Couldn\'t`.

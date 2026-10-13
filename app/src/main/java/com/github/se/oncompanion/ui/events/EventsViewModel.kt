@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.ui.events
 
 import android.util.Log

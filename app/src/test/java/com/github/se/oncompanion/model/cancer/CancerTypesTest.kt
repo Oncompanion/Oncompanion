@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.cancer
 
 import org.junit.Assert.assertEquals
