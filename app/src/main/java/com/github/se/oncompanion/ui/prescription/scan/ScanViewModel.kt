@@ -42,37 +42,45 @@ enum class CameraStatus {
  *   isn't shown again (e.g. after the phone is rotated)
  * @property camera whether the camera is on
  * @property isCapturing a photo is being taken
- * @property photoTaken a photo was just taken (message to show once)
+ * @property photo the photo just taken, shown so the user checks it before it's used; `null` while
+ *   the camera is shown
  * @property captureFailed the last photo couldn't be taken (message to show once)
+ * @property readingComingSoon the user chose to use the photo, but reading prescriptions doesn't
+ *   exist yet (message to show once, with a way to enter the prescription manually)
  */
 data class ScanUiState(
     val permission: CameraPermission = CameraPermission.UNKNOWN,
     val permissionRequested: Boolean = false,
     val camera: CameraStatus = CameraStatus.STARTING,
     val isCapturing: Boolean = false,
-    val photoTaken: Boolean = false,
+    val photo: File? = null,
     val captureFailed: Boolean = false,
+    val readingComingSoon: Boolean = false,
 ) {
-  /** A photo can be taken: the camera is allowed and on, and no photo is being taken. */
+  /**
+   * A photo can be taken: the camera is allowed and on, no photo is being taken, and the last one
+   * isn't being checked.
+   */
   val canCapture: Boolean
-    get() = permission == CameraPermission.GRANTED && camera == CameraStatus.READY && !isCapturing
+    get() =
+        permission == CameraPermission.GRANTED &&
+            camera == CameraStatus.READY &&
+            !isCapturing &&
+            photo == null
 }
 
 /**
  * State of the prescription scan screen (US-10, #61). It has no Android `Context`: the screen
  * checks the permission and drives the camera, and reports here.
  *
- * The photo of a prescription is a medical document: there is at most one, in [photoStore], and it
- * is deleted when the screen is closed or destroyed. Photos left by an earlier scan (e.g. the app
- * was killed) are deleted when the screen opens.
+ * The photo of a prescription is a medical document: there is at most one, in [photoStore], shown
+ * for the user to check, and it is deleted on Retake and when the screen is closed or destroyed.
+ * Photos left by an earlier scan (e.g. the app was killed) are deleted when the screen opens.
  */
 class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
 
   private val _uiState = MutableStateFlow(ScanUiState())
   val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
-
-  /** The photo taken on this screen, if any. */
-  private var photo: File? = null
 
   /** The user closed the screen: a photo that finishes after that must not be kept. */
   private var closed = false
@@ -121,7 +129,7 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
   fun capture(takePhoto: suspend (File) -> Unit) {
     if (!_uiState.value.canCapture) return
     val file = photoStore.newPhotoFile()
-    _uiState.update { it.copy(isCapturing = true, photoTaken = false, captureFailed = false) }
+    _uiState.update { it.copy(isCapturing = true, captureFailed = false) }
     viewModelScope.launch {
       try {
         takePhoto(file)
@@ -131,10 +139,8 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
           _uiState.update { it.copy(isCapturing = false) }
           return@launch
         }
-        // Only one photo at a time: the new one replaces the previous one
-        photo?.let(photoStore::delete)
-        photo = file
-        _uiState.update { it.copy(isCapturing = false, photoTaken = true) }
+        // Shown to the user to check before it's used
+        _uiState.update { it.copy(isCapturing = false, photo = file) }
       } catch (e: CancellationException) {
         photoStore.delete(file)
         throw e
@@ -148,7 +154,23 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
 
   /** The message about the last photo has been shown. */
   fun onMessageShown() {
-    _uiState.update { it.copy(photoTaken = false, captureFailed = false) }
+    _uiState.update { it.copy(captureFailed = false, readingComingSoon = false) }
+  }
+
+  /**
+   * The user wants to use the photo. Reading the prescription (#62) doesn't exist yet: until then,
+   * the photo is deleted, the camera is shown again and the user is told it's coming soon, with
+   * manual entry as the way forward.
+   */
+  fun usePhoto() {
+    if (_uiState.value.photo == null) return
+    deletePhoto()
+    _uiState.update { it.copy(readingComingSoon = true) }
+  }
+
+  /** The photo isn't good enough: it's deleted and the camera is shown again. */
+  fun retake() {
+    deletePhoto()
   }
 
   /**
@@ -165,9 +187,10 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
     deletePhoto()
   }
 
+  // There is at most one photo: the one being checked
   private fun deletePhoto() {
-    photo?.let(photoStore::delete)
-    photo = null
+    _uiState.value.photo?.let(photoStore::delete)
+    _uiState.update { it.copy(photo = null) }
   }
 
   private companion object {

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
@@ -15,6 +16,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,15 +33,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -47,11 +53,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -71,7 +81,11 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Scan a paper prescription with the camera (US-10, Figma "US-10 / Prescription scan"). The camera
@@ -163,6 +177,8 @@ fun ScanScreen(
       onOpenSettings = { context.startActivity(appSettingsIntent(context)) },
       onCapture = { viewModel.capture { file -> camera.takePhoto(context, file) } },
       onMessageShown = viewModel::onMessageShown,
+      onRetake = viewModel::retake,
+      onUsePhoto = viewModel::usePhoto,
       viewfinder = { camera.Viewfinder(it) },
       modifier = modifier,
   )
@@ -181,8 +197,12 @@ private fun scanViewModel(): ScanViewModel {
  * @param onOpenSettings opens this app's page in the phone's settings, where the camera can be
  *   allowed after it was refused
  * @param onCapture takes a photo
- * @param onMessageShown called once the message about the last photo is gone
+ * @param onMessageShown called once the message about the failed photo is gone
+ * @param onRetake deletes the photo being checked and shows the camera again
+ * @param onUsePhoto uses the photo being checked
  * @param viewfinder what the camera sees
+ * @param photoDispatcher where the photo is read for the preview, off the main thread; tests pass
+ *   their own to control when it's read
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -194,20 +214,31 @@ fun ScanContent(
     modifier: Modifier = Modifier,
     onCapture: () -> Unit = {},
     onMessageShown: () -> Unit = {},
+    onRetake: () -> Unit = {},
+    onUsePhoto: () -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
+    photoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
   // One message at a time about the last photo, then the view model forgets it
   val snackbarHostState = remember { SnackbarHostState() }
-  val photoTaken = stringResource(R.string.prescription_scan_photo_taken)
   val captureFailed = stringResource(R.string.prescription_scan_capture_failed)
-  LaunchedEffect(uiState.photoTaken, uiState.captureFailed) {
-    val message =
-        when {
-          uiState.photoTaken -> photoTaken
-          uiState.captureFailed -> captureFailed
-          else -> return@LaunchedEffect
-        }
-    snackbarHostState.showSnackbar(message)
+  val readingComingSoon = stringResource(R.string.prescription_scan_reading_coming_soon)
+  val enterManually = stringResource(R.string.prescription_scan_enter_manually)
+  LaunchedEffect(uiState.captureFailed, uiState.readingComingSoon) {
+    when {
+      uiState.captureFailed -> snackbarHostState.showSnackbar(captureFailed)
+      // Until prescriptions can be read, manual entry is the way forward (US-24)
+      uiState.readingComingSoon -> {
+        val result =
+            snackbarHostState.showSnackbar(
+                readingComingSoon,
+                actionLabel = enterManually,
+                duration = SnackbarDuration.Long,
+            )
+        if (result == SnackbarResult.ActionPerformed) onEnterManually()
+      }
+      else -> return@LaunchedEffect
+    }
     onMessageShown()
   }
 
@@ -224,7 +255,14 @@ fun ScanContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
           TopAppBar(
-              title = { Text(stringResource(R.string.prescription_scan_title)) },
+              title = {
+                Text(
+                    stringResource(
+                        if (uiState.photo != null) R.string.prescription_scan_check_title
+                        else R.string.prescription_scan_title
+                    )
+                )
+              },
               navigationIcon = {
                 IconButton(
                     onClick = onBack,
@@ -266,6 +304,8 @@ fun ScanContent(
                 R.string.prescription_scan_camera_unavailable_title,
                 R.string.prescription_scan_camera_unavailable_explanation,
             )
+        uiState.photo != null ->
+            PhotoPreview(uiState.photo, onRetake, onUsePhoto, photoDispatcher, content)
         else -> CameraView(uiState, onCapture, viewfinder, content)
       }
     }
@@ -362,6 +402,114 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
     }
   }
 }
+
+/**
+ * The photo just taken, so the user checks it is sharp and complete before it's used (Figma "US-10
+ * / Scan – Photo preview").
+ */
+@Composable
+private fun PhotoPreview(
+    photo: File,
+    onRetake: () -> Unit,
+    onUsePhoto: () -> Unit,
+    photoDispatcher: CoroutineDispatcher,
+    modifier: Modifier,
+) {
+  Column(
+      modifier = modifier.testTag(C.Tag.prescription_scan_photo_preview),
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Box(Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+      when (val image = rememberPhoto(photo, photoDispatcher)) {
+        PhotoImage.Loading -> CircularProgressIndicator()
+        PhotoImage.Unreadable ->
+            Text(
+                text = stringResource(R.string.prescription_scan_photo_unreadable),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.testTag(C.Tag.prescription_scan_photo_unreadable),
+            )
+        is PhotoImage.Loaded ->
+            Image(
+                bitmap = image.bitmap,
+                contentDescription = stringResource(R.string.prescription_scan_photo_description),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().testTag(C.Tag.prescription_scan_photo),
+            )
+      }
+    }
+    Text(
+        text = stringResource(R.string.prescription_scan_check_hint),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    // "Use this photo" first, as in the mockup: it's the expected next step
+    Button(
+        onClick = onUsePhoto,
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                .testTag(C.Tag.prescription_scan_use_photo_button),
+    ) {
+      Text(stringResource(R.string.prescription_scan_use_photo))
+    }
+    OutlinedButton(
+        onClick = onRetake,
+        modifier =
+            Modifier.fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(16.dp)
+                .testTag(C.Tag.prescription_scan_retake_button),
+    ) {
+      Text(stringResource(R.string.prescription_scan_retake))
+    }
+  }
+}
+
+/** The photo as shown on screen: being read, impossible to read, or ready. */
+private sealed interface PhotoImage {
+  data object Loading : PhotoImage
+
+  data object Unreadable : PhotoImage
+
+  data class Loaded(val bitmap: ImageBitmap) : PhotoImage
+}
+
+/**
+ * Reads [photo] on [dispatcher], outside the main thread, so the screen doesn't freeze on a
+ * 12-megapixel photo. `ImageDecoder` turns it the right way up (portrait photos are saved sideways
+ * with an orientation tag) and shrinks it to the screen: the full-size photo isn't needed to check
+ * it.
+ */
+@Composable
+private fun rememberPhoto(photo: File, dispatcher: CoroutineDispatcher): PhotoImage =
+    produceState<PhotoImage>(PhotoImage.Loading, photo, dispatcher) {
+          value =
+              withContext(dispatcher) {
+                try {
+                  val source = ImageDecoder.createSource(photo)
+                  val bitmap =
+                      ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                        val scale = MAX_PREVIEW_SIZE / maxOf(info.size.width, info.size.height)
+                        if (scale < 1f) {
+                          decoder.setTargetSize(
+                              (info.size.width * scale).toInt(),
+                              (info.size.height * scale).toInt(),
+                          )
+                        }
+                      }
+                  PhotoImage.Loaded(bitmap.asImageBitmap())
+                } catch (e: CancellationException) {
+                  throw e
+                } catch (e: Exception) {
+                  Log.w(TAG, "Couldn't read the photo", e)
+                  PhotoImage.Unreadable
+                }
+              }
+        }
+        .value
+
+/** Longest side of the photo on screen, in pixels: enough to check it, light enough to load. */
+private const val MAX_PREVIEW_SIZE = 2048f
 
 /** The camera can't be used (refused, or no camera): why, and that the photo stays on the phone. */
 @Composable

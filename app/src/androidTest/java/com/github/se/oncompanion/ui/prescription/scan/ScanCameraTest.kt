@@ -9,17 +9,16 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
 import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -70,7 +69,7 @@ class ScanCameraTest {
           .isNotEmpty()
 
   @Test
-  fun takesARealPhoto_andDeletesItWhenTheScreenIsClosed() {
+  fun realPhoto_isShown_deletedOnRetake_andDeletedOnClose() {
     var closed = false
     compose.setContent { ScanScreen(onEnterManually = {}, onBack = { closed = true }) }
 
@@ -80,12 +79,24 @@ class ScanCameraTest {
     assumeFalse("the camera can't be turned on on this device", cameraUnavailable())
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
 
-    // The photo is finished ("Photo taken"), and it's a real JPEG in the scans folder of the cache
-    val photoTaken = context.getString(R.string.prescription_scan_photo_taken)
-    waitUntil { compose.onAllNodesWithText(photoTaken).fetchSemanticsNodes().isNotEmpty() }
-    val photo = photosOnDisk.single()
-    assertArrayEquals(JPEG_START, photo.readBytes().copyOf(2))
+    // The real photo is shown to be checked: a real JPEG in the scans folder of the cache
+    waitUntil {
+      compose.onAllNodesWithTag(C.Tag.prescription_scan_photo).fetchSemanticsNodes().isNotEmpty()
+    }
+    val first = photosOnDisk.single()
+    assertArrayEquals(JPEG_START, first.readBytes().copyOf(2))
 
+    // Retake deletes it and turns the camera back on
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
+    waitUntil { cameraReady() }
+    assertFalse(first.exists())
+
+    // A second photo, then closing the screen deletes it too
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    waitUntil {
+      compose.onAllNodesWithTag(C.Tag.prescription_scan_photo).fetchSemanticsNodes().isNotEmpty()
+    }
+    assertEquals(1, photosOnDisk.size)
     compose.onNodeWithTag(C.Tag.prescription_scan_close_button).performClick()
     compose.waitForIdle()
 

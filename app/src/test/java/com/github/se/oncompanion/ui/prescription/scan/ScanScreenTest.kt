@@ -264,9 +264,44 @@ class ScanScreenTest {
 
     assertEquals(photosOnDisk, camera.photos)
     assertEquals(1, photosOnDisk.size)
+    // The photo is shown to be checked, instead of the camera
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo_preview).assertIsDisplayed()
+  }
+
+  @Test
+  fun retake_deletesThePhoto_andShowsTheCameraAgain() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
+    compose.waitForIdle()
+
+    assertTrue(photosOnDisk.isEmpty())
+    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsDisplayed()
+  }
+
+  @Test
+  fun usePhoto_deletesIt_andOffersManualEntry() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitForIdle()
+
+    assertTrue(photosOnDisk.isEmpty())
     compose
-        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_photo_taken))
+        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_reading_coming_soon))
         .assertIsDisplayed()
+    compose
+        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_enter_manually))
+        .performClick()
+    compose.waitForIdle()
+    assertEquals(1, manualEntries)
   }
 
   @Test
