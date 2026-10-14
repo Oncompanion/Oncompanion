@@ -6,7 +6,9 @@ package com.github.se.oncompanion.ui.planning
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -49,11 +51,11 @@ data class PlanningUiState(
 
 /** Owns calendar selection; presentation and date labels belong to the view. */
 class PlanningViewModel(
-    private val repository: PlanningRepository,
-    private val clock: Clock,
-    val zoneId: ZoneId,
+    private val repository: PlanningRepository = PlanningRepositoryProvider.repository,
+    private val clock: Clock = Clock.systemDefaultZone(),
+    val zoneId: ZoneId = ZoneId.systemDefault(),
     private val savedStateHandle: SavedStateHandle,
-    private val authRepository: AuthRepository? = null,
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
   private val initialDate =
@@ -68,17 +70,13 @@ class PlanningViewModel(
 
   init {
     savedStateHandle[SELECTED_DATE] = initialDate.toString()
-    if (authRepository == null) {
-      observeWeek()
-    } else {
-      // Session observation must survive an agenda read failure to clear the previous patient.
-      viewModelScope.launch {
-        authRepository
-            .observeCurrentUser()
-            .map { it?.uid }
-            .distinctUntilChanged()
-            .collect { observeWeek() }
-      }
+    // Session observation must survive an agenda read failure to clear the previous patient.
+    viewModelScope.launch {
+      authRepository
+          .observeCurrentUser()
+          .map { it?.uid }
+          .distinctUntilChanged()
+          .collect { observeWeek() }
     }
   }
 

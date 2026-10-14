@@ -16,8 +16,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -45,11 +43,11 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
+import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
-import java.time.Clock
-import java.time.ZoneId
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -107,13 +105,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) {
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(
-              PlanningRepositoryProvider.repository,
-              Clock.systemDefaultZone(),
-              ZoneId.systemDefault(),
-              createSavedStateHandle(),
-              AuthRepositoryProvider.repository,
-          )
+          PlanningViewModel(savedStateHandle = createSavedStateHandle())
         }
         PlanningScreen(navigationActions, planningViewModel)
       }
@@ -147,6 +139,14 @@ fun AppNavHost(
             navigationActions = navigationActions,
             // Scoped to this back stack entry, so each opened symptom has its own ViewModel
             viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+        )
+      }
+      composable(Screen.SYMPTOM_ADD) {
+        // Saving returns to the journal, where the new entry is at the top
+        AddSymptomScreen(
+            viewModel = viewModel { AddSymptomViewModel() },
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
         )
       }
     }
