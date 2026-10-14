@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.requestFocus
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -35,7 +36,11 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsAboveKeyboard
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.showKeyboard
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -46,6 +51,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionFormScreenTest {
@@ -514,6 +520,55 @@ class PrescriptionFormScreenTest {
     setContent(filled.copy(error = PrescriptionFormError.NOT_SIGNED_IN))
 
     waitForText(string(R.string.prescription_form_error_not_signed_in))
+  }
+
+  // ---------- Keyboard ----------
+
+  @Test
+  fun keyboardOpenOnDurationKeepsTheFieldAndSaveAboveIt() {
+    setContent(filled)
+    val keyboardHeight = 600
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).performClick()
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    val save = composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button)
+    save.assertIsAboveKeyboard(keyboardHeight)
+    // The field being typed is scrolled into what is left between the top bar and Save
+    val saveTop = save.fetchSemanticsNode().boundsInRoot.top
+    val duration = composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field)
+    assertTrue(duration.fetchSemanticsNode().boundsInRoot.bottom <= saveTop)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscapeKeyboardOpenOnDurationKeepsTheWholeFieldVisible() {
+    setContent(filled)
+    val keyboardHeight = 500
+    val duration = composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field)
+
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    duration.performScrollTo().requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    duration.performScrollTo().assertIsFullyVisible()
+    duration.assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscapeKeyboardOpenSaveAndCloseCanBeScrolledTo() {
+    setContent(filled)
+    val keyboardHeight = 500
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    val save = composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button)
+    save.performScrollTo().assertIsFullyVisible()
+    save.assertIsAboveKeyboard(keyboardHeight)
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_close_button)
+        .performScrollTo()
+        .assertIsFullyVisible()
   }
 
   // ---------- PrescriptionFormScreen ----------

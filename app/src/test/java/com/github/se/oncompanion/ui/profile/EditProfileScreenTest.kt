@@ -21,14 +21,19 @@ import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsAboveKeyboard
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
+import com.github.se.oncompanion.ui.showKeyboard
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class EditProfileScreenTest {
@@ -144,6 +149,39 @@ class EditProfileScreenTest {
     node(C.Tag.edit_profile_cancel).performScrollTo().performClick()
     compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
     compose.runOnIdle { assertEquals(3, backs) }
+  }
+
+  @Test
+  fun keyboardOpenSaveAndCancelCanBeScrolledAboveIt() {
+    content()
+    val keyboardHeight = 600
+    compose.showKeyboard(keyboardHeight)
+    node(C.Tag.edit_profile_save).performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.edit_profile_cancel).performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscapeKeyboardOpenKeepsTheTypedFieldAndTheWayBackReachable() {
+    content()
+    val keyboardHeight = 500
+
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    node(C.Tag.edit_profile_family_name).performScrollTo().requestFocus()
+    compose.showKeyboard(keyboardHeight)
+
+    node(C.Tag.edit_profile_family_name).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.edit_profile_family_name).assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.edit_profile_back).performScrollTo().assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscapeKeepsTheBackArrowWhenTheFormIsNotShown() {
+    content(EditProfileUiState(EditProfileStatus.ERROR))
+
+    node(C.Tag.edit_profile_back).assertIsDisplayed().performClick()
+    assertEquals(1, backs)
   }
 
   private fun model(): Pair<EditProfileViewModel, FakeUserProfileRepository> {

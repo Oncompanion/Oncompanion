@@ -66,6 +66,32 @@ proxy that enforces the aggregate limit, caches requests and can switch its upst
 without an app update, as the policy requires. Proxy deployment/configuration is outside #142;
 the repository is not yet wired into production. No profile fields, Firestore rules, hospital
 field UI (#143), or profile integration (#144) are added.
+
+## Reusable hospital field (issue #143)
+
+`ui/common/HospitalField` is an outlined free-text location field with an explicit Search button.
+The form owns its text and structured selection. `onValueChange(String)` supports unrestricted
+manual entry. Selecting a result sends its name through `onValueChange`, then the complete existing
+`Hospital` through `onHospitalSelected(Hospital?)`. Manual edits send `null` before the text callback
+so the parent clears any previous structured selection, including for empty or unmatched text.
+Parents also clear their selection when changing text externally and decide which hospital details
+to persist. Search outcomes never replace text or emit a selection. `HospitalFieldContent` renders
+idle, loading, results, empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
+receives a `HospitalRepository`; each field needs its own lifecycle-scoped ViewModel and a stable
+repository instance. It never checks connectivity before searching, so repository cache hits
+remain available offline. Cache misses report a short error while manual entry stays usable.
+
+Editing, external text changes, disabling or removing the field cancels obsolete requests and
+clears feedback. A generation check discards late responses. Successful lookups show linked
+OpenStreetMap attribution, including empty and cached results. The field has no screen-specific
+navigation, patient data or persistence; Profile (#144) and Add Appointment integration remain
+separate tasks. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
+from #142 still applies.
+
+The overview and Account/Appointment diagrams show the reusable HospitalField →
+HospitalFieldViewModel → HospitalRepository path. Connections from Edit Profile and Add
+Appointment remain planned; no screen integration is introduced by #143.
+
 ## Feature diagrams
 
 `ResolveCareCircleAccess` is drawn in the Care circle diagram. The other diagrams show it as one planned box, linked to every screen that shows patient data.

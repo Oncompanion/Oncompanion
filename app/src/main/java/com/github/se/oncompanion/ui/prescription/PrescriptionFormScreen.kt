@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,6 +64,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -142,102 +146,112 @@ fun PrescriptionFormContent(
     }
   }
 
+  // A short screen (a phone held sideways) keeps nothing fixed: with the keyboard open, a fixed
+  // top bar and Save would leave no room for the field being typed
+  val scrollsEverything = isCompactHeight()
+
   Scaffold(
-      modifier = modifier.testTag(C.Tag.prescription_form_screen),
-      topBar = {
-        TopAppBar(
-            title = { Text(stringResource(R.string.prescription_form_add_title)) },
-            navigationIcon = {
-              // Not while saving or once saved: the form then leaves by itself, and a second way
-              // out would go back twice
-              IconButton(
-                  onClick = onClose,
-                  enabled = !uiState.isSaving && !uiState.isSaved,
-                  modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
-              ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.prescription_form_close),
-                )
-              }
-            },
-        )
-      },
+      // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
+      modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
+      topBar = { if (!scrollsEverything) FormTopBar(uiState, onClose) },
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
-      bottomBar = {
-        SaveButton(
-            text = stringResource(R.string.prescription_form_save),
-            enabled = uiState.canSave,
-            isSaving = uiState.isSaving,
-            onClick = onSave,
-            testTag = C.Tag.prescription_form_save_button,
-            savingTestTag = C.Tag.prescription_form_saving,
-        )
-      },
+      bottomBar = { if (!scrollsEverything) FormSaveButton(uiState, onSave) },
   ) { innerPadding ->
     Column(
         modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
     ) {
-      // What the medications share: the doctor (optional) and the date of the prescription
-      OutlinedTextField(
-          value = uiState.draft.prescribedBy,
-          onValueChange = onPrescribedByChange,
-          label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
-          singleLine = true,
-          keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
-      )
-      DateField(
-          label = stringResource(R.string.prescription_form_date),
-          date = uiState.draft.prescribedOn,
-          onDateChange = onPrescribedOnChange,
-          testTag = C.Tag.prescription_form_date_field,
-      )
+      // The Scaffold already keeps the content clear of the status bar
+      if (scrollsEverything) FormTopBar(uiState, onClose, WindowInsets(0))
+      Column(
+          modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+          verticalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        // What the medications share: the doctor (optional) and the date of the prescription
+        OutlinedTextField(
+            value = uiState.draft.prescribedBy,
+            onValueChange = onPrescribedByChange,
+            label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
+            singleLine = true,
+            keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
+        )
+        DateField(
+            label = stringResource(R.string.prescription_form_date),
+            date = uiState.draft.prescribedOn,
+            onDateChange = onPrescribedOnChange,
+            testTag = C.Tag.prescription_form_date_field,
+        )
 
-      // The medications in order: the open one with its fields, the others as one row each
-      val invalidMedications = uiState.invalidMedications
-      uiState.draft.medications.forEachIndexed { position, medication ->
-        if (position == uiState.openMedication) {
-          OpenMedication(
-              number = position + 1,
-              medication = medication,
-              // A state without a flag for this medication counts its name as touched
-              nameTouched = uiState.nameTouched.getOrElse(position) { true },
-              canRemove = uiState.canRemoveMedication,
-              onNameChange = onMedicationNameChange,
-              onDosageChange = onDosageChange,
-              onFrequencyChange = onFrequencyChange,
-              onStartDateChange = onStartDateChange,
-              onDurationChange = onDurationChange,
-              onRemove = { onRemoveMedication(position) },
-          )
-        } else {
-          ClosedMedication(
-              position = position,
-              medication = medication,
-              blocksSave = position in invalidMedications,
-              onEdit = { onOpenMedication(position) },
-          )
+        // The medications in order: the open one with its fields, the others as one row each
+        val invalidMedications = uiState.invalidMedications
+        uiState.draft.medications.forEachIndexed { position, medication ->
+          if (position == uiState.openMedication) {
+            OpenMedication(
+                number = position + 1,
+                medication = medication,
+                // A state without a flag for this medication counts its name as touched
+                nameTouched = uiState.nameTouched.getOrElse(position) { true },
+                canRemove = uiState.canRemoveMedication,
+                onNameChange = onMedicationNameChange,
+                onDosageChange = onDosageChange,
+                onFrequencyChange = onFrequencyChange,
+                onStartDateChange = onStartDateChange,
+                onDurationChange = onDurationChange,
+                onRemove = { onRemoveMedication(position) },
+            )
+          } else {
+            ClosedMedication(
+                position = position,
+                medication = medication,
+                blocksSave = position in invalidMedications,
+                onEdit = { onOpenMedication(position) },
+            )
+          }
+        }
+
+        TextButton(
+            onClick = onAddMedication,
+            enabled = uiState.canAddMedication,
+            modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
+        ) {
+          Icon(Icons.Default.Add, contentDescription = null)
+          Spacer(Modifier.width(8.dp))
+          Text(stringResource(R.string.prescription_form_add_medication))
         }
       }
-
-      TextButton(
-          onClick = onAddMedication,
-          enabled = uiState.canAddMedication,
-          modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
-      ) {
-        Icon(Icons.Default.Add, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.prescription_form_add_medication))
-      }
+      if (scrollsEverything) FormSaveButton(uiState, onSave)
     }
   }
+}
+
+/** The title and the button that leaves the form without saving. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormTopBar(
+    uiState: PrescriptionFormUiState,
+    onClose: () -> Unit,
+    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
+) {
+  TopAppBar(
+      title = { Text(stringResource(R.string.prescription_form_add_title)) },
+      navigationIcon = {
+        // Not while saving or once saved: the form then leaves by itself, and a second way
+        // out would go back twice
+        IconButton(
+            onClick = onClose,
+            enabled = !uiState.isSaving && !uiState.isSaved,
+            modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
+        ) {
+          Icon(
+              imageVector = Icons.Default.Close,
+              contentDescription = stringResource(R.string.prescription_form_close),
+          )
+        }
+      },
+      windowInsets = windowInsets,
+  )
 }
 
 /** The fields of the medication being edited, under its title ("Medication 2"). */
@@ -447,6 +461,21 @@ private fun DateField(
             ),
     )
   }
+}
+
+/**
+ * Save, enabled when the form is valid; in the bottom bar, or after the fields on a short screen.
+ */
+@Composable
+private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit) {
+  SaveButton(
+      text = stringResource(R.string.prescription_form_save),
+      enabled = uiState.canSave,
+      isSaving = uiState.isSaving,
+      onClick = onSave,
+      testTag = C.Tag.prescription_form_save_button,
+      savingTestTag = C.Tag.prescription_form_saving,
+  )
 }
 
 private fun textKeyboard(capitalization: KeyboardCapitalization) =

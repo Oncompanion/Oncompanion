@@ -274,4 +274,11 @@
     <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
+    <!-- Hospital field -->
+    <string name="hospital_field_label">Hospital or location</string>
+    <string name="hospital_field_hint">Enter a hospital name or another location</string>
+    <string name="hospital_search">Search</string>
+    <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
+    <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
+    <string name="hospital_attribution">© OpenStreetMap contributors</string>
 </resources>
