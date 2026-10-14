@@ -24,6 +24,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.io.File
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -256,6 +257,31 @@ class ScanContentTest {
     }
     compose.onNodeWithTag(C.Tag.prescription_scan_photo).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+  }
+
+  @Test
+  fun photo_isReadOnTheGivenDispatcher() {
+    val dispatcher = StandardTestDispatcher()
+    val photo = temporaryFolder.newFile("broken.jpg").apply { writeText("x") }
+    compose.setContent {
+      ScanContent(
+          uiState = granted().copy(photo = photo),
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          photoDispatcher = dispatcher,
+      )
+    }
+    compose.waitForIdle()
+
+    // Not read until the dispatcher runs: the preview is still loading
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo_unreadable).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertIsDisplayed()
+
+    dispatcher.scheduler.advanceUntilIdle()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_photo_unreadable).assertIsDisplayed()
   }
 
   @Test

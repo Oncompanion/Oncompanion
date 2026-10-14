@@ -83,6 +83,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -194,6 +195,8 @@ private fun scanViewModel(): ScanViewModel {
  * @param onRetake deletes the photo being checked and shows the camera again
  * @param onUsePhoto uses the photo being checked
  * @param viewfinder what the camera sees
+ * @param photoDispatcher where the photo is read for the preview, off the main thread; tests pass
+ *   their own to control when it's read
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -208,6 +211,7 @@ fun ScanContent(
     onUsePhoto: () -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
+    photoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
   // One message at a time about the last photo, then the view model forgets it
   val snackbarHostState = remember { SnackbarHostState() }
@@ -294,7 +298,8 @@ fun ScanContent(
                 R.string.prescription_scan_camera_unavailable_title,
                 R.string.prescription_scan_camera_unavailable_explanation,
             )
-        uiState.photo != null -> PhotoPreview(uiState.photo, onRetake, onUsePhoto, content)
+        uiState.photo != null ->
+            PhotoPreview(uiState.photo, onRetake, onUsePhoto, photoDispatcher, content)
         else -> CameraView(uiState, onCapture, viewfinder, content)
       }
     }
@@ -396,6 +401,7 @@ private fun PhotoPreview(
     photo: File,
     onRetake: () -> Unit,
     onUsePhoto: () -> Unit,
+    photoDispatcher: CoroutineDispatcher,
     modifier: Modifier,
 ) {
   Column(
@@ -403,7 +409,7 @@ private fun PhotoPreview(
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     Box(Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-      when (val image = rememberPhoto(photo)) {
+      when (val image = rememberPhoto(photo, photoDispatcher)) {
         PhotoImage.Loading -> CircularProgressIndicator()
         PhotoImage.Unreadable ->
             Text(
@@ -458,15 +464,16 @@ private sealed interface PhotoImage {
 }
 
 /**
- * Reads [photo] outside the main thread, so the screen doesn't freeze on a 12-megapixel photo.
- * `ImageDecoder` turns it the right way up (portrait photos are saved sideways with an orientation
- * tag) and shrinks it to the screen: the full-size photo isn't needed to check it.
+ * Reads [photo] on [dispatcher], outside the main thread, so the screen doesn't freeze on a
+ * 12-megapixel photo. `ImageDecoder` turns it the right way up (portrait photos are saved sideways
+ * with an orientation tag) and shrinks it to the screen: the full-size photo isn't needed to check
+ * it.
  */
 @Composable
-private fun rememberPhoto(photo: File): PhotoImage =
-    produceState<PhotoImage>(PhotoImage.Loading, photo) {
+private fun rememberPhoto(photo: File, dispatcher: CoroutineDispatcher): PhotoImage =
+    produceState<PhotoImage>(PhotoImage.Loading, photo, dispatcher) {
           value =
-              withContext(Dispatchers.IO) {
+              withContext(dispatcher) {
                 try {
                   val source = ImageDecoder.createSource(photo)
                   val bitmap =
