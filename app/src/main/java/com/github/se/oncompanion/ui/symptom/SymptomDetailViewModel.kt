@@ -6,11 +6,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
-import com.github.se.oncompanion.model.symptom.SymptomRepositoryFirestore
+import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,8 +39,8 @@ data class SymptomDetailUiState(
 /** Loads one symptom of the signed-in user's journal (US-8), and keeps it up to date. */
 class SymptomDetailViewModel(
     private val symptomId: String,
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val symptomRepository: SymptomRepository = SymptomRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(SymptomDetailUiState())

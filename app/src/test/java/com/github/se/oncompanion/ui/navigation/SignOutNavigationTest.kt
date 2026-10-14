@@ -12,13 +12,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -34,6 +37,16 @@ class SignOutNavigationTest {
   private lateinit var nav: TestNavHostController
   private lateinit var actions: NavigationActions
 
+  // The app's repositories, put back after each test
+  private val appAuthRepository = AuthRepositoryProvider.repository
+  private val appProfileRepository = UserProfileRepositoryProvider.repository
+
+  @After
+  fun restoreProviders() {
+    AuthRepositoryProvider.repository = appAuthRepository
+    UserProfileRepositoryProvider.repository = appProfileRepository
+  }
+
   private class CachedTabViewModel : ViewModel() {
     var cleared = false
 
@@ -45,18 +58,14 @@ class SignOutNavigationTest {
   private fun content() {
     val user = runBlocking { auth.signInWithGoogle("one") }
     profiles.seed(UserProfile(user.uid, Role.PATIENT, "Alex", cancerType = "Private diagnosis"))
+    AuthRepositoryProvider.repository = auth
+    UserProfileRepositoryProvider.repository = profiles
     compose.setContent {
       val context = LocalContext.current
       nav = remember {
         TestNavHostController(context).apply { navigatorProvider.addNavigator(ComposeNavigator()) }
       }
-      AppNavHost(
-          nav,
-          Route.OVERVIEW,
-          authRepository = auth,
-          profileRepository = profiles,
-          credentialProvider = credentials,
-      )
+      AppNavHost(nav, Route.OVERVIEW, credentialProvider = credentials)
     }
     compose.runOnIdle { actions = NavigationActions(nav) }
   }

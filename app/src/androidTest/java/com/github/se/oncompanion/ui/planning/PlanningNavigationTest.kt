@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -27,6 +28,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.flowOf
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -36,13 +38,20 @@ import org.junit.runner.RunWith
 class PlanningNavigationTest {
   @get:Rule val compose = createComposeRule()
 
+  // The app's repository, put back after each test
+  private val appPlanningRepository = PlanningRepositoryProvider.repository
+
+  @After
+  fun restoreProvider() {
+    PlanningRepositoryProvider.repository = appPlanningRepository
+  }
+
   @Test
   fun planningIsReachableAndFitsAboveBottomBarWithLargeText() {
+    PlanningRepositoryProvider.repository = EmptyPlanningRepository
     compose.setContent {
       CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
-        OncompanionTheme {
-          AppNavHost(startRoute = Route.OVERVIEW, planningRepository = EmptyPlanningRepository)
-        }
+        OncompanionTheme { AppNavHost(startRoute = Route.OVERVIEW) }
       }
     }
     compose.onNodeWithTag(Tab.PLANNING.testTag).performClick()
@@ -101,9 +110,10 @@ class PlanningNavigationTest {
             "Ligue · Geneva",
         )
     val source = PlanningRepository { flowOf(listOf(event, appointment, medication)) }
+    PlanningRepositoryProvider.repository = source
     compose.setContent {
       CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
-        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING, planningRepository = source) }
+        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) }
       }
     }
     compose.onNodeWithText("Frequency: Twice a day").assertIsDisplayed()

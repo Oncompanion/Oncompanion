@@ -115,7 +115,7 @@ class OverviewScreenTest {
     val viewModel =
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
-            profileRepository = { FakeUserProfileRepository() },
+            profileRepository = FakeUserProfileRepository(),
             overviewRepository = repository,
             clock = { morning },
         )
@@ -351,7 +351,7 @@ class OverviewScreenTest {
     val viewModel =
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
-            profileRepository = { FakeUserProfileRepository() },
+            profileRepository = FakeUserProfileRepository(),
             overviewRepository = FakeOverviewRepository(),
             clock = { time },
         )

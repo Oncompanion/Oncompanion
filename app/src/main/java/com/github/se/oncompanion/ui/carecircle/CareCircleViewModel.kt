@@ -5,10 +5,10 @@ package com.github.se.oncompanion.ui.carecircle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
-import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,8 +37,9 @@ sealed interface CareCircleUiState {
 
 /** Lists the members of the signed-in user's care circle (US-13). */
 class CareCircleViewModel(
-    private val careCircleRepository: CareCircleRepository = CareCircleRepositoryFirestore(),
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow<CareCircleUiState>(CareCircleUiState.Loading)

@@ -56,7 +56,7 @@ class OverviewViewModelTest {
       auth: AuthRepository = FakeAuthRepository(),
       profiles: FakeUserProfileRepository = FakeUserProfileRepository(),
       overview: OverviewRepository = FakeOverviewRepository(),
-  ) = OverviewViewModel(auth, { profiles }, overview, clock = { now })
+  ) = OverviewViewModel(auth, profiles, overview, clock = { now })
 
   // ----- First name -----
 
@@ -263,7 +263,7 @@ class OverviewViewModelTest {
     val vm =
         OverviewViewModel(
             FakeAuthRepository(),
-            { FakeUserProfileRepository() },
+            FakeUserProfileRepository(),
             FakeOverviewRepository(todayItems = listOf(chemo, item("lunch", 13))),
             clock = { time },
         )
@@ -286,7 +286,7 @@ class OverviewViewModelTest {
     val vm =
         OverviewViewModel(
             FakeAuthRepository(),
-            { FakeUserProfileRepository() },
+            FakeUserProfileRepository(),
             FakeOverviewRepository(todayItems = listOf(item("lunch", 13))),
             clock = { time },
         )
@@ -315,7 +315,7 @@ class OverviewViewModelTest {
     val vm =
         OverviewViewModel(
             FakeAuthRepository(),
-            { FakeUserProfileRepository() },
+            FakeUserProfileRepository(),
             counting,
             clock = { time },
         )

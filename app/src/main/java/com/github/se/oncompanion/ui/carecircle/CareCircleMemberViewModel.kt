@@ -6,10 +6,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
-import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.ui.navigation.Screen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -47,8 +47,9 @@ sealed interface CareCircleMemberUiState {
  */
 class CareCircleMemberViewModel(
     savedStateHandle: SavedStateHandle,
-    private val careCircleRepository: CareCircleRepository = CareCircleRepositoryFirestore(),
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val memberUid: String? = savedStateHandle[Screen.CARE_CIRCLE_MEMBER_ARG]

@@ -6,9 +6,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,8 +57,8 @@ sealed interface ProfileUiState {
 /** Observes the authenticated profile and handles confirmed sign-out (US-18, US-19). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
