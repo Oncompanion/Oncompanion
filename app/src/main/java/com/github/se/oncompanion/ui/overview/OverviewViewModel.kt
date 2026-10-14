@@ -19,6 +19,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.Period
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -127,15 +128,15 @@ class OverviewViewModel(
   }
 
   /**
-   * Starts (or, after an error, restarts) observing the planning data from today to
-   * [LOOKAHEAD_DAYS] days later: enough to find the next appointment.
+   * Starts (or, after an error, restarts) observing the planning data from today to [LOOKAHEAD]
+   * later, so the next appointment is found even months ahead, as between two oncology check-ups.
    */
   fun loadDay() {
     dayObservation?.cancel()
     val now = now()
     _uiState.update { it.copy(now = now, isLoading = true, hasError = false) }
     val today = now.toLocalDate()
-    val range = PlanningRange(today, today.plusDays(LOOKAHEAD_DAYS), zoneId)
+    val range = PlanningRange(today, today.plus(LOOKAHEAD), zoneId)
     dayObservation = viewModelScope.launch {
       planningRepository
           .observeItems(range)
@@ -258,7 +259,7 @@ class OverviewViewModel(
     const val TAG = "OverviewViewModel"
 
     /** How far ahead the next appointment is looked for. */
-    const val LOOKAHEAD_DAYS = 31L
+    val LOOKAHEAD: Period = Period.ofYears(1)
 
     /**
      * How long an event or appointment counts as happening (the planning data only has start

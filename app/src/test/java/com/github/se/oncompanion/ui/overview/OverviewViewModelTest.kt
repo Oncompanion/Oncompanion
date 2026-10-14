@@ -153,14 +153,26 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun planningIsObserved_fromTodayForAMonth_inTheGivenZone() {
+  fun planningIsObserved_fromTodayForAYear_inTheGivenZone() {
     val planning = FakePlanningRepository()
     viewModel(planning = planning)
 
     val range = planning.ranges.single()
     assertEquals(now.toLocalDate(), range.startDateInclusive)
-    assertEquals(now.toLocalDate().plusDays(31), range.endDateExclusive)
+    assertEquals(now.toLocalDate().plusYears(1), range.endDateExclusive)
     assertEquals(zone, range.zoneId)
+  }
+
+  @Test
+  fun nextAppointment_monthsAway_isStillFound() {
+    // Oncology check-ups are often months apart
+    val vm = viewModel(planning = planning(appointment("check-up", now.plusMonths(4))))
+
+    assertEquals(
+        NextAppointment("Appointment check-up", now.plusMonths(4)),
+        vm.uiState.value.nextAppointment,
+    )
+    assertTrue(vm.uiState.value.todayEntries.isEmpty())
   }
 
   @Test
