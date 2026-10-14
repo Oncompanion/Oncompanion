@@ -1,12 +1,19 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
 
 import androidx.lifecycle.SavedStateHandle
+import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
+import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentType
+import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
+import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -22,8 +29,56 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
+/** Checks calendar selection and patient isolation across agenda updates and failures. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlanningViewModelTest {
+  /** Signing out clears a loaded patient's agenda even after its listener has failed. */
+  @Test fun signOutAfterReadFailureClearsPatientAgenda() = checkAccountChangeAfterReadFailure(true)
+
+  /** A new account loads its own agenda without retrying the previous account's failed read. */
+  @Test
+  fun accountSwitchAfterReadFailureLoadsNewPatientAgenda() =
+      checkAccountChangeAfterReadFailure(false)
+
+  private fun checkAccountChangeAfterReadFailure(signOut: Boolean) =
+      runTest(dispatcher) {
+        val auth = FakeAuthRepository { AuthUser(it) }
+        auth.signInWithGoogle("a")
+        val appointments = FakeAppointmentRepository()
+        val time = clock.instant()
+        appointments.seed("a", Appointment("a", "Patient A", time, AppointmentType.CONSULTATION))
+        appointments.seed("b", Appointment("b", "Patient B", time, AppointmentType.CONSULTATION))
+        val vm =
+            PlanningViewModel(
+                AppointmentPlanningSource(appointments, auth),
+                clock,
+                zone,
+                SavedStateHandle(),
+                auth,
+            )
+        drain()
+        assertEquals("Patient A", vm.uiState.value.items.single().title)
+        appointments.failActiveObservations(IllegalStateException("Read failed"))
+        drain()
+        assertTrue(vm.uiState.value.hasError)
+        if (signOut) auth.signOut() else auth.signInWithGoogle("b")
+        drain()
+        assertFalse(vm.uiState.value.hasError)
+        assertFalse(vm.uiState.value.isLoading)
+        if (signOut) assertTrue(vm.uiState.value.items.isEmpty())
+        else assertEquals("Patient B", vm.uiState.value.items.single().title)
+        appointments.seed(
+            "a",
+            Appointment("old", "Old patient update", time, AppointmentType.CONSULTATION),
+        )
+        drain()
+        assertTrue(
+            vm.uiState.value.items.none {
+              it.title == "Old patient update" || it.title == "Patient A"
+            }
+        )
+      }
+
   private val zone = ZoneId.of("Europe/Zurich")
   private val clock = Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone)
 

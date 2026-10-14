@@ -1,12 +1,16 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import java.time.Clock
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 
 /**
@@ -20,6 +24,12 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     AppointmentRepository {
   private val store = MutableStateFlow<Map<String, Map<String, Appointment>>>(emptyMap())
   private var nextId = 1
+  private val activeFailures = MutableSharedFlow<Exception>(extraBufferCapacity = 1)
+
+  /** Fails active appointment-list listeners without affecting subsequent observations. */
+  fun failActiveObservations(error: Exception) {
+    check(activeFailures.tryEmit(error)) { "An observation failure is already pending" }
+  }
 
   /** When set, either observation fails with this exception when collection starts. */
   var observeError: Exception? = null
@@ -50,17 +60,20 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     return flow {
       observeError?.let { throw it }
       emitAll(
-          store
-              .map {
-                it[uid]
-                    .orEmpty()
-                    .values
-                    .sortedWith(
-                        compareBy<Appointment> { entry -> entry.scheduledAt }
-                            .thenBy { entry -> entry.id }
-                    )
-              }
-              .distinctUntilChanged()
+          merge(
+              activeFailures.map { throw it },
+              store
+                  .map {
+                    it[uid]
+                        .orEmpty()
+                        .values
+                        .sortedWith(
+                            compareBy<Appointment> { entry -> entry.scheduledAt }
+                                .thenBy { entry -> entry.id }
+                        )
+                  }
+                  .distinctUntilChanged(),
+          )
       )
     }
   }
