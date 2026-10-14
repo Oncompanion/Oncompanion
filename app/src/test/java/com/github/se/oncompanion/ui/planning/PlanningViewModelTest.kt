@@ -109,7 +109,14 @@ class PlanningViewModelTest {
   fun selectsTodayAndNavigatesAcrossYearBoundary() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.selectedDate)
         assertEquals(LocalDate.of(2026, 9, 28), vm.uiState.value.weekStart)
@@ -136,7 +143,14 @@ class PlanningViewModelTest {
                 item("tomorrow", "2026-10-02T22:00:00Z"),
                 item("outside", "2026-11-02T08:00:00Z"),
             )
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertTrue(vm.uiState.value.untimedItems.isEmpty())
         assertEquals(vm.uiState.value.items, vm.uiState.value.scheduledItems)
@@ -159,7 +173,14 @@ class PlanningViewModelTest {
   fun errorCanBeRetried() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository().apply { fail = true }
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertTrue(vm.uiState.value.hasError)
         assertFalse(vm.uiState.value.isLoading)
@@ -174,7 +195,14 @@ class PlanningViewModelTest {
   fun weekRangeAccountsForDaylightSaving() =
       runTest(dispatcher) {
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         vm.selectDate(LocalDate.of(2026, 10, 25))
         drain()
         val range = repository.ranges.last()
@@ -185,7 +213,14 @@ class PlanningViewModelTest {
   @Test
   fun navigationStopsAtSupportedYearBoundaries() =
       runTest(dispatcher) {
-        val vm = PlanningViewModel(FakePlanningRepository(), clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                FakePlanningRepository(),
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         val first = LocalDate.of(1, 1, 1)
         vm.selectDate(first)
         vm.previousWeek()
@@ -214,7 +249,14 @@ class PlanningViewModelTest {
                 }
               }
             }
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertEquals(listOf(cached), vm.uiState.value.items)
         assertTrue(vm.uiState.value.hasError)
@@ -232,7 +274,13 @@ class PlanningViewModelTest {
   fun initialSelectionIsSavedBeforeAnyCalendarAction() =
       runTest(dispatcher) {
         val saved = SavedStateHandle()
-        PlanningViewModel(FakePlanningRepository(), clock, zone, saved)
+        PlanningViewModel(
+            FakePlanningRepository(),
+            clock,
+            zone,
+            saved,
+            authRepository = FakeAuthRepository(),
+        )
         drain()
         assertEquals("2026-10-02", saved.get<String>("planning_selected_date"))
       }
@@ -241,7 +289,14 @@ class PlanningViewModelTest {
   fun restoresSelectedDateAndObservesItsWeek() =
       runTest(dispatcher) {
         val saved = SavedStateHandle()
-        val original = PlanningViewModel(FakePlanningRepository(), clock, zone, saved)
+        val original =
+            PlanningViewModel(
+                FakePlanningRepository(),
+                clock,
+                zone,
+                saved,
+                authRepository = FakeAuthRepository(),
+            )
         val selected = LocalDate.of(2027, 1, 7)
         original.selectDate(selected)
         val restoredState =
@@ -249,7 +304,14 @@ class PlanningViewModelTest {
                 mapOf("planning_selected_date" to saved.get<String>("planning_selected_date"))
             )
         val repository = FakePlanningRepository()
-        val restored = PlanningViewModel(repository, clock, zone, restoredState)
+        val restored =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                restoredState,
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertEquals(selected, restored.uiState.value.selectedDate)
         assertEquals(LocalDate.of(2027, 1, 4), restored.uiState.value.weekStart)
@@ -267,6 +329,7 @@ class PlanningViewModelTest {
                   clock,
                   zone,
                   SavedStateHandle(mapOf("planning_selected_date" to value)),
+                  authRepository = FakeAuthRepository(),
               )
           assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.selectedDate)
         }
@@ -286,7 +349,14 @@ class PlanningViewModelTest {
               override fun instant(): Instant = now
             }
         val repository = FakePlanningRepository()
-        val vm = PlanningViewModel(repository, movingClock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                movingClock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         now = Instant.parse("2026-10-02T22:01:00Z")
         vm.refreshToday()
@@ -333,7 +403,14 @@ class PlanningViewModelTest {
                       medication("outside", date.plusWeeks(1)),
                   )
             }
-        val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertEquals(listOf(first, tie, last), vm.uiState.value.untimedItems)
         assertEquals(listOf(appointment, event), vm.uiState.value.scheduledItems)
@@ -377,7 +454,14 @@ class PlanningViewModelTest {
               FakePlanningRepository().apply {
                 items.value = listOf(last, tie, upper, accented, plain, lower)
               }
-          val vm = PlanningViewModel(repository, clock, zone, SavedStateHandle())
+          val vm =
+              PlanningViewModel(
+                  repository,
+                  clock,
+                  zone,
+                  SavedStateHandle(),
+                  authRepository = FakeAuthRepository(),
+              )
           drain()
           assertEquals(
               listOf(lower, upper, plain, accented, tie, last),
@@ -401,12 +485,43 @@ class PlanningViewModelTest {
             )
         val repository = FakePlanningRepository().apply { items.value = listOf(medication) }
         val vm =
-            PlanningViewModel(repository, clock, ZoneId.of("Pacific/Honolulu"), SavedStateHandle())
+            PlanningViewModel(
+                repository,
+                clock,
+                ZoneId.of("Pacific/Honolulu"),
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
         drain()
         assertEquals(listOf(medication), vm.uiState.value.items)
         vm.selectDate(date.minusDays(1))
         assertTrue(vm.uiState.value.items.isEmpty())
         assertTrue(vm.uiState.value.untimedItems.isEmpty())
         assertTrue(vm.uiState.value.scheduledItems.isEmpty())
+      }
+
+  /** Default construction observes repositories supplied by the refactored providers. */
+  @Test
+  fun defaultsUsePlanningAndAuthProviders() =
+      runTest(dispatcher) {
+        val oldPlanning =
+            com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository
+        val oldAuth = com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository
+        val repository = FakePlanningRepository()
+        repository.items.value = listOf(item("provider", "2026-10-02T10:00:00Z"))
+        try {
+          com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository =
+              repository
+          com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository =
+              FakeAuthRepository()
+          val vm =
+              PlanningViewModel(clock = clock, zoneId = zone, savedStateHandle = SavedStateHandle())
+          drain()
+          assertEquals(repository.items.value, vm.uiState.value.items)
+        } finally {
+          com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository =
+              oldPlanning
+          com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository = oldAuth
+        }
       }
 }
