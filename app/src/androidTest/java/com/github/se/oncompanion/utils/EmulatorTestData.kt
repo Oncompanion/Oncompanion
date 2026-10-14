@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.utils
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.io.IOException
@@ -57,6 +58,19 @@ object EmulatorTestData {
     val email = "$name-${UUID.randomUUID()}@example.com"
     emails[name] = email
     return auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
+  }
+
+  /**
+   * Creates the signed-in user's profile with [role] ("PATIENT" or "CAREGIVER") and waits for the
+   * server, e.g. because joining a care circle needs a caregiver profile.
+   */
+  suspend fun createProfile(role: String, firstName: String = "Test") {
+    val uid = checkNotNull(FirebaseEmulator.auth.currentUser) { "No user signed in" }.uid
+    val profile =
+        mapOf("role" to role, "firstName" to firstName, "createdAt" to FieldValue.serverTimestamp())
+    withTimeout(10_000) {
+      FirebaseEmulator.firestore.collection("users").document(uid).set(profile).await()
+    }
   }
 
   /** Signs in the account last created with [createUser] for [name]. Returns its uid. */

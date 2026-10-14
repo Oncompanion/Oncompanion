@@ -39,6 +39,9 @@ class FakeCareCircleRepository : CareCircleRepository {
     circles.value = circles.value + (ownerUid to members)
   }
 
+  /** The members of [ownerUid]'s circle, unsorted. */
+  fun members(ownerUid: String): List<CareCircleMember> = circles.value[ownerUid].orEmpty()
+
   override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> =
       tracked(ownerUid) {
         circles.map { circle -> circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME) }

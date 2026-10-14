@@ -78,6 +78,7 @@ class CareCircleRepositoryFirestore(
         // Read leniently: a field of the wrong type is treated as missing (and logged)
         email = doc.getLenient<String>(FIELD_EMAIL),
         addedAt = doc.getLenient<Timestamp>(FIELD_ADDED_AT)?.toInstant(),
+        inviteCode = doc.getLenient<String>(FIELD_INVITE_CODE),
     )
   }
 
@@ -103,6 +104,7 @@ class CareCircleRepositoryFirestore(
     const val FIELD_PERMISSIONS = "permissions"
     const val FIELD_EMAIL = "email"
     const val FIELD_ADDED_AT = "addedAt"
+    const val FIELD_INVITE_CODE = "inviteCode"
     private const val TAG = "CareCircleRepository"
   }
 }
