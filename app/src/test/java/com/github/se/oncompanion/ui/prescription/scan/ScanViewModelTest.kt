@@ -130,6 +130,19 @@ class ScanViewModelTest {
     assertFalse(state.canCapture)
   }
 
+  @Test
+  fun cameraStartingAgain_noPhotoCanBeTaken_untilItIsOpen() {
+    cameraReady()
+
+    // A new camera, e.g. after the phone was rotated
+    viewModel.onCameraStarting()
+
+    assertEquals(CameraStatus.STARTING, state.camera)
+    assertFalse(state.canCapture)
+    viewModel.onCameraReady()
+    assertTrue(state.canCapture)
+  }
+
   // ---- capture ----
 
   @Test

@@ -6,6 +6,7 @@ import android.content.Context
 import android.util.Log
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraState
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -17,11 +18,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
@@ -34,12 +42,12 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 interface ScanCamera {
 
   /**
-   * Turns the camera on for [lifecycleOwner]. Throws if the phone has no camera that can be used.
+   * Turns the camera on for [lifecycleOwner] while the flow is collected, and turns it off when the
+   * collection stops (the screen is left). Each session starts with [CameraStatus.STARTING], then
+   * says [CameraStatus.READY] once the camera is really open, and [CameraStatus.UNAVAILABLE] if it
+   * can't be used: no camera, or a failure while opening or later.
    */
-  suspend fun start(context: Context, lifecycleOwner: LifecycleOwner)
-
-  /** Turns the camera off, when the scan screen is left. */
-  fun stop()
+  fun open(context: Context, lifecycleOwner: LifecycleOwner): Flow<CameraStatus>
 
   /** Takes a photo into [file]. Throws if it couldn't be taken. */
   suspend fun takePhoto(context: Context, file: File)
@@ -59,24 +67,44 @@ class CameraXScanCamera : ScanCamera {
   private val imageCapture =
       ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
 
-  private var provider: ProcessCameraProvider? = null
+  override fun open(context: Context, lifecycleOwner: LifecycleOwner): Flow<CameraStatus> =
+      callbackFlow {
+        send(CameraStatus.STARTING)
+        val cameraProvider = ProcessCameraProvider.awaitInstance(context)
+        // The back camera faces the prescription; the front one is better than none
+        val selector =
+            listOf(CameraSelector.DEFAULT_BACK_CAMERA, CameraSelector.DEFAULT_FRONT_CAMERA)
+                .firstOrNull { runCatching { cameraProvider.hasCamera(it) }.getOrDefault(false) }
+        if (selector == null) {
+          send(CameraStatus.UNAVAILABLE)
+          awaitClose {}
+          return@callbackFlow
+        }
+        cameraProvider.unbind(preview, imageCapture)
+        val camera = cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+        // Binding doesn't mean the camera opened: CameraX says when it opens, or fails to
+        val cameraState = camera.cameraInfo.cameraState
+        val observer = Observer<CameraState> { trySend(it.toStatus()) }
+        cameraState.observeForever(observer)
+        awaitClose {
+          cameraState.removeObserver(observer)
+          cameraProvider.unbind(preview, imageCapture)
+        }
+      }
+      // CameraX and its LiveData only work on the main thread, whoever collects the flow
+      .flowOn(ContextCompat.getMainExecutor(context).asCoroutineDispatcher())
+      .distinctUntilChanged()
 
-  override suspend fun start(context: Context, lifecycleOwner: LifecycleOwner) {
-    val cameraProvider = ProcessCameraProvider.awaitInstance(context)
-    // The back camera faces the prescription; the front one is better than none
-    val selector =
-        listOf(CameraSelector.DEFAULT_BACK_CAMERA, CameraSelector.DEFAULT_FRONT_CAMERA)
-            .firstOrNull { runCatching { cameraProvider.hasCamera(it) }.getOrDefault(false) }
-            ?: throw IllegalStateException("This phone has no camera")
-    cameraProvider.unbind(preview, imageCapture)
-    cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
-    provider = cameraProvider
-  }
-
-  override fun stop() {
-    provider?.unbind(preview, imageCapture)
-    provider = null
-  }
+  /**
+   * A critical error (camera disabled, broken, Do Not Disturb...) won't go away on its own. A
+   * recoverable one (e.g. another app uses the camera) is retried by CameraX: still starting.
+   */
+  private fun CameraState.toStatus(): CameraStatus =
+      when {
+        error?.type == CameraState.ErrorType.CRITICAL -> CameraStatus.UNAVAILABLE
+        type == CameraState.Type.OPEN -> CameraStatus.READY
+        else -> CameraStatus.STARTING
+      }
 
   override suspend fun takePhoto(context: Context, file: File) =
       suspendCancellableCoroutine { continuation ->
