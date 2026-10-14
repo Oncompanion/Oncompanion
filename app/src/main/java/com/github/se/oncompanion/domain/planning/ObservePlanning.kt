@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flowOf
  */
 class ObservePlanning(private val sources: List<PlanningRepository>) : PlanningRepository {
 
+  /** Merges [sources], e.g. `ObservePlanning(appointments, events)`. */
   constructor(vararg sources: PlanningRepository) : this(sources.toList())
 
   /** The entries of every source within [range], sorted by day, then by time. */
