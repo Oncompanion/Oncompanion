@@ -4,9 +4,11 @@ package com.github.se.oncompanion.ui.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
+import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
@@ -180,5 +182,24 @@ class SymptomJournalViewModelTest {
   fun defaultRepositories_canBeCreatedWithoutFirebase() {
     // Like the app's NavHost does: without Firebase, the journal shows the error state
     assertTrue(SymptomJournalViewModel().uiState.value.hasError)
+  }
+
+  @Test
+  fun defaultRepositories_areTheOnesOfTheProviders() {
+    val auth = AuthRepositoryProvider.repository
+    val symptoms = SymptomRepositoryProvider.repository
+    try {
+      AuthRepositoryProvider.repository = signedIn()
+      SymptomRepositoryProvider.repository = repository
+      repository.seed("alice", entry("monNoon", "2026-10-05T12:00:00Z"))
+
+      // Only the clock is passed: the repositories come from the providers
+      val state = SymptomJournalViewModel(clock = clock).uiState.value
+
+      assertEquals(listOf(LocalDate.of(2026, 10, 5) to listOf("monNoon")), idsByDay(state))
+    } finally {
+      AuthRepositoryProvider.repository = auth
+      SymptomRepositoryProvider.repository = symptoms
+    }
   }
 }

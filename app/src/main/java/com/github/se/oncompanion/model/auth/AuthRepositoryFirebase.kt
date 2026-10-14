@@ -14,8 +14,8 @@ import kotlinx.coroutines.tasks.await
 /**
  * [AuthRepository] backed by Firebase Authentication.
  *
- * Firebase is only accessed when first used, not when the repository is created: screens can create
- * it (e.g. as a ViewModel default) even where Firebase isn't initialized, like unit tests.
+ * Firebase is only accessed when first used, not when the repository is created: its provider can
+ * build it even where Firebase isn't initialized, like unit tests.
  */
 class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.getInstance() }) :
     AuthRepository {
@@ -67,7 +67,7 @@ class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.g
 
     /**
      * Given name of the last user who signed in, with their uid. Firebase doesn't keep it, so it is
-     * kept here for as long as the app runs, shared by every instance (screens create their own).
+     * kept here for as long as the app runs, shared by every instance.
      */
     @Volatile var lastGivenName: Pair<String, String>? = null
   }

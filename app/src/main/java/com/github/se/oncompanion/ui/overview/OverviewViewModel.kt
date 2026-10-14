@@ -6,14 +6,14 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
-import com.github.se.oncompanion.model.overview.FakeOverviewRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.overview.NextAppointment
 import com.github.se.oncompanion.model.overview.OverviewRepository
+import com.github.se.oncompanion.model.overview.OverviewRepositoryProvider
 import com.github.se.oncompanion.model.overview.TodayItem
 import com.github.se.oncompanion.model.overview.TodayItemKind
 import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import java.time.Duration
 import java.time.LocalDateTime
 import kotlin.coroutines.cancellation.CancellationException
@@ -65,16 +65,12 @@ data class OverviewUiState(
  * Loads the user's day for the Overview (US-23): their first name, their next appointment and
  * today's items.
  *
- * @param profileRepository creates the profile repository; it is only called when a user is signed
- *   in, so the Overview also works where Firebase isn't available
  * @param clock the current time
  */
 class OverviewViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val profileRepository: () -> UserProfileRepository = {
-      UserProfileRepositoryFirestore()
-    },
-    private val overviewRepository: OverviewRepository = FakeOverviewRepository(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    private val overviewRepository: OverviewRepository = OverviewRepositoryProvider.repository,
     private val clock: () -> LocalDateTime = LocalDateTime::now,
 ) : ViewModel() {
 
@@ -147,7 +143,7 @@ class OverviewViewModel(
     _uiState.update { it.copy(firstName = user.firstNameGuess()) }
     viewModelScope.launch {
       try {
-        profileRepository().observeProfile(user.uid).collect { profile ->
+        profileRepository.observeProfile(user.uid).collect { profile ->
           val name = profile?.firstName?.takeIf { it.isNotBlank() } ?: return@collect
           _uiState.update { it.copy(firstName = name) }
         }

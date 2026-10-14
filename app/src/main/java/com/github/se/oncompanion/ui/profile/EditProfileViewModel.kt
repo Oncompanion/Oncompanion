@@ -5,10 +5,10 @@ package com.github.se.oncompanion.ui.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,8 +47,8 @@ data class EditProfileUiState(
  * An existing profile's draft. Observation refreshes untouched fields and preserves local edits.
  */
 class EditProfileViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(EditProfileUiState())
   val uiState = _uiState.asStateFlow()
@@ -137,11 +137,11 @@ class EditProfileViewModel(
   /**
    * Saves the draft locally, including offline; role and creation time stay unchanged.
    *
-   * [UserProfileRepositoryFirestore.updateProfile] completes once the write is applied locally,
-   * without waiting for server acceptance. `saveFailed` only reports exceptions thrown by the
-   * repository call before or during local completion, such as validation or immediate write
-   * errors. A later server/security-rule rejection cannot set `saveFailed`; Firestore may roll back
-   * the local change after this screen has reported completion.
+   * [UserProfileRepository.updateProfile] completes once the write is applied locally, without
+   * waiting for server acceptance. `saveFailed` only reports exceptions thrown by the repository
+   * call before or during local completion, such as validation or immediate write errors. A later
+   * server/security-rule rejection cannot set `saveFailed`; Firestore may roll back the local
+   * change after this screen has reported completion.
    */
   fun saveProfile() {
     val state = _uiState.value

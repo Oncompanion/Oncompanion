@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
@@ -15,7 +16,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore
 import com.github.se.oncompanion.model.appointment.AppointmentType
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -75,15 +75,8 @@ class PlanningAppointmentsTest {
         db.disableNetwork().await()
       }
     }
-    compose.setContent {
-      OncompanionTheme {
-        AppNavHost(
-            startRoute = Route.PLANNING,
-            authRepository = AuthRepositoryFirebase(FirebaseEmulator.auth),
-            appointmentRepository = repository,
-        )
-      }
-    }
+    // No provider is replaced: the app's own repositories read the emulator
+    compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
     compose.onNodeWithText("Offline consultation").assertIsDisplayed()
     compose.onNodeWithText("HUG").assertIsDisplayed()
     // Keep the populated offline agenda as a device-rendered artifact for the PR review.

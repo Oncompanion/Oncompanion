@@ -9,7 +9,7 @@ import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
@@ -82,7 +82,7 @@ data class PrescriptionFormUiState(
  * @param initialDraft what the form starts with; `null` for an empty form
  */
 class PrescriptionFormViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val manageMedicationSchedule: ManageMedicationSchedule = ManageMedicationSchedule(),
     clock: Clock = Clock.systemDefaultZone(),
     initialDraft: PrescriptionDraft? = null,

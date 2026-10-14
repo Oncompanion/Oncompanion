@@ -30,19 +30,25 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.EventRepository
+import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -51,6 +57,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Rule
@@ -70,6 +77,25 @@ class AppNavHostTest {
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
+  // The app's repositories, put back after each test
+  private val appPlanningRepository = PlanningRepositoryProvider.repository
+  private val appCareCircleRepository = CareCircleRepositoryProvider.repository
+  private val appEventRepository = EventRepositoryProvider.repository
+  private val appAuthRepository = AuthRepositoryProvider.repository
+  private val appAppointmentRepository = AppointmentRepositoryProvider.repository
+  private val appMedicationRepository = MedicationRepositoryProvider.repository
+
+  @After
+  fun restoreProviders() {
+    PlanningRepositoryProvider.repository = appPlanningRepository
+    CareCircleRepositoryProvider.repository = appCareCircleRepository
+    EventRepositoryProvider.repository = appEventRepository
+    AuthRepositoryProvider.repository = appAuthRepository
+    AppointmentRepositoryProvider.repository = appAppointmentRepository
+    MedicationRepositoryProvider.repository = appMedicationRepository
+  }
+
+  /** Shows the NavHost with these repositories in the providers its ViewModels read. */
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
@@ -78,31 +104,19 @@ class AppNavHostTest {
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
   ) {
+    PlanningRepositoryProvider.repository = planningRepository
+    CareCircleRepositoryProvider.repository = careCircleRepository
+    EventRepositoryProvider.repository = eventRepository
+    AuthRepositoryProvider.repository = authRepository
+    MedicationRepositoryProvider.repository = medicationRepository
     composeTestRule.setContent {
       activity = checkNotNull(LocalActivity.current)
       navController =
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      if (startRoute == null)
-          AppNavHost(
-              navController = navController,
-              planningRepository = planningRepository,
-              careCircleRepository = careCircleRepository,
-              eventRepository = eventRepository,
-              authRepository = authRepository,
-              medicationRepository = medicationRepository,
-          )
-      else
-          AppNavHost(
-              navController = navController,
-              startRoute = startRoute,
-              planningRepository = planningRepository,
-              careCircleRepository = careCircleRepository,
-              eventRepository = eventRepository,
-              authRepository = authRepository,
-              medicationRepository = medicationRepository,
-          )
+      if (startRoute == null) AppNavHost(navController = navController)
+      else AppNavHost(navController = navController, startRoute = startRoute)
     }
   }
 
@@ -699,9 +713,9 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 
-  /** Verifies production source selection without overriding the Planning contract. */
+  /** Verifies the default Planning source reads the appointment and auth providers. */
   @Test
-  fun defaultPlanningSourceUsesInjectedAppointmentAndAuthRepositories() {
+  fun defaultPlanningSourceUsesTheAppointmentAndAuthProviders() {
     val auth = FakeAuthRepository()
     runTest { auth.signInWithGoogle("planning-owner") }
     val appointments = FakeAppointmentRepository()
@@ -714,13 +728,9 @@ class AppNavHostTest {
             type = AppointmentType.CONSULTATION,
         ),
     )
-    composeTestRule.setContent {
-      AppNavHost(
-          startRoute = Route.PLANNING,
-          authRepository = auth,
-          appointmentRepository = appointments,
-      )
-    }
+    AppointmentRepositoryProvider.repository = appointments
+    // The planning provider keeps its default, so the appointment can only come through it
+    setNavHost(Route.PLANNING, planningRepository = appPlanningRepository, authRepository = auth)
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
   }
