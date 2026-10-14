@@ -713,9 +713,9 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 
-  /** Verifies the default Planning source reads the appointment and auth providers. */
+  /** Verifies the default Planning source reads the appointment, auth and event providers. */
   @Test
-  fun defaultPlanningSourceUsesTheAppointmentAndAuthProviders() {
+  fun defaultPlanningSourceShowsAppointmentsAndEvents() {
     val auth = FakeAuthRepository()
     runTest { auth.signInWithGoogle("planning-owner") }
     val appointments = FakeAppointmentRepository()
@@ -729,9 +729,26 @@ class AppNavHostTest {
         ),
     )
     AppointmentRepositoryProvider.repository = appointments
-    // The planning provider keeps its default, so the appointment can only come through it
-    setNavHost(Route.PLANNING, planningRepository = appPlanningRepository, authRepository = auth)
+    // An event later today: the fake's "now" is midnight, so it counts as upcoming
+    val today = LocalDate.now()
+    val events =
+        FakeEventRepository(
+            listOf(
+                FakeEventRepository.sampleEvents(today)
+                    .first()
+                    .copy(startDateTime = today.atTime(15, 0))
+            ),
+            now = { today.atStartOfDay() },
+        )
+    // The planning provider keeps its default, so the entries can only come through it
+    setNavHost(
+        Route.PLANNING,
+        planningRepository = appPlanningRepository,
+        authRepository = auth,
+        eventRepository = events,
+    )
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Gentle yoga for patients").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
   }
 }

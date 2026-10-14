@@ -4,6 +4,7 @@ package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -14,14 +15,18 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
  */
 object PlanningRepositoryProvider {
   /**
-   * The signed-in patient's appointments by default. The appointment and auth providers are read on
-   * each observation, so replacing them also reaches Planning.
+   * By default, the signed-in patient's appointments and the Ligue's upcoming events, merged by
+   * [ObservePlanning]. The providers are read on each observation, so replacing them also reaches
+   * Planning.
    */
   @Volatile
   var repository: PlanningRepository = PlanningRepository { range ->
-    AppointmentPlanningSource(
-            AppointmentRepositoryProvider.repository,
-            AuthRepositoryProvider.repository,
+    ObservePlanning(
+            AppointmentPlanningSource(
+                AppointmentRepositoryProvider.repository,
+                AuthRepositoryProvider.repository,
+            ),
+            EventPlanningSource(EventRepositoryProvider.repository),
         )
         .observeItems(range)
   }
