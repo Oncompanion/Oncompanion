@@ -69,13 +69,13 @@
     <string name="overview_today">Today</string>
     <string name="overview_see_planning">See planning</string>
     <string name="overview_nothing_today">Nothing planned today</string>
-    <string name="overview_nothing_today_hint">Medication intakes and events of the day will appear here.</string>
+    <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
     <string name="overview_no_set_time">No set time</string>
     <string name="overview_done">Done</string>
     <string name="overview_error_title">Couldn\'t load your day</string>
-    <string name="overview_error_hint">Your shortcuts still work. Check your connection and try again.</string>
+    <string name="overview_error_hint">Your shortcuts still work. Please try again.</string>
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
 
