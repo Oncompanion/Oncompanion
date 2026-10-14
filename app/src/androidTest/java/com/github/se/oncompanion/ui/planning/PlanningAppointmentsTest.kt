@@ -16,7 +16,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore
@@ -118,11 +117,10 @@ class PlanningAppointmentsTest {
     compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
     compose.onNodeWithTag(C.Tag.planning_add).performClick()
     compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Offline form visit")
-    closeSoftKeyboard()
     compose.onNodeWithTag(C.Tag.appointment_time).performClick()
     compose.onNodeWithTag(C.Tag.appointment_confirm).performClick()
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().performTextInput("Room 12")
-    closeSoftKeyboard()
+    // The form scrolls above the IME; avoid Espresso's separate window-focus-dependent dismissal.
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
     compose.waitUntil(10_000) {
       compose
