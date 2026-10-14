@@ -172,6 +172,12 @@ object C {
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
 
+    const val care_circle_pending_section = "care_circle_pending_section"
+    const val care_circle_pending_label = "care_circle_pending_label"
+
+    /** The row of the invitation whose invite code is [inviteCode]. */
+    fun careCircleInvite(inviteCode: String) = "care_circle_invite_$inviteCode"
+
     // Care circle member details
     const val care_circle_member_screen = "care_circle_member_screen"
     const val care_circle_member_back_button = "care_circle_member_back_button"
