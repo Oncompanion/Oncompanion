@@ -172,7 +172,7 @@ class MedicationRepositoryFirestore(
       Prescription(
               id = doc.id,
               prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
-              prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
+              prescribedOn = requireNotNull(doc.getTimestamp(FIELD_PRESCRIBED_ON)).toLocalDate(),
               medications =
                   (doc.get(FIELD_MEDICATIONS) as List<*>)
                       .mapNotNull { toMedication(doc.id, it) }
