@@ -535,6 +535,20 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
+  @Test
+  fun symptomJournalAddButton_opensTheAddScreen_andCloseReturns() {
+    setNavHost(Route.SYMPTOMS)
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_close).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+  }
+
   /** Opens the prescriptions list from its Overview shortcut, as the user does. */
   private fun openPrescriptionsFromOverview(medicationRepository: MedicationRepository) {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
@@ -680,6 +694,7 @@ class AppNavHostTest {
     assertEquals("overview", Route.OVERVIEW)
     assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("prescriptions_scan", Screen.PRESCRIPTION_SCAN)
+    assertEquals("symptoms_add", Screen.SYMPTOM_ADD)
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
