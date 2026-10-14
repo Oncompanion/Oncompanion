@@ -63,6 +63,8 @@ object Screen {
   /** The [SYMPTOM_DETAIL] screen of the symptom [symptomId]. */
   fun symptomDetail(symptomId: String) = "symptoms_detail/$symptomId"
 
+  const val SYMPTOM_ADD = "symptoms_add"
+
   // Route.PRESCRIPTIONS
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"

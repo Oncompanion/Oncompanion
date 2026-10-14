@@ -53,6 +53,8 @@ enum class CarePermission {
  * @property email the member's Google account email, copied from their sign-in when they join;
  *   never typed or edited by the patient (see docs/architecture.md, "Care circle invitations")
  * @property addedAt when the member joined the circle, or null if unknown
+ * @property inviteCode the invite code the member joined with, or null if unknown. Not shown; it
+ *   tells a used invite (deleted when redeemed) from a cancelled one.
  */
 data class CareCircleMember(
     val uid: String,
@@ -62,6 +64,7 @@ data class CareCircleMember(
     val permissions: Set<CarePermission> = emptySet(),
     val email: String? = null,
     val addedAt: Instant? = null,
+    val inviteCode: String? = null,
 ) {
   /** What the patient decided about this member: name, relationship and permissions. */
   val details: CareCircleMemberDetails

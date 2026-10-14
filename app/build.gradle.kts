@@ -128,6 +128,10 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
 dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.core.splashscreen)
+  // Prescription scan (US-10): camera preview and capture
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.compose)
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
