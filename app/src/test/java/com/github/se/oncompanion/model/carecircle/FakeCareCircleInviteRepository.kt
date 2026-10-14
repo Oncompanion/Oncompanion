@@ -142,7 +142,8 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     // member are added together
     val now = Instant.now()
     invites.value -= invite.inviteCode
-    joined[caregiverUid] = joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
+    joined[caregiverUid] =
+        joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
     circle?.let {
       val details = invite.details
       val member =
