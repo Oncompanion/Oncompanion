@@ -27,7 +27,7 @@ import kotlinx.coroutines.tasks.await
 /**
  * [CareCircleInviteRepository] backed by Cloud Firestore, documents at `/invites/{inviteCode}`.
  * Redeeming an invite deletes it and writes the member at
- * `/users/{patientUid}/circle/{caregiverUid}` and the caregiver's [JoinedCircle] at
+ * `/users/{patientUid}/circle/{caregiverUid}` and the caregiver's [JoinedCareCircle] at
  * `/users/{caregiverUid}/patients/{patientUid}`.
  *
  * Writes don't await Firestore's tasks on purpose: those only complete once the server confirms,
@@ -176,7 +176,7 @@ class CareCircleInviteRepositoryFirestore(
 
   /**
    * Checks the invite [inviteCode] and the caregiver's membership on the server, then writes the
-   * member and the caregiver's [JoinedCircle] and deletes the invite in [transaction]. A
+   * member and the caregiver's [JoinedCareCircle] and deletes the invite in [transaction]. A
    * transaction is never applied locally first nor queued offline, so the caregiver never sees a
    * join that the server later undoes. The checks give an answer the caregiver understands; the
    * rules are the real guard.
@@ -298,7 +298,7 @@ class CareCircleInviteRepositoryFirestore(
     const val FIELD_EMAIL = "email"
     const val FIELD_CREATED_AT = "createdAt"
     const val FIELD_REDEEMER_UID = "redeemerUid"
-    /** Subcollection of `/users/{caregiverUid}`: the caregiver's [JoinedCircle]s. */
+    /** Subcollection of `/users/{caregiverUid}`: the caregiver's [JoinedCareCircle]s. */
     const val PATIENTS_COLLECTION = "patients"
     const val FIELD_PATIENT_FIRST_NAME = "patientFirstName"
     const val FIELD_JOINED_AT = "joinedAt"
