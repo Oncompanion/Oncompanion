@@ -217,6 +217,7 @@ service cloud.firestore {
       match /patients/{patientUid} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
+                      && patientUid != uid
                       && request.resource.data.keys().hasOnly(
                              ['patientFirstName', 'inviteCode', 'joinedAt'])
                       && request.resource.data.joinedAt == request.time
