@@ -218,6 +218,37 @@ class SymptomRepositoryFirestoreTest {
     }
   }
 
+  // ---- delete ----
+
+  @Test
+  fun deleteRemovesOnlyThatEntry(): Unit = runBlocking {
+    val deleted = repository.addSymptom(aliceUid, fatigue("2026-10-05T08:00:00Z"))
+    val kept = repository.addSymptom(aliceUid, fatigue("2026-10-04T08:00:00Z"))
+    awaitServerAck()
+
+    repository.deleteSymptom(aliceUid, deleted)
+    awaitServerAck()
+
+    assertEquals(listOf(kept), observeListOnce().map { it.id })
+    assertNull(observeOnce(deleted))
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(aliceUid)).document(deleted).get(Source.SERVER).await()
+        }
+    assertFalse(server.exists())
+  }
+
+  @Test
+  fun deleteMissingEntryDoesNothing(): Unit = runBlocking {
+    val kept = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+
+    repository.deleteSymptom(aliceUid, "missing")
+    awaitServerAck()
+
+    assertEquals(listOf(kept), observeListOnce().map { it.id })
+  }
+
   // ---- server rejections: no exception, the entry is rolled back ----
 
   @Test
@@ -237,6 +268,25 @@ class SymptomRepositoryFirestoreTest {
     EmulatorTestData.signIn("bob")
     val server = withTimeout(10_000) { doc.get(Source.SERVER).await() }
     assertFalse("rejected symptom must not be on the server", server.exists())
+  }
+
+  @Test
+  fun deleteOfAnotherUsersEntryReturnsButIsRejectedByServer(): Unit = runBlocking {
+    val bobUid = EmulatorTestData.createUser("bob")
+    val id = repository.addSymptom(bobUid, fatigue())
+    awaitServerAck()
+    EmulatorTestData.signIn("alice")
+
+    val elapsed = timed { withTimeout(5_000) { repository.deleteSymptom(bobUid, id) } }
+    assertTrue("deleteSymptom took $elapsed ms", elapsed < 1_000)
+    awaitServerAck()
+
+    EmulatorTestData.signIn("bob")
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(bobUid)).document(id).get(Source.SERVER).await()
+        }
+    assertTrue("rejected deletion must keep the symptom on the server", server.exists())
   }
 
   /** Whether the local cache holds an existing document for [doc]. */
@@ -326,5 +376,29 @@ class SymptomRepositoryFirestoreTest {
     val synced = observeOnce(id)
     assertSameContent(fatigue(), synced)
     assertNotNull(synced!!.createdAt)
+  }
+
+  @Test
+  fun offlineDeleteReturnsImmediately_hidesTheEntry_andSyncsWhenBackOnline(): Unit = runBlocking {
+    val id = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+    db.disableNetwork().await()
+    try {
+      val elapsed = timed { withTimeout(5_000) { repository.deleteSymptom(aliceUid, id) } }
+      assertTrue("deleteSymptom took $elapsed ms", elapsed < 1_000)
+
+      // Gone from the journal while still offline
+      assertEquals(emptyList<SymptomEntry>(), observeListOnce())
+      assertNull(observeOnce(id))
+    } finally {
+      db.enableNetwork().await()
+    }
+
+    awaitServerAck()
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(aliceUid)).document(id).get(Source.SERVER).await()
+        }
+    assertFalse("the deletion reaches the server once online", server.exists())
   }
 }

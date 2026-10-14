@@ -126,4 +126,44 @@ class FakeSymptomRepositoryTest {
       }
     }
   }
+
+  @Test
+  fun deleteRemovesOnlyThatEntryOfThatUser() = runTest {
+    val kept = entry("2026-10-05T08:00:00Z").copy(id = "kept")
+    repository.seed("alice", entry("2026-10-05T09:00:00Z").copy(id = "s1"), kept)
+    repository.seed("bob", entry("2026-10-05T09:00:00Z").copy(id = "s1"))
+
+    repository.deleteSymptom("alice", "s1")
+
+    assertEquals(listOf(kept), repository.symptoms("alice"))
+    assertEquals(listOf("s1"), repository.symptoms("bob").map { it.id })
+    assertNull(repository.observeSymptom("alice", "s1").first())
+  }
+
+  @Test
+  fun deleteMissingEntryDoesNothing() = runTest {
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+
+    repository.deleteSymptom("alice", "missing")
+    repository.deleteSymptom("nobody", "s1")
+
+    assertEquals(listOf(stored), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun writeErrorFailsDeleteAndKeepsTheEntry() = runTest {
+    val error = IllegalStateException("rejected")
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+    repository.writeError = error
+
+    try {
+      repository.deleteSymptom("alice", "s1")
+      fail("Expected the write error")
+    } catch (e: IllegalStateException) {
+      assertSame(error, e)
+    }
+    assertEquals(listOf(stored), repository.symptoms("alice"))
+  }
 }

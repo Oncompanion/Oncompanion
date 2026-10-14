@@ -97,6 +97,20 @@ class SymptomJournalViewModelTest {
   }
 
   @Test
+  fun deletedEntry_disappearsFromTheJournal() {
+    repository.seed(
+        "alice",
+        entry("kept", "2026-10-05T08:00:00Z"),
+        entry("deleted", "2026-10-04T21:30:00Z"),
+    )
+    val vm = viewModel()
+
+    runBlocking { repository.deleteSymptom("alice", "deleted") }
+
+    assertEquals(listOf(LocalDate.of(2026, 10, 5) to listOf("kept")), idsByDay(vm.uiState.value))
+  }
+
+  @Test
   fun eachEntry_hasItsLocalTime() {
     val entry = entry("s1", "2026-10-04T21:30:00Z")
     repository.seed("alice", entry)

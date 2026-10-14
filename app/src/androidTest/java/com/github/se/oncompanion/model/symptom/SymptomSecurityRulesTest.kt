@@ -19,6 +19,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -257,15 +258,40 @@ class SymptomSecurityRulesTest {
     assertCreateDenied(validSymptom().apply { put("createdAt", Timestamp.now()) })
   }
 
+  // ---- delete ----
+
+  @Test
+  fun ownerCanDelete(): Unit = runBlocking {
+    val doc = symptoms(aliceUid).document()
+    allowed(doc.set(validSymptom()))
+    allowed(doc.delete())
+    assertFalse(allowed(doc.get(Source.SERVER)).exists())
+  }
+
+  @Test
+  fun otherUserCannotDelete(): Unit = runBlocking {
+    val doc = symptoms(aliceUid).document()
+    allowed(doc.set(validSymptom()))
+    EmulatorTestData.signIn("bob")
+    denied(doc.delete())
+  }
+
+  @Test
+  fun signedOutCannotDelete(): Unit = runBlocking {
+    val doc = symptoms(aliceUid).document()
+    allowed(doc.set(validSymptom()))
+    EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
+    denied(doc.delete())
+  }
+
   // ---- entries can't change yet ----
 
   @Test
-  fun ownerCannotUpdateOrDelete(): Unit = runBlocking {
+  fun ownerCannotUpdate(): Unit = runBlocking {
     val doc = symptoms(aliceUid).document()
     allowed(doc.set(validSymptom()))
     denied(doc.update("intensity", 2))
     denied(doc.set(mapOf("intensity" to 2), SetOptions.merge()))
-    denied(doc.delete())
   }
 
   @Test

@@ -143,9 +143,10 @@ service cloud.firestore {
       }
 
       // ---------- Symptoms ----------
-      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can't be changed yet.
+      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can be deleted but not
+      // changed yet.
       match /symptoms/{symptomId} {
-        allow read: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidSymptom(request.resource.data)
                       && request.resource.data.createdAt == request.time;
