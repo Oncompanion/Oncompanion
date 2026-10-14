@@ -34,12 +34,12 @@ import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.shadows.ShadowToast
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleScreenTest {
@@ -462,26 +462,20 @@ class CareCircleScreenTest {
   }
 
   @Test
-  fun screen_addingAMember_explainsItIsNotImplemented() {
-    setScreen(listOf(sophie))
+  fun screen_addingAMember_opensTheForm() {
+    val navigationActions = setScreen(listOf(sophie))
     composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_add_member_not_implemented),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf(Screen.CARE_CIRCLE_ADD), navigationActions.navigatedTo)
     }
   }
 
   @Test
-  fun screen_emptyCircle_addButtonExplainsItIsNotImplemented() {
-    setScreen(emptyList())
+  fun screen_emptyCircle_addButtonOpensTheForm() {
+    val navigationActions = setScreen(emptyList())
     composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_add_member_not_implemented),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf(Screen.CARE_CIRCLE_ADD), navigationActions.navigatedTo)
     }
   }
 }

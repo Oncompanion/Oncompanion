@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.ui.carecircle
 
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,8 +35,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -60,10 +57,8 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 /**
  * Displays the members of the signed-in user's care circle (US-13), following the "US-13 / Circle
  * members" as well as the people invited who haven't joined yet. Tapping a member opens their
- * details (US-14). @TODO: Invitations don't open anything yet: the invite code screen comes in a
- * later PR.
- *
- * @TODO: Adding a member (US-13) comes in a later PR: for now it shows a toast.
+ * details (US-14), and "Add member" opens the form adding someone (#79). @TODO: Invitations don't
+ * open anything yet: the invite code screen comes in a later PR.
  */
 @Composable
 fun CareCircleScreen(
@@ -72,8 +67,6 @@ fun CareCircleScreen(
     viewModel: CareCircleViewModel = viewModel(),
 ) {
   val uiState by viewModel.uiState.collectAsState()
-  val context = LocalContext.current
-  val resources = LocalResources.current
   // Back from another screen or app: an invitation may have expired in the meantime
   LifecycleResumeEffect(viewModel) {
     viewModel.refreshExpiry()
@@ -86,11 +79,7 @@ fun CareCircleScreen(
       onMemberClick = { member ->
         navigationActions.navigateTo(Screen.careCircleMember(member.uid))
       },
-      onAddMember = {
-        // TODO: open the add member screen (US-13) instead of this toast
-        val message = resources.getString(R.string.care_circle_add_member_not_implemented)
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-      },
+      onAddMember = { navigationActions.navigateTo(Screen.CARE_CIRCLE_ADD) },
       onRetry = viewModel::retry,
       modifier = modifier,
   )

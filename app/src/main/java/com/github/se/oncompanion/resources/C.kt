@@ -232,6 +232,27 @@ object C {
     fun careCircleMemberPermission(permissionName: String) =
         "care_circle_member_permission_$permissionName"
 
+    // Add a care circle member
+    const val care_circle_form_screen = "care_circle_form_screen"
+    const val care_circle_form_back_button = "care_circle_form_back_button"
+    const val care_circle_form_first_name = "care_circle_form_first_name"
+    const val care_circle_form_family_name = "care_circle_form_family_name"
+    const val care_circle_form_relationship = "care_circle_form_relationship"
+    const val care_circle_form_email = "care_circle_form_email"
+    const val care_circle_form_can_see = "care_circle_form_can_see"
+    const val care_circle_form_save_button = "care_circle_form_save_button"
+    const val care_circle_form_saving = "care_circle_form_saving"
+    const val care_circle_form_missing = "care_circle_form_missing"
+    const val care_circle_form_save_error = "care_circle_form_save_error"
+
+    /** The relationship [relationshipName] in the relationship menu, e.g. "DAUGHTER". */
+    fun careCircleFormRelationshipOption(relationshipName: String) =
+        "care_circle_form_relationship_$relationshipName"
+
+    /** The switch giving access to [permissionName], e.g. "PLANNING". */
+    fun careCircleFormPermission(permissionName: String) =
+        "care_circle_form_permission_$permissionName"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
