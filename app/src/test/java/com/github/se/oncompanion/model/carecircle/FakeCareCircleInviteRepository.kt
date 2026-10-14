@@ -4,11 +4,13 @@ package com.github.se.oncompanion.model.carecircle
 
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 
 /**
  * In-memory [CareCircleInviteRepository] for ViewModel and screen tests (no Firebase).
@@ -18,8 +20,9 @@ import kotlinx.coroutines.flow.map
  * invite (or null), and writes refuse invalid details or emails. New invites are stored with
  * `isSynced = true` (the server has them); call [setInvites] to test unsynced ones. Test hooks:
  * [setInvites] replaces every invite, [observeError], [createError], [updateError] and
- * [cancelError] make the matching calls fail, [created] records the invites created (including
- * renewed ones), and [nextInviteCode] picks the next invite code.
+ * [cancelError] make the matching calls fail, [failObservations] makes the running observations
+ * fail, [created] records the invites created (including renewed ones), and [nextInviteCode] picks
+ * the next invite code.
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
  * [joinedCircles]; [isOffline] makes it fail like without a connection. The caregiver's role isn't
@@ -35,6 +38,17 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
 
   /** When non-null, collecting [observePendingInvites] or [observeInvite] fails with it. */
   var observeError: Exception? = null
+
+  /** Errors sent to the observations running when [failObservations] is called. */
+  private val listenerFailures = MutableSharedFlow<Exception>(extraBufferCapacity = 1)
+
+  /**
+   * Makes every running [observePendingInvites] and [observeInvite] collection fail with [error],
+   * like a snapshot listener that fails after its first results. Later collections aren't affected.
+   */
+  fun failObservations(error: Exception) {
+    listenerFailures.tryEmit(error)
+  }
 
   /** When non-null, [createInvite] and [renewInvite] throw it. */
   var createError: Exception? = null
@@ -175,6 +189,6 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
 
   private fun <T> observed(source: () -> Flow<T>): Flow<T> = flow {
     observeError?.let { throw it }
-    emitAll(source())
+    emitAll(merge(source(), listenerFailures.map { throw it }))
   }
 }

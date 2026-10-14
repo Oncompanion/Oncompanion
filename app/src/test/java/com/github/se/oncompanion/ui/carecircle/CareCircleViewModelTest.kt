@@ -444,6 +444,34 @@ class CareCircleViewModelTest {
   }
 
   @Test
+  fun listenerFailureAfterLoading_staysError_pastTheNextExpiry() = runTest {
+    val almostExpired =
+        invite(
+            "EEEEE23456",
+            "Almost",
+            createdAt = now.minus(Duration.ofDays(7)).plus(Duration.ofHours(1)),
+        )
+    invites.setInvites(listOf(almostExpired))
+    val viewModel = createViewModel()
+    runCurrent()
+    assertEquals(
+        CareCircleUiState.CareCircleMembers(emptyList(), pending(almostExpired)),
+        viewModel.uiState.value,
+    )
+
+    invites.failObservations(
+        FirebaseFirestoreException("denied", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+    )
+    runCurrent()
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
+
+    // The expiry timer must not bring back the list read before the failure
+    advanceTimeBy(1.hours + 1.seconds)
+    runCurrent()
+    assertEquals(CareCircleUiState.Error, viewModel.uiState.value)
+  }
+
+  @Test
   fun refreshExpiry_catchesUpWhenTheClockMovedWithoutTheTimer() = runTest {
     val almostExpired =
         invite(

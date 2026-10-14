@@ -21,7 +21,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -110,8 +109,9 @@ class CareCircleViewModel(
             ) { members, invites, _ ->
               members to invites
             }
-            .catch { _uiState.value = CareCircleUiState.Error }
-            // New data or a refresh cancels the wait below and starts again from the new lists
+            // New data or a refresh cancels the wait below and starts again from the new lists.
+            // A failing listener cancels it too and ends up in the catch below, so the timer can't
+            // show the old lists over the error
             .collectLatest { (members, invites) ->
               while (true) {
                 val now = clock.instant()
@@ -127,7 +127,7 @@ class CareCircleViewModel(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        // e.g. Firebase not available
+        // e.g. Firebase not available, or a listener refused by the rules
         _uiState.value = CareCircleUiState.Error
       }
     }
