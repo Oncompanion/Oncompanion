@@ -16,8 +16,9 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
 object PlanningRepositoryProvider {
   /**
    * By default, the signed-in patient's appointments and the Ligue's upcoming events, merged by
-   * [ObservePlanning]. The providers are read on each observation, so replacing them also reaches
-   * Planning.
+   * [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read, Planning
+   * still shows the appointments instead of an error. The providers are read on each observation,
+   * so replacing them also reaches Planning.
    */
   @Volatile
   var repository: PlanningRepository = PlanningRepository { range ->
@@ -26,7 +27,8 @@ object PlanningRepositoryProvider {
                 AppointmentRepositoryProvider.repository,
                 AuthRepositoryProvider.repository,
             ),
-            EventPlanningSource(EventRepositoryProvider.repository),
+            // Events are nice to have: if they fail, the appointments still show
+            OptionalPlanningSource(EventPlanningSource(EventRepositoryProvider.repository)),
         )
         .observeItems(range)
   }

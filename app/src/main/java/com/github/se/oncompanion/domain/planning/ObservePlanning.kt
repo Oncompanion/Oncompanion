@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.flowOf
  * them through its own [PlanningRepository]; adding a feature to Planning is one more source here.
  *
  * The list updates whenever one of the sources changes. If a source fails, the whole list fails, so
- * the screen shows its error and retry instead of a calendar that silently misses entries.
+ * the screen shows its error and retry instead of a calendar that silently misses entries. A source
+ * that isn't essential (the Ligue's events) is wrapped in [OptionalPlanningSource], so its failure
+ * only hides its own entries.
  */
 class ObservePlanning(private val sources: List<PlanningRepository>) : PlanningRepository {
 
