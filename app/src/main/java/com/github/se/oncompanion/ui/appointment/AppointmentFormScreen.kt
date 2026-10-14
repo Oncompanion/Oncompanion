@@ -155,7 +155,9 @@ fun AppointmentFormContent(
           stringResource(R.string.appointment_date),
           { if (state.editable) dateOpen = true },
           stringResource(R.string.appointment_pick_date),
-          trailingIcon = {},
+          trailingIcon = {
+            Icon(painterResource(R.drawable.ic_calendar_month), contentDescription = null)
+          },
           modifier = Modifier.testTag(C.Tag.appointment_date),
       )
       val use24Hours = DateFormat.is24HourFormat(LocalContext.current)
@@ -165,7 +167,9 @@ fun AppointmentFormContent(
           stringResource(R.string.appointment_time),
           { if (state.editable) timeOpen = true },
           stringResource(R.string.appointment_pick_time),
-          trailingIcon = {},
+          trailingIcon = {
+            Icon(painterResource(R.drawable.ic_schedule), contentDescription = null)
+          },
           supportingText = { Text(stringResource(R.string.appointment_required)) },
           modifier = Modifier.testTag(C.Tag.appointment_time),
       )
