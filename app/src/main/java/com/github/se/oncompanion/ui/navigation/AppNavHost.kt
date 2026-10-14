@@ -16,8 +16,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -48,8 +46,6 @@ import com.github.se.oncompanion.ui.profile.ProfileViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
-import java.time.Clock
-import java.time.ZoneId
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -107,13 +103,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) {
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(
-              PlanningRepositoryProvider.repository,
-              Clock.systemDefaultZone(),
-              ZoneId.systemDefault(),
-              createSavedStateHandle(),
-              AuthRepositoryProvider.repository,
-          )
+          PlanningViewModel(savedStateHandle = createSavedStateHandle())
         }
         PlanningScreen(navigationActions, planningViewModel)
       }
