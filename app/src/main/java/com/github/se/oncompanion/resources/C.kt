@@ -110,6 +110,11 @@ object C {
     const val symptom_detail_when = "symptom_detail_when"
     const val symptom_detail_intensity = "symptom_detail_intensity"
     const val symptom_detail_notes = "symptom_detail_notes"
+    const val symptom_detail_delete = "symptom_detail_delete"
+    const val symptom_delete_dialog = "symptom_delete_dialog"
+    const val symptom_delete_confirm = "symptom_delete_confirm"
+    const val symptom_delete_cancel = "symptom_delete_cancel"
+    const val symptom_delete_error = "symptom_delete_error"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile

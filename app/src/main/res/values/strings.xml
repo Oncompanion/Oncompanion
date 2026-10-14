@@ -112,6 +112,12 @@
     <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
     <!-- Severity · start of the notes, under a journal entry, e.g. "Moderate · Hiccups since lunch" -->
     <string name="symptom_journal_summary">%1$s · %2$s</string>
+    <string name="symptom_detail_delete">Delete entry</string>
+    <string name="symptom_delete_title">Delete this entry?</string>
+    <string name="symptom_delete_message">It will be removed from your symptom journal. You can\'t undo this.</string>
+    <string name="symptom_delete_confirm">Delete</string>
+    <string name="symptom_delete_cancel">Cancel</string>
+    <string name="symptom_delete_error">Couldn\'t delete this entry. Try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
