@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -131,17 +132,20 @@ fun AppointmentFormContent(
           singleLine = true,
           isError =
               (state.titleTouched && state.title.isBlank()) ||
-                  state.title.length > Appointment.MAX_TITLE_LENGTH,
+                  state.title.trim().length > Appointment.MAX_TITLE_LENGTH,
           supportingText = {
             Text(
-                stringResource(
-                    if (state.title.length > Appointment.MAX_TITLE_LENGTH)
-                        R.string.appointment_text_limit
-                    else if (state.titleTouched && state.title.isBlank())
-                        R.string.appointment_title_missing
-                    else R.string.appointment_required,
-                    Appointment.MAX_TITLE_LENGTH,
-                )
+                when {
+                  state.title.trim().length > Appointment.MAX_TITLE_LENGTH ->
+                      pluralStringResource(
+                          R.plurals.appointment_text_limit,
+                          Appointment.MAX_TITLE_LENGTH,
+                          Appointment.MAX_TITLE_LENGTH,
+                      )
+                  state.titleTouched && state.title.isBlank() ->
+                      stringResource(R.string.appointment_title_missing)
+                  else -> stringResource(R.string.appointment_required)
+                }
             )
           },
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.appointment_title),
@@ -189,12 +193,16 @@ fun AppointmentFormContent(
             enabled = state.editable,
             singleLine = true,
             label = { Text(stringResource(R.string.appointment_location)) },
-            isError = state.location.length > Appointment.MAX_LOCATION_LENGTH,
+            isError = state.location.trim().length > Appointment.MAX_LOCATION_LENGTH,
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.appointment_location),
         )
-        if (state.location.length > Appointment.MAX_LOCATION_LENGTH)
+        if (state.location.trim().length > Appointment.MAX_LOCATION_LENGTH)
             Text(
-                stringResource(R.string.appointment_text_limit, Appointment.MAX_LOCATION_LENGTH),
+                pluralStringResource(
+                    R.plurals.appointment_text_limit,
+                    Appointment.MAX_LOCATION_LENGTH,
+                    Appointment.MAX_LOCATION_LENGTH,
+                ),
                 color = MaterialTheme.colorScheme.error,
             )
       }
@@ -225,10 +233,16 @@ fun AppointmentFormContent(
           enabled = state.editable,
           minLines = 3,
           label = { Text(stringResource(R.string.appointment_notes)) },
-          isError = state.notes.length > Appointment.MAX_NOTES_LENGTH,
+          isError = state.notes.trim().length > Appointment.MAX_NOTES_LENGTH,
           supportingText = {
-            if (state.notes.length > Appointment.MAX_NOTES_LENGTH)
-                Text(stringResource(R.string.appointment_text_limit, Appointment.MAX_NOTES_LENGTH))
+            if (state.notes.trim().length > Appointment.MAX_NOTES_LENGTH)
+                Text(
+                    pluralStringResource(
+                        R.plurals.appointment_text_limit,
+                        Appointment.MAX_NOTES_LENGTH,
+                        Appointment.MAX_NOTES_LENGTH,
+                    )
+                )
           },
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.appointment_notes),
       )

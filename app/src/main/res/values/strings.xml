@@ -292,7 +292,10 @@
     <string name="appointment_pick_time">Choose a time</string>
     <string name="appointment_required">Required</string>
     <string name="appointment_title_missing">Please enter a title</string>
-    <string name="appointment_text_limit">Use at most %1$d characters</string>
+    <plurals name="appointment_text_limit">
+        <item quantity="one">Use at most %1$d character</item>
+        <item quantity="other">Use at most %1$d characters</item>
+    </plurals>
     <string name="appointment_missing_time">This time does not exist on this date. Choose another time.</string>
     <string name="appointment_repeated_time">This time occurs twice. Choose its UTC offset.</string>
     <string name="appointment_offset">UTC %1$s</string>

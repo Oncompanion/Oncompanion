@@ -64,6 +64,24 @@ class AppointmentFormViewModelTest {
     }
   }
 
+  /** Limits apply to stored text while whitespace-only titles remain invalid. */
+  @Test
+  fun surroundingWhitespaceDoesNotConsumeStoredLimits() =
+      runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onTitleChange("  " + "t".repeat(Appointment.MAX_TITLE_LENGTH) + "  ")
+        vm.onTimeChange(LocalTime.NOON)
+        vm.onLocationChange("  " + "l".repeat(Appointment.MAX_LOCATION_LENGTH) + "  ")
+        vm.onNotesChange("  " + "n".repeat(Appointment.MAX_NOTES_LENGTH) + "  ")
+        assertTrue(vm.uiState.value.canSave)
+        vm.save()
+        advanceUntilIdle()
+        val saved = repo.appointments("uid-patient").single()
+        assertEquals(Appointment.MAX_TITLE_LENGTH, saved.title.length)
+        assertEquals(Appointment.MAX_LOCATION_LENGTH, saved.location!!.length)
+        assertEquals(Appointment.MAX_NOTES_LENGTH, saved.notes!!.length)
+      }
+
   /** A save records normalized text and the exact Zurich instant only once. */
   @Test
   fun saveRecordsAllFieldsAndBlocksRepeatedSubmission() =

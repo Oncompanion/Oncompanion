@@ -101,6 +101,47 @@ class AppointmentFormScreenTest {
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
   }
 
+  /** Padding around stored-limit text does not show a contradictory error. */
+  @Test
+  fun trimmedLimitsKeepSaveEnabledWithoutLengthErrors() {
+    show(
+        state()
+            .copy(
+                title = " " + "t".repeat(100) + " ",
+                time = LocalTime.NOON,
+                location = " " + "l".repeat(200) + " ",
+                notes = " " + "n".repeat(1000) + " ",
+            )
+    )
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsEnabled()
+    for (limit in listOf(100, 200, 1000)) compose
+        .onNodeWithText("Use at most $limit characters")
+        .assertDoesNotExist()
+  }
+
+  /** Limit messages select the correct English singular and plural forms. */
+  @Test
+  fun characterLimitMessagesUsePluralResources() {
+    compose.setContent {
+      androidx.compose.material3.Text(
+          androidx.compose.ui.res.pluralStringResource(
+              com.github.se.oncompanion.R.plurals.appointment_text_limit,
+              1,
+              1,
+          )
+      )
+      androidx.compose.material3.Text(
+          androidx.compose.ui.res.pluralStringResource(
+              com.github.se.oncompanion.R.plurals.appointment_text_limit,
+              2,
+              2,
+          )
+      )
+    }
+    compose.onNodeWithText("Use at most 1 character").assertExists()
+    compose.onNodeWithText("Use at most 2 characters").assertExists()
+  }
+
   /** The real Screen records optional location text only after confirmation. */
   @Test
   fun realScreenSavesManualLocationOnce() {

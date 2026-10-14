@@ -68,9 +68,9 @@ data class AppointmentFormUiState(
     get() =
         editable &&
             title.isNotBlank() &&
-            title.length <= Appointment.MAX_TITLE_LENGTH &&
-            location.length <= Appointment.MAX_LOCATION_LENGTH &&
-            notes.length <= Appointment.MAX_NOTES_LENGTH &&
+            title.trim().length <= Appointment.MAX_TITLE_LENGTH &&
+            location.trim().length <= Appointment.MAX_LOCATION_LENGTH &&
+            notes.trim().length <= Appointment.MAX_NOTES_LENGTH &&
             instant?.let {
               it >= Appointment.MIN_SCHEDULED_AT && it <= Appointment.MAX_SCHEDULED_AT
             } == true
