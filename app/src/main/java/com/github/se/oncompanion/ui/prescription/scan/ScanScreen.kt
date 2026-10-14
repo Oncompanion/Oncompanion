@@ -191,10 +191,10 @@ fun ScanContent(
     onBack: () -> Unit,
     onEnterManually: () -> Unit,
     onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
     onCapture: () -> Unit = {},
     onMessageShown: () -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
   // One message at a time about the last photo, then the view model forgets it
   val snackbarHostState = remember { SnackbarHostState() }
