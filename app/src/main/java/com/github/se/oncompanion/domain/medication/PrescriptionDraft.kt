@@ -84,4 +84,26 @@ data class MedicationDraft(
       )
 }
 
+/**
+ * The draft that shows this saved prescription in the prescription form, so the user can correct
+ * it. Each medication keeps its ID, which is how saving the draft changes the saved medication
+ * instead of adding another one. An optional text that isn't stored is empty.
+ */
+fun Prescription.toDraft(): PrescriptionDraft =
+    PrescriptionDraft(
+        prescribedBy = prescribedBy.orEmpty(),
+        prescribedOn = prescribedOn,
+        medications =
+            medications.map {
+              MedicationDraft(
+                  id = it.id,
+                  name = it.name,
+                  dosage = it.dosage.orEmpty(),
+                  frequency = it.frequency.orEmpty(),
+                  startDate = it.startDate,
+                  durationDays = it.durationDays,
+              )
+            },
+    )
+
 private const val PLACEHOLDER_ID = "draft"

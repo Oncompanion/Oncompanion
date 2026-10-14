@@ -12,8 +12,10 @@ import com.google.firebase.firestore.Source
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -130,6 +132,18 @@ class MedicationRepositoryFirestoreTest {
         "startDate": $rawDay}}}"""
   }
 
+  /**
+   * Waits for the next value of one running collection that satisfies [predicate]. Unlike
+   * [awaitFirst], which starts a new listener each time, it follows a single listener through
+   * several changes.
+   */
+  private suspend fun <T> ReceiveChannel<T>.awaitNext(predicate: (T) -> Boolean = { true }): T =
+      withTimeout(10.seconds) {
+        var value = receive()
+        while (!predicate(value)) value = receive()
+        value
+      }
+
   /** Waits for the first value of the stream that satisfies [predicate]. */
   private suspend fun <T> Flow<T>.awaitFirst(predicate: (T) -> Boolean = { true }): T =
       withTimeout(10.seconds) { first { predicate(it) } }
@@ -165,21 +179,24 @@ class MedicationRepositoryFirestoreTest {
     assertNotEquals(first, second)
   }
 
-  // ---- add / get ----
+  // ---- add / observe one ----
 
   @Test
-  fun getUnknownPrescriptionReturnsNull(): Unit = runBlocking {
-    assertNull(repository.getPrescription(aliceUid, "nothing"))
+  fun observeUnknownPrescriptionEmitsNull(): Unit = runBlocking {
+    assertNull(repository.observePrescription(aliceUid, "nothing").awaitFirst())
   }
 
   @Test
-  fun addThenGetRoundTrip(): Unit = runBlocking {
+  fun addThenObserveRoundTrip(): Unit = runBlocking {
     repository.addPrescription(aliceUid, prescription())
 
-    assertSameContent(prescription(), repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(
+        prescription(),
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst(),
+    )
 
     awaitServerAck()
-    val stored = repository.getPrescription(aliceUid, "presc-1")
+    val stored = repository.observePrescription(aliceUid, "presc-1").awaitFirst()
     assertSameContent(prescription(), stored)
     assertNotNull("createdAt is set once the server confirms", stored!!.createdAt)
   }
@@ -203,7 +220,7 @@ class MedicationRepositoryFirestoreTest {
     repository.addPrescription(aliceUid, minimal)
     awaitServerAck()
 
-    val stored = repository.getPrescription(aliceUid, "minimal")
+    val stored = repository.observePrescription(aliceUid, "minimal").awaitFirst()
     assertSameContent(minimal, stored)
     assertNull(stored!!.prescribedBy)
     assertNull(stored.medications.single().durationDays)
@@ -231,7 +248,9 @@ class MedicationRepositoryFirestoreTest {
 
     assertEquals(
         names,
-        repository.getPrescription(aliceUid, "presc-1")!!.medications.map { it.name },
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst()!!.medications.map {
+          it.name
+        },
     )
   }
 
@@ -240,7 +259,7 @@ class MedicationRepositoryFirestoreTest {
     repository.addPrescription(aliceUid, prescription().copy(createdAt = Instant.EPOCH))
     awaitServerAck()
 
-    val stored = repository.getPrescription(aliceUid, "presc-1")
+    val stored = repository.observePrescription(aliceUid, "presc-1").awaitFirst()
     assertNotNull(stored!!.createdAt)
     assertTrue(stored.createdAt!!.isAfter(Instant.parse("2020-01-01T00:00:00Z")))
   }
@@ -314,7 +333,10 @@ class MedicationRepositoryFirestoreTest {
         Timestamp(Instant.parse("2026-01-14T23:00:00Z")),
         serverMedications("presc-1").singleOrNull()?.get("startDate"),
     )
-    assertSameContent(summerAndWinter, repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(
+        summerAndWinter,
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst(),
+    )
   }
 
   @Test
@@ -324,7 +346,7 @@ class MedicationRepositoryFirestoreTest {
 
     val bobUid = EmulatorTestData.createUser("bob")
 
-    assertNull(repository.getPrescription(bobUid, "presc-1"))
+    assertNull(repository.observePrescription(bobUid, "presc-1").awaitFirst())
   }
 
   // ---- observe prescriptions ----
@@ -438,6 +460,49 @@ class MedicationRepositoryFirestoreTest {
     }
   }
 
+  // ---- observe one prescription ----
+
+  @Test
+  fun observePrescriptionEmitsTheUpdateThenTheDeletion(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    val values = repository.observePrescription(aliceUid, "presc-1").produceIn(this)
+    assertSameContent(prescription(), values.awaitNext())
+
+    repository.updatePrescription(aliceUid, edited())
+    assertSameContent(edited(), values.awaitNext { it?.prescribedBy == "Dr. Leroy" })
+
+    repository.deletePrescription(aliceUid, "presc-1")
+    assertNull(values.awaitNext { it == null })
+    values.cancel()
+  }
+
+  @Test
+  fun observePrescriptionEmitsNullForAMalformedDocument(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users/$aliceUid/prescriptions",
+        "malformed",
+        """{"prescribedBy": {"stringValue": "Dr. Nobody"}}""",
+    )
+
+    assertNull(repository.observePrescription(aliceUid, "malformed").awaitFirst())
+  }
+
+  @Test
+  fun observePrescriptionOfAnotherUserEndsWithPermissionDenied(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    EmulatorTestData.createUser("bob")
+
+    try {
+      // Collected until it fails: the stream may first emit what this device has cached
+      withTimeout(10.seconds) { repository.observePrescription(aliceUid, "presc-1").collect {} }
+      fail("Expected FirebaseFirestoreException")
+    } catch (e: FirebaseFirestoreException) {
+      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
+    }
+  }
+
   // ---- stored values the security rules don't check ----
 
   @Test
@@ -454,7 +519,7 @@ class MedicationRepositoryFirestoreTest {
         ),
     )
 
-    val stored = repository.getPrescription(aliceUid, "mixed")
+    val stored = repository.observePrescription(aliceUid, "mixed").awaitFirst()
 
     assertEquals(listOf("valid-1", "valid-2"), stored?.medications?.map { it.id })
   }
@@ -478,7 +543,7 @@ class MedicationRepositoryFirestoreTest {
         ),
     )
 
-    val stored = repository.getPrescription(aliceUid, "mixed")
+    val stored = repository.observePrescription(aliceUid, "mixed").awaitFirst()
 
     assertEquals(listOf("one-day", "max", "no-end"), stored?.medications?.map { it.id })
     assertEquals(listOf(1, 3650, null), stored?.medications?.map { it.durationDays })
@@ -496,7 +561,7 @@ class MedicationRepositoryFirestoreTest {
         ),
     )
 
-    val stored = repository.getPrescription(aliceUid, "repeated")
+    val stored = repository.observePrescription(aliceUid, "repeated").awaitFirst()
 
     // The first one is kept
     assertEquals(listOf("twice", "once"), stored?.medications?.map { it.id })
@@ -516,7 +581,7 @@ class MedicationRepositoryFirestoreTest {
     repository.addPrescription(aliceUid, prescription())
     awaitServerAck()
 
-    assertNull(repository.getPrescription(aliceUid, "all-invalid"))
+    assertNull(repository.observePrescription(aliceUid, "all-invalid").awaitFirst())
     val observed = repository.observeMedications(aliceUid).awaitFirst { it.isNotEmpty() }
     assertEquals(
         prescription().medications.map { it.id }.sorted(),
@@ -598,9 +663,9 @@ class MedicationRepositoryFirestoreTest {
 
     repository.updatePrescription(aliceUid, edited())
 
-    assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(edited(), repository.observePrescription(aliceUid, "presc-1").awaitFirst())
     awaitServerAck()
-    assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(edited(), repository.observePrescription(aliceUid, "presc-1").awaitFirst())
   }
 
   @Test
@@ -618,13 +683,16 @@ class MedicationRepositoryFirestoreTest {
   fun updateKeepsCreatedAt(): Unit = runBlocking {
     repository.addPrescription(aliceUid, prescription())
     awaitServerAck()
-    val createdAt = repository.getPrescription(aliceUid, "presc-1")!!.createdAt
+    val createdAt = repository.observePrescription(aliceUid, "presc-1").awaitFirst()!!.createdAt
     assertNotNull(createdAt)
 
     repository.updatePrescription(aliceUid, edited().copy(createdAt = Instant.EPOCH))
     awaitServerAck()
 
-    assertEquals(createdAt, repository.getPrescription(aliceUid, "presc-1")!!.createdAt)
+    assertEquals(
+        createdAt,
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst()!!.createdAt,
+    )
   }
 
   @Test
@@ -637,7 +705,7 @@ class MedicationRepositoryFirestoreTest {
     repository.updatePrescription(aliceUid, edited())
     awaitServerAck()
 
-    assertSameContent(other, repository.getPrescription(aliceUid, "other"))
+    assertSameContent(other, repository.observePrescription(aliceUid, "other").awaitFirst())
   }
 
   @Test
@@ -645,7 +713,7 @@ class MedicationRepositoryFirestoreTest {
     repository.updatePrescription(aliceUid, edited())
     awaitServerAck()
 
-    assertNull(repository.getPrescription(aliceUid, "presc-1"))
+    assertNull(repository.observePrescription(aliceUid, "presc-1").awaitFirst())
     assertFalse(serverPrescription("presc-1").exists())
   }
 
@@ -662,7 +730,10 @@ class MedicationRepositoryFirestoreTest {
     }
     awaitServerAck()
 
-    assertSameContent(prescription(), repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(
+        prescription(),
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst(),
+    )
   }
 
   @Test
@@ -693,11 +764,11 @@ class MedicationRepositoryFirestoreTest {
 
     repository.deletePrescription(aliceUid, "presc-1")
 
-    assertNull(repository.getPrescription(aliceUid, "presc-1"))
+    assertNull(repository.observePrescription(aliceUid, "presc-1").awaitFirst())
     awaitServerAck()
     assertFalse(serverPrescription("presc-1").exists())
     // The other prescription is untouched
-    assertSameContent(other, repository.getPrescription(aliceUid, "other"))
+    assertSameContent(other, repository.observePrescription(aliceUid, "other").awaitFirst())
     assertEquals(
         listOf("other-med"),
         repository.observeMedications(aliceUid).awaitFirst { it.size == 1 }.map { it.id },
@@ -712,7 +783,10 @@ class MedicationRepositoryFirestoreTest {
     repository.deletePrescription(aliceUid, "nothing")
     awaitServerAck()
 
-    assertSameContent(prescription(), repository.getPrescription(aliceUid, "presc-1"))
+    assertSameContent(
+        prescription(),
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst(),
+    )
   }
 
   @Test
@@ -732,21 +806,80 @@ class MedicationRepositoryFirestoreTest {
   // ---- offline ----
 
   @Test
-  fun addAndGetWorkOffline(): Unit = runBlocking {
+  fun addAndObserveWorkOffline(): Unit = runBlocking {
     db.disableNetwork().await()
 
     withTimeout(5.seconds) { repository.addPrescription(aliceUid, prescription()) }
 
-    val cached = withTimeout(5.seconds) { repository.getPrescription(aliceUid, "presc-1") }
+    val cached =
+        withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() }
     assertSameContent(prescription(), cached)
     assertNull("Not confirmed by the server yet", cached!!.createdAt)
   }
 
   @Test
-  fun getUnknownPrescriptionOfflineReturnsNull(): Unit = runBlocking {
+  fun observeUnknownPrescriptionOfflineEmitsNull(): Unit = runBlocking {
     db.disableNetwork().await()
 
-    assertNull(withTimeout(5.seconds) { repository.getPrescription(aliceUid, "nothing") })
+    assertNull(
+        withTimeout(5.seconds) { repository.observePrescription(aliceUid, "nothing").awaitFirst() }
+    )
+  }
+
+  @Test
+  fun observePrescriptionEmitsAPrescriptionThisDeviceNeverLoadedOnceBackOnline(): Unit =
+      runBlocking {
+        db.disableNetwork().await()
+        // Saved from another device: this one, offline, has never seen it
+        EmulatorTestData.createRawDocument(
+            "users/$aliceUid/prescriptions",
+            "elsewhere",
+            rawPrescription("elsewhere-med" to "Zolpidem"),
+        )
+        val values = repository.observePrescription(aliceUid, "elsewhere").produceIn(this)
+        assertNull(values.awaitNext())
+
+        db.enableNetwork().await()
+
+        val found = values.awaitNext { it != null }
+        assertEquals(listOf("elsewhere-med"), found!!.medications.map { it.id })
+        values.cancel()
+      }
+
+  @Test
+  fun observePrescriptionEmitsNullOnceBackOnlineWhenItWasDeletedElsewhere(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    db.disableNetwork().await()
+    // Deleted from another device while this one is offline: it still shows its cached copy
+    EmulatorTestData.deleteRawDocument("users/$aliceUid/prescriptions/presc-1")
+    val values = repository.observePrescription(aliceUid, "presc-1").produceIn(this)
+    assertSameContent(prescription(), values.awaitNext())
+
+    db.enableNetwork().await()
+
+    assertNull(values.awaitNext { it == null })
+    values.cancel()
+  }
+
+  @Test
+  fun observePrescriptionEmitsAChangeMadeElsewhereOnceBackOnline(): Unit = runBlocking {
+    repository.addPrescription(aliceUid, prescription())
+    awaitServerAck()
+    db.disableNetwork().await()
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/prescriptions",
+        "presc-1",
+        rawPrescription("changed-elsewhere" to "Zolpidem"),
+    )
+    val values = repository.observePrescription(aliceUid, "presc-1").produceIn(this)
+    assertSameContent(prescription(), values.awaitNext())
+
+    db.enableNetwork().await()
+
+    val changed = values.awaitNext { it?.medications?.size == 1 }
+    assertEquals(listOf("changed-elsewhere"), changed!!.medications.map { it.id })
+    values.cancel()
   }
 
   @Test
@@ -758,11 +891,13 @@ class MedicationRepositoryFirestoreTest {
     withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
     assertSameContent(
         edited(),
-        withTimeout(5.seconds) { repository.getPrescription(aliceUid, "presc-1") },
+        withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() },
     )
 
     withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
-    assertNull(withTimeout(5.seconds) { repository.getPrescription(aliceUid, "presc-1") })
+    assertNull(
+        withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() }
+    )
   }
 
   @Test
@@ -792,7 +927,10 @@ class MedicationRepositoryFirestoreTest {
         db.enableNetwork().await()
         awaitServerAck()
 
-        assertSameContent(edited(), repository.getPrescription(aliceUid, "presc-1"))
+        assertSameContent(
+            edited(),
+            repository.observePrescription(aliceUid, "presc-1").awaitFirst(),
+        )
         assertEquals(listOf("presc-1-dexamethasone", "presc-1-new"), serverMedicationIds("presc-1"))
       }
 

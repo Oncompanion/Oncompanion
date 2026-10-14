@@ -99,6 +99,7 @@ class SymptomJournalScreenTest {
       state: SymptomJournalUiState,
       onBack: () -> Unit = {},
       onEntryClick: (String) -> Unit = {},
+      onAddClick: () -> Unit = {},
       onRetry: () -> Unit = {},
   ) {
     composeTestRule.setContent {
@@ -106,6 +107,7 @@ class SymptomJournalScreenTest {
           uiState = state,
           onBack = onBack,
           onEntryClick = onEntryClick,
+          onAddClick = onAddClick,
           onRetry = onRetry,
       )
     }
@@ -301,6 +303,30 @@ class SymptomJournalScreenTest {
     assertEquals(1, backs)
   }
 
+  @Test
+  fun addButton_isShownWhenEmpty_andOpensTheAddScreen() {
+    var adds = 0
+    setContent(loaded, onAddClick = { adds++ })
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed().performClick()
+
+    assertEquals(1, adds)
+  }
+
+  @Test
+  fun addButton_isShownWithEntries() {
+    setContent(filled)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
+  }
+
+  @Test
+  fun addButton_isShownAfterAnError() {
+    setContent(loaded.copy(hasError = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
+  }
+
   // ----- With the ViewModel -----
 
   @Test
@@ -318,10 +344,14 @@ class SymptomJournalScreenTest {
     }
 
     composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
     composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
 
     composeTestRule.runOnIdle {
-      assertEquals(listOf(Screen.symptomDetail("fatigue")), navigationActions.opened)
+      assertEquals(
+          listOf(Screen.symptomDetail("fatigue"), Screen.SYMPTOM_ADD),
+          navigationActions.opened,
+      )
       assertEquals(1, navigationActions.backCount)
     }
   }

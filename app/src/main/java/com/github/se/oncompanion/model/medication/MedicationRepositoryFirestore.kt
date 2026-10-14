@@ -57,8 +57,17 @@ class MedicationRepositoryFirestore(
             )
       }
 
-  override suspend fun getPrescription(uid: String, id: String): Prescription? =
-      existingPrescription(uid, id)?.let(::toPrescription)
+  override fun observePrescription(uid: String, id: String): Flow<Prescription?> = callbackFlow {
+    val registration =
+        prescriptions(uid).document(id).addSnapshotListener { snapshot, error ->
+          if (error != null) {
+            close(error)
+          } else {
+            trySend(snapshot?.let(::toPrescription))
+          }
+        }
+    awaitClose { registration.remove() }
+  }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
       prescriptions(uid).snapshots().map { documents ->
@@ -93,18 +102,6 @@ class MedicationRepositoryFirestore(
 
   private fun prescriptions(uid: String) =
       db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
-
-  /**
-   * The document of prescription [id], or `null` if it doesn't exist, or if the device is offline
-   * and has never loaded it.
-   */
-  private suspend fun existingPrescription(uid: String, id: String): DocumentSnapshot? =
-      try {
-        prescriptions(uid).document(id).get().await().takeIf { it.exists() }
-      } catch (e: FirebaseFirestoreException) {
-        // Offline, Firestore fails on a document it has never seen: there is nothing to return
-        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) null else throw e
-      }
 
   /**
    * Whether this device knows that prescription [id] doesn't exist (e.g. it was deleted). Only
@@ -167,26 +164,28 @@ class MedicationRepositoryFirestore(
    * Builds a prescription from its document. The security rules don't check the fields of each
    * medication, so they are checked here: a medication that can't be read or is not
    * [Medication.isValid] is left out, and so is one that repeats the ID of an earlier one. `null`
-   * if the document itself can't be read or none of its medications is kept.
+   * if the document doesn't exist, can't be read, or none of its medications is kept.
    */
-  private fun toPrescription(doc: DocumentSnapshot): Prescription? =
-      try {
-        Prescription(
-                id = doc.id,
-                prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
-                prescribedOn = doc.getTimestamp(FIELD_PRESCRIBED_ON)!!.toLocalDate(),
-                medications =
-                    (doc.get(FIELD_MEDICATIONS) as List<*>)
-                        .mapNotNull { toMedication(doc.id, it) }
-                        .distinctBy { it.id },
-                // Pending server timestamps read as null until the write reaches the server
-                createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
-            )
-            .takeIf { it.medications.isNotEmpty() }
-      } catch (e: Exception) {
-        Log.e(TAG, "Malformed prescription document ${doc.id}", e)
-        null
-      }
+  private fun toPrescription(doc: DocumentSnapshot): Prescription? {
+    if (!doc.exists()) return null
+    return try {
+      Prescription(
+              id = doc.id,
+              prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
+              prescribedOn = requireNotNull(doc.getTimestamp(FIELD_PRESCRIBED_ON)).toLocalDate(),
+              medications =
+                  (doc.get(FIELD_MEDICATIONS) as List<*>)
+                      .mapNotNull { toMedication(doc.id, it) }
+                      .distinctBy { it.id },
+              // Pending server timestamps read as null until the write reaches the server
+              createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
+          )
+          .takeIf { it.medications.isNotEmpty() }
+    } catch (e: Exception) {
+      Log.e(TAG, "Malformed prescription document ${doc.id}", e)
+      null
+    }
+  }
 
   /**
    * Builds a medication from one entry of the list of medications of [prescriptionId], or `null` if

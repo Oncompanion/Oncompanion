@@ -4,6 +4,7 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import java.time.Instant
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -249,6 +250,78 @@ class PrescriptionDraftTest {
     assertNull(prescription.medications[0].dosage)
     assertNull(prescription.medications[0].frequency)
     assertNull(prescription.medications[0].durationDays)
+  }
+
+  // ---------- From a saved prescription ----------
+
+  private val saved =
+      Prescription(
+          id = "presc-1",
+          prescribedBy = "Dr. Martin",
+          prescribedOn = date,
+          medications =
+              listOf(
+                  Medication(
+                      id = "med-1",
+                      prescriptionId = "presc-1",
+                      name = "Ondansetron 8 mg",
+                      dosage = "1 tablet",
+                      frequency = "Twice a day",
+                      startDate = date.plusDays(1),
+                      durationDays = 5,
+                  ),
+                  Medication(
+                      id = "med-2",
+                      prescriptionId = "presc-1",
+                      name = "Dexamethasone",
+                      startDate = date,
+                  ),
+              ),
+          createdAt = Instant.parse("2026-09-29T08:00:00Z"),
+      )
+
+  @Test
+  fun draftOfASavedPrescriptionShowsWhatWasSaved() {
+    val expected =
+        PrescriptionDraft(
+            prescribedBy = "Dr. Martin",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    MedicationDraft(
+                        id = "med-1",
+                        name = "Ondansetron 8 mg",
+                        dosage = "1 tablet",
+                        frequency = "Twice a day",
+                        startDate = date.plusDays(1),
+                        durationDays = 5,
+                    ),
+                    MedicationDraft(id = "med-2", name = "Dexamethasone", startDate = date),
+                ),
+        )
+
+    assertEquals(expected, saved.toDraft())
+  }
+
+  @Test
+  fun optionalTextNotSavedIsEmptyInTheDraft() {
+    val bare = saved.copy(prescribedBy = null, medications = saved.medications.drop(1))
+
+    val draft = bare.toDraft()
+
+    assertEquals("", draft.prescribedBy)
+    assertEquals("", draft.medications.single().dosage)
+    assertEquals("", draft.medications.single().frequency)
+    assertNull(draft.medications.single().durationDays)
+  }
+
+  @Test
+  fun draftOfASavedPrescriptionIsValidAndMakesTheSamePrescriptionAgain() {
+    val draft = saved.toDraft()
+
+    assertTrue(draft.isValid())
+    // No new ID is needed: every medication keeps its own. Only the server sets createdAt.
+    assertEquals(saved.copy(createdAt = null), draft.toPrescription(saved.id, newIds()))
   }
 
   @Test
