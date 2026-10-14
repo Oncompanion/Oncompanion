@@ -29,7 +29,7 @@ sealed interface CareCircleEntry {
   /**
    * An invitation waiting for its invite code to be used.
    *
-   * @property expired whether the invite code can no longer be used, as of when the list was read
+   * @property expired whether the invite code can no longer be used, as of the last check
    */
   data class Pending(val invite: CareCircleInvite, val expired: Boolean) : CareCircleEntry {
     override val key: String

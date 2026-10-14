@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
@@ -73,6 +74,11 @@ fun CareCircleScreen(
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
   val resources = LocalResources.current
+  // Back from another screen or app: an invitation may have expired in the meantime
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshExpiry()
+    onPauseOrDispose {}
+  }
 
   CareCircleContent(
       uiState = uiState,
