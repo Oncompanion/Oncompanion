@@ -10,8 +10,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -34,29 +38,40 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import kotlinx.coroutines.CancellationException
 
 /**
  * Scan a paper prescription with the camera (US-10, Figma "US-10 / Prescription scan"). The camera
@@ -66,16 +81,19 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
  *
  * @param onEnterManually opens the manual entry form (US-24)
  * @param onBack leaves the scan screen
+ * @param camera the camera; replaced by a fake in tests
  */
 @Composable
 fun ScanScreen(
     onEnterManually: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ScanViewModel = viewModel { ScanViewModel() },
+    viewModel: ScanViewModel = scanViewModel(),
+    camera: ScanCamera = remember { CameraXScanCamera() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
+  val lifecycleOwner = LocalLifecycleOwner.current
 
   // Android's permission dialog; its answer goes to the view model
   val permissionLauncher =
@@ -110,13 +128,51 @@ fun ScanScreen(
     }
   }
 
+  // Turns the camera on once it's allowed and passes on what it reports; leaving the screen stops
+  // the collection, which turns the camera off. A new camera (e.g. after a rotation) starts again
+  // from "starting", so no photo can be taken before it's open
+  if (uiState.permission == CameraPermission.GRANTED) {
+    LaunchedEffect(camera) {
+      try {
+        camera.open(context, lifecycleOwner).collect { status ->
+          when (status) {
+            CameraStatus.STARTING -> viewModel.onCameraStarting()
+            CameraStatus.READY -> viewModel.onCameraReady()
+            CameraStatus.UNAVAILABLE -> viewModel.onCameraUnavailable()
+          }
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.w(TAG, "Couldn't turn the camera on", e)
+        viewModel.onCameraUnavailable()
+      }
+    }
+  }
+
   ScanContent(
       uiState = uiState,
-      onBack = onBack,
-      onEnterManually = onEnterManually,
+      onBack = {
+        viewModel.onClose()
+        onBack()
+      },
+      onEnterManually = {
+        viewModel.onClose()
+        onEnterManually()
+      },
       onOpenSettings = { context.startActivity(appSettingsIntent(context)) },
+      onCapture = { viewModel.capture { file -> camera.takePhoto(context, file) } },
+      onMessageShown = viewModel::onMessageShown,
+      viewfinder = { camera.Viewfinder(it) },
       modifier = modifier,
   )
+}
+
+/** The scan view model, with its photos kept in the app's cache. */
+@Composable
+private fun scanViewModel(): ScanViewModel {
+  val cacheDir = LocalContext.current.cacheDir
+  return viewModel { ScanViewModel(ScanPhotoStore(cacheDir)) }
 }
 
 /**
@@ -124,6 +180,9 @@ fun ScanScreen(
  *
  * @param onOpenSettings opens this app's page in the phone's settings, where the camera can be
  *   allowed after it was refused
+ * @param onCapture takes a photo
+ * @param onMessageShown called once the message about the last photo is gone
+ * @param viewfinder what the camera sees
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,12 +192,36 @@ fun ScanContent(
     onEnterManually: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onCapture: () -> Unit = {},
+    onMessageShown: () -> Unit = {},
+    viewfinder: @Composable (Modifier) -> Unit = {},
 ) {
+  // One message at a time about the last photo, then the view model forgets it
+  val snackbarHostState = remember { SnackbarHostState() }
+  val photoTaken = stringResource(R.string.prescription_scan_photo_taken)
+  val captureFailed = stringResource(R.string.prescription_scan_capture_failed)
+  LaunchedEffect(uiState.photoTaken, uiState.captureFailed) {
+    val message =
+        when {
+          uiState.photoTaken -> photoTaken
+          uiState.captureFailed -> captureFailed
+          else -> return@LaunchedEffect
+        }
+    snackbarHostState.showSnackbar(message)
+    onMessageShown()
+  }
+
+  val cameraOff =
+      uiState.permission == CameraPermission.REFUSED ||
+          (uiState.permission == CameraPermission.GRANTED &&
+              uiState.camera == CameraStatus.UNAVAILABLE)
+
   // A camera screen stays dark whatever the phone's theme, as in the mockup: the photo is easier to
   // judge on a dark background
   OncompanionTheme(darkTheme = true) {
     Scaffold(
         modifier = modifier.testTag(C.Tag.prescription_scan_screen),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
           TopAppBar(
               title = { Text(stringResource(R.string.prescription_scan_title)) },
@@ -156,44 +239,133 @@ fun ScanContent(
           )
         },
         bottomBar = {
-          // Ways forward when the camera is refused
-          if (uiState.permission == CameraPermission.REFUSED) {
-            CameraOffActions(onEnterManually = onEnterManually, onOpenSettings = onOpenSettings)
+          // Ways forward when the camera can't be used; "Open settings" only helps after a refusal
+          if (cameraOff) {
+            CameraOffActions(
+                onEnterManually = onEnterManually,
+                onOpenSettings =
+                    onOpenSettings.takeIf { uiState.permission == CameraPermission.REFUSED },
+            )
           }
         },
     ) { padding ->
       val content = Modifier.fillMaxSize().padding(padding)
-      when (uiState.permission) {
+      when {
         // Android's dialog is on top: nothing to show behind it
-        CameraPermission.UNKNOWN -> Box(content.testTag(C.Tag.prescription_scan_permission_pending))
-        CameraPermission.GRANTED -> CameraStarting(content)
-        CameraPermission.REFUSED -> CameraOff(content)
+        uiState.permission == CameraPermission.UNKNOWN ->
+            Box(content.testTag(C.Tag.prescription_scan_permission_pending))
+        uiState.permission == CameraPermission.REFUSED ->
+            CameraOff(
+                content,
+                R.string.prescription_scan_camera_off_title,
+                R.string.prescription_scan_camera_off_explanation,
+            )
+        uiState.camera == CameraStatus.UNAVAILABLE ->
+            CameraOff(
+                content,
+                R.string.prescription_scan_camera_unavailable_title,
+                R.string.prescription_scan_camera_unavailable_explanation,
+            )
+        else -> CameraView(uiState, onCapture, viewfinder, content)
       }
     }
   }
 }
 
-/** The camera is allowed and starting: a dark viewfinder with the framing hint. */
+/**
+ * The camera: its preview (with a spinner over it while it starts), the framing hint and the
+ * shutter.
+ */
 @Composable
-private fun CameraStarting(modifier: Modifier) {
+private fun CameraView(
+    uiState: ScanUiState,
+    onCapture: () -> Unit,
+    viewfinder: @Composable (Modifier) -> Unit,
+    modifier: Modifier,
+) {
   Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
         modifier = Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.prescription_scan_viewfinder),
         contentAlignment = Alignment.Center,
     ) {
-      CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_scan_camera_starting))
+      // Shown while the camera starts too: CameraX only reports it open once the preview has
+      // somewhere to draw
+      viewfinder(Modifier.fillMaxSize())
+      if (uiState.camera == CameraStatus.READY) {
+        FramingGuide(
+            Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.prescription_scan_framing_guide)
+        )
+      } else {
+        CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_scan_camera_starting))
+      }
     }
     Text(
         text = stringResource(R.string.prescription_scan_frame_hint),
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(16.dp),
     )
+    Shutter(enabled = uiState.canCapture, isCapturing = uiState.isCapturing, onClick = onCapture)
+    Spacer(Modifier.navigationBarsPadding().height(24.dp))
   }
 }
 
-/** The camera was refused: why the app needs it, and that the photo stays on the phone. */
+/**
+ * The four corners of an A4 page in portrait, as in the mockup, so the user fills the photo with
+ * the prescription: the bigger the text, the easier it is to read.
+ */
 @Composable
-private fun CameraOff(modifier: Modifier) {
+private fun FramingGuide(modifier: Modifier) {
+  val color = MaterialTheme.colorScheme.primary
+  Canvas(modifier) {
+    // The largest A4 rectangle (1 : 1.41) that fits, centred
+    val pageWidth = minOf(size.width, size.height / A4_RATIO)
+    val pageHeight = pageWidth * A4_RATIO
+    val left = (size.width - pageWidth) / 2
+    val top = (size.height - pageHeight) / 2
+    val corner = pageWidth * 0.12f
+    val stroke = 4.dp.toPx()
+    for ((x, dx) in listOf(left to 1f, left + pageWidth to -1f)) {
+      for ((y, dy) in listOf(top to 1f, top + pageHeight to -1f)) {
+        drawLine(color, Offset(x, y), Offset(x + dx * corner, y), stroke, StrokeCap.Round)
+        drawLine(color, Offset(x, y), Offset(x, y + dy * corner), stroke, StrokeCap.Round)
+      }
+    }
+  }
+}
+
+/** Height / width of an A4 page. */
+private const val A4_RATIO = 1.414f
+
+/** The round shutter button; a spinner replaces it while the photo is being taken. */
+@Composable
+private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit) {
+  val description = stringResource(R.string.prescription_scan_take_photo)
+  Surface(
+      onClick = onClick,
+      enabled = enabled,
+      shape = CircleShape,
+      color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+      border = BorderStroke(4.dp, MaterialTheme.colorScheme.surface),
+      // Screen readers announce the button, which has no visible text
+      modifier =
+          Modifier.size(76.dp).testTag(C.Tag.prescription_scan_capture_button).semantics {
+            contentDescription = description
+          },
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      if (isCapturing) {
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.size(32.dp).testTag(C.Tag.prescription_scan_capturing),
+        )
+      }
+    }
+  }
+}
+
+/** The camera can't be used (refused, or no camera): why, and that the photo stays on the phone. */
+@Composable
+private fun CameraOff(modifier: Modifier, title: Int, explanation: Int) {
   Box(modifier = modifier.padding(horizontal = 32.dp), contentAlignment = Alignment.Center) {
     Column(
         modifier = Modifier.testTag(C.Tag.prescription_scan_camera_off),
@@ -207,13 +379,13 @@ private fun CameraOff(modifier: Modifier) {
       )
       Spacer(Modifier.height(16.dp))
       Text(
-          text = stringResource(R.string.prescription_scan_camera_off_title),
+          text = stringResource(title),
           style = MaterialTheme.typography.titleLarge,
           textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(12.dp))
       Text(
-          text = stringResource(R.string.prescription_scan_camera_off_explanation),
+          text = stringResource(explanation),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,
@@ -222,9 +394,9 @@ private fun CameraOff(modifier: Modifier) {
   }
 }
 
-/** "Enter manually" and "Open settings", side by side at the bottom as in the mockup. */
+/** "Enter manually" and, after a refusal, "Open settings", side by side as in the mockup. */
 @Composable
-private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: () -> Unit) {
+private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: (() -> Unit)?) {
   Row(
       modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
       horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -239,15 +411,22 @@ private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: () -> 
           Modifier.padding(start = 8.dp),
       )
     }
-    FilledTonalButton(
-        onClick = onOpenSettings,
-        modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_open_settings_button),
-    ) {
-      Icon(Icons.Filled.Settings, contentDescription = null)
-      Text(stringResource(R.string.prescription_scan_open_settings), Modifier.padding(start = 8.dp))
+    if (onOpenSettings != null) {
+      FilledTonalButton(
+          onClick = onOpenSettings,
+          modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_open_settings_button),
+      ) {
+        Icon(Icons.Filled.Settings, contentDescription = null)
+        Text(
+            stringResource(R.string.prescription_scan_open_settings),
+            Modifier.padding(start = 8.dp),
+        )
+      }
     }
   }
 }
+
+private const val TAG = "ScanScreen"
 
 /** The activity showing this context, if any (Compose may wrap it). */
 private fun Context.findActivity(): Activity? =
