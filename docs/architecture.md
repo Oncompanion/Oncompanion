@@ -115,6 +115,16 @@ field's `searchEnabled` parameter defaults to true for other consumers; disablin
 obsolete results in `HospitalField`. Existing Nominatim behavior is unchanged. This integration does
 not depend on the pending hospital-provider PR, deploy a proxy or integrate Add Appointment.
 
+Normal app builds use the deployed Firebase rules even when running on an Android emulator.
+The instrumented test runner explicitly connects Auth and Firestore to the local Firebase emulators;
+manual local testing likewise requires configuring both SDKs before any app ViewModel uses them.
+Publish the hospital validation before manually testing a build with this field against production:
+older rules reject even a null `hospital` field, and Firestore then rolls back the local save.
+When publishing from a feature branch, apply only the hospital validation to the latest deployed
+rules so unrelated rules added since the branch was created are preserved. Navigation regression
+tests check server acknowledgement, Profile display and a freshly opened Edit Profile draft;
+offline tests separately check the local cache and synchronization after reconnecting.
+
 The Account diagram shows the built manual-entry connection and planned search connection. The
 overview identifies Profile hospital text and the reusable content alongside the search ViewModel.
 

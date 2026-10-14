@@ -16,10 +16,15 @@ import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.navigation.AppNavHost
+import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.Source
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
@@ -34,12 +39,91 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HospitalProfileTest {
   @get:Rule val compose = createComposeRule()
+  private val originalRepository = UserProfileRepositoryProvider.repository
 
   /** Restores networking and authentication after the offline profile interaction. */
   @After
   fun restoreEmulator(): Unit = runBlocking {
+    UserProfileRepositoryProvider.repository = originalRepository
     FirebaseEmulator.firestore.enableNetwork().await()
     EmulatorTestData.signOut()
+  }
+
+  /** Real navigation reloads a server-accepted hospital into a fresh editor, then clears it. */
+  @Test
+  fun savedHospitalSurvivesProfileNavigationServerSyncAndReopeningEditor() {
+    val db = FirebaseEmulator.firestore
+    val repository = UserProfileRepositoryFirestore(db)
+    val uid = runBlocking {
+      withTimeout(10_000) {
+        db.enableNetwork().await()
+        val owner = EmulatorTestData.createUser("hospital-navigation")
+        // Exercise a profile created before hospital was an allowed field.
+        db.collection("users")
+            .document(owner)
+            .set(
+                mapOf(
+                    "role" to "PATIENT",
+                    "firstName" to "Alice",
+                    "createdAt" to FieldValue.serverTimestamp(),
+                )
+            )
+            .await()
+        owner
+      }
+    }
+    UserProfileRepositoryProvider.repository = repository
+    compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PROFILE) } }
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.profile_edit).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose.onNodeWithTag(C.Tag.profile_hospital).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.profile_edit).performClick()
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.hospital_field).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose
+        .onNodeWithTag(C.Tag.hospital_field)
+        .performScrollTo()
+        .performTextInput("Manual hospital")
+    compose.onNodeWithTag(C.Tag.hospital_search).performScrollTo().assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.edit_profile_save).performScrollTo().performClick()
+
+    // A local-only assertion can pass just before obsolete rules roll the write back.
+    runBlocking {
+      withTimeout(10_000) {
+        db.waitForPendingWrites().await()
+        val stored = db.collection("users").document(uid).get(Source.SERVER).await()
+        assertEquals("Manual hospital", stored.getString("hospital"))
+        assertFalse(stored.metadata.hasPendingWrites())
+        assertEquals("Manual hospital", repository.getProfile(uid)!!.hospital)
+      }
+    }
+    compose.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()
+    compose.onNodeWithText("Manual hospital").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.profile_edit).performClick()
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.hospital_field).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose
+        .onNodeWithTag(C.Tag.hospital_field)
+        .performScrollTo()
+        .assertTextContains("Manual hospital")
+        .performTextClearance()
+    compose.onNodeWithTag(C.Tag.hospital_search).performScrollTo().assertIsNotEnabled()
+    compose
+        .onNodeWithTag(C.Tag.edit_profile_save)
+        .performScrollTo()
+        .assertIsEnabled()
+        .performClick()
+    runBlocking {
+      withTimeout(10_000) {
+        db.waitForPendingWrites().await()
+        assertNull(db.collection("users").document(uid).get(Source.SERVER).await().get("hospital"))
+      }
+    }
+    compose.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.profile_hospital).assertDoesNotExist()
   }
 
   /** Manual-only M1 entry is saved locally offline and displayed; clearing also persists. */
