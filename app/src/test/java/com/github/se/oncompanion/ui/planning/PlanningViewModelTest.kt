@@ -5,9 +5,11 @@ package com.github.se.oncompanion.ui.planning
 
 import androidx.lifecycle.SavedStateHandle
 import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -82,6 +84,9 @@ class PlanningViewModelTest {
   private val zone = ZoneId.of("Europe/Zurich")
   private val clock = Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone)
 
+  private val originalPlanningRepository = PlanningRepositoryProvider.repository
+  private val originalAuthRepository = AuthRepositoryProvider.repository
+
   private val dispatcher = StandardTestDispatcher()
 
   @Before
@@ -91,8 +96,55 @@ class PlanningViewModelTest {
 
   @After
   fun resetMain() {
+    PlanningRepositoryProvider.repository = originalPlanningRepository
+    AuthRepositoryProvider.repository = originalAuthRepository
     Dispatchers.resetMain()
   }
+
+  /** Default dependencies use the providers and continue observing account changes. */
+  @Test
+  fun defaultRepositoriesFollowProviderSessionChanges() =
+      runTest(dispatcher) {
+        val auth = FakeAuthRepository { AuthUser(it) }
+        val appointments = FakeAppointmentRepository()
+        appointments.seed(
+            "a",
+            Appointment("a", "Patient A", clock.instant(), AppointmentType.CONSULTATION),
+        )
+        appointments.seed(
+            "b",
+            Appointment("b", "Patient B", clock.instant(), AppointmentType.CONSULTATION),
+        )
+        PlanningRepositoryProvider.repository = AppointmentPlanningSource(appointments, auth)
+        AuthRepositoryProvider.repository = auth
+        auth.signInWithGoogle("a")
+        val vm =
+            PlanningViewModel(clock = clock, zoneId = zone, savedStateHandle = SavedStateHandle())
+        drain()
+        assertEquals("Patient A", vm.uiState.value.items.single().title)
+        auth.signInWithGoogle("b")
+        drain()
+        assertEquals("Patient B", vm.uiState.value.items.single().title)
+        auth.signOut()
+        drain()
+        assertTrue(vm.uiState.value.items.isEmpty())
+        assertFalse(vm.uiState.value.isLoading)
+      }
+
+  /** Navigation can construct Planning with only the saved state and system time defaults. */
+  @Test
+  fun savedStateOnlyConstructorUsesSystemDateAndZone() =
+      runTest(dispatcher) {
+        PlanningRepositoryProvider.repository = FakePlanningRepository()
+        AuthRepositoryProvider.repository = FakeAuthRepository()
+        val before = LocalDate.now()
+        val vm = PlanningViewModel(savedStateHandle = SavedStateHandle())
+        val after = LocalDate.now()
+        drain()
+        assertEquals(ZoneId.systemDefault(), vm.zoneId)
+        assertTrue(vm.uiState.value.today in listOf(before, after))
+        assertFalse(vm.uiState.value.isLoading)
+      }
 
   private fun drain() {
     dispatcher.scheduler.runCurrent()

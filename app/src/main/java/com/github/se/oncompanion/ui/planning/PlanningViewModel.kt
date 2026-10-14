@@ -70,7 +70,7 @@ class PlanningViewModel(
 
   init {
     savedStateHandle[SELECTED_DATE] = initialDate.toString()
-    // Session observation survives agenda failures so old patient data is always cleared.
+    // Session observation must survive an agenda read failure to clear the previous patient.
     viewModelScope.launch {
       authRepository
           .observeCurrentUser()
