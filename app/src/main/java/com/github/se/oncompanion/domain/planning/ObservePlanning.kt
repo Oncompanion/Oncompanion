@@ -28,8 +28,10 @@ class ObservePlanning(private val sources: List<PlanningRepository>) : PlanningR
   override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> {
     // combine() never emits without any flow to combine
     if (sources.isEmpty()) return flowOf(emptyList())
+    // Built once per observation, not on every update of a source
+    val order = order(range)
     return combine(sources.map { it.observeItems(range) }) { lists ->
-      lists.flatMap { it }.filter { it.timing in range }.sortedWith(order(range))
+      lists.flatMap { it }.filter { it.timing in range }.sortedWith(order)
     }
   }
 
