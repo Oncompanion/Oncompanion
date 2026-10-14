@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -163,6 +164,7 @@ object C {
     const val profile_sign_out_cancel = "profile_sign_out_cancel"
     const val profile_sign_out_error = "profile_sign_out_error"
     const val profile_signing_out = "profile_signing_out"
+    const val profile_hospital = "profile_hospital"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
     const val cancer_type_suggestion = "cancer_type_suggestion"

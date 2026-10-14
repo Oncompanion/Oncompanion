@@ -36,6 +36,7 @@ class HospitalFieldTest {
       )
   private var value by mutableStateOf("")
   private var enabled by mutableStateOf(true)
+  private var searchEnabled by mutableStateOf(true)
   private var visible by mutableStateOf(true)
   private val changes = mutableListOf<String>()
   private val selections = mutableListOf<Hospital?>()
@@ -61,6 +62,7 @@ class HospitalFieldTest {
                 selections.add(it)
               },
               enabled = enabled,
+              searchEnabled = searchEnabled,
           )
     }
     return vm
@@ -379,5 +381,57 @@ class HospitalFieldTest {
     node(C.Tag.hospital_error).assertDoesNotExist()
     node(C.Tag.hospital_empty).assertDoesNotExist()
     node(C.Tag.hospital_loading).assertDoesNotExist()
+  }
+
+  /** Disabling Search keeps manual entry usable and prevents all repository calls. */
+  @Test
+  fun searchDisabledKeepsButtonVisibleAndTypingEnabledWithoutRepositoryCalls() {
+    searchEnabled = false
+    val model = field(initial = "Manual hospital")
+    node(C.Tag.hospital_search).assertIsDisplayed().assertIsNotEnabled().performTouchInput {
+      click()
+    }
+    node(C.Tag.hospital_field).assertIsEnabled().performTextReplacement("Home")
+    compose.runOnIdle {
+      assertEquals("Home", value)
+      assertTrue(fake.queries.isEmpty())
+      assertEquals(HospitalFieldUiState.Idle, model.uiState.value)
+      assertEquals(listOf<Hospital?>(null), selections)
+    }
+  }
+
+  /** A manual-only consumer cannot dispatch a search action even through the button semantics. */
+  @Test
+  fun statelessSearchDisabledNeverDispatchesSearchAction() {
+    var searches = 0
+    compose.setContent {
+      HospitalFieldContent(
+          "Hospital",
+          {},
+          HospitalFieldUiState.Idle,
+          { searches++ },
+          {},
+          searchEnabled = false,
+      )
+    }
+    node(C.Tag.hospital_search).assertIsNotEnabled().performClick().performTouchInput { click() }
+    compose.runOnIdle { assertEquals(0, searches) }
+  }
+
+  /** Switching to manual-only mode cancels pending search and rejects its late response. */
+  @Test
+  fun disablingSearchDuringPendingRequestDiscardsLateResults() = runTest {
+    val pending = CompletableDeferred<HospitalSearchResult>()
+    fake.pendingResult = pending
+    fake.ignoreCancellation = true
+    val model = field(initial = "Geneva")
+    search()
+    compose.runOnIdle { searchEnabled = false }
+    compose.waitForIdle()
+    pending.complete(HospitalSearchResult.Success(hospitals))
+    advanceUntilIdle()
+    node(C.Tag.hospital_field).assertIsEnabled().assertTextContains("Geneva")
+    node(C.Tag.hospital_search).assertIsNotEnabled()
+    assertNoLateFeedback(model)
   }
 }

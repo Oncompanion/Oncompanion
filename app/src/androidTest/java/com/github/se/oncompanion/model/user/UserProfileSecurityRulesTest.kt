@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -319,5 +320,70 @@ class UserProfileSecurityRulesTest {
   fun randomTopLevelCollectionIsDenied(): Unit = runBlocking {
     denied(db.collection("random").document("doc").set(mapOf("a" to 1)))
     denied(db.collection("random").document("doc").get(Source.SERVER))
+  }
+
+  /** Optional hospital supports missing, null, empty and bounded names on creation. */
+  @Test
+  fun optionalHospitalCreateRepresentationsAreAllowed(): Unit = runBlocking {
+    for (value in
+        listOf(null, "", "Manual hospital", "h".repeat(UserProfile.MAX_HOSPITAL_LENGTH))) {
+      allowed(userDoc(aliceUid).set(validProfile().apply { put("hospital", value) }))
+      assertEquals(value, allowed(userDoc(aliceUid).get(Source.SERVER)).get("hospital"))
+      allowed(userDoc(aliceUid).delete())
+    }
+    // Missing hospital is still allowed, including on a new profile.
+    createAliceProfile()
+    allowed(userDoc(aliceUid).update("firstName", "Legacy saved"))
+  }
+
+  /** Hospital names can be added, edited, cleared to null or removed from a legacy profile. */
+  @Test
+  fun optionalHospitalUpdatesAreAllowed(): Unit = runBlocking {
+    createAliceProfile()
+    val createdAt = allowed(userDoc(aliceUid).get(Source.SERVER)).getTimestamp("createdAt")
+    for (value in listOf("Hospital", "Changed hospital", "h".repeat(100), "", null)) {
+      allowed(userDoc(aliceUid).update(mapOf("hospital" to value)))
+      val stored = allowed(userDoc(aliceUid).get(Source.SERVER))
+      assertEquals(value, stored.get("hospital"))
+      assertEquals("PATIENT", stored.getString("role"))
+      assertEquals(createdAt, stored.getTimestamp("createdAt"))
+    }
+    allowed(userDoc(aliceUid).update("hospital", FieldValue.delete()))
+    allowed(userDoc(aliceUid).update("firstName", "Legacy saved again"))
+  }
+
+  /** Extra-long hospital names and incorrect types are denied on creates and updates. */
+  @Test
+  fun hospitalLengthAndTypeValidationAreEnforced(): Unit = runBlocking {
+    val invalids =
+        listOf<Any>(
+            "h".repeat(UserProfile.MAX_HOSPITAL_LENGTH + 1),
+            42,
+            true,
+            listOf("Hospital"),
+            mapOf("name" to "Hospital"),
+        )
+    for (invalid in invalids) {
+      denied(userDoc(aliceUid).set(validProfile().apply { put("hospital", invalid) }))
+    }
+    createAliceProfile()
+    for (invalid in invalids) denied(userDoc(aliceUid).update("hospital", invalid))
+  }
+
+  /**
+   * Accepting optional hospital never grants access to another user or changes protected fields.
+   */
+  @Test
+  fun hospitalCannotBypassOwnershipOrImmutableFields(): Unit = runBlocking {
+    createAliceProfile()
+    denied(userDoc(aliceUid).update(mapOf("hospital" to "Hospital", "role" to "CAREGIVER")))
+    denied(
+        userDoc(aliceUid).update(mapOf("hospital" to "Hospital", "createdAt" to Timestamp(0, 0)))
+    )
+    EmulatorTestData.signIn("bob")
+    denied(userDoc(aliceUid).update("hospital", "Other user's hospital"))
+    denied(userDoc(aliceUid).get(Source.SERVER))
+    EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
+    denied(userDoc(aliceUid).update("hospital", "Signed out hospital"))
   }
 }

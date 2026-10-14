@@ -1,3 +1,4 @@
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 
@@ -85,13 +86,37 @@ remain available offline. Cache misses report a short error while manual entry s
 Editing, external text changes, disabling or removing the field cancels obsolete requests and
 clears feedback. A generation check discards late responses. Successful lookups show linked
 OpenStreetMap attribution, including empty and cached results. The field has no screen-specific
-navigation, patient data or persistence; Profile (#144) and Add Appointment integration remain
-separate tasks. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
+navigation, patient data or persistence. Profile (#144) uses its stateless content for manual entry;
+Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
 The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Connections from Edit Profile and Add
-Appointment remain planned; no screen integration is introduced by #143.
+HospitalFieldViewModel → HospitalRepository path. Edit Profile now uses the manual-only content; its search ViewModel connection and
+Add Appointment integration remain planned.
+
+## Optional profile hospital (issue #144)
+
+`UserProfile.hospital` is nullable text, limited to `MAX_HOSPITAL_LENGTH = 100`. Firestore's
+`hospital` field is optional: missing, null and empty strings are accepted, with non-string and
+oversized values denied by `isValidProfile`. Repository validation uses the same model limit.
+Missing fields deserialize to null. As with family name and cancer type, new and updated profiles
+write a null field when no hospital is supplied. Edit Profile trims text and saves blank input as
+null; updating uses `update()` and retains role, creation time and unrelated document fields.
+
+Profile displays only a nonblank saved hospital. Patient Edit Profile drafts initialize from the
+saved hospital, track hospital edits separately from incoming snapshots, and allow adding, editing
+or clearing it. Empty hospital text never makes Save unavailable. Input is bounded by the shared
+model limit like the existing fields. Caregivers gain no hospital editor.
+
+For M1, Edit Profile reuses `HospitalFieldContent` with `searchEnabled = false`: the Search button
+is visible and disabled while text remains editable. It supplies idle feedback and no search action,
+so no hospital repository, endpoint or search ViewModel is constructed for this screen. The shared
+field's `searchEnabled` parameter defaults to true for other consumers; disabling it also clears
+obsolete results in `HospitalField`. Existing Nominatim behavior is unchanged. This integration does
+not depend on the pending hospital-provider PR, deploy a proxy or integrate Add Appointment.
+
+The Account diagram shows the built manual-entry connection and planned search connection. The
+overview identifies Profile hospital text and the reusable content alongside the search ViewModel.
 
 ## Feature diagrams
 

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -6,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
@@ -27,6 +29,7 @@ enum class EditProfileStatus {
   ERROR,
 }
 
+/** Profile draft with optional patient hospital text; an empty hospital never prevents saving. */
 data class EditProfileUiState(
     val status: EditProfileStatus = EditProfileStatus.LOADING,
     val firstName: String = "",
@@ -35,12 +38,14 @@ data class EditProfileUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val saveFailed: Boolean = false,
+    val hospital: String = "",
+    val isPatient: Boolean = true,
 ) {
   val canEdit: Boolean
     get() = status == EditProfileStatus.READY && !isSaving && !isSaved
 
   val canSave: Boolean
-    get() = canEdit && firstName.isNotBlank()
+    get() = canEdit && firstName.isNotBlank() && hospital.length <= UserProfile.MAX_HOSPITAL_LENGTH
 }
 
 /**
@@ -59,6 +64,7 @@ class EditProfileViewModel(
   private var firstNameEdited = false
   private var familyNameEdited = false
   private var cancerTypeEdited = false
+  private var hospitalEdited = false
 
   init {
     retry()
@@ -85,6 +91,10 @@ class EditProfileViewModel(
                       _uiState.value =
                           state.copy(
                               status = EditProfileStatus.READY,
+                              isPatient = current.role == Role.PATIENT,
+                              hospital =
+                                  if (hospitalEdited) state.hospital
+                                  else current.hospital.orEmpty(),
                               firstName =
                                   if (firstNameEdited) state.firstName else current.firstName,
                               familyName =
@@ -124,6 +134,11 @@ class EditProfileViewModel(
     it.copy(cancerType = value.take(UserProfile.MAX_CANCER_TYPE_LENGTH))
   }
 
+  /** Bounds manual hospital text like the other fields; caregivers keep their existing data. */
+  fun onHospitalChange(value: String) = edit {
+    if (it.isPatient) it.copy(hospital = value.take(UserProfile.MAX_HOSPITAL_LENGTH)) else it
+  }
+
   private fun edit(change: (EditProfileUiState) -> EditProfileUiState) {
     val state = _uiState.value
     if (!state.canEdit) return
@@ -131,6 +146,7 @@ class EditProfileViewModel(
     firstNameEdited = firstNameEdited || updated.firstName != state.firstName
     familyNameEdited = familyNameEdited || updated.familyName != state.familyName
     cancerTypeEdited = cancerTypeEdited || updated.cancerType != state.cancerType
+    hospitalEdited = hospitalEdited || updated.hospital != state.hospital
     _uiState.value = updated.copy(saveFailed = false)
   }
 
@@ -160,6 +176,9 @@ class EditProfileViewModel(
                 firstName = state.firstName.trim(),
                 familyName = state.familyName.trim().ifEmpty { null },
                 cancerType = state.cancerType.trim().ifEmpty { null },
+                hospital =
+                    if (state.isPatient) state.hospital.trim().ifEmpty { null }
+                    else original.hospital,
             )
         )
         if (attempt == generation && authRepository.currentUser?.uid == original.uid) {
@@ -187,6 +206,7 @@ class EditProfileViewModel(
     firstNameEdited = false
     familyNameEdited = false
     cancerTypeEdited = false
+    hospitalEdited = false
     _uiState.value = EditProfileUiState(status = status)
   }
 }

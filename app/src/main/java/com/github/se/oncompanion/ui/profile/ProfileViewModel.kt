@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -29,6 +30,7 @@ data class ProfileDetails(
     val cancerType: String?,
     val email: String?,
     val memberSince: Instant?,
+    val hospital: String? = null,
 )
 
 /** What the Profile screen displays while resolving the signed-in user's profile. */
@@ -150,6 +152,7 @@ class ProfileViewModel(
                           firstName = profile.firstName,
                           familyName = profile.familyName,
                           cancerType = profile.cancerType,
+                          hospital = profile.hospital,
                           email = user.email,
                           memberSince = profile.createdAt,
                       )

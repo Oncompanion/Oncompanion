@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -54,6 +55,7 @@ class EditProfileScreenTest {
           onFirstNameChange = { state = state.copy(firstName = it) },
           onFamilyNameChange = { state = state.copy(familyName = it) },
           onCancerTypeChange = { state = state.copy(cancerType = it) },
+          onHospitalChange = { state = state.copy(hospital = it) },
           onSave = { saves++ },
       )
     }
@@ -298,5 +300,100 @@ class EditProfileScreenTest {
     node(C.Tag.edit_profile_first_name).assertTextContains("Sam")
     node(C.Tag.edit_profile_back).performClick()
     compose.runOnIdle { assertEquals(Screen.PROFILE, nav.currentDestination?.route) }
+  }
+
+  /** The saved text is editable even though M1 search is visible and disabled. */
+  @Test
+  fun hospitalPrefillsCanBeEditedAndClearedWithSearchDisabled() {
+    content(state.copy(hospital = "Saved hospital"))
+    node(C.Tag.hospital_field)
+        .performScrollTo()
+        .assertTextContains("Saved hospital")
+        .assertIsEnabled()
+        .performTextReplacement("Any manual hospital")
+    node(C.Tag.hospital_search)
+        .performScrollTo()
+        .assertIsDisplayed()
+        .assertIsNotEnabled()
+        .performTouchInput { click() }
+    compose.runOnIdle { assertEquals("Any manual hospital", state.hospital) }
+    node(C.Tag.hospital_results).assertDoesNotExist()
+    node(C.Tag.hospital_loading).assertDoesNotExist()
+    node(C.Tag.hospital_field).performScrollTo().performTextClearance()
+    node(C.Tag.edit_profile_save).performScrollTo().assertIsEnabled().performClick()
+    compose.runOnIdle {
+      assertEquals("", state.hospital)
+      assertEquals(1, saves)
+    }
+  }
+
+  /** Saving with the real Edit Profile ViewModel stores only optional manual hospital text. */
+  @Test
+  fun screenManualHospitalSaveAndClearWorkWithoutSearchInfrastructure() {
+    val (model, profiles) = model()
+    profiles.seed(profiles.profiles["uid-1"]!!.copy(hospital = "Saved"))
+    var completed = 0
+    compose.setContent {
+      EditProfileScreen(onBack = {}, onSaved = { completed++ }, viewModel = model)
+    }
+    node(C.Tag.hospital_field)
+        .performScrollTo()
+        .assertTextContains("Saved")
+        .performTextReplacement("  My hospital  ")
+    node(C.Tag.hospital_search).performScrollTo().assertIsNotEnabled().performTouchInput { click() }
+    node(C.Tag.edit_profile_save).performScrollTo().performClick()
+    compose.runOnIdle {
+      assertEquals("My hospital", profiles.profiles["uid-1"]!!.hospital)
+      assertEquals(1, completed)
+    }
+    node(C.Tag.hospital_field).performScrollTo().performTextClearance()
+    node(C.Tag.edit_profile_save).performScrollTo().performClick()
+    compose.runOnIdle {
+      assertNull(profiles.profiles["uid-1"]!!.hospital)
+      assertEquals(2, completed)
+    }
+  }
+
+  /** Cancel leaves the persisted hospital untouched. */
+  @Test
+  fun cancellingHospitalDraftDoesNotSaveIt() {
+    val (model, profiles) = model()
+    compose.setContent { EditProfileScreen({}, { fail("Must not save") }, model) }
+    node(C.Tag.hospital_field).performScrollTo().performTextInput("Unsaved hospital")
+    node(C.Tag.edit_profile_cancel).performScrollTo().performClick()
+    compose.runOnIdle { assertNull(profiles.profiles["uid-1"]!!.hospital) }
+  }
+
+  /** Hospital follows the existing saving state and does not appear for caregivers. */
+  @Test
+  fun hospitalIsDisabledWhileSavingAndNotShownForCaregivers() {
+    content(state.copy(isSaving = true))
+    node(C.Tag.hospital_field).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.hospital_search).performScrollTo().assertIsNotEnabled()
+    compose.runOnIdle { state = state.copy(isSaving = false, isPatient = false) }
+    node(C.Tag.hospital_field).assertDoesNotExist()
+    node(C.Tag.hospital_search).assertDoesNotExist()
+  }
+
+  /** Hospital manual entry and Save remain reachable with the keyboard open in portrait. */
+  @Test
+  fun hospitalKeyboardEntryRemainsReachable() {
+    content()
+    node(C.Tag.hospital_field).performScrollTo().requestFocus()
+    compose.showKeyboard(600)
+    node(C.Tag.hospital_field).performScrollTo().assertIsAboveKeyboard(600)
+    node(C.Tag.edit_profile_save).performScrollTo().assertIsAboveKeyboard(600)
+  }
+
+  /** The patient can edit a hospital and return even in landscape with the keyboard open. */
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun hospitalLandscapeKeyboardEntryRemainsReachable() {
+    content()
+    node(C.Tag.hospital_field).performScrollTo().requestFocus()
+    compose.showKeyboard(500)
+    node(C.Tag.hospital_field).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.hospital_field).assertIsAboveKeyboard(500)
+    node(C.Tag.edit_profile_back).performScrollTo().assertIsFullyVisible()
   }
 }

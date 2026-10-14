@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -81,5 +82,16 @@ class UserProfileTest {
   @Test
   fun nullOptionalsAreValid() {
     assertTrue(valid.copy(familyName = null, cancerType = null, createdAt = null).isValid())
+  }
+
+  /** Optional hospital matches the existing nullable optional-string rules and shared limit. */
+  @Test
+  fun hospitalIsOptionalAndHasABoundedLength() {
+    assertNull(valid.hospital)
+    assertEquals(100, UserProfile.MAX_HOSPITAL_LENGTH)
+    listOf(null, "", "   ", "Manually entered hospital", "h".repeat(100)).forEach {
+      assertTrue(valid.copy(hospital = it).isValid())
+    }
+    assertFalse(valid.copy(hospital = "h".repeat(101)).isValid())
   }
 }
