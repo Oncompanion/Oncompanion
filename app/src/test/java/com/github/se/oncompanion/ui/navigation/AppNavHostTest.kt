@@ -437,7 +437,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
     val heading =
         composeTestRule
@@ -747,6 +747,6 @@ class AppNavHostTest {
     // The planning provider keeps its default, so the appointment can only come through it
     setNavHost(Route.PLANNING, planningRepository = appPlanningRepository, authRepository = auth)
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
   }
 }

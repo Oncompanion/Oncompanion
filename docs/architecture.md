@@ -139,6 +139,33 @@ Appointment remain planned; no screen integration is introduced by #143.
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
+## Appointment creation form (issue #147)
+
+Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
+`AppointmentFormUiState` and delegates to stateless `AppointmentFormContent`. Title and explicit
+time are required; date is prefilled. Type, optional location and notes are recorded without
+interpreting treatment. The form reuses shared date/Save components and keyboard handling.
+
+Location is temporarily an ordinary optional text field. The team deferred hospital search until
+the proxy/service configuration is available; the form makes no hospital requests. Blank location
+is saved as null; entered text is trimmed and respects the existing 200-character limit. The
+reusable HospitalField remains available for later integration, with no endpoint placeholder or
+search dependency added to this form.
+
+AppointmentFormViewModel takes appointment/auth repositories from their providers by default;
+tests can still inject fakes directly. PlanningViewModel now follows the same provider convention,
+uses system clock/zone defaults and always observes a non-null authentication repository.
+AppNavHost passes only saved state or the initial date, never repositories.
+
+A local save returns a saved-day result to the existing Planning entry, selects that day (including
+another week), consumes the result and removes the form. The live appointment source supplies the
+row; no duplicate Planning write is made. Cancel preserves the original calendar selection.
+Immediate failures retain the draft; completion means enqueue, not server acknowledgement.
+
+Local times are resolved in the display zone: spring gaps require correction, autumn repeated
+times require an offset choice. Account changes clear private input and suppress stale completion.
+Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
+
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.

@@ -551,4 +551,29 @@ class PlanningViewModelTest {
         assertTrue(vm.uiState.value.untimedItems.isEmpty())
         assertTrue(vm.uiState.value.scheduledItems.isEmpty())
       }
+
+  /** Default construction observes repositories supplied by the refactored providers. */
+  @Test
+  fun defaultsUsePlanningAndAuthProviders() =
+      runTest(dispatcher) {
+        val oldPlanning =
+            com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository
+        val oldAuth = com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository
+        val repository = FakePlanningRepository()
+        repository.items.value = listOf(item("provider", "2026-10-02T10:00:00Z"))
+        try {
+          com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository =
+              repository
+          com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository =
+              FakeAuthRepository()
+          val vm =
+              PlanningViewModel(clock = clock, zoneId = zone, savedStateHandle = SavedStateHandle())
+          drain()
+          assertEquals(repository.items.value, vm.uiState.value.items)
+        } finally {
+          com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider.repository =
+              oldPlanning
+          com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository = oldAuth
+        }
+      }
 }
