@@ -136,7 +136,8 @@ fun CareCircleContent(
       CareCircleUiState.Loading -> LoadingState(contentModifier)
       CareCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
       CareCircleUiState.Error -> ErrorState(onRetry, contentModifier)
-      is CareCircleUiState.CareCircleMembers -> CareCircleMemberList(uiState, onMemberClick, contentModifier)
+      is CareCircleUiState.CareCircleMembers ->
+          CareCircleMemberList(uiState, onMemberClick, contentModifier)
     }
   }
 }
