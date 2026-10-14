@@ -171,10 +171,6 @@
         },
         {
           "type": "arrow",
-          "id": "ar7"
-        },
-        {
-          "type": "arrow",
           "id": "planning_session_auth"
         }
       ],
@@ -305,11 +301,11 @@
       "type": "rectangle",
       "x": 1300,
       "y": 200,
-      "width": 580,
+      "width": 280,
       "height": 110,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
       "strokeStyle": "dashed",
@@ -321,8 +317,8 @@
         "type": 3
       },
       "seed": 1277828161,
-      "version": 1,
-      "versionNonce": 145944841,
+      "version": 2,
+      "versionNonce": 145944852,
       "isDeleted": false,
       "boundElements": [
         {
@@ -350,7 +346,7 @@
           "id": "ar10"
         }
       ],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a008"
@@ -360,10 +356,10 @@
       "type": "text",
       "x": 1310,
       "y": 217.5,
-      "width": 560,
+      "width": 260,
       "height": 75.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -374,16 +370,16 @@
       "frameId": null,
       "roundness": null,
       "seed": 1450007911,
-      "version": 1,
-      "versionNonce": 1850742647,
+      "version": 3,
+      "versionNonce": 1850742658,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a009",
-      "text": "ObservePlanning\nappointments + medications + events\n\u2192 planning items",
-      "originalText": "ObservePlanning\nappointments + medications + events\n\u2192 planning items",
+      "text": "ObservePlanning\nmerges the sources\n(medications planned)",
+      "originalText": "ObservePlanning\nmerges the sources\n(medications planned)",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -819,11 +815,11 @@
         },
         {
           "type": "arrow",
-          "id": "ar10"
+          "id": "ar15"
         },
         {
           "type": "arrow",
-          "id": "ar15"
+          "id": "source_events"
         }
       ],
       "updated": 1791200000000,
@@ -896,10 +892,6 @@
         {
           "type": "text",
           "id": "planningrepo_t"
-        },
-        {
-          "type": "arrow",
-          "id": "ar7"
         },
         {
           "type": "arrow",
@@ -1489,16 +1481,16 @@
     {
       "id": "ar6",
       "type": "arrow",
-      "x": 1480.0,
+      "x": 1440,
       "y": 126,
       "width": 110.0,
       "height": 68,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1507,11 +1499,11 @@
         "type": 2
       },
       "seed": 569513560,
-      "version": 1,
-      "versionNonce": 284448309,
+      "version": 2,
+      "versionNonce": 284448320,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a034",
@@ -1521,7 +1513,7 @@
           0
         ],
         [
-          110.0,
+          0,
           68
         ]
       ],
@@ -1532,7 +1524,7 @@
         "mode": "orbit",
         "elementId": "planning",
         "fixedPoint": [
-          0.2,
+          0.14,
           1
         ]
       },
@@ -1566,11 +1558,11 @@
         "type": 2
       },
       "seed": 2004159264,
-      "version": 1,
-      "versionNonce": 749490765,
-      "isDeleted": false,
+      "version": 2,
+      "versionNonce": 749490776,
+      "isDeleted": true,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a035",
@@ -1607,16 +1599,16 @@
     {
       "id": "ar8",
       "type": "arrow",
-      "x": 1886,
-      "y": 255.0,
+      "x": 1550,
+      "y": 194,
       "width": 48,
       "height": 0.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1625,11 +1617,11 @@
         "type": 2
       },
       "seed": 1891641409,
-      "version": 1,
-      "versionNonce": 147728210,
+      "version": 2,
+      "versionNonce": 147728221,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a036",
@@ -1639,8 +1631,16 @@
           0
         ],
         [
-          48,
-          0.0
+          0,
+          -29
+        ],
+        [
+          570,
+          -29
+        ],
+        [
+          570,
+          0
         ]
       ],
       "lastCommittedPoint": null,
@@ -1650,23 +1650,23 @@
         "mode": "orbit",
         "elementId": "observe",
         "fixedPoint": [
-          1,
-          0.5
+          0.89,
+          0
         ]
       },
       "endBinding": {
         "mode": "orbit",
         "elementId": "planningrepo",
         "fixedPoint": [
-          0,
-          0.5
+          0.5,
+          0
         ]
       }
     },
     {
       "id": "ar9",
       "type": "arrow",
-      "x": 1532.0,
+      "x": 1412,
       "y": 316,
       "width": 102.0,
       "height": 58,
@@ -1684,11 +1684,11 @@
         "type": 2
       },
       "seed": 1888218466,
-      "version": 1,
-      "versionNonce": 524596787,
+      "version": 2,
+      "versionNonce": 524596798,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a037",
@@ -1698,7 +1698,7 @@
           0
         ],
         [
-          -102.0,
+          18,
           58
         ]
       ],
@@ -1725,16 +1725,16 @@
     {
       "id": "ar10",
       "type": "arrow",
-      "x": 1793.0,
-      "y": 316,
+      "x": 1586,
+      "y": 255,
       "width": 69.0,
       "height": 58,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1743,11 +1743,11 @@
         "type": 2
       },
       "seed": 793553386,
-      "version": 1,
-      "versionNonce": 612005770,
+      "version": 2,
+      "versionNonce": 612005781,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a038",
@@ -1757,8 +1757,8 @@
           0
         ],
         [
-          -69.0,
-          58
+          28,
+          0
         ]
       ],
       "lastCommittedPoint": null,
@@ -1768,16 +1768,16 @@
         "mode": "orbit",
         "elementId": "observe",
         "fixedPoint": [
-          0.85,
-          1
+          1,
+          0.5
         ]
       },
       "endBinding": {
         "mode": "orbit",
-        "elementId": "event",
+        "elementId": "eventsource",
         "fixedPoint": [
-          0.4,
-          0
+          0,
+          0.5
         ]
       }
     },
@@ -2095,16 +2095,16 @@
       "frameId": null,
       "roundness": null,
       "seed": 1404403444,
-      "version": 1,
-      "versionNonce": 1135891496,
+      "version": 2,
+      "versionNonce": 1135891507,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1791100000000,
+      "updated": 1792000000000,
       "link": null,
       "locked": false,
       "index": "a044",
-      "text": "Planning reads appointments; Overview uses its stand-in and multi-source aggregation remains planned.",
-      "originalText": "Planning reads appointments; Overview uses its stand-in and multi-source aggregation remains planned.",
+      "text": "Planning merges appointments and events through ObservePlanning; medications and the Overview are planned.",
+      "originalText": "Planning merges appointments and events through ObservePlanning; medications and the Overview are planned.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -2946,6 +2946,145 @@
         "fixedPoint": [
           1,
           0.5
+        ]
+      }
+    },
+    {
+      "id": "eventsource",
+      "type": "rectangle",
+      "x": 1620,
+      "y": 200,
+      "width": 260,
+      "height": 110,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 512574198,
+      "version": 1,
+      "versionNonce": 570402825,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "eventsource_t"
+        },
+        {
+          "type": "arrow",
+          "id": "ar10"
+        },
+        {
+          "type": "arrow",
+          "id": "source_events"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a022V"
+    },
+    {
+      "id": "eventsource_t",
+      "type": "text",
+      "x": 1630,
+      "y": 230.0,
+      "width": 240,
+      "height": 50.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 849943643,
+      "version": 2,
+      "versionNonce": 281058974,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792000000000,
+      "link": null,
+      "locked": false,
+      "index": "a023V",
+      "text": "EventPlanningSource\n(PlanningRepository)",
+      "originalText": "EventPlanningSource\n(PlanningRepository)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "eventsource",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "source_events",
+      "type": "arrow",
+      "x": 1750,
+      "y": 316,
+      "width": 0.0,
+      "height": 58,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 259691267,
+      "version": 1,
+      "versionNonce": 749490765,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a03aV",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          58
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "eventsource",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "event",
+        "fixedPoint": [
+          0.5,
+          0
         ]
       }
     }
