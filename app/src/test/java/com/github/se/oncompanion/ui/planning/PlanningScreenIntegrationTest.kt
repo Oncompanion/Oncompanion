@@ -47,6 +47,7 @@ class PlanningScreenIntegrationTest {
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
             SavedStateHandle(),
+            authRepository = FakeAuthRepository(),
         )
     var selectedRoute: String? = null
     val navigation =
@@ -83,6 +84,7 @@ class PlanningScreenIntegrationTest {
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
             SavedStateHandle(),
+            authRepository = FakeAuthRepository(),
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
@@ -117,6 +119,7 @@ class PlanningScreenIntegrationTest {
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
+            authRepository = FakeAuthRepository(),
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
