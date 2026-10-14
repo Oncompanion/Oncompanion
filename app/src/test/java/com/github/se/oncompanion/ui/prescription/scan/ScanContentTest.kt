@@ -136,7 +136,8 @@ class ScanContentTest {
     compose.onNodeWithTag(C.Tag.prescription_scan_camera_starting).assertIsDisplayed()
     compose.onNodeWithText(string(R.string.prescription_scan_frame_hint)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsNotEnabled()
-    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertDoesNotExist()
+    // The preview is already there, as the camera only opens once it can draw it
+    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertExists()
     compose.onNodeWithTag(C.Tag.prescription_scan_framing_guide).assertDoesNotExist()
   }
 

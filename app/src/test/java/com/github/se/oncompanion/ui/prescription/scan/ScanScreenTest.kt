@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +25,7 @@ import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -210,6 +213,48 @@ class ScanScreenTest {
   }
 
   @Test
+  fun phoneRotated_noPhotoCanBeTaken_untilTheNewCameraIsOpen() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsEnabled()
+
+    // Rotating recreates the screen with a new camera, still opening; the ViewModel survives it
+    val newCamera = FakeScanCamera().apply { opening = CompletableDeferred() }
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread {
+      compose.activity.setContent {
+        ScanScreen(onEnterManually = {}, onBack = {}, viewModel = viewModel, camera = newCamera)
+      }
+    }
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsNotEnabled()
+
+    newCamera.opening?.complete(Unit)
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsEnabled()
+  }
+
+  @Test
+  fun cameraFailingOnceOpen_offersManualEntry() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertIsDisplayed()
+
+    camera.fail()
+    compose.waitForIdle()
+
+    compose
+        .onNodeWithText(
+            compose.activity.getString(R.string.prescription_scan_camera_unavailable_title)
+        )
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_enter_manually_button).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertDoesNotExist()
+  }
+
+  @Test
   fun shutter_takesAPhotoIntoTheScansFolder() {
     grantCamera()
     showScreen()
@@ -319,6 +364,8 @@ class ScanScreenTest {
     showScreen()
 
     compose.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
+    // Leaving cancels the camera's coroutine, which then finishes on the test's dispatcher
+    compose.waitForIdle()
 
     assertEquals(1, camera.stops)
   }

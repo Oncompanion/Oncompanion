@@ -104,12 +104,20 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
     _uiState.update { it.copy(permission = CameraPermission.REFUSED) }
   }
 
-  /** The camera is on. */
+  /**
+   * The camera is being turned on, e.g. again after the phone was rotated: no photo can be taken
+   * until it's open.
+   */
+  fun onCameraStarting() {
+    _uiState.update { it.copy(camera = CameraStatus.STARTING) }
+  }
+
+  /** The camera is open. */
   fun onCameraReady() {
     _uiState.update { it.copy(camera = CameraStatus.READY) }
   }
 
-  /** The camera couldn't be turned on. */
+  /** The camera can't be used: it couldn't be turned on, or it failed. */
   fun onCameraUnavailable() {
     _uiState.update { it.copy(camera = CameraStatus.UNAVAILABLE) }
   }

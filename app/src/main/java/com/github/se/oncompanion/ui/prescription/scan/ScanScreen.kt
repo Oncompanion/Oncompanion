@@ -142,12 +142,19 @@ fun ScanScreen(
     }
   }
 
-  // Turns the camera on once it's allowed, and off when the screen is left
+  // Turns the camera on once it's allowed and passes on what it reports; leaving the screen stops
+  // the collection, which turns the camera off. A new camera (e.g. after a rotation) starts again
+  // from "starting", so no photo can be taken before it's open
   if (uiState.permission == CameraPermission.GRANTED) {
     LaunchedEffect(camera) {
       try {
-        camera.start(context, lifecycleOwner)
-        viewModel.onCameraReady()
+        camera.open(context, lifecycleOwner).collect { status ->
+          when (status) {
+            CameraStatus.STARTING -> viewModel.onCameraStarting()
+            CameraStatus.READY -> viewModel.onCameraReady()
+            CameraStatus.UNAVAILABLE -> viewModel.onCameraUnavailable()
+          }
+        }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -155,7 +162,6 @@ fun ScanScreen(
         viewModel.onCameraUnavailable()
       }
     }
-    DisposableEffect(camera) { onDispose { camera.stop() } }
   }
 
   ScanContent(
@@ -205,12 +211,12 @@ fun ScanContent(
     onBack: () -> Unit,
     onEnterManually: () -> Unit,
     onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
     onCapture: () -> Unit = {},
     onMessageShown: () -> Unit = {},
     onRetake: () -> Unit = {},
     onUsePhoto: () -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
-    modifier: Modifier = Modifier,
     photoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
   // One message at a time about the last photo, then the view model forgets it
@@ -306,7 +312,10 @@ fun ScanContent(
   }
 }
 
-/** The camera: its preview (or a spinner while it starts), the framing hint and the shutter. */
+/**
+ * The camera: its preview (with a spinner over it while it starts), the framing hint and the
+ * shutter.
+ */
 @Composable
 private fun CameraView(
     uiState: ScanUiState,
@@ -319,8 +328,10 @@ private fun CameraView(
         modifier = Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.prescription_scan_viewfinder),
         contentAlignment = Alignment.Center,
     ) {
+      // Shown while the camera starts too: CameraX only reports it open once the preview has
+      // somewhere to draw
+      viewfinder(Modifier.fillMaxSize())
       if (uiState.camera == CameraStatus.READY) {
-        viewfinder(Modifier.fillMaxSize())
         FramingGuide(
             Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.prescription_scan_framing_guide)
         )
