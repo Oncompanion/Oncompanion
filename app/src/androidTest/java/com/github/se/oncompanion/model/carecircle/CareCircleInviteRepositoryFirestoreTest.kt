@@ -8,7 +8,12 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -58,10 +63,36 @@ class CareCircleInviteRepositoryFirestoreTest {
     FirebaseEmulator.auth.signOut()
   }
 
-  private suspend fun serverDoc(inviteCode: String): DocumentSnapshot =
+  /** Alice's invite [inviteCode] on the server, or null if it doesn't exist. */
+  private suspend fun serverDoc(inviteCode: String): DocumentSnapshot? =
       withTimeout(10_000) {
         db.waitForPendingWrites().await()
-        db.collection(COLLECTION).document(inviteCode).get(Source.SERVER).await()
+        // Among alice's invites: the rules refuse to get a missing invite
+        db.collection(COLLECTION)
+            .whereEqualTo("ownerUid", aliceUid)
+            .get(Source.SERVER)
+            .await()
+            .documents
+            .firstOrNull { it.id == inviteCode }
+      }
+
+  /**
+   * Watches alice's [inviteCode] until it is seen, runs [change], and waits for the same collection
+   * to emit null. Fails if the flow fails.
+   */
+  private suspend fun assertBecomesNull(inviteCode: String, change: suspend () -> Unit) =
+      coroutineScope {
+        val seen = CompletableDeferred<Unit>()
+        val becameNull = async {
+          repository
+              .observeInvite(aliceUid, inviteCode)
+              .onEach { if (it?.isSynced == true) seen.complete(Unit) }
+              .dropWhile { !seen.isCompleted }
+              .first { it == null }
+        }
+        withTimeout(10_000) { seen.await() }
+        change()
+        assertNull(withTimeout(10_000) { becameNull.await() })
       }
 
   private suspend fun create(details: CareCircleMemberDetails = julie, email: String? = null) =
@@ -75,7 +106,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertEquals(julie, invite.details)
     assertFalse(invite.isSynced)
 
-    val doc = serverDoc(invite.inviteCode)
+    val doc = serverDoc(invite.inviteCode)!!
     assertEquals("Julie", doc.getString("firstName"))
     assertEquals("Alice", doc.getString("ownerFirstName"))
     assertEquals("julie@example.com", doc.getString("email"))
@@ -162,31 +193,31 @@ class CareCircleInviteRepositoryFirestoreTest {
   }
 
   @Test
-  fun observeInvite_emitsTheInvite_thenNullOnceUsed(): Unit = runBlocking {
+  fun observeInvite_emitsTheInvite_thenNullOnceRedeemed(): Unit = runBlocking {
     val invite = create()
     val observed =
         withTimeout(10_000) {
-          repository.observeInvite(invite.inviteCode).first { it?.isSynced == true }
+          repository.observeInvite(aliceUid, invite.inviteCode).first { it?.isSynced == true }
         }
     assertEquals(julie, observed!!.details)
 
-    // The caregiver redeems it from another phone
-    EmulatorTestData.replaceRawDocument(
-        COLLECTION,
-        invite.inviteCode,
-        """{"ownerUid": {"stringValue": "$aliceUid"}, "firstName": {"stringValue": "Julie"},
-            "redeemerUid": {"stringValue": "julie"}}""",
-    )
-    assertNull(
-        withTimeout(10_000) { repository.observeInvite(invite.inviteCode).first { it == null } }
-    )
+    // bob redeems it on his phone, which deletes it, while alice keeps watching on hers
+    assertBecomesNull(invite.inviteCode) {
+      EmulatorTestData.deleteRawDocument("$COLLECTION/${invite.inviteCode}")
+    }
+  }
+
+  @Test
+  fun observeInvite_emitsNullOnceCancelled(): Unit = runBlocking {
+    val invite = create()
+    assertBecomesNull(invite.inviteCode) { repository.cancelInvite(invite.inviteCode) }
   }
 
   @Test
   fun observeInvite_ofAMissingInvite_isNull(): Unit = runBlocking {
     assertNull(
         withTimeout(10_000) {
-          repository.observeInvite(CareCircleInvite.generateInviteCode()).first()
+          repository.observeInvite(aliceUid, CareCircleInvite.generateInviteCode()).first()
         }
     )
   }
@@ -197,7 +228,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     val changed = CareCircleMemberDetails("Jules", null, Relationship.FRIEND, emptySet())
     repository.updateInvite(invite.inviteCode, changed, null)
 
-    val doc = serverDoc(invite.inviteCode)
+    val doc = serverDoc(invite.inviteCode)!!
     assertEquals("Jules", doc.getString("firstName"))
     assertNull(doc.get("familyName"))
     assertEquals("FRIEND", doc.getString("relationship"))
@@ -211,15 +242,17 @@ class CareCircleInviteRepositoryFirestoreTest {
     val invite = create()
     repository.cancelInvite(invite.inviteCode)
     repository.updateInvite(invite.inviteCode, julie.copy(firstName = "Jules"), null)
-    assertFalse(serverDoc(invite.inviteCode).exists())
+    assertNull(serverDoc(invite.inviteCode))
   }
 
   @Test
   fun cancelInvite_deletesTheInvite(): Unit = runBlocking {
     val invite = create()
     repository.cancelInvite(invite.inviteCode)
-    assertFalse(serverDoc(invite.inviteCode).exists())
-    assertNull(withTimeout(10_000) { repository.observeInvite(invite.inviteCode).first() })
+    assertNull(serverDoc(invite.inviteCode))
+    assertNull(
+        withTimeout(10_000) { repository.observeInvite(aliceUid, invite.inviteCode).first() }
+    )
   }
 
   @Test
@@ -231,8 +264,8 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertEquals("julie@example.com", renewed.email)
     assertFalse(renewed.isSynced)
 
-    assertFalse(serverDoc(expired.inviteCode).exists())
-    val doc = serverDoc(renewed.inviteCode)
+    assertNull(serverDoc(expired.inviteCode))
+    val doc = serverDoc(renewed.inviteCode)!!
     assertEquals("Julie", doc.getString("firstName"))
     assertNotNull(doc.getTimestamp("createdAt"))
   }

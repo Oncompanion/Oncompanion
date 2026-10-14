@@ -38,10 +38,10 @@ interface CareCircleInviteRepository {
   fun observePendingInvites(ownerUid: String): Flow<List<CareCircleInvite>>
 
   /**
-   * Emits one invitation now and on every change, or null once it is used, cancelled or missing.
-   * Works offline from the local cache. The flow fails if it can't be read.
+   * Emits [ownerUid]'s invitation [inviteCode] now and on every change, or null once it is used,
+   * cancelled or missing. Works offline from the local cache. The flow fails if it can't be read.
    */
-  fun observeInvite(inviteCode: String): Flow<CareCircleInvite?>
+  fun observeInvite(ownerUid: String, inviteCode: String): Flow<CareCircleInvite?>
 
   /**
    * Replaces the details and email of an unused invitation. Returns right away (see the class
@@ -63,4 +63,37 @@ interface CareCircleInviteRepository {
    * Returns the new invitation right away (see the class documentation).
    */
   suspend fun renewInvite(expired: CareCircleInvite): CareCircleInvite
+
+  /**
+   * Joins the circle of the invitation [inviteCode] (as typed, e.g. "abcde-fghjk") as
+   * [caregiverUid], sharing [caregiverEmail] (their account email) with the patient, and deletes
+   * the invitation so its invite code can't be used again. Unlike the other writes, it needs a
+   * connection and is never saved on the device first: only the server knows whether the invite
+   * code is still valid (see architecture.md). Only a caregiver account can join.
+   */
+  suspend fun redeem(
+      inviteCode: String,
+      caregiverUid: String,
+      caregiverEmail: String?,
+  ): RedeemResult
+}
+
+/** What happened when a caregiver entered an invite code. */
+sealed interface RedeemResult {
+  /** The caregiver is now a member of [patientUid]'s circle. */
+  data class Joined(val patientUid: String, val patientFirstName: String) : RedeemResult
+
+  /** Already in this patient's circle (e.g. a second invitation from the same patient). */
+  data class AlreadyMember(val patientFirstName: String) : RedeemResult
+
+  /**
+   * Unknown, malformed, already used, expired, or the caregiver's own invite code. These aren't
+   * told apart, so nobody can learn which invite codes exist.
+   */
+  data object InvalidOrUsed : RedeemResult
+
+  /**
+   * The server couldn't be reached. Nothing was saved, not even on the device: try again online.
+   */
+  data object Offline : RedeemResult
 }
