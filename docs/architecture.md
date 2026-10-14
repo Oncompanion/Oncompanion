@@ -1,4 +1,5 @@
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 
 # Architecture
@@ -43,6 +44,14 @@ dispatcher and Android JSON parsing, with no new dependency. `FakeHospitalReposi
 `app/src/test/.../model/hospital` supplies configurable outcomes and records submitted queries.
 Hospital identities use OSM object type and ID rather than provider-specific place IDs.
 
+`HospitalRepositoryProvider` follows #177's replaceable `@Volatile repository` convention.
+Deployment wiring can call `configure(searchEndpoint)` before creating field ViewModels to install
+one shared `HospitalRepositoryNominatim`, preserving its cache across consumers. There is no public
+service URL or placeholder URL by default: until configured, blank searches return an empty success
+and other searches return the existing service error without HTTP. Tests replace `repository` with
+`FakeHospitalRepository` and restore the original in `@After`. Configuring the provider does not
+implement or deploy the required proxy.
+
 The [official Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
 prohibits autocomplete. The future field (#143) must use an explicit Search button, with no
 keystroke, background, periodic or automatic nearest-hospital requests. Only public hospital
@@ -78,9 +87,10 @@ so the parent clears any previous structured selection, including for empty or u
 Parents also clear their selection when changing text externally and decide which hospital details
 to persist. Search outcomes never replace text or emit a selection. `HospitalFieldContent` renders
 idle, loading, results, empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
-receives a `HospitalRepository`; each field needs its own lifecycle-scoped ViewModel and a stable
-repository instance. It never checks connectivity before searching, so repository cache hits
-remain available offline. Cache misses report a short error while manual entry stays usable.
+receives a `HospitalRepository`, defaulting to `HospitalRepositoryProvider.repository`. Tests can
+still inject a fake directly. Each field needs its own lifecycle-scoped ViewModel, which retains the
+repository captured at construction so later provider replacements do not discard its cache. It never
+checks connectivity before searching, so repository cache hits remain available offline. Cache misses report a short error while manual entry stays usable.
 
 Editing, external text changes, disabling or removing the field cancels obsolete requests and
 clears feedback. A generation check discards late responses. Successful lookups show linked
