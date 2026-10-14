@@ -154,7 +154,7 @@ private fun LoadingState(modifier: Modifier) {
  */
 @Composable
 private fun MemberList(
-    circle: CareCircleUiState.Members,
+    careCircle: CareCircleUiState.Members,
     onMemberClick: (CareCircleMember) -> Unit,
     modifier: Modifier,
 ) {
@@ -165,26 +165,26 @@ private fun MemberList(
   ) {
     item { Intro() }
     // People who joined
-    if (circle.joined.isNotEmpty()) {
+    if (careCircle.joined.isNotEmpty()) {
       item {
         SectionHeader(
-            text = stringResource(R.string.care_circle_members_count, circle.joined.size),
+            text = stringResource(R.string.care_circle_members_count, careCircle.joined.size),
             tag = C.Tag.care_circle_members_count,
         )
       }
-      items(circle.joined, key = { it.key }) { entry ->
+      items(careCircle.joined, key = { it.key }) { entry ->
         MemberItem(member = entry.member, onClick = { onMemberClick(entry.member) })
       }
     }
     // Invitations not used yet
-    if (circle.pending.isNotEmpty()) {
+    if (careCircle.pending.isNotEmpty()) {
       item {
         SectionHeader(
-            text = stringResource(R.string.care_circle_pending_count, circle.pending.size),
+            text = stringResource(R.string.care_circle_pending_count, careCircle.pending.size),
             tag = C.Tag.care_circle_pending_section,
         )
       }
-      items(circle.pending, key = { it.key }) { entry -> PendingItem(entry) }
+      items(careCircle.pending, key = { it.key }) { entry -> PendingItem(entry) }
     }
   }
 }
