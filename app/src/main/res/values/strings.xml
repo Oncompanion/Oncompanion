@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Codex <noreply@openai.com> -->
 <resources>
     <string name="app_name">oncompanion</string>
     <!-- Planning -->
@@ -281,4 +282,29 @@
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
     <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
+    <!-- Appointment form -->
+    <string name="appointment_add">Add appointment</string>
+    <string name="appointment_back">Back</string>
+    <string name="appointment_title">Title</string>
+    <string name="appointment_date">Date</string>
+    <string name="appointment_time">Time</string>
+    <string name="appointment_pick_date">Choose a date</string>
+    <string name="appointment_pick_time">Choose a time</string>
+    <string name="appointment_required">Required</string>
+    <string name="appointment_title_missing">Please enter a title</string>
+    <string name="appointment_text_limit">Use at most %1$d characters</string>
+    <string name="appointment_missing_time">This time does not exist on this date. Choose another time.</string>
+    <string name="appointment_repeated_time">This time occurs twice. Choose its UTC offset.</string>
+    <string name="appointment_offset">UTC %1$s</string>
+    <string name="appointment_type">Type</string>
+    <string name="appointment_treatment">Treatment</string>
+    <string name="appointment_consultation">Consultation</string>
+    <string name="appointment_other">Other</string>
+    <string name="appointment_location">Location (optional)</string>
+    <string name="appointment_notes">Notes (optional)</string>
+    <string name="appointment_save">Save appointment</string>
+    <string name="appointment_confirm">OK</string>
+    <string name="appointment_cancel">Cancel</string>
+    <string name="appointment_signed_out">Sign in again to save your appointment.</string>
+    <string name="appointment_save_failed">Couldn\'t save your appointment. Please try again.</string>
 </resources>
