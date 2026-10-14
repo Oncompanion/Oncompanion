@@ -84,7 +84,7 @@ class CameraXScanCamera : ScanCamera {
         val camera = cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
         // Binding doesn't mean the camera opened: CameraX says when it opens, or fails to
         val cameraState = camera.cameraInfo.cameraState
-        val observer = Observer<CameraState> { trySend(it.toStatus()) }
+        val observer = Observer<CameraState> { trySend(cameraStatusOf(it)) }
         cameraState.observeForever(observer)
         awaitClose {
           cameraState.removeObserver(observer)
@@ -94,17 +94,6 @@ class CameraXScanCamera : ScanCamera {
       // CameraX and its LiveData only work on the main thread, whoever collects the flow
       .flowOn(ContextCompat.getMainExecutor(context).asCoroutineDispatcher())
       .distinctUntilChanged()
-
-  /**
-   * A critical error (camera disabled, broken, Do Not Disturb...) won't go away on its own. A
-   * recoverable one (e.g. another app uses the camera) is retried by CameraX: still starting.
-   */
-  private fun CameraState.toStatus(): CameraStatus =
-      when {
-        error?.type == CameraState.ErrorType.CRITICAL -> CameraStatus.UNAVAILABLE
-        type == CameraState.Type.OPEN -> CameraStatus.READY
-        else -> CameraStatus.STARTING
-      }
 
   override suspend fun takePhoto(context: Context, file: File) =
       suspendCancellableCoroutine { continuation ->
@@ -137,3 +126,15 @@ class CameraXScanCamera : ScanCamera {
     const val TAG = "ScanCamera"
   }
 }
+
+/**
+ * What CameraX's [state] means for the scan screen. A critical error (camera disabled, broken, Do
+ * Not Disturb...) won't go away on its own. A recoverable one (e.g. another app uses the camera) is
+ * retried by CameraX, so the camera is still starting.
+ */
+internal fun cameraStatusOf(state: CameraState): CameraStatus =
+    when {
+      state.error?.type == CameraState.ErrorType.CRITICAL -> CameraStatus.UNAVAILABLE
+      state.type == CameraState.Type.OPEN -> CameraStatus.READY
+      else -> CameraStatus.STARTING
+    }
