@@ -4,6 +4,7 @@ package com.github.se.oncompanion.model.medication
 
 import java.time.Instant
 import java.time.LocalDate
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -295,6 +296,52 @@ class FakeMedicationRepositoryTest {
 
     thrown.forEach { assertSame(error, it) }
   }
+
+  @Test
+  fun failRunningReadsFailsTheStreamsBeingCollectedButNotLaterOnes() =
+      runTest(UnconfinedTestDispatcher()) {
+        repository.addPrescription("alice", recent)
+        val error = IllegalStateException("permission lost")
+        val failures =
+            listOf(
+                    repository.observePrescription("alice", "recent"),
+                    repository.observePrescriptions("alice"),
+                    repository.observeMedications("alice"),
+                )
+                .map { stream ->
+                  async {
+                    try {
+                      stream.collect {}
+                      null
+                    } catch (e: IllegalStateException) {
+                      e
+                    }
+                  }
+                }
+
+        repository.failRunningReads(error)
+
+        // Coroutines may copy an exception between coroutines, so its message is compared
+        failures.forEach { assertEquals(error.message, it.await()?.message) }
+        assertEquals(
+            recent.copy(createdAt = now),
+            repository.observePrescription("alice", "recent").first(),
+        )
+      }
+
+  @Test
+  fun prescriptionObserversCountsTheRunningCollections() =
+      runTest(UnconfinedTestDispatcher()) {
+        assertEquals(0, repository.prescriptionObservers)
+
+        val first = launch { repository.observePrescription("alice", "recent").collect {} }
+        val second = launch { repository.observePrescription("bob", "older").collect {} }
+        assertEquals(2, repository.prescriptionObservers)
+
+        first.cancel()
+        second.cancel()
+        assertEquals(0, repository.prescriptionObservers)
+      }
 
   @Test
   fun writeErrorIsThrownByEveryWriteAndStoresNothing() = runTest {

@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.prescription
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -13,6 +14,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.io.IOException
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
@@ -20,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -32,7 +35,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Waits for [gate] (if set) before saving, to observe the form while it is saving. */
+/**
+ * Waits for [gate] (if set) before adding or updating, to observe the form while it is saving. An
+ * update waits after [ManageMedicationSchedule.update] has checked that the prescription exists.
+ */
 private class GatedMedicationRepository(private val delegate: FakeMedicationRepository) :
     MedicationRepository by delegate {
   var gate: CompletableDeferred<Unit>? = null
@@ -40,6 +46,11 @@ private class GatedMedicationRepository(private val delegate: FakeMedicationRepo
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     gate?.await()
     delegate.addPrescription(uid, prescription)
+  }
+
+  override suspend fun updatePrescription(uid: String, prescription: Prescription) {
+    gate?.await()
+    delegate.updatePrescription(uid, prescription)
   }
 }
 
@@ -822,5 +833,706 @@ class PrescriptionFormViewModelTest {
     viewModel.clearError()
 
     assertNull(viewModel.state.error)
+  }
+
+  // ---------- Editing a saved prescription ----------
+
+  private val saved =
+      Prescription(
+          id = "presc-1",
+          prescribedBy = "Dr. Martin",
+          prescribedOn = today.minusDays(3),
+          medications =
+              listOf(
+                  Medication(
+                      id = "med-1",
+                      prescriptionId = "presc-1",
+                      name = "Ondansetron 8 mg",
+                      dosage = "1 tablet",
+                      frequency = "Twice a day",
+                      startDate = today.minusDays(3),
+                      durationDays = 5,
+                  ),
+                  Medication(
+                      id = "med-2",
+                      prescriptionId = "presc-1",
+                      name = "Dexamethasone",
+                      startDate = today.minusDays(2),
+                  ),
+              ),
+          createdAt = Instant.parse("2026-10-05T08:00:00Z"),
+      )
+
+  /** A form opened to edit the prescription [id], not loaded yet. */
+  private fun editViewModel(id: String = saved.id) =
+      PrescriptionFormViewModel(
+          auth,
+          ManageMedicationSchedule(medications),
+          clock,
+          prescriptionId = id,
+          medicationRepository = medications,
+      )
+
+  /** A form opened to edit [saved], loaded. */
+  private fun TestScope.loadedEditViewModel(): PrescriptionFormViewModel {
+    fakeMedications.seed(uid, saved)
+    return editViewModel().also { advanceUntilIdle() }
+  }
+
+  @Test
+  fun newFormIsReadyAndNotEditing() = runTest {
+    // Nothing is read for a new prescription, so a failing read changes nothing
+    fakeMedications.readError = IOException("unavailable")
+
+    val viewModel = viewModel()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertFalse(viewModel.state.isEditing)
+    assertEquals(PrescriptionFormLoad.READY, PrescriptionFormUiState(viewModel.state.draft).load)
+  }
+
+  @Test
+  fun editFormIsLoadingUntilThePrescriptionIsRead() = runTest {
+    fakeMedications.seed(uid, saved)
+
+    val viewModel = editViewModel()
+
+    assertEquals(PrescriptionFormLoad.LOADING, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+    assertFalse(viewModel.state.canSave)
+
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+  }
+
+  @Test
+  fun nothingCanBeEditedOrSavedWhileLoading() = runTest {
+    fakeMedications.seed(uid, saved)
+    val viewModel = editViewModel()
+    val loading = viewModel.state
+
+    viewModel.editEverything()
+    viewModel.save()
+
+    assertEquals(loading, viewModel.state)
+
+    advanceUntilIdle()
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+  }
+
+  @Test
+  fun editFormIsPrefilledWithTheSavedPrescription() = runTest {
+    val viewModel = loadedEditViewModel()
+
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    assertEquals(listOf("med-1", "med-2"), viewModel.medications.map { it.id })
+    assertEquals(0, viewModel.state.openMedication)
+    assertTrue(viewModel.state.canSave)
+    assertTrue(viewModel.state.invalidMedications.isEmpty())
+    assertFalse(viewModel.state.isSaved)
+    assertNull(viewModel.state.error)
+  }
+
+  @Test
+  fun savedStartDatesCountAsChosenAndSavedNamesAsTouched() = runTest {
+    val viewModel = loadedEditViewModel()
+    assertEquals(listOf(true, true), viewModel.state.startDateChosen)
+    assertEquals(listOf(true, true), viewModel.state.nameTouched)
+
+    viewModel.onPrescribedOnChange(today.minusDays(9))
+
+    assertEquals(
+        listOf(today.minusDays(3), today.minusDays(2)),
+        viewModel.medications.map { it.startDate },
+    )
+  }
+
+  @Test
+  fun prescriptionThatDoesNotExistIsNotFound() = runTest {
+    fakeMedications.seed(uid, saved)
+
+    val viewModel = editViewModel("unknown")
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+    assertFalse(viewModel.state.canSave)
+    assertNull(viewModel.state.error)
+  }
+
+  @Test
+  fun prescriptionOfAnotherUserIsNotFound() = runTest {
+    fakeMedications.seed("patient-2", saved)
+
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+  }
+
+  @Test
+  fun failureToLoadIsReportedAsALoadFailure() = runTest {
+    fakeMedications.seed(uid, saved)
+    fakeMedications.readError = IOException("unavailable")
+
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.FAILED, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+    assertFalse(viewModel.state.canSave)
+    // Not a failed save
+    assertNull(viewModel.state.error)
+  }
+
+  @Test
+  fun nothingIsLoadedWhenNobodyIsSignedIn() = runTest {
+    fakeMedications.seed(uid, saved)
+    auth.signOut()
+
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.NOT_SIGNED_IN, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+  }
+
+  @Test
+  fun nothingCanBeEditedOrSavedWhenThePrescriptionIsNotLoaded() = runTest {
+    val viewModel = editViewModel("unknown")
+    advanceUntilIdle()
+    val notFound = viewModel.state
+
+    viewModel.editEverything()
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(notFound, viewModel.state)
+    assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
+  }
+
+  @Test
+  fun editFormValidatesLikeANewOne() = runTest {
+    val viewModel = loadedEditViewModel()
+    val tooLong = "a".repeat(200)
+
+    // Text is cut to the same limits
+    viewModel.onPrescribedByChange(tooLong)
+    viewModel.onMedicationNameChange(tooLong)
+    assertEquals(Prescription.MAX_PRESCRIBED_BY_LENGTH, viewModel.state.draft.prescribedBy.length)
+    assertEquals(Medication.MAX_TEXT_LENGTH, viewModel.medication.name.length)
+    assertTrue(viewModel.state.canSave)
+
+    // A name is required
+    viewModel.onMedicationNameChange("  ")
+    assertFalse(viewModel.state.canSave)
+    assertEquals(setOf(0), viewModel.state.invalidMedications)
+    viewModel.onMedicationNameChange("Ondansetron")
+
+    // Same duration limits
+    viewModel.onDurationChange("0")
+    assertFalse(viewModel.state.canSave)
+    viewModel.onDurationChange((Medication.MAX_DURATION_DAYS + 1).toString())
+    assertFalse(viewModel.state.canSave)
+    viewModel.onDurationChange(Medication.MAX_DURATION_DAYS.toString())
+    assertTrue(viewModel.state.canSave)
+
+    // An added medication needs a name, and at least one medication stays
+    viewModel.addMedication()
+    assertEquals(setOf(2), viewModel.state.invalidMedications)
+    assertFalse(viewModel.state.canSave)
+    viewModel.removeMedication(2)
+    viewModel.removeMedication(1)
+    viewModel.removeMedication(0)
+    assertEquals(1, viewModel.medications.size)
+    assertFalse(viewModel.state.canRemoveMedication)
+  }
+
+  @Test
+  fun editFormWithAnInvalidDraftSavesNothing() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onMedicationNameChange("")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+    assertFalse(viewModel.state.isSaved)
+  }
+
+  @Test
+  fun saveUpdatesThePrescriptionInsteadOfAddingOne() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange(" Dr. House ")
+    viewModel.onPrescribedOnChange(today.minusDays(1))
+    viewModel.onDosageChange("2 tablets")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    val expected =
+        saved.copy(
+            prescribedBy = "Dr. House",
+            prescribedOn = today.minusDays(1),
+            medications =
+                listOf(saved.medications[0].copy(dosage = "2 tablets"), saved.medications[1]),
+        )
+    assertEquals(listOf(expected), fakeMedications.prescriptionsOf(uid))
+    assertTrue(viewModel.state.isSaved)
+    assertFalse(viewModel.state.isSaving)
+    assertNull(viewModel.state.error)
+  }
+
+  @Test
+  fun saveKeepsTheSavedMedicationsAddsTheNewOnesAndRemovesTheOthers() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.removeMedication(0)
+    viewModel.addMedication()
+    viewModel.onMedicationNameChange("Paracetamol")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    val updated = fakeMedications.prescriptionsOf(uid).single()
+    assertEquals(saved.id, updated.id)
+    assertEquals(listOf("Dexamethasone", "Paracetamol"), updated.medications.map { it.name })
+    assertEquals(saved.medications[1], updated.medications[0])
+    assertFalse(updated.medications[1].id in listOf("med-1", "med-2", saved.id))
+    assertEquals(saved.id, updated.medications[1].prescriptionId)
+  }
+
+  @Test
+  fun failedUpdateShowsAnErrorAndCanBeTriedAgain() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    fakeMedications.writeError = IOException("disk full")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertFalse(viewModel.state.isSaving)
+    assertFalse(viewModel.state.isSaved)
+    assertEquals("Dr. House", viewModel.state.draft.prescribedBy)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+
+    fakeMedications.writeError = null
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.state.isSaved)
+    assertNull(viewModel.state.error)
+    assertEquals(
+        listOf(saved.copy(prescribedBy = "Dr. House")),
+        fakeMedications.prescriptionsOf(uid),
+    )
+  }
+
+  @Test
+  fun updateWhenNobodyIsSignedInAnymoreShowsAnError() = runTest {
+    val viewModel = loadedEditViewModel()
+    auth.signOut()
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormError.NOT_SIGNED_IN, viewModel.state.error)
+    assertFalse(viewModel.state.isSaved)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+  }
+
+  @Test
+  fun prescriptionDeletedBeforeSavingIsNotSavedAndNoLongerFound() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    // Deleted from the detail screen of another device while the form is open
+    fakeMedications.deletePrescription(uid, saved.id)
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertFalse(viewModel.state.isSaved)
+    assertFalse(viewModel.state.isSaving)
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+    assertNull(viewModel.state.error)
+    assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
+  }
+
+  @Test
+  fun failureToCheckThePrescriptionBeforeSavingIsAFailedSave() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    fakeMedications.readError = IOException("unavailable")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertFalse(viewModel.state.isSaved)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+  }
+
+  // ---------- Following the saved prescription ----------
+
+  @Test
+  fun prescriptionThatArrivesLaterFillsTheFormByItself() = runTest {
+    // Offline on a device that has never loaded it: not found until the connection comes back
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+
+    fakeMedications.seed(uid, saved)
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    assertTrue(viewModel.state.canSave)
+  }
+
+  @Test
+  fun prescriptionDeletedWhileCorrectingIsNoLongerFoundRightAway() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+
+    // Deleted from another device while the form is open
+    fakeMedications.deletePrescription(uid, saved.id)
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+    assertFalse(viewModel.state.isSaved)
+    assertNull(viewModel.state.error)
+  }
+
+  @Test
+  fun changeMadeElsewhereRefreshesAFormTheUserHasNotTouched() = runTest {
+    val viewModel = loadedEditViewModel()
+    val changed = saved.copy(prescribedBy = "Dr. Leroy", medications = saved.medications.take(1))
+
+    fakeMedications.updatePrescription(uid, changed)
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(changed.toDraft(), viewModel.state.draft)
+    assertEquals(listOf(true), viewModel.state.nameTouched)
+  }
+
+  @Test
+  fun changeMadeElsewhereDoesNotReplaceWhatTheUserIsCorrecting() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    val corrected = viewModel.state
+
+    fakeMedications.updatePrescription(uid, saved.copy(prescribedBy = "Dr. Leroy"))
+    advanceUntilIdle()
+
+    assertEquals(corrected, viewModel.state)
+  }
+
+  @Test
+  fun lookingAtAnotherMedicationDoesNotCountAsCorrecting() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.openMedication(1)
+    val changed = saved.copy(prescribedBy = "Dr. Leroy")
+
+    fakeMedications.updatePrescription(uid, changed)
+    advanceUntilIdle()
+
+    assertEquals(changed.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun samePrescriptionEmittedAgainKeepsTheMedicationTheUserOpened() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.openMedication(1)
+    val opened = viewModel.state
+
+    // Only the save time changes, e.g. once the server confirms the prescription
+    fakeMedications.seed(uid, saved.copy(createdAt = saved.createdAt!!.plusSeconds(60)))
+    advanceUntilIdle()
+
+    assertEquals(opened, viewModel.state)
+  }
+
+  @Test
+  fun prescriptionThatComesBackAfterADeletionStartsFromWhatIsSaved() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    fakeMedications.deletePrescription(uid, saved.id)
+    advanceUntilIdle()
+    val restored = saved.copy(prescribedBy = "Dr. Leroy")
+
+    fakeMedications.seed(uid, restored)
+    advanceUntilIdle()
+
+    // What was typed before the deletion is gone
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(restored.toDraft(), viewModel.state.draft)
+
+    // The user hasn't changed the restored prescription: a change made elsewhere shows again
+    val changedAgain = restored.copy(prescribedBy = "Dr. Grey")
+    fakeMedications.updatePrescription(uid, changedAgain)
+    advanceUntilIdle()
+    assertEquals(changedAgain.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun savedFormKeepsWhatWasSavedWhenItsOwnSaveIsEmitted() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.state.isSaved)
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals("Dr. House", viewModel.state.draft.prescribedBy)
+  }
+
+  @Test
+  fun savedFormIgnoresWhatHappensToThePrescriptionAfterwards() = runTest {
+    // Untouched, so only the guard on a saved form keeps the next values out
+    val viewModel = loadedEditViewModel()
+    viewModel.save()
+    advanceUntilIdle()
+    val done = viewModel.state
+    assertTrue(done.isSaved)
+
+    fakeMedications.updatePrescription(uid, saved.copy(prescribedBy = "Dr. Leroy"))
+    advanceUntilIdle()
+    fakeMedications.deletePrescription(uid, saved.id)
+    advanceUntilIdle()
+
+    assertEquals(done, viewModel.state)
+  }
+
+  @Test
+  fun prescriptionDeletedWhileSavingIsNotReportedAsSaved() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    val gate = CompletableDeferred<Unit>()
+    medications.gate = gate
+    viewModel.save()
+    // The use case has checked that the prescription exists and is about to write
+    advanceUntilIdle()
+
+    fakeMedications.deletePrescription(uid, saved.id)
+    advanceUntilIdle()
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertFalse(viewModel.state.isSaved)
+    assertFalse(viewModel.state.isSaving)
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
+  }
+
+  @Test
+  fun changeMadeElsewhereWhileSavingKeepsShowingWhatIsSaved() = runTest {
+    // Untouched, so without the guard on saving the change would refresh the form
+    val viewModel = loadedEditViewModel()
+    val gate = CompletableDeferred<Unit>()
+    medications.gate = gate
+    viewModel.save()
+    advanceUntilIdle()
+    val saving = viewModel.state
+    assertTrue(saving.isSaving)
+
+    fakeMedications.updatePrescription(uid, saved.copy(prescribedBy = "Dr. Leroy"))
+    advanceUntilIdle()
+
+    assertEquals(saving, viewModel.state)
+
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    // The last save wins: this one reached the repository after the other device's
+    assertTrue(viewModel.state.isSaved)
+    assertEquals("Dr. Martin", fakeMedications.prescriptionsOf(uid).single().prescribedBy)
+  }
+
+  @Test
+  fun correctionCannotBeChangedWhileItIsSaving() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    val gate = CompletableDeferred<Unit>()
+    medications.gate = gate
+    viewModel.save()
+    advanceUntilIdle()
+    val saving = viewModel.state
+
+    viewModel.editEverything()
+
+    assertEquals(saving, viewModel.state)
+    gate.complete(Unit)
+    advanceUntilIdle()
+    assertEquals("Dr. House", fakeMedications.prescriptionsOf(uid).single().prescribedBy)
+  }
+
+  @Test
+  fun changeMadeElsewhereKeepsAFailedSaveToShow() = runTest {
+    val viewModel = loadedEditViewModel()
+    fakeMedications.writeError = IOException("disk full")
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
+    fakeMedications.writeError = null
+    val changed = saved.copy(prescribedBy = "Dr. Leroy")
+
+    fakeMedications.seed(uid, changed)
+    advanceUntilIdle()
+
+    assertEquals(changed.toDraft(), viewModel.state.draft)
+    assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
+  }
+
+  @Test
+  fun correctionUndoneByTheUserFollowsChangesMadeElsewhereAgain() = runTest {
+    val viewModel = loadedEditViewModel()
+    // Typed then erased: the form shows what is saved again, so there is nothing to lose
+    viewModel.onPrescribedByChange("Dr. MartinX")
+    viewModel.onPrescribedByChange("Dr. Martin")
+    val changed = saved.copy(prescribedBy = "Dr. Leroy")
+
+    fakeMedications.updatePrescription(uid, changed)
+    advanceUntilIdle()
+
+    assertEquals(changed.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun readFailureWhileCorrectingIsReportedAsALoadFailure() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+
+    fakeMedications.failRunningReads(IOException("permission lost"))
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.FAILED, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+  }
+
+  // ---------- Loading again ----------
+
+  @Test
+  fun loadAfterAFailureReadsThePrescriptionAgain() = runTest {
+    fakeMedications.seed(uid, saved)
+    fakeMedications.readError = IOException("unavailable")
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+    fakeMedications.readError = null
+
+    viewModel.load()
+
+    assertEquals(PrescriptionFormLoad.LOADING, viewModel.state.load)
+
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertTrue(viewModel.state.isEditing)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    assertTrue(viewModel.state.canSave)
+  }
+
+  @Test
+  fun loadAfterAFailureCanFailAgain() = runTest {
+    fakeMedications.readError = IOException("unavailable")
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.FAILED, viewModel.state.load)
+  }
+
+  @Test
+  fun loadAfterAFailureWhileCorrectingStartsFromWhatIsSaved() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    fakeMedications.failRunningReads(IOException("permission lost"))
+    advanceUntilIdle()
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun loadAfterNotFoundFindsThePrescriptionOnceItExists() = runTest {
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    fakeMedications.seed(uid, saved)
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun loadAfterSigningInAgainReadsThePrescription() = runTest {
+    fakeMedications.seed(uid, saved)
+    auth.signOut()
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+    auth.signInWithGoogle("token")
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun loadWhileLoadingReadsThePrescriptionOnce() = runTest {
+    fakeMedications.seed(uid, saved)
+    val viewModel = editViewModel()
+
+    viewModel.load()
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    assertEquals(1, fakeMedications.prescriptionObservers)
+  }
+
+  @Test
+  fun loadKeepsWhatTheUserIsCorrecting() = runTest {
+    val viewModel = loadedEditViewModel()
+    viewModel.onPrescribedByChange("Dr. House")
+    val corrected = viewModel.state
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(corrected, viewModel.state)
+  }
+
+  @Test
+  fun loadDoesNothingForANewPrescription() = runTest {
+    fakeMedications.readError = IOException("unavailable")
+    val viewModel = viewModelWith("Ondansetron")
+    val typed = viewModel.state
+
+    viewModel.load()
+    advanceUntilIdle()
+
+    assertEquals(typed, viewModel.state)
+    assertFalse(viewModel.state.isEditing)
   }
 }

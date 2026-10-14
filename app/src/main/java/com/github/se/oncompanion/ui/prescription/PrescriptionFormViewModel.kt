@@ -8,14 +8,18 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.MedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +38,26 @@ enum class PrescriptionFormError {
 }
 
 /**
+ * Whether the form has the prescription it works on, so the screen can show the form, a progress
+ * indicator, or why there is nothing to edit.
+ */
+enum class PrescriptionFormLoad {
+  /** The form can be filled in: a new prescription, or the saved one once it is read. */
+  READY,
+  /** The saved prescription is being read. */
+  LOADING,
+  /**
+   * There is no such prescription: it was deleted (e.g. from another device), or the device is
+   * offline and has never loaded it.
+   */
+  NOT_FOUND,
+  /** Nobody is signed in (e.g. the session expired): the user has to sign in again. */
+  NOT_SIGNED_IN,
+  /** Reading the prescription failed. Not a connection problem: offline, the cache answers. */
+  FAILED,
+}
+
+/**
  * What the prescription form shows.
  *
  * @property draft the prescription as typed so far
@@ -44,6 +68,10 @@ enum class PrescriptionFormError {
  *   name or left it for another medication. A missing name is only flagged from then on.
  * @property isSaving the prescription is being saved
  * @property isSaved the prescription is saved: the form is done
+ * @property error why the last save failed, until it has been shown
+ * @property isEditing the form corrects a saved prescription instead of adding a new one
+ * @property load whether the form can be filled in. Until it is [PrescriptionFormLoad.READY],
+ *   [draft] isn't the saved prescription and must not be shown.
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -53,6 +81,8 @@ data class PrescriptionFormUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val error: PrescriptionFormError? = null,
+    val isEditing: Boolean = false,
+    val load: PrescriptionFormLoad = PrescriptionFormLoad.READY,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -69,23 +99,37 @@ data class PrescriptionFormUiState(
   val invalidMedications: Set<Int>
     get() = draft.medications.indices.filterNot { draft.medications[it].isValid() }.toSet()
 
-  /** The prescription can be saved: the draft is valid and nothing is being saved. */
+  /**
+   * The prescription can be saved: the form has its prescription, the draft is valid and nothing is
+   * being saved.
+   */
   val canSave: Boolean
-    get() = draft.isValid() && !isSaving && !isSaved
+    get() = load == PrescriptionFormLoad.READY && draft.isValid() && !isSaving && !isSaved
 }
 
 /**
  * The prescription form (US-24): the user types a prescription and its medications, one open for
  * editing at a time, then saves it. Nothing is saved before the user confirms with Save.
  *
+ * Given a [prescriptionId], the form corrects that saved prescription instead (US-12): it reads it
+ * (see [load]), starts from what was saved, and Save replaces it. The fields and their validation
+ * are the same as for a new prescription.
+ *
  * @param clock the current date, which a new prescription starts with
- * @param initialDraft what the form starts with; `null` for an empty form
+ * @param initialDraft what the form starts with; `null` for an empty form. Replaced by the saved
+ *   prescription when [prescriptionId] is given.
+ * @param prescriptionId the saved prescription to correct; `null` to add a new one
+ * @param medicationRepository reads the prescription to correct. Writes go through
+ *   [manageMedicationSchedule].
  */
 class PrescriptionFormViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val manageMedicationSchedule: ManageMedicationSchedule = ManageMedicationSchedule(),
     clock: Clock = Clock.systemDefaultZone(),
     initialDraft: PrescriptionDraft? = null,
+    private val prescriptionId: String? = null,
+    private val medicationRepository: MedicationRepository =
+        MedicationRepositoryProvider.repository,
 ) : ViewModel() {
 
   // A new form follows the date of the prescription; in a given draft every start date is chosen
@@ -102,6 +146,85 @@ class PrescriptionFormViewModel(
               }
       )
   val uiState: StateFlow<PrescriptionFormUiState> = _uiState.asStateFlow()
+
+  private var observation: Job? = null
+
+  // The draft the form last started from: while the form still shows it, the user changed nothing
+  private var shownDraft: PrescriptionDraft? = null
+
+  init {
+    // A saved prescription has to be read before the form can show it
+    if (prescriptionId != null) {
+      _uiState.update { it.copy(isEditing = true, load = PrescriptionFormLoad.LOADING) }
+    }
+    load()
+  }
+
+  /**
+   * Starts (or, after an error, restarts) observing the saved prescription to correct, and starts
+   * the form from it. The screen calls it to try again when the prescription couldn't be loaded.
+   *
+   * The form keeps following the saved prescription while it is open:
+   * - A prescription that arrives later (e.g. once the connection is back on a device that had
+   *   never loaded it) fills the form by itself.
+   * - A change made elsewhere refreshes the form while it still shows what was saved (the user
+   *   changed nothing, or undid their changes). Otherwise it is ignored, so nothing replaces what
+   *   they are correcting. It is also ignored while saving and once saved.
+   * - A deletion makes the form [PrescriptionFormLoad.NOT_FOUND] right away, also while saving, and
+   *   what was typed is dropped: there is nothing left to correct.
+   *
+   * Does nothing for a new prescription, which has nothing to read, and once the form is
+   * [PrescriptionFormLoad.READY]: it is already following the prescription.
+   *
+   * Every saved start date counts as chosen and every name as touched, as in a draft the form is
+   * given. This is the only place the form reads a prescription.
+   */
+  fun load() {
+    val id = prescriptionId ?: return
+    if (_uiState.value.load == PrescriptionFormLoad.READY) return
+    observation?.cancel()
+    _uiState.update { it.copy(load = PrescriptionFormLoad.LOADING) }
+    val uid = authRepository.signedInUid(TAG)
+    if (uid == null) {
+      _uiState.update { it.copy(load = PrescriptionFormLoad.NOT_SIGNED_IN) }
+      return
+    }
+    observation = viewModelScope.launch {
+      try {
+        medicationRepository.observePrescription(uid, id).collect(::show)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to load the prescription $id", e)
+        _uiState.update { it.copy(load = PrescriptionFormLoad.FAILED) }
+      }
+    }
+  }
+
+  /**
+   * Applies what is saved for the prescription to correct, `null` if it doesn't exist. Like every
+   * change to the state, it runs on the main thread, so reading then writing the state can't lose
+   * an update.
+   */
+  private fun show(saved: Prescription?) {
+    val state = _uiState.value
+    // Once saved, the form is done: what arrives next is its own save
+    if (state.isSaved) return
+    if (saved == null) {
+      _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
+      return
+    }
+    // While saving, the form keeps showing what is being saved
+    if (state.isSaving) return
+    val draft = saved.toDraft().cutToLimits()
+    // A form in use is left alone if the user changed it, and also if the same content arrives
+    // again (e.g. the server confirmed it), which would close the medication they opened
+    val ready = state.load == PrescriptionFormLoad.READY
+    if (ready && (state.draft != shownDraft || draft == state.draft)) return
+    // Anything typed before a deletion or a failure is dropped: the form starts from what is saved
+    shownDraft = draft
+    _uiState.value = PrescriptionFormUiState(draft, isEditing = true, error = state.error)
+  }
 
   /** Text longer than the prescription can store is cut. */
   fun onPrescribedByChange(value: String) {
@@ -226,9 +349,15 @@ class PrescriptionFormViewModel(
   }
 
   /**
-   * Saves the prescription through [ManageMedicationSchedule]. Does nothing unless
+   * Saves the prescription through [ManageMedicationSchedule]: a new one is added, a saved one
+   * ([PrescriptionFormUiState.isEditing]) is replaced. Does nothing unless
    * [PrescriptionFormUiState.canSave]. Saving returns as soon as the prescription is stored on the
    * device, also offline.
+   *
+   * If the prescription to correct was deleted since the form was opened (e.g. from another
+   * device), or while saving, nothing is saved and the form becomes
+   * [PrescriptionFormLoad.NOT_FOUND] instead of saved. See [ManageMedicationSchedule.update] for
+   * what this can't catch.
    *
    * [PrescriptionFormError.SAVE_FAILED] only covers what fails before that, on the device. If the
    * server refuses the prescription later, the form isn't told: it has already reported the save as
@@ -245,8 +374,18 @@ class PrescriptionFormViewModel(
     _uiState.update { it.copy(isSaving = true, error = null) }
     viewModelScope.launch {
       try {
-        manageMedicationSchedule(uid, state.draft)
-        _uiState.update { it.copy(isSaving = false, isSaved = true) }
+        val stillExists =
+            if (prescriptionId == null) {
+              manageMedicationSchedule.add(uid, state.draft)
+              true
+            } else manageMedicationSchedule.update(uid, prescriptionId, state.draft)
+        _uiState.update {
+          // Deleted since the form was opened, or while saving (the repository then writes
+          // nothing): there is nothing left to correct
+          if (stillExists && it.load != PrescriptionFormLoad.NOT_FOUND) {
+            it.copy(isSaving = false, isSaved = true)
+          } else it.copy(isSaving = false, load = PrescriptionFormLoad.NOT_FOUND)
+        }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -262,11 +401,15 @@ class PrescriptionFormViewModel(
   }
 
   /**
-   * Applies a change the user made to the form. Ignored while the prescription is being saved and
-   * once it is saved: the form would no longer show what was saved.
+   * Applies a change the user made to the form. Ignored until the form has its prescription, while
+   * the prescription is being saved and once it is saved: the form would no longer show what was
+   * saved.
    */
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
-    _uiState.update { state -> if (state.isSaving || state.isSaved) state else transform(state) }
+    _uiState.update { state ->
+      val locked = state.load != PrescriptionFormLoad.READY || state.isSaving || state.isSaved
+      if (locked) state else transform(state)
+    }
   }
 
   private fun editOpenMedication(transform: (MedicationDraft) -> MedicationDraft) {
