@@ -43,6 +43,8 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
+import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
@@ -137,6 +139,14 @@ fun AppNavHost(
             navigationActions = navigationActions,
             // Scoped to this back stack entry, so each opened symptom has its own ViewModel
             viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+        )
+      }
+      composable(Screen.SYMPTOM_ADD) {
+        // Saving returns to the journal, where the new entry is at the top
+        AddSymptomScreen(
+            viewModel = viewModel { AddSymptomViewModel() },
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
         )
       }
     }
