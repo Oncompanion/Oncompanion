@@ -340,7 +340,7 @@ class CareCircleScreenTest {
   }
 
   @Test
-  fun inviteNotOnTheServerYet_saysItIsNotSent() {
+  fun inviteNotOnTheServerYet_saysWaitingToSync() {
     setContent(circle(pending = listOf(julie.copy(createdAt = null, isSynced = false))))
     composeTestRule
         .onNodeWithText(string(R.string.care_circle_invite_not_synced))

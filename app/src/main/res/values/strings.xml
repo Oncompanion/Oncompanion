@@ -183,7 +183,7 @@
     <string name="care_circle_pending_count">Waiting to join (%1$d)</string>
     <string name="care_circle_invite_pending">Invitation pending</string>
     <string name="care_circle_invite_expired">Invitation expired</string>
-    <string name="care_circle_invite_not_synced">Not sent yet, you\'re offline</string>
+    <string name="care_circle_invite_not_synced">Waiting to sync</string>
     <string name="care_circle_pending_label">Pending</string>
 
     <string name="permission_planning">Planning</string>
