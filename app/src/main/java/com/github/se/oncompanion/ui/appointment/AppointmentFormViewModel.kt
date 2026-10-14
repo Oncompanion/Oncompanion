@@ -143,43 +143,50 @@ class AppointmentFormViewModel(
   fun save() {
     val draft = state.value
     if (!draft.canSave) return
+    val uid = validatedOwner(draft.date) ?: return
+    val attempt = session
+    val appointment = draft.toAppointment()
+    state.update { it.copy(isSaving = true, error = null) }
+    viewModelScope.launch { writeAppointment(uid, appointment, attempt) }
+  }
+
+  // Authentication can change before observer delivery; reject the old patient's draft.
+  private fun validatedOwner(date: LocalDate): String? {
     val uid = runCatching { authRepository.currentUser?.uid }.getOrNull()
     if (uid != ownerUid) {
-      // Authentication can change before its flow is delivered; never submit the old draft.
       session++
       ownerUid = uid
-      state.value =
-          AppointmentFormUiState(draft.date, zoneId, error = AppointmentFormError.NOT_SIGNED_IN)
-      return
+      state.value = AppointmentFormUiState(date, zoneId, error = AppointmentFormError.NOT_SIGNED_IN)
+      return null
     }
-    if (uid == null) {
-      state.update { it.copy(error = AppointmentFormError.NOT_SIGNED_IN) }
-      return
-    }
-    val attempt = session
-    val instant = requireNotNull(draft.instant)
-    state.update { it.copy(isSaving = true, error = null) }
-    viewModelScope.launch {
-      try {
-        if (attempt != session || authRepository.currentUser?.uid != uid) return@launch
-        repository.addAppointment(
-            uid,
-            Appointment(
-                title = draft.title.trim(),
-                scheduledAt = instant,
-                type = draft.type,
-                location = draft.location.trim().ifEmpty { null },
-                notes = draft.notes.trim().ifEmpty { null },
-            ),
-        )
-        if (attempt == session && authRepository.currentUser?.uid == uid)
-            state.update { it.copy(isSaving = false, savedAt = instant) }
-      } catch (cancelled: CancellationException) {
-        throw cancelled
-      } catch (_: Exception) {
-        if (attempt == session)
-            state.update { it.copy(isSaving = false, error = AppointmentFormError.SAVE_FAILED) }
-      }
+    if (uid == null) state.update { it.copy(error = AppointmentFormError.NOT_SIGNED_IN) }
+    return uid
+  }
+
+  private fun AppointmentFormUiState.toAppointment() =
+      Appointment(
+          title = title.trim(),
+          scheduledAt = requireNotNull(instant),
+          type = type,
+          location = location.trim().ifEmpty { null },
+          notes = notes.trim().ifEmpty { null },
+      )
+
+  private fun isCurrentAttempt(uid: String, attempt: Int) =
+      attempt == session && authRepository.currentUser?.uid == uid
+
+  // Only the session that submitted the write may receive its completion.
+  private suspend fun writeAppointment(uid: String, appointment: Appointment, attempt: Int) {
+    try {
+      if (!isCurrentAttempt(uid, attempt)) return
+      repository.addAppointment(uid, appointment)
+      if (isCurrentAttempt(uid, attempt))
+          state.update { it.copy(isSaving = false, savedAt = appointment.scheduledAt) }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Exception) {
+      if (attempt == session)
+          state.update { it.copy(isSaving = false, error = AppointmentFormError.SAVE_FAILED) }
     }
   }
 
