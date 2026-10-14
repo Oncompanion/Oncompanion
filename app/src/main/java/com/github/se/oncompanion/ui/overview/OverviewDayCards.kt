@@ -28,8 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.model.overview.NextAppointment
-import com.github.se.oncompanion.model.overview.TodayItemKind
 import com.github.se.oncompanion.resources.C
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -91,12 +89,6 @@ internal fun NextAppointmentCard(
         )
       } else {
         Text(text = appointment.title, style = MaterialTheme.typography.headlineSmall)
-        appointment.doctor?.let {
-          Text(
-              text = stringResource(R.string.overview_appointment_with, it),
-              style = MaterialTheme.typography.bodyMedium,
-          )
-        }
         IconLine(R.drawable.ic_schedule) {
           Text(
               text = appointmentWhen(appointment, today),
@@ -187,22 +179,24 @@ internal fun TodaySection(entries: List<TodayEntry>, onOpenPlanning: () -> Unit)
   }
 }
 
-/** One of today's items (Figma: "Today item"): time, icon, title, detail and its status. */
+/**
+ * One of today's entries (Figma: "Today item"): time (or "No set time"), icon, title, detail and,
+ * for a timed entry, its status.
+ */
 @Composable
 private fun TodayRow(entry: TodayEntry) {
   val colors = MaterialTheme.colorScheme
-  val item = entry.item
   val done = entry.status == TodayItemStatus.DONE
   Row(
       modifier =
           Modifier.fillMaxWidth()
               .padding(horizontal = 16.dp, vertical = 12.dp)
-              .testTag(C.Tag.overviewTodayItem(item.id)),
+              .testTag(C.Tag.overviewTodayItem(entry.key)),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Text(
-        text = item.time.format(timeFormatter),
+        text = entry.time?.format(timeFormatter) ?: stringResource(R.string.overview_no_set_time),
         style = MaterialTheme.typography.labelMedium,
         color = if (done) colors.onSurfaceVariant else colors.onSurface,
         // At least 40dp so times line up, wider if the user enlarged the font
@@ -213,18 +207,18 @@ private fun TodayRow(entry: TodayEntry) {
         contentAlignment = Alignment.Center,
     ) {
       Icon(
-          painter = painterResource(item.kind.icon()),
+          painter = painterResource(entry.kind.icon()),
           contentDescription = null,
           tint = colors.onSecondaryContainer,
       )
     }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
       Text(
-          text = item.title,
+          text = entry.title,
           style = MaterialTheme.typography.titleMedium,
           color = if (done) colors.onSurfaceVariant else colors.onSurface,
       )
-      item.subtitle?.let {
+      entry.subtitle?.let {
         Text(text = it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
       }
     }
@@ -247,14 +241,9 @@ private fun TodayRow(entry: TodayEntry) {
               container = colors.primaryContainer,
               content = colors.onPrimaryContainer,
           )
-      // Neutral, not alarming: the app only reports what the user entered
-      TodayItemStatus.NOT_TAKEN ->
-          StatusChip(
-              text = stringResource(R.string.overview_not_taken),
-              container = colors.surfaceContainerHighest,
-              content = colors.onSurfaceVariant,
-          )
-      TodayItemStatus.LATER -> {}
+      // No status for an entry without a time: the app never decides whether a medication was taken
+      TodayItemStatus.LATER,
+      null -> {}
     }
   }
 }

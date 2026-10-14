@@ -55,6 +55,7 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -482,7 +483,15 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(Tab.EVENTS.testTag).performClick()
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertIsDisplayed()
-    composeTestRule.runOnIdle { assertEquals(1, repository.ranges.size) }
+    // The Overview reads the same planning data over a month; Planning's own week is read once
+    composeTestRule.runOnIdle {
+      assertEquals(
+          1,
+          repository.ranges.count {
+            ChronoUnit.DAYS.between(it.startDateInclusive, it.endDateExclusive) == 7L
+          },
+      )
+    }
   }
 
   @Test

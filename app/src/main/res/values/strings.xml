@@ -61,7 +61,6 @@
     <string name="overview_greeting_evening">Good evening</string>
     <string name="overview_greeting_evening_name">Good evening, %1$s</string>
     <string name="overview_next_appointment">NEXT APPOINTMENT</string>
-    <string name="overview_appointment_with">With %1$s</string>
     <string name="overview_today_at">Today, %1$s</string>
     <string name="overview_tomorrow_at">Tomorrow, %1$s</string>
     <string name="overview_no_appointment">No upcoming appointment</string>
@@ -73,7 +72,7 @@
     <string name="overview_nothing_today_hint">Medication intakes and events of the day will appear here.</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
-    <string name="overview_not_taken">Not taken yet</string>
+    <string name="overview_no_set_time">No set time</string>
     <string name="overview_done">Done</string>
     <string name="overview_error_title">Couldn\'t load your day</string>
     <string name="overview_error_hint">Your shortcuts still work. Check your connection and try again.</string>
