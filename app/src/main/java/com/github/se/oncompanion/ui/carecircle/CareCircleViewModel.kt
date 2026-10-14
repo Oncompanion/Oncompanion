@@ -32,7 +32,7 @@ sealed interface CareCircleUiState {
    * The circle, in two sections each sorted by name: the people who [joined], and the invitations
    * still [pending]. One of the two may be empty, never both.
    */
-  data class Members(
+  data class CareCircleMembers(
       val joined: List<CareCircleEntry.Joined>,
       val pending: List<CareCircleEntry.Pending>,
   ) : CareCircleUiState
@@ -91,7 +91,7 @@ class CareCircleViewModel(
               val now = clock.instant()
               if (members.isEmpty() && invites.isEmpty()) CareCircleUiState.Empty
               else
-                  CareCircleUiState.Members(
+                  CareCircleUiState.CareCircleMembers(
                       joined = members.map { CareCircleEntry.Joined(it) },
                       pending = invites.map { CareCircleEntry.Pending(it, it.isExpired(now)) },
                   )

@@ -121,7 +121,7 @@ fun CareCircleContent(
       },
       floatingActionButton = {
         // In the empty state, the add button is part of the content instead
-        if (uiState is CareCircleUiState.Members) {
+        if (uiState is CareCircleUiState.CareCircleMembers) {
           ExtendedFloatingActionButton(
               text = { Text(stringResource(R.string.care_circle_add_member)) },
               icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
@@ -136,7 +136,7 @@ fun CareCircleContent(
       CareCircleUiState.Loading -> LoadingState(contentModifier)
       CareCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
       CareCircleUiState.Error -> ErrorState(onRetry, contentModifier)
-      is CareCircleUiState.Members -> MemberList(uiState, onMemberClick, contentModifier)
+      is CareCircleUiState.CareCircleMembers -> CareCircleMemberList(uiState, onMemberClick, contentModifier)
     }
   }
 }
@@ -153,8 +153,8 @@ private fun LoadingState(modifier: Modifier) {
  * "Waiting to join (m)", the invitations not used yet. An empty section is not shown.
  */
 @Composable
-private fun MemberList(
-    careCircle: CareCircleUiState.Members,
+private fun CareCircleMemberList(
+    careCircle: CareCircleUiState.CareCircleMembers,
     onMemberClick: (CareCircleMember) -> Unit,
     modifier: Modifier,
 ) {
@@ -408,7 +408,7 @@ fun CareCircleScreenPreview() {
   OncompanionTheme {
     CareCircleContent(
         uiState =
-            CareCircleUiState.Members(
+            CareCircleUiState.CareCircleMembers(
                 joined =
                     listOf(
                             CareCircleMember(

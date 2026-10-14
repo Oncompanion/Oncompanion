@@ -100,7 +100,7 @@ class CareCircleScreenTest {
       joined: List<CareCircleMember> = emptyList(),
       pending: List<CareCircleInvite> = emptyList(),
   ) =
-      CareCircleUiState.Members(
+      CareCircleUiState.CareCircleMembers(
           joined = joined.map { CareCircleEntry.Joined(it) },
           pending = pending.map { CareCircleEntry.Pending(it, expired = false) },
       )
@@ -330,7 +330,7 @@ class CareCircleScreenTest {
   @Test
   fun expiredInvite_saysItExpired() {
     setContent(
-        CareCircleUiState.Members(
+        CareCircleUiState.CareCircleMembers(
             joined = emptyList(),
             pending = listOf(CareCircleEntry.Pending(julie, expired = true)),
         )

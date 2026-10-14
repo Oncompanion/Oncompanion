@@ -124,7 +124,7 @@ class CareCircleViewModelTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(joined(marc, sophie), emptyList()),
+        CareCircleUiState.CareCircleMembers(joined(marc, sophie), emptyList()),
         viewModel.uiState.value,
     )
   }
@@ -146,7 +146,7 @@ class CareCircleViewModelTest {
 
     repository.setMembers(ownerUid, listOf(sophie))
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(joined(sophie), emptyList()), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(joined(sophie), emptyList()), viewModel.uiState.value)
 
     repository.setMembers(ownerUid, emptyList())
     advanceUntilIdle()
@@ -159,7 +159,7 @@ class CareCircleViewModelTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(emptyList(), pending(bruno, julie)),
+        CareCircleUiState.CareCircleMembers(emptyList(), pending(bruno, julie)),
         viewModel.uiState.value,
     )
   }
@@ -171,7 +171,7 @@ class CareCircleViewModelTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(joined(marc, sophie), pending(julie)),
+        CareCircleUiState.CareCircleMembers(joined(marc, sophie), pending(julie)),
         viewModel.uiState.value,
     )
   }
@@ -182,7 +182,7 @@ class CareCircleViewModelTest {
     invites.setInvites(listOf(julie.copy(redeemerUid = "uid-julie")))
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(joined(sophie), emptyList()), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(joined(sophie), emptyList()), viewModel.uiState.value)
   }
 
   @Test
@@ -190,7 +190,7 @@ class CareCircleViewModelTest {
     invites.setInvites(listOf(julie))
     val viewModel = createViewModel()
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(emptyList(), pending(julie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(emptyList(), pending(julie)), viewModel.uiState.value)
 
     // What redeeming does: the invite is used and a member doc appears
     val julieMember = CareCircleMember(uid = "uid-julie", firstName = "Julie")
@@ -198,7 +198,7 @@ class CareCircleViewModelTest {
     repository.setMembers(ownerUid, listOf(julieMember))
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(joined(julieMember), emptyList()),
+        CareCircleUiState.CareCircleMembers(joined(julieMember), emptyList()),
         viewModel.uiState.value,
     )
   }
@@ -212,7 +212,7 @@ class CareCircleViewModelTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(
+        CareCircleUiState.CareCircleMembers(
             emptyList(),
             listOf(
                 CareCircleEntry.Pending(lastMoment, expired = false),
@@ -230,7 +230,7 @@ class CareCircleViewModelTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
     assertEquals(
-        CareCircleUiState.Members(emptyList(), listOf(CareCircleEntry.Pending(notSynced, false))),
+        CareCircleUiState.CareCircleMembers(emptyList(), listOf(CareCircleEntry.Pending(notSynced, false))),
         viewModel.uiState.value,
     )
   }
@@ -294,7 +294,7 @@ class CareCircleViewModelTest {
     viewModel.retry()
     assertEquals(CareCircleUiState.Loading, viewModel.uiState.value)
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(joined(sophie), emptyList()), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(joined(sophie), emptyList()), viewModel.uiState.value)
     assertEquals(listOf(ownerUid, ownerUid), repository.observedOwners)
   }
 
@@ -309,7 +309,7 @@ class CareCircleViewModelTest {
     invites.observeError = null
     viewModel.retry()
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(emptyList(), pending(julie)), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(emptyList(), pending(julie)), viewModel.uiState.value)
   }
 
   @Test
@@ -325,6 +325,6 @@ class CareCircleViewModelTest {
     // Only the new observation updates the state: no stale "Empty" from the first one
     repository.setMembers(ownerUid, listOf(sophie))
     advanceUntilIdle()
-    assertEquals(CareCircleUiState.Members(joined(sophie), emptyList()), viewModel.uiState.value)
+    assertEquals(CareCircleUiState.CareCircleMembers(joined(sophie), emptyList()), viewModel.uiState.value)
   }
 }
