@@ -82,7 +82,7 @@ class PrescriptionFormViewModelTest {
   }
 
   private fun viewModel(initialDraft: PrescriptionDraft? = null) =
-      PrescriptionFormViewModel(auth, ManageMedicationSchedule(medications), clock, initialDraft)
+      PrescriptionFormViewModel(auth, medications, clock = clock, initialDraft = initialDraft)
 
   private val PrescriptionFormViewModel.state
     get() = uiState.value
@@ -865,13 +865,7 @@ class PrescriptionFormViewModelTest {
 
   /** A form opened to edit the prescription [id], not loaded yet. */
   private fun editViewModel(id: String = saved.id) =
-      PrescriptionFormViewModel(
-          auth,
-          ManageMedicationSchedule(medications),
-          clock,
-          prescriptionId = id,
-          medicationRepository = medications,
-      )
+      PrescriptionFormViewModel(auth, medications, clock = clock, prescriptionId = id)
 
   /** A form opened to edit [saved], loaded. */
   private fun TestScope.loadedEditViewModel(): PrescriptionFormViewModel {
@@ -890,6 +884,27 @@ class PrescriptionFormViewModelTest {
     assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
     assertFalse(viewModel.state.isEditing)
     assertEquals(PrescriptionFormLoad.READY, PrescriptionFormUiState(viewModel.state.draft).load)
+  }
+
+  @Test
+  fun formGivenOnlyARepositoryReadsAndWritesThroughIt() = runTest {
+    fakeMedications.seed(uid, saved)
+    // No use case given: it must default to the same repository, never to the production one
+    val viewModel =
+        PrescriptionFormViewModel(
+            auth,
+            medicationRepository = fakeMedications,
+            clock = clock,
+            prescriptionId = saved.id,
+        )
+    advanceUntilIdle()
+    viewModel.onPrescribedByChange("Dr. House")
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.state.isSaved)
+    assertEquals("Dr. House", fakeMedications.prescriptionsOf(uid).single().prescribedBy)
   }
 
   @Test

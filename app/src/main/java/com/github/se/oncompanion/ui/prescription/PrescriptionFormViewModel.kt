@@ -115,21 +115,24 @@ data class PrescriptionFormUiState(
  * (see [load]), starts from what was saved, and Save replaces it. The fields and their validation
  * are the same as for a new prescription.
  *
+ * @param medicationRepository reads the prescription to correct. Writes go through
+ *   [manageMedicationSchedule].
+ * @param manageMedicationSchedule saves the prescription; by default through
+ *   [medicationRepository], so the form never reads from one repository and writes to another
  * @param clock the current date, which a new prescription starts with
  * @param initialDraft what the form starts with; `null` for an empty form. Replaced by the saved
  *   prescription when [prescriptionId] is given.
  * @param prescriptionId the saved prescription to correct; `null` to add a new one
- * @param medicationRepository reads the prescription to correct. Writes go through
- *   [manageMedicationSchedule].
  */
 class PrescriptionFormViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
-    private val manageMedicationSchedule: ManageMedicationSchedule = ManageMedicationSchedule(),
+    private val medicationRepository: MedicationRepository =
+        MedicationRepositoryProvider.repository,
+    private val manageMedicationSchedule: ManageMedicationSchedule =
+        ManageMedicationSchedule(medicationRepository),
     clock: Clock = Clock.systemDefaultZone(),
     initialDraft: PrescriptionDraft? = null,
     private val prescriptionId: String? = null,
-    private val medicationRepository: MedicationRepository =
-        MedicationRepositoryProvider.repository,
 ) : ViewModel() {
 
   // A new form follows the date of the prescription; in a given draft every start date is chosen
