@@ -16,18 +16,23 @@ import kotlinx.coroutines.flow.flowOf
  * them through its own [PlanningRepository]; adding a feature to Planning is one more source here.
  *
  * The list updates whenever one of the sources changes. If a source fails, the whole list fails, so
- * the screen shows its error and retry instead of a calendar that silently misses entries.
+ * the screen shows its error and retry instead of a calendar that silently misses entries. A source
+ * that isn't essential (the Ligue's events) is wrapped in [OptionalPlanningSource], so its failure
+ * only hides its own entries.
  */
 class ObservePlanning(private val sources: List<PlanningRepository>) : PlanningRepository {
 
+  /** Merges [sources], e.g. `ObservePlanning(appointments, events)`. */
   constructor(vararg sources: PlanningRepository) : this(sources.toList())
 
   /** The entries of every source within [range], sorted by day, then by time. */
   override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> {
     // combine() never emits without any flow to combine
     if (sources.isEmpty()) return flowOf(emptyList())
+    // Built once per observation, not on every update of a source
+    val order = order(range)
     return combine(sources.map { it.observeItems(range) }) { lists ->
-      lists.flatMap { it }.filter { it.timing in range }.sortedWith(order(range))
+      lists.flatMap { it }.filter { it.timing in range }.sortedWith(order)
     }
   }
 

@@ -8,6 +8,8 @@ import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
@@ -16,7 +18,9 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -75,6 +79,37 @@ class PlanningRepositoryProviderTest {
     val items = original.observeItems(range).first { it.size == 2 }
 
     assertEquals(listOf("Saved consultation", event.title), items.map { it.title })
+  }
+
+  /** If the events can't be read, the default provider still shows the appointments. */
+  @Test
+  fun failingEvents_keepTheAppointmentsByDefault() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
+    val auth = FakeAuthRepository { AuthUser(it) }
+    auth.signInWithGoogle("patient")
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        "patient",
+        Appointment(
+            "saved",
+            "Saved consultation",
+            range.startInclusive,
+            AppointmentType.CONSULTATION,
+        ),
+    )
+    AuthRepositoryProvider.repository = auth
+    AppointmentRepositoryProvider.repository = appointments
+    EventRepositoryProvider.repository =
+        object : EventRepository by FakeEventRepository(emptyList()) {
+          override fun getUpcomingEvents(): Flow<List<Event>> = flow {
+            error("Events couldn't be read")
+          }
+        }
+
+    val items = original.observeItems(range).first { it.isNotEmpty() }
+
+    assertEquals(listOf("Saved consultation"), items.map { it.title })
   }
 
   /** The repository given to the provider is the one it hands out afterwards. */

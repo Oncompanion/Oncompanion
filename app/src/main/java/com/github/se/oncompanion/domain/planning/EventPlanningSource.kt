@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.map
  */
 class EventPlanningSource(private val events: EventRepository) : PlanningRepository {
 
+  /** The upcoming events that start within [range], as timed entries, updated live. */
   override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
       events.getUpcomingEvents().map { upcoming ->
         upcoming.map { it.toPlanningItem(range) }.filter { it.timing in range }
