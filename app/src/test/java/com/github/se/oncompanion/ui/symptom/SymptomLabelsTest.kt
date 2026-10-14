@@ -12,6 +12,7 @@ import com.github.se.oncompanion.model.symptom.Severity
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import java.time.Instant
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -75,5 +76,20 @@ class SymptomLabelsTest {
       Text(fatigue.copy(types = listOf(SymptomType.OTHER), notes = "Hiccups").title())
     }
     composeTestRule.onNodeWithText("Other").assertExists()
+  }
+
+  @Test
+  fun dayLabel_isTodayYesterday_orTheDay_withTheYearOnlyForAnotherYear() {
+    val today = LocalDate.of(2026, 10, 5)
+    val labels = mutableListOf<String>()
+    composeTestRule.setContent {
+      labels +=
+          listOf(today, today.minusDays(1), LocalDate.of(2026, 10, 3), LocalDate.of(2025, 10, 4))
+              .map { dayLabel(it, today) }
+    }
+
+    composeTestRule.runOnIdle {
+      assertEquals(listOf("Today", "Yesterday", "Sat 3 Oct", "Sat 4 Oct 2025"), labels.take(4))
+    }
   }
 }

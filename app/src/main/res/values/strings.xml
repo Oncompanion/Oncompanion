@@ -112,6 +112,30 @@
     <string name="symptom_detail_not_found_hint">It may have been deleted on another device.</string>
     <!-- Severity · start of the notes, under a journal entry, e.g. "Moderate · Hiccups since lunch" -->
     <string name="symptom_journal_summary">%1$s · %2$s</string>
+    <string name="symptom_add_title">Log symptoms</string>
+    <string name="symptom_add_close">Close</string>
+    <string name="symptom_add_types">What are you feeling?</string>
+    <string name="symptom_add_intensity">How bad do you feel overall? (optional)</string>
+    <!-- The intensity and its severity in words, e.g. "6/10 · Moderate" -->
+    <string name="symptom_add_intensity_value">%1$d/10 · %2$s</string>
+    <string name="symptom_add_intensity_not_set">Not set</string>
+    <string name="symptom_add_intensity_clear">Clear</string>
+    <string name="symptom_add_when">When did you feel it?</string>
+    <string name="symptom_add_date_time">Date &amp; time</string>
+    <!-- The day and the time, e.g. "Today · 09:30" -->
+    <string name="symptom_add_date_time_value">%1$s · %2$s</string>
+    <string name="symptom_add_date_time_hint">Set to now. Change it if you felt it earlier.</string>
+    <string name="symptom_add_change_date_time">Change the date and time</string>
+    <string name="symptom_add_in_future">This is later than now. Pick an earlier day or time.</string>
+    <string name="symptom_add_notes_title">Describe how you feel</string>
+    <string name="symptom_add_notes">Notes</string>
+    <string name="symptom_add_notes_other_placeholder">Which other symptom did you feel?</string>
+    <string name="symptom_add_notes_required">Required with Other</string>
+    <string name="symptom_add_picker_confirm">OK</string>
+    <string name="symptom_add_picker_cancel">Cancel</string>
+    <string name="symptom_add_save">Save</string>
+    <string name="symptom_add_error_not_signed_in">You\'re signed out. Sign in again to save your symptoms.</string>
+    <string name="symptom_add_error_save_failed">Couldn\'t save your symptoms. Please try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -274,6 +298,12 @@
     <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
+    <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
+    <string name="prescription_scan_camera_unavailable_explanation">oncompanion couldn\'t turn on your phone\'s camera. You can enter the prescription yourself instead.</string>
+    <string name="prescription_scan_take_photo">Take a photo</string>
+    <string name="prescription_scan_photo_taken">Photo taken</string>
+    <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
+
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>
     <string name="hospital_field_hint">Enter a hospital name or another location</string>

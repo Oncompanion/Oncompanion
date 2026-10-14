@@ -19,7 +19,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 
 **Domain layer** (`domain/<feature>/`, optional). One class per use case, usually with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (directory, events, appointments list) go straight from the ViewModel to the repository.
 
-- `LogSymptom` turns a one-tap entry or a voice transcript into a symptom entry for the right patient, so one-tap entries and the voice journal in the symptom tracker share the same logic.
+- `LogSymptom` is planned with the voice journal. The add symptom form saves through `SymptomRepository` directly for now: it only uses that repository, so there is no logic to share yet. `LogSymptom` will turn a voice transcript into a draft of the same form, which the patient confirms before it is saved, and log it for the right patient once caregivers can log on a patient's behalf. The form's rule for when a symptom was felt (the pure function `occurredAt` in `AddSymptomViewModel.kt`) then moves to `domain/symptom` with it, so both use the same one.
 - `ManageMedicationSchedule` saves a confirmed prescription with its medications and keeps their reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule; that is why it exposes three named operations (`add`, `update`, `delete`) instead of a single `invoke`.
 - `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
 - `GenerateAppointmentSummary` gathers the symptoms and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
@@ -132,6 +132,12 @@ Firestore's local cache is the offline store: writes are applied locally right a
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
+
+## Prescription scan
+
+The scan screen (`ui/prescription/scan/`) uses the camera through CameraX. The camera stays in the UI layer, behind a small `ScanCamera` interface so the screen can be tested with a fake: its preview has to be drawn inside the screen, so it can't sit behind a device service like `TextRecognizer`. Only its result, the photo file, leaves the screen.
+
+The photo of a prescription is a medical document, so it is never uploaded and never kept: `ScanPhotoStore` (`model/medication/scan/`) writes it to a `scans/` folder of the app's private cache, which is never backed up. There is at most one photo at a time, and it is deleted when the scan screen is closed or destroyed, including when the screen is left while the photo is still being written. Photos left behind by an interrupted scan (e.g. the app was killed) are deleted the next time the scan screen opens. When text recognition exists, the photo is handed to `DraftMedicationFromScan`, which deletes it once read.
 
 ## Care circle invitations
 

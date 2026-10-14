@@ -140,7 +140,7 @@
       "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -160,6 +160,14 @@
         {
           "type": "arrow",
           "id": "ar5"
+        },
+        {
+          "type": "arrow",
+          "id": "scan_store_ar"
+        },
+        {
+          "type": "arrow",
+          "id": "scan_camerax_ar"
         }
       ],
       "updated": 1791100000000,
@@ -171,9 +179,9 @@
       "id": "scan_t",
       "type": "text",
       "x": 1050,
-      "y": 45.0,
+      "y": 32.5,
       "width": 240,
-      "height": 50.0,
+      "height": 75.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -194,8 +202,8 @@
       "link": null,
       "locked": false,
       "index": "a005",
-      "text": "ScanScreen\ntakes a photo",
-      "originalText": "ScanScreen\ntakes a photo",
+      "text": "ScanScreen\ntakes a photo\n(camera: CameraX)",
+      "originalText": "ScanScreen\ntakes a photo\n(camera: CameraX)",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2248,6 +2256,282 @@
       "containerId": null,
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "store",
+      "type": "rectangle",
+      "x": 1600,
+      "y": 380,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1536438366,
+      "version": 1,
+      "versionNonce": 185632494,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "store_t"
+        },
+        {
+          "type": "arrow",
+          "id": "scan_store_ar"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051V"
+    },
+    {
+      "id": "store_t",
+      "type": "text",
+      "x": 1610,
+      "y": 392.5,
+      "width": 240,
+      "height": 75.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 188471949,
+      "version": 1,
+      "versionNonce": 780566092,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051VV",
+      "text": "ScanPhotoStore\nphoto in app cache,\nnever uploaded",
+      "originalText": "ScanPhotoStore\nphoto in app cache,\nnever uploaded",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "store",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "camerax",
+      "type": "rectangle",
+      "x": 1600,
+      "y": 560,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1303547774,
+      "version": 1,
+      "versionNonce": 1294007495,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "camerax_t"
+        },
+        {
+          "type": "arrow",
+          "id": "scan_camerax_ar"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051VVV"
+    },
+    {
+      "id": "camerax_t",
+      "type": "text",
+      "x": 1610,
+      "y": 597.5,
+      "width": 240,
+      "height": 25.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 535294743,
+      "version": 1,
+      "versionNonce": 2140536732,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051VVVV",
+      "text": "CameraX",
+      "originalText": "CameraX",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "camerax",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "scan_store_ar",
+      "type": "arrow",
+      "x": 1306,
+      "y": 95,
+      "width": 424,
+      "height": 279,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 260241605,
+      "version": 1,
+      "versionNonce": 1936035364,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051VVVVV",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          424,
+          279
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "scan",
+        "fixedPoint": [
+          1,
+          0.75
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "store",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "scan_camerax_ar",
+      "type": "arrow",
+      "x": 1306,
+      "y": 45,
+      "width": 614,
+      "height": 565,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 398225092,
+      "version": 1,
+      "versionNonce": 12292264,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a051VVVVVV",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          614,
+          0
+        ],
+        [
+          614,
+          565
+        ],
+        [
+          560,
+          565
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "scan",
+        "fixedPoint": [
+          1,
+          0.25
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "camerax",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      }
     }
   ],
   "appState": {

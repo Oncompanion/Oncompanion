@@ -50,6 +50,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       # Cache the Emulator, if the cache does not hit, create the emulator.
+      # The emulator has a back camera so the real-camera test (ScanCameraTest) can run; the key changes
+      # with the emulator's hardware, so an old snapshot without a camera is never reused.
       # API 34 matches targetSdk. compileSdk 37 is only the compile platform.
       - name: AVD cache
         uses: actions/cache@v6
@@ -58,7 +60,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-34
+          key: avd-34-camera
 
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -68,7 +70,7 @@ jobs:
           target: google_apis
           arch: x86_64
           force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: false
           script: echo "Generated AVD snapshot for caching."
 
@@ -114,7 +116,7 @@ jobs:
           target: google_apis
           arch: x86_64
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
           script: ./gradlew connectedCheck --parallel --build-cache
 
