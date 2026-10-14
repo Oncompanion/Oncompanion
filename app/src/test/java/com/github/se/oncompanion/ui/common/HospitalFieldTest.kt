@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -28,6 +29,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HospitalFieldTest {
   @get:Rule val compose = createComposeRule()
+  private val originalRepository = HospitalRepositoryProvider.repository
   private val fake = FakeHospitalRepository()
   private val hospitals =
       listOf(
@@ -41,12 +43,19 @@ class HospitalFieldTest {
   private val selections = mutableListOf<Hospital?>()
   private var selected: Hospital? = null
 
+  /** Restores the provider after tests that exercise default ViewModel construction. */
+  @After
+  fun restoreProvider() {
+    HospitalRepositoryProvider.repository = originalRepository
+  }
+
   private fun field(
       repository: HospitalRepository = fake,
       initial: String = "",
   ): HospitalFieldViewModel {
     value = initial
-    val vm = HospitalFieldViewModel(repository)
+    HospitalRepositoryProvider.repository = repository
+    val vm = HospitalFieldViewModel()
     compose.setContent {
       if (visible)
           HospitalField(
@@ -85,6 +94,21 @@ class HospitalFieldTest {
     }
     node(C.Tag.hospital_results).assertDoesNotExist()
     node(C.Tag.hospital_attribution).assertDoesNotExist()
+  }
+
+  /** Missing deployment configuration reports an error without blocking offline manual entry. */
+  @Test
+  fun unconfiguredProviderKeepsManualEntryUsableAfterSearchFailure() {
+    field(originalRepository, "Geneva")
+    search()
+    node(C.Tag.hospital_error).assertIsDisplayed()
+    node(C.Tag.hospital_field).assertTextContains("Geneva").performTextReplacement("Home")
+    node(C.Tag.hospital_error).assertDoesNotExist()
+    compose.runOnIdle {
+      assertEquals("Home", value)
+      assertNull(selected)
+      assertTrue(fake.queries.isEmpty())
+    }
   }
 
   @Test

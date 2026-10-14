@@ -1,10 +1,12 @@
 // Co-authored-by: Codex
+// Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.ui.common
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.hospital.Hospital
 import com.github.se.oncompanion.model.hospital.HospitalRepository
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.hospital.HospitalSearchResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -28,7 +30,9 @@ sealed interface HospitalFieldUiState {
 }
 
 /** Owns explicit searches through one injected repository, preserving its existing cache. */
-class HospitalFieldViewModel(private val repository: HospitalRepository) : ViewModel() {
+class HospitalFieldViewModel(
+    private val repository: HospitalRepository = HospitalRepositoryProvider.repository
+) : ViewModel() {
   private val state = MutableStateFlow<HospitalFieldUiState>(HospitalFieldUiState.Idle)
   val uiState = state.asStateFlow()
   private var searchJob: Job? = null
