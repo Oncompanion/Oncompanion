@@ -13,7 +13,7 @@ import java.time.Instant
  * @property patientFirstName the patient's first name, copied from the invite when joining
  * @property joinedAt when the server received the join, or null until it has
  */
-data class JoinedCircle(
+data class JoinedCareCircle(
     val patientUid: String,
     val patientFirstName: String,
     val joinedAt: Instant? = null,

@@ -5,11 +5,11 @@ package com.github.se.oncompanion.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryFirebase
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
-import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,8 +52,8 @@ data class OnboardingUiState(
  * The first name is pre-filled from the Google account (the user can change it).
  */
 class OnboardingViewModel(
-    private val authRepository: AuthRepository = AuthRepositoryFirebase(),
-    private val profileRepository: UserProfileRepository = UserProfileRepositoryFirestore(),
+    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(OnboardingUiState(firstName = prefilledFirstName()))

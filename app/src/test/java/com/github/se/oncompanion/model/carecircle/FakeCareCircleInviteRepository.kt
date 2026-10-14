@@ -54,10 +54,10 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   /** When true, [redeem] returns [RedeemResult.Offline] and saves nothing. */
   var isOffline = false
 
-  private val joined = mutableMapOf<String, List<JoinedCircle>>()
+  private val joined = mutableMapOf<String, List<JoinedCareCircle>>()
 
   /** The circles [caregiverUid] joined with [redeem], in order. */
-  fun joinedCircles(caregiverUid: String): List<JoinedCircle> = joined[caregiverUid].orEmpty()
+  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> = joined[caregiverUid].orEmpty()
 
   /** The invite stored with [inviteCode], whatever its state, or null. */
   fun invite(inviteCode: String): CareCircleInvite? = invites.value[inviteCode]
@@ -142,7 +142,8 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     // member are added together
     val now = Instant.now()
     invites.value -= invite.inviteCode
-    joined[caregiverUid] = joinedBefore + JoinedCircle(invite.ownerUid, invite.ownerFirstName, now)
+    joined[caregiverUid] =
+        joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
     circle?.let {
       val details = invite.details
       val member =

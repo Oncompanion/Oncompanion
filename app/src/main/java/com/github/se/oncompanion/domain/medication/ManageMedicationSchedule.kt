@@ -3,7 +3,7 @@
 package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
-import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 
 /**
  * Saves a prescription the user has confirmed, with its medications. Every medication write goes
@@ -11,7 +11,7 @@ import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
  * in one place. There are no reminders yet: for now it only saves.
  */
 class ManageMedicationSchedule(
-    private val medicationRepository: MedicationRepository = MedicationRepositoryFirestore()
+    private val medicationRepository: MedicationRepository = MedicationRepositoryProvider.repository
 ) {
 
   /**

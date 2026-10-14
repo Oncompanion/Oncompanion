@@ -12,8 +12,10 @@ import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,14 +31,22 @@ class NavigationActionsTest {
   private lateinit var navController: TestNavHostController
   private lateinit var navigationActions: NavigationActions
 
+  // The app's repository, put back after each test
+  private val appAuthRepository = AuthRepositoryProvider.repository
+
+  @After
+  fun restoreProvider() {
+    AuthRepositoryProvider.repository = appAuthRepository
+  }
+
   private fun setNavHost(startRoute: String) {
-    val auth = FakeAuthRepository()
+    AuthRepositoryProvider.repository = FakeAuthRepository()
     composeTestRule.setContent {
       navController =
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      AppNavHost(navController = navController, startRoute = startRoute, authRepository = auth)
+      AppNavHost(navController = navController, startRoute = startRoute)
     }
     composeTestRule.runOnIdle { navigationActions = NavigationActions(navController) }
   }
