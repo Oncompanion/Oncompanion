@@ -26,7 +26,8 @@ import kotlinx.coroutines.launch
  * @property entry the symptom, or `null` while loading, after an error, or if it doesn't exist
  * @property isLoading true until the symptom arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
- * @property isConfirmingDelete the dialog asking to confirm the deletion is shown
+ * @property isConfirmingDelete the user asked to delete the symptom and hasn't confirmed or
+ *   cancelled
  * @property isDeleting the symptom is being deleted
  * @property hasDeleteError the last deletion failed; the symptom is kept
  * @property isDeleted the symptom is deleted: the screen is done
@@ -43,6 +44,13 @@ data class SymptomDetailUiState(
   /** The symptom is shown and can be deleted. */
   val canDelete: Boolean
     get() = entry != null && !isLoading && !hasError && !isDeleting && !isDeleted
+
+  /**
+   * The dialog asking to confirm the deletion is shown: only while its Delete button can do
+   * something, so it never stays over a symptom that is gone or reloading.
+   */
+  val isDeleteDialogShown: Boolean
+    get() = isConfirmingDelete && (canDelete || isDeleting)
 
   /** The symptom doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
@@ -70,22 +78,45 @@ class SymptomDetailViewModel(
 
   /** Starts (or, after an error, restarts) observing the symptom. */
   fun load() {
-    observation?.cancel()
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     val uid = authRepository.signedInUid(TAG)
     if (uid == null) {
+      observation?.cancel()
       _uiState.update { it.copy(isLoading = false, hasError = true) }
       return
     }
+    observe(uid)
+  }
+
+  /** Observes the symptom of [uid] in place of the current observation, keeping what is shown. */
+  private fun observe(uid: String) {
+    observation?.cancel()
     observation = viewModelScope.launch {
       symptomRepository
           .observeSymptom(uid, symptomId)
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom $symptomId", e)
-            _uiState.update { it.copy(isLoading = false, hasError = true) }
+            _uiState.update {
+              it.copy(
+                  isLoading = false,
+                  hasError = true,
+                  isConfirmingDelete = false,
+                  hasDeleteError = false,
+              )
+            }
           }
           .collect { entry ->
-            _uiState.update { it.copy(entry = entry, isLoading = false, hasError = false) }
+            _uiState.update {
+              // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
+              val stillConfirming = it.isConfirmingDelete && entry != null
+              it.copy(
+                  entry = entry,
+                  isLoading = false,
+                  hasError = false,
+                  isConfirmingDelete = stillConfirming,
+                  hasDeleteError = it.hasDeleteError && stillConfirming,
+              )
+            }
           }
     }
   }
@@ -130,8 +161,9 @@ class SymptomDetailViewModel(
         throw e
       } catch (e: Exception) {
         Log.e(TAG, "Failed to delete the symptom $symptomId", e)
+        // Keeps the symptom and the dialog shown (no loading state) so the user can try again
         _uiState.update { it.copy(isDeleting = false, hasDeleteError = true) }
-        load()
+        observe(uid)
       }
     }
   }

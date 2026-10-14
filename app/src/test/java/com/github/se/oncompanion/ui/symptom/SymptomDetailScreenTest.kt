@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
@@ -238,6 +239,42 @@ class SymptomDetailScreenTest {
 
     assertEquals(1, confirms)
     assertEquals(1, cancels)
+  }
+
+  @Test
+  fun confirmingWithoutAnEntry_showsNoDialog() {
+    setContent(loaded.copy(isConfirmingDelete = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
+  }
+
+  @Test
+  fun backInTheDialog_cancelsTheDeletion() {
+    var cancels = 0
+    setContent(
+        loaded.copy(entry = fatigue, isConfirmingDelete = true),
+        onCancelDelete = { cancels++ },
+    )
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    Espresso.pressBack()
+
+    composeTestRule.runOnIdle { assertEquals(1, cancels) }
+  }
+
+  @Test
+  fun backWhileDeleting_doesNotCancel() {
+    var cancels = 0
+    setContent(
+        loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true),
+        onCancelDelete = { cancels++ },
+    )
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    Espresso.pressBack()
+
+    composeTestRule.runOnIdle { assertEquals(0, cancels) }
   }
 
   @Test

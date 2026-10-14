@@ -220,6 +220,9 @@ class SymptomDetailViewModelTest {
     var state = vm.uiState.value
     assertTrue(state.hasDeleteError)
     assertTrue(state.isConfirmingDelete)
+    // No loading state in between: the dialog stays open with the error
+    assertFalse(state.isLoading)
+    assertTrue(state.isDeleteDialogShown)
     assertFalse(state.isDeleted)
     assertEquals(fatigue, state.entry)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
@@ -286,5 +289,52 @@ class SymptomDetailViewModelTest {
 
     assertTrue(vm.uiState.value.isDeleted)
     assertFalse(vm.uiState.value.isDeleting)
+  }
+
+  @Test
+  fun deleteDialog_isShownOnlyWhileDeleteCanDoSomething() {
+    val confirming =
+        SymptomDetailUiState(entry = fatigue, isLoading = false, isConfirmingDelete = true)
+
+    assertTrue(confirming.isDeleteDialogShown)
+    assertTrue(confirming.copy(isDeleting = true).isDeleteDialogShown)
+    assertFalse(confirming.copy(isConfirmingDelete = false).isDeleteDialogShown)
+    assertFalse(confirming.copy(entry = null).isDeleteDialogShown)
+    assertFalse(confirming.copy(isLoading = true).isDeleteDialogShown)
+    assertFalse(confirming.copy(hasError = true).isDeleteDialogShown)
+  }
+
+  @Test
+  fun entryDeletedElsewhereWhileConfirming_closesTheConfirmation() {
+    val vm = confirmingDelete()
+
+    // Deleted on another device
+    runBlocking { repository.deleteSymptom("alice", "s1") }
+
+    var state = vm.uiState.value
+    assertTrue(state.isNotFound)
+    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.isDeleteDialogShown)
+
+    // Coming back (e.g. the deletion was rolled back) doesn't reopen the dialog
+    repository.seed("alice", fatigue)
+    state = vm.uiState.value
+    assertEquals(fatigue, state.entry)
+    assertFalse(state.isDeleteDialogShown)
+  }
+
+  @Test
+  fun loadErrorAfterAFailedDelete_closesTheConfirmation() {
+    val vm = confirmingDelete()
+    repository.writeError = IllegalStateException("rejected")
+    repository.observeError = IllegalStateException("no cache")
+
+    vm.confirmDelete()
+
+    val state = vm.uiState.value
+    assertTrue(state.hasError)
+    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.hasDeleteError)
+    assertFalse(state.isDeleteDialogShown)
   }
 }

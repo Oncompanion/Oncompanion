@@ -133,7 +133,7 @@ fun SymptomDetailContent(
     }
   }
 
-  if (uiState.isConfirmingDelete) {
+  if (uiState.isDeleteDialogShown) {
     DeleteDialog(
         isDeleting = uiState.isDeleting,
         hasError = uiState.hasDeleteError,
