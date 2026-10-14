@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * [CareCircleRepository] backed by Cloud Firestore, documents at `/users/{ownerUid}/circle/{uid}`.
+ * Writes return once applied to the local cache; a write the server rejects is rolled back and
+ * logged.
  *
  * Firebase is only accessed when first used, not when the repository is created: screens can create
  * it (e.g. as a ViewModel default) even where Firebase isn't initialized, like unit tests.
@@ -57,10 +59,39 @@ class CareCircleRepositoryFirestore(
         awaitClose { registration.remove() }
       }
 
-  private fun circle(ownerUid: String) =
-      db.collection(UserProfileRepositoryFirestore.COLLECTION)
-          .document(ownerUid)
-          .collection(COLLECTION)
+  override suspend fun updateMember(
+      ownerUid: String,
+      memberUid: String,
+      details: CareCircleMemberDetails,
+  ) {
+    require(details.isValid()) { "Invalid care circle member details" }
+    // update, never set: a member removed on another device must not come back
+    circle(ownerUid).document(memberUid).update(detailFields(details)).addOnFailureListener { e ->
+      logRejected("update of member $memberUid", e)
+    }
+  }
+
+  override suspend fun removeMember(ownerUid: String, memberUid: String) {
+    // One batch, so going offline halfway can't leave the caregiver a link to a circle they left
+    db.batch()
+        .delete(circle(ownerUid).document(memberUid))
+        .delete(
+            users()
+                .document(memberUid)
+                .collection(CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION)
+                .document(ownerUid)
+        )
+        .commit()
+        .addOnFailureListener { e -> logRejected("removal of member $memberUid", e) }
+  }
+
+  private fun users() = db.collection(UserProfileRepositoryFirestore.COLLECTION)
+
+  private fun circle(ownerUid: String) = users().document(ownerUid).collection(COLLECTION)
+
+  private fun logRejected(what: String, e: Exception) {
+    Log.e(TAG, "The server rejected the $what; it was rolled back", e)
+  }
 
   private fun fromDocument(doc: DocumentSnapshot): CareCircleMember? {
     val firstName = doc.getString(FIELD_FIRST_NAME)
@@ -106,5 +137,16 @@ class CareCircleRepositoryFirestore(
     const val FIELD_ADDED_AT = "addedAt"
     const val FIELD_INVITE_CODE = "inviteCode"
     private const val TAG = "CareCircleRepository"
+
+    /** The fields of [details], as stored on a member and on an invite. */
+    internal fun detailFields(details: CareCircleMemberDetails): Map<String, Any?> =
+        mapOf(
+            FIELD_FIRST_NAME to details.firstName,
+            FIELD_FAMILY_NAME to details.familyName,
+            FIELD_RELATIONSHIP to details.relationship.name,
+            // In display order, so a member's list equals its invite's
+            FIELD_PERMISSIONS to
+                CarePermission.entries.filter { it in details.permissions }.map { it.name },
+        )
   }
 }

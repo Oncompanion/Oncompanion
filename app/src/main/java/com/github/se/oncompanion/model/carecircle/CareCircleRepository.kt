@@ -4,7 +4,11 @@ package com.github.se.oncompanion.model.carecircle
 
 import kotlinx.coroutines.flow.Flow
 
-/** Reads a user's care circle. Use [CareCircleRepositoryFirestore] in the app. */
+/**
+ * Reads a user's care circle, and lets the patient change or remove its members. Members are only
+ * added by redeeming an invite ([CareCircleInviteRepository.redeem]). Use
+ * [CareCircleRepositoryFirestore] in the app.
+ */
 interface CareCircleRepository {
 
   /**
@@ -21,4 +25,21 @@ interface CareCircleRepository {
    * rules deny it).
    */
   fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?>
+
+  /**
+   * Replaces what the patient decided about [memberUid] in [ownerUid]'s circle: name, relationship
+   * and permissions. A member who is no longer in the circle (e.g. removed on another device) isn't
+   * brought back. Returns once saved on the device, also offline.
+   *
+   * @throws IllegalArgumentException if [details] aren't valid ([CareCircleMemberDetails.isValid])
+   */
+  suspend fun updateMember(ownerUid: String, memberUid: String, details: CareCircleMemberDetails)
+
+  /**
+   * Removes [memberUid] from [ownerUid]'s circle, so they can no longer see the patient's data once
+   * the removal reaches the server. Also deletes the member's link to this circle
+   * (`/users/{memberUid}/patients/{ownerUid}`), so they aren't left with a circle they can't read.
+   * Returns once saved on the device, also offline.
+   */
+  suspend fun removeMember(ownerUid: String, memberUid: String)
 }

@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_INVITE_CODE
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.detailFields
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -236,16 +237,6 @@ class CareCircleInviteRepositoryFirestore(
     require(details.isValid()) { "Invalid care circle member details" }
     require(email == null || CareCircleInvite.isValidEmail(email)) { "Invalid email" }
   }
-
-  private fun detailFields(details: CareCircleMemberDetails): Map<String, Any?> =
-      mapOf(
-          FIELD_FIRST_NAME to details.firstName,
-          FIELD_FAMILY_NAME to details.familyName,
-          FIELD_RELATIONSHIP to details.relationship.name,
-          // In display order, so a member's list equals its invite's
-          FIELD_PERMISSIONS to
-              CarePermission.entries.filter { it in details.permissions }.map { it.name },
-      )
 
   /** All the fields of a new, unused invite; the server sets the creation time. */
   private fun newInviteFields(invite: CareCircleInvite): Map<String, Any?> =

@@ -188,7 +188,8 @@ service cloud.firestore {
       // ---------- Care circle ----------
       // /users/{uid}/circle/{memberUid}: the people the user shares their care with, keyed by the
       // member's uid. The owner and that member can read it. Only created by the member redeeming
-      // an invite, as a copy of it with their account email.
+      // an invite, as a copy of it with their account email; then only the owner changes what
+      // they decided about the member (not the email, invite code or join time) or removes them.
       match /circle/{memberUid} {
         allow read: if isOwner(uid) || isOwner(memberUid);
         allow create: if isOwner(memberUid)
@@ -201,11 +202,18 @@ service cloud.firestore {
                       && redeemsInvite(request.resource.data.inviteCode, uid)
                       && copiesInvite(request.resource.data,
                              get(invitePath(request.resource.data.inviteCode)).data);
+        allow update: if isOwner(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(detailKeys())
+                      && isValidCareCircleMemberDetails(request.resource.data);
+        allow delete: if isOwner(uid);
       }
 
       // ---------- Care circles joined ----------
       // /users/{uid}/patients/{patientUid}: the circles this caregiver joined, created with the
-      // member doc when redeeming an invite.
+      // member doc when redeeming an invite. The patient deletes it when removing the caregiver:
+      // the only write a patient makes into another user's data, so no link to a circle the
+      // caregiver can no longer read is left behind.
       match /patients/{patientUid} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
@@ -215,6 +223,7 @@ service cloud.firestore {
                       && redeemsInvite(request.resource.data.inviteCode, patientUid)
                       && request.resource.data.patientFirstName
                              == get(invitePath(request.resource.data.inviteCode)).data.ownerFirstName;
+        allow delete: if isOwner(patientUid);
       }
 
       // Everything personal (entries, records, reminders...) goes under the user, in a collection
