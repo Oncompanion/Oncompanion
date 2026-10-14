@@ -28,7 +28,6 @@ import androidx.compose.ui.test.requestFocus
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.model.auth.AuthUser
@@ -582,7 +581,7 @@ class PrescriptionFormScreenTest {
   private fun setScreen() {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = uid) })
     runBlocking { auth.signInWithGoogle("token") }
-    val viewModel = PrescriptionFormViewModel(auth, ManageMedicationSchedule(medications), clock)
+    val viewModel = PrescriptionFormViewModel(auth, medications, clock = clock)
     composeTestRule.setContent {
       PrescriptionFormScreen(
           viewModel = viewModel,

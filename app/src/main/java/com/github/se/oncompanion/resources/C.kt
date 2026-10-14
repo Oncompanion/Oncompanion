@@ -1,4 +1,4 @@
-// Co-authored-by: Codex
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.resources
@@ -6,6 +6,23 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment form
+    const val appointment_screen = "appointment_screen"
+    const val appointment_back = "appointment_back"
+    const val appointment_title = "appointment_title"
+    const val appointment_date = "appointment_date"
+    const val appointment_time = "appointment_time"
+    const val appointment_location = "appointment_location"
+    const val appointment_notes = "appointment_notes"
+    const val appointment_save = "appointment_save"
+    const val appointment_saving = "appointment_saving"
+    const val appointment_picker = "appointment_picker"
+    const val appointment_confirm = "appointment_confirm"
+    const val appointment_cancel = "appointment_cancel"
+
+    /** Identifies the recorded appointment category choice. */
+    fun appointmentType(type: String) = "appointment_type_$type"
+
     // Hospital field
     const val hospital_field = "hospital_field"
     const val hospital_search = "hospital_search"
@@ -110,6 +127,21 @@ object C {
     const val symptom_detail_when = "symptom_detail_when"
     const val symptom_detail_intensity = "symptom_detail_intensity"
     const val symptom_detail_notes = "symptom_detail_notes"
+    const val symptom_add_screen = "symptom_add_screen"
+    const val symptom_add_close = "symptom_add_close"
+    const val symptom_add_intensity = "symptom_add_intensity"
+    const val symptom_add_intensity_value = "symptom_add_intensity_value"
+    const val symptom_add_intensity_clear = "symptom_add_intensity_clear"
+    const val symptom_add_intensity_track = "symptom_add_intensity_track"
+    const val symptom_add_when = "symptom_add_when"
+    const val symptom_add_notes = "symptom_add_notes"
+    const val symptom_add_save = "symptom_add_save"
+    const val symptom_add_saving = "symptom_add_saving"
+    const val symptom_add_date_picker = "symptom_add_date_picker"
+    const val symptom_add_time_picker = "symptom_add_time_picker"
+    const val symptom_add_picker_confirm = "symptom_add_picker_confirm"
+    const val symptom_add_picker_cancel = "symptom_add_picker_cancel"
+    const val symptom_journal_add = "symptom_journal_add"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
@@ -158,6 +190,9 @@ object C {
 
     /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
     fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
+
+    /** The chip of a symptom type on the add screen; [type] is its enum name, e.g. `FATIGUE`. */
+    fun symptomAddType(type: String) = "symptom_add_type_$type"
 
     // Care circle
     const val care_circle_back_button = "care_circle_back_button"
@@ -243,5 +278,13 @@ object C {
     const val prescription_scan_camera_off = "prescription_scan_camera_off"
     const val prescription_scan_enter_manually_button = "prescription_scan_enter_manually_button"
     const val prescription_scan_open_settings_button = "prescription_scan_open_settings_button"
+    const val prescription_scan_capture_button = "prescription_scan_capture_button"
+    const val prescription_scan_capturing = "prescription_scan_capturing"
+    const val prescription_scan_framing_guide = "prescription_scan_framing_guide"
+    const val prescription_scan_photo_preview = "prescription_scan_photo_preview"
+    const val prescription_scan_photo = "prescription_scan_photo"
+    const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
+    const val prescription_scan_retake_button = "prescription_scan_retake_button"
+    const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
   }
 }

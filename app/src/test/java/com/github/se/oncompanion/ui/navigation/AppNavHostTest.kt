@@ -475,7 +475,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
     val heading =
         composeTestRule
@@ -561,6 +561,20 @@ class AppNavHostTest {
     }
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun symptomJournalAddButton_opensTheAddScreen_andCloseReturns() {
+    setNavHost(Route.SYMPTOMS)
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_close).performClick()
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
@@ -709,6 +723,7 @@ class AppNavHostTest {
     assertEquals("overview", Route.OVERVIEW)
     assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("prescriptions_scan", Screen.PRESCRIPTION_SCAN)
+    assertEquals("symptoms_add", Screen.SYMPTOM_ADD)
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
@@ -770,6 +785,6 @@ class AppNavHostTest {
     // The planning provider keeps its default, so the appointment can only come through it
     setNavHost(Route.PLANNING, planningRepository = appPlanningRepository, authRepository = auth)
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
   }
 }

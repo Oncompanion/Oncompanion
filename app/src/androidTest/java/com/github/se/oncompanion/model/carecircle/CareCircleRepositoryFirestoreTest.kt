@@ -8,10 +8,12 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_EMAIL
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_INVITE_CODE
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.firestore.Source
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +26,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,14 +34,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Tests [CareCircleRepositoryFirestore] against the Firestore emulator. Who can read the circle is
- * tested in [CareCircleSecurityRulesTest].
+ * Tests [CareCircleRepositoryFirestore] against the Firestore emulator. Who can read and write the
+ * circle is tested in [CareCircleSecurityRulesTest].
  */
 @RunWith(AndroidJUnit4::class)
 class CareCircleRepositoryFirestoreTest {
 
   private lateinit var repository: CareCircleRepositoryFirestore
   private lateinit var aliceUid: String
+  private lateinit var bobUid: String
 
   private val db
     get() = FirebaseEmulator.firestore
@@ -47,7 +51,8 @@ class CareCircleRepositoryFirestoreTest {
   fun setUp(): Unit = runBlocking {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
-    aliceUid = EmulatorTestData.createUser("alice")
+    bobUid = EmulatorTestData.createUser("bob")
+    aliceUid = EmulatorTestData.createUser("alice") // alice, the patient, stays signed in
     repository = CareCircleRepositoryFirestore(db)
   }
 
@@ -58,8 +63,8 @@ class CareCircleRepositoryFirestoreTest {
   }
 
   /**
-   * Writes a member to alice's circle, bypassing the rules: clients can't write to the circle until
-   * adding a member exists.
+   * Writes a member to alice's circle, bypassing the rules: clients only create members by
+   * redeeming an invite.
    */
   private suspend fun addMember(
       uid: String,
@@ -69,6 +74,7 @@ class CareCircleRepositoryFirestoreTest {
       permissions: Any? = null,
       email: Any? = null,
       addedAt: Any? = null,
+      inviteCode: String? = null,
   ) {
     val fields =
         mapOf(
@@ -78,6 +84,7 @@ class CareCircleRepositoryFirestoreTest {
                 FIELD_PERMISSIONS to permissions,
                 FIELD_EMAIL to email,
                 FIELD_ADDED_AT to addedAt,
+                FIELD_INVITE_CODE to inviteCode,
             )
             .filterValues { it != null }
     val json = JSONObject()
@@ -101,6 +108,31 @@ class CareCircleRepositoryFirestoreTest {
                 )
         else -> error("Unsupported test value: $value")
       }
+
+  /** Writes bob's link to alice's circle, bypassing the rules like [addMember]. */
+  private suspend fun addBobsLinkToAlice() {
+    withTimeout(10_000) {
+      EmulatorTestData.createRawDocument(
+          "users/$bobUid/${CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION}",
+          aliceUid,
+          """{"patientFirstName": {"stringValue": "Alice"}}""",
+      )
+    }
+  }
+
+  private fun bobsLinkToAlice() =
+      db.collection("users")
+          .document(bobUid)
+          .collection(CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION)
+          .document(aliceUid)
+
+  private fun memberDoc(uid: String) =
+      db.collection("users").document(aliceUid).collection(COLLECTION).document(uid)
+
+  /** Waits until the server has every write made on this device, accepted or rolled back. */
+  private suspend fun synced() {
+    withTimeout(10_000) { db.waitForPendingWrites().await() }
+  }
 
   private suspend fun firstMembers(): List<CareCircleMember> =
       withTimeout(10_000) { repository.observeMembers(aliceUid).first() }
@@ -313,8 +345,116 @@ class CareCircleRepositoryFirestoreTest {
     }
   }
 
+  // ---- updateMember ----
+
+  @Test
+  fun updateMember_isSeenByObserveMember_andKeepsHowTheyJoined(): Unit = runBlocking {
+    addMember(
+        "marc",
+        "Marc",
+        "Dubois",
+        "SON",
+        listOf("PLANNING"),
+        "marc@x.ch",
+        ADDED_AT,
+        "ABCDEFGHJK",
+    )
+
+    repository.updateMember(aliceUid, "marc", UPDATED)
+
+    val expected =
+        CareCircleMember(
+            "marc",
+            "Marcus",
+            null,
+            Relationship.FRIEND,
+            setOf(CarePermission.EVENTS, CarePermission.SYMPTOMS),
+            "marc@x.ch",
+            ADDED_AT,
+            "ABCDEFGHJK",
+        )
+    assertEquals(expected, firstMember("marc"))
+    // The server accepted it
+    synced()
+    val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
+    assertEquals("Marcus", saved.getString(FIELD_FIRST_NAME))
+    assertEquals(listOf("EVENTS", "SYMPTOMS"), saved.get(FIELD_PERMISSIONS))
+  }
+
+  @Test
+  fun updateMember_invalidDetails_throwsAndSavesNothing(): Unit = runBlocking {
+    addMember("marc", "Marc")
+
+    val error = runCatching {
+      repository.updateMember(aliceUid, "marc", CareCircleMemberDetails(firstName = " "))
+    }
+        .exceptionOrNull()
+
+    assertTrue(error is IllegalArgumentException)
+    assertEquals("Marc", firstMember("marc")?.firstName)
+  }
+
+  @Test
+  fun updateMember_removedMember_isNotBroughtBack(): Unit = runBlocking {
+    repository.updateMember(aliceUid, "marc", UPDATED)
+
+    assertNull(firstMember("marc"))
+    synced()
+    assertFalse(withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }.exists())
+  }
+
+  // ---- removeMember ----
+
+  @Test
+  fun removeMember_deletesTheMemberAndTheirLinkToTheCircle(): Unit = runBlocking {
+    addMember(bobUid, "Bob")
+    addMember("marc", "Marc")
+    addBobsLinkToAlice()
+
+    repository.removeMember(aliceUid, bobUid)
+
+    assertEquals(listOf("marc"), firstMembers().map { it.uid })
+    synced()
+    assertFalse(withTimeout(10_000) { memberDoc(bobUid).get(Source.SERVER).await() }.exists())
+    EmulatorTestData.signIn("bob")
+    assertFalse(withTimeout(10_000) { bobsLinkToAlice().get(Source.SERVER).await() }.exists())
+  }
+
+  @Test
+  fun offline_updateAndRemove_areSavedOnTheDevice_thenSynced(): Unit = runBlocking {
+    addMember("marc", "Marc")
+    addMember(bobUid, "Bob")
+    addBobsLinkToAlice()
+    assertEquals(2, firstMembers().size) // loads them into the cache
+
+    db.disableNetwork().await()
+    try {
+      // Both return without waiting for the server
+      withTimeout(10_000) {
+        repository.updateMember(aliceUid, "marc", UPDATED)
+        repository.removeMember(aliceUid, bobUid)
+      }
+      assertEquals(listOf("Marcus"), firstMembers().map { it.firstName })
+    } finally {
+      db.enableNetwork().await()
+    }
+
+    synced()
+    val members = withTimeout(10_000) { memberDoc("marc").parent.get(Source.SERVER).await() }
+    assertEquals(listOf("marc"), members.documents.map { it.id })
+    assertEquals("Marcus", members.documents.single().getString(FIELD_FIRST_NAME))
+    EmulatorTestData.signIn("bob")
+    assertFalse(withTimeout(10_000) { bobsLinkToAlice().get(Source.SERVER).await() }.exists())
+  }
+
   private companion object {
     const val SOPHIE_EMAIL = "sophie.dubois@example.com"
     val ADDED_AT: Instant = Instant.parse("2026-08-14T09:30:00Z")
+    val UPDATED =
+        CareCircleMemberDetails(
+            firstName = "Marcus",
+            relationship = Relationship.FRIEND,
+            permissions = setOf(CarePermission.SYMPTOMS, CarePermission.EVENTS),
+        )
   }
 }

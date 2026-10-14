@@ -4,7 +4,10 @@
 package com.github.se.oncompanion.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -16,8 +19,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
+import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
@@ -45,11 +48,12 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
+import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
-import java.time.Clock
-import java.time.ZoneId
+import java.time.LocalDate
 
 /**
  * The app's navigation graph. Each feature lives in its own nested graph ([Route]).
@@ -105,17 +109,59 @@ fun AppNavHost(
 
     // Bottom bar tabs, next to Overview
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
-      composable(Screen.PLANNING) {
+      composable(Screen.PLANNING) { entry ->
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(
-              PlanningRepositoryProvider.repository,
-              Clock.systemDefaultZone(),
-              ZoneId.systemDefault(),
-              createSavedStateHandle(),
-              AuthRepositoryProvider.repository,
-          )
+          PlanningViewModel(savedStateHandle = createSavedStateHandle())
         }
-        PlanningScreen(navigationActions, planningViewModel)
+        // Return to this calendar instance and reveal the saved day, including another week.
+        val savedDate by
+            entry.savedStateHandle
+                .getStateFlow<String?>(Screen.APPOINTMENT_SAVED_DATE, null)
+                .collectAsStateWithLifecycle()
+        LaunchedEffect(savedDate) {
+          savedDate?.let { date ->
+            planningViewModel.selectDate(LocalDate.parse(date))
+            entry.savedStateHandle[Screen.APPOINTMENT_SAVED_DATE] = null
+          }
+        }
+        PlanningScreen(
+            navigationActions,
+            planningViewModel,
+            onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+        )
+      }
+      composable(
+          Screen.APPOINTMENT_ADD,
+          arguments =
+              listOf(
+                  navArgument(Screen.APPOINTMENT_DATE) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                  }
+              ),
+      ) { entry ->
+        val date =
+            runCatching { LocalDate.parse(entry.arguments?.getString(Screen.APPOINTMENT_DATE)) }
+                .getOrNull()
+                ?.takeIf { it.year in 1..9999 } ?: LocalDate.now()
+        val form: AppointmentFormViewModel = viewModel { AppointmentFormViewModel(date) }
+        AppointmentFormScreen(
+            form,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onSaved = { instant ->
+              // A completion during an exit animation must not pop the calendar as well.
+              if (navController.currentBackStackEntry == entry) {
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set(
+                        Screen.APPOINTMENT_SAVED_DATE,
+                        instant.atZone(form.zoneId).toLocalDate().toString(),
+                    )
+                navigationActions.goBack()
+              }
+            },
+        )
       }
     }
     navigation(startDestination = Screen.EVENTS, route = Route.EVENTS) {
@@ -147,6 +193,14 @@ fun AppNavHost(
             navigationActions = navigationActions,
             // Scoped to this back stack entry, so each opened symptom has its own ViewModel
             viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+        )
+      }
+      composable(Screen.SYMPTOM_ADD) {
+        // Saving returns to the journal, where the new entry is at the top
+        AddSymptomScreen(
+            viewModel = viewModel { AddSymptomViewModel() },
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
         )
       }
     }
