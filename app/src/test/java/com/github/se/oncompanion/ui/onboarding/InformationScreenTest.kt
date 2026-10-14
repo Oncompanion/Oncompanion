@@ -20,10 +20,12 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.requestFocus
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -32,7 +34,12 @@ import com.github.se.oncompanion.model.cancer.CancerTypes
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsAboveKeyboard
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.showKeyboard
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -40,6 +47,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class InformationScreenTest {
@@ -357,6 +365,45 @@ class InformationScreenTest {
 
     waitForNoText(string(R.string.onboarding_error_not_signed_in))
     composeTestRule.runOnIdle { assertEquals(listOf("errorShown"), events) }
+  }
+
+  @Test
+  fun content_keyboardOpen_continueCanBeScrolledAboveIt() {
+    setContent(OnboardingUiState(firstName = "Alex"))
+    val keyboardHeight = 600
+
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    continueButton().performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun content_landscapeKeyboardOpen_keepsTheTypedFieldVisible() {
+    setContent(OnboardingUiState(firstName = "Alex"))
+    val keyboardHeight = 500
+
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    familyNameField().performScrollTo().requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    familyNameField().performScrollTo().assertIsFullyVisible()
+    familyNameField().assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun content_smallLandscapeKeyboardOpen_showsTheWholeFieldAndContinue() {
+    setContent(OnboardingUiState(firstName = "Alex"))
+    // Leaves 100 dp above the keyboard, as on a small phone held sideways
+    val keyboardHeight = 520
+
+    familyNameField().performScrollTo().requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    familyNameField().performScrollTo().assertIsFullyVisible()
+    continueButton().performScrollTo().assertIsFullyVisible()
+    continueButton().assertIsAboveKeyboard(keyboardHeight)
   }
 
   // --- InformationScreen with a view model ---

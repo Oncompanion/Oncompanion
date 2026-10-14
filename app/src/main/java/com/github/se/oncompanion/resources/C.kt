@@ -1,3 +1,4 @@
+// Co-authored-by: Codex
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.resources
@@ -5,6 +6,16 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Hospital field
+    const val hospital_field = "hospital_field"
+    const val hospital_search = "hospital_search"
+    const val hospital_loading = "hospital_loading"
+    const val hospital_results = "hospital_results"
+    const val hospital_result = "hospital_result"
+    const val hospital_empty = "hospital_empty"
+    const val hospital_error = "hospital_error"
+    const val hospital_attribution = "hospital_attribution"
+
     // Planning
     const val planning_no_set_time = "planning_no_set_time"
     const val planning_scheduled = "planning_scheduled"
@@ -202,6 +213,20 @@ object C {
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
+
+    const val prescriptions_back_button = "prescriptions_back_button"
+    const val prescriptions_loading = "prescriptions_loading"
+    const val prescriptions_error = "prescriptions_error"
+    const val prescriptions_retry_button = "prescriptions_retry_button"
+    const val prescriptions_empty = "prescriptions_empty"
+    const val prescriptions_list = "prescriptions_list"
+    const val prescriptions_this_month_header = "prescriptions_this_month_header"
+    const val prescriptions_earlier_header = "prescriptions_earlier_header"
+    const val prescriptions_enter_manually_button = "prescriptions_enter_manually_button"
+    const val prescriptions_scan_button = "prescriptions_scan_button"
+
+    /** One prescription of the list. */
+    fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
 
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"

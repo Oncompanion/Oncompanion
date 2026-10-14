@@ -3,20 +3,16 @@
 package com.github.se.oncompanion.ui.prescription
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,10 +22,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,7 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,17 +46,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -74,9 +60,12 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
-import java.time.Instant
+import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
+import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.PickerTestTags
+import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -157,93 +146,112 @@ fun PrescriptionFormContent(
     }
   }
 
+  // A short screen (a phone held sideways) keeps nothing fixed: with the keyboard open, a fixed
+  // top bar and Save would leave no room for the field being typed
+  val scrollsEverything = isCompactHeight()
+
   Scaffold(
-      modifier = modifier.testTag(C.Tag.prescription_form_screen),
-      topBar = {
-        TopAppBar(
-            title = { Text(stringResource(R.string.prescription_form_add_title)) },
-            navigationIcon = {
-              // Not while saving or once saved: the form then leaves by itself, and a second way
-              // out would go back twice
-              IconButton(
-                  onClick = onClose,
-                  enabled = !uiState.isSaving && !uiState.isSaved,
-                  modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
-              ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.prescription_form_close),
-                )
-              }
-            },
-        )
-      },
+      // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
+      modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
+      topBar = { if (!scrollsEverything) FormTopBar(uiState, onClose) },
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
-      bottomBar = { SaveButton(uiState, onSave) },
+      bottomBar = { if (!scrollsEverything) FormSaveButton(uiState, onSave) },
   ) { innerPadding ->
     Column(
         modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
     ) {
-      // What the medications share: the doctor (optional) and the date of the prescription
-      OutlinedTextField(
-          value = uiState.draft.prescribedBy,
-          onValueChange = onPrescribedByChange,
-          label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
-          singleLine = true,
-          keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
-      )
-      DateField(
-          label = stringResource(R.string.prescription_form_date),
-          date = uiState.draft.prescribedOn,
-          onDateChange = onPrescribedOnChange,
-          testTag = C.Tag.prescription_form_date_field,
-      )
+      // The Scaffold already keeps the content clear of the status bar
+      if (scrollsEverything) FormTopBar(uiState, onClose, WindowInsets(0))
+      Column(
+          modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+          verticalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        // What the medications share: the doctor (optional) and the date of the prescription
+        OutlinedTextField(
+            value = uiState.draft.prescribedBy,
+            onValueChange = onPrescribedByChange,
+            label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
+            singleLine = true,
+            keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
+        )
+        DateField(
+            label = stringResource(R.string.prescription_form_date),
+            date = uiState.draft.prescribedOn,
+            onDateChange = onPrescribedOnChange,
+            testTag = C.Tag.prescription_form_date_field,
+        )
 
-      // The medications in order: the open one with its fields, the others as one row each
-      val invalidMedications = uiState.invalidMedications
-      uiState.draft.medications.forEachIndexed { position, medication ->
-        if (position == uiState.openMedication) {
-          OpenMedication(
-              number = position + 1,
-              medication = medication,
-              // A state without a flag for this medication counts its name as touched
-              nameTouched = uiState.nameTouched.getOrElse(position) { true },
-              canRemove = uiState.canRemoveMedication,
-              onNameChange = onMedicationNameChange,
-              onDosageChange = onDosageChange,
-              onFrequencyChange = onFrequencyChange,
-              onStartDateChange = onStartDateChange,
-              onDurationChange = onDurationChange,
-              onRemove = { onRemoveMedication(position) },
-          )
-        } else {
-          ClosedMedication(
-              position = position,
-              medication = medication,
-              blocksSave = position in invalidMedications,
-              onEdit = { onOpenMedication(position) },
-          )
+        // The medications in order: the open one with its fields, the others as one row each
+        val invalidMedications = uiState.invalidMedications
+        uiState.draft.medications.forEachIndexed { position, medication ->
+          if (position == uiState.openMedication) {
+            OpenMedication(
+                number = position + 1,
+                medication = medication,
+                // A state without a flag for this medication counts its name as touched
+                nameTouched = uiState.nameTouched.getOrElse(position) { true },
+                canRemove = uiState.canRemoveMedication,
+                onNameChange = onMedicationNameChange,
+                onDosageChange = onDosageChange,
+                onFrequencyChange = onFrequencyChange,
+                onStartDateChange = onStartDateChange,
+                onDurationChange = onDurationChange,
+                onRemove = { onRemoveMedication(position) },
+            )
+          } else {
+            ClosedMedication(
+                position = position,
+                medication = medication,
+                blocksSave = position in invalidMedications,
+                onEdit = { onOpenMedication(position) },
+            )
+          }
+        }
+
+        TextButton(
+            onClick = onAddMedication,
+            enabled = uiState.canAddMedication,
+            modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
+        ) {
+          Icon(Icons.Default.Add, contentDescription = null)
+          Spacer(Modifier.width(8.dp))
+          Text(stringResource(R.string.prescription_form_add_medication))
         }
       }
-
-      TextButton(
-          onClick = onAddMedication,
-          enabled = uiState.canAddMedication,
-          modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
-      ) {
-        Icon(Icons.Default.Add, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.prescription_form_add_medication))
-      }
+      if (scrollsEverything) FormSaveButton(uiState, onSave)
     }
   }
+}
+
+/** The title and the button that leaves the form without saving. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormTopBar(
+    uiState: PrescriptionFormUiState,
+    onClose: () -> Unit,
+    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
+) {
+  TopAppBar(
+      title = { Text(stringResource(R.string.prescription_form_add_title)) },
+      navigationIcon = {
+        // Not while saving or once saved: the form then leaves by itself, and a second way
+        // out would go back twice
+        IconButton(
+            onClick = onClose,
+            enabled = !uiState.isSaving && !uiState.isSaved,
+            modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
+        ) {
+          Icon(
+              imageVector = Icons.Default.Close,
+              contentDescription = stringResource(R.string.prescription_form_close),
+          )
+        }
+      },
+      windowInsets = windowInsets,
+  )
 }
 
 /** The fields of the medication being edited, under its title ("Medication 2"). */
@@ -417,7 +425,6 @@ private fun MedicationDraft.summary(): String {
  * A field showing [date] that opens a date picker when tapped. [onDateChange] is called when the
  * user confirms a date.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateField(
     label: String,
@@ -426,102 +433,49 @@ private fun DateField(
     testTag: String,
 ) {
   var pickerOpen by rememberSaveable { mutableStateOf(false) }
-  val pickDateLabel = stringResource(R.string.prescription_form_pick_date)
 
-  OutlinedTextField(
+  ClickableReadOnlyField(
       value = date.format(dateFormatter),
-      onValueChange = {},
-      readOnly = true,
-      label = { Text(label) },
+      label = label,
+      onClick = { pickerOpen = true },
+      onClickLabel = stringResource(R.string.prescription_form_pick_date),
       trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-      singleLine = true,
-      modifier =
-          Modifier.fillMaxWidth()
-              .testTag(testTag)
-              // Nothing can be typed here: the keyboard's Next skips it
-              .focusProperties { canFocus = false }
-              // A text field keeps its taps for itself, so they are caught before it sees them
-              .pointerInput(Unit) {
-                awaitEachGesture {
-                  awaitFirstDown(pass = PointerEventPass.Initial)
-                  if (waitForUpOrCancellation(pass = PointerEventPass.Initial) != null) {
-                    pickerOpen = true
-                  }
-                }
-              }
-              // Screen readers announce a button that opens the picker, not a text box
-              .semantics {
-                role = Role.Button
-                onClick(label = pickDateLabel) {
-                  pickerOpen = true
-                  true
-                }
-              },
+      modifier = Modifier.testTag(testTag),
   )
 
   if (pickerOpen) {
-    // The Material date picker counts days in UTC, whatever the phone's time zone
-    val pickerState =
-        rememberDatePickerState(
-            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-        )
-    DatePickerDialog(
-        onDismissRequest = { pickerOpen = false },
-        confirmButton = {
-          TextButton(
-              onClick = {
-                pickerState.selectedDateMillis?.let { millis ->
-                  onDateChange(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
-                }
-                pickerOpen = false
-              },
-              modifier = Modifier.testTag(C.Tag.prescription_form_date_picker_confirm),
-          ) {
-            Text(stringResource(R.string.prescription_form_date_confirm))
-          }
+    DayPickerDialog(
+        date = date,
+        onConfirm = {
+          onDateChange(it)
+          pickerOpen = false
         },
-        dismissButton = {
-          TextButton(
-              onClick = { pickerOpen = false },
-              modifier = Modifier.testTag(C.Tag.prescription_form_date_picker_cancel),
-          ) {
-            Text(stringResource(R.string.prescription_form_date_cancel))
-          }
-        },
-    ) {
-      DatePicker(
-          state = pickerState,
-          modifier = Modifier.testTag(C.Tag.prescription_form_date_picker),
-      )
-    }
+        onDismiss = { pickerOpen = false },
+        confirmLabel = stringResource(R.string.prescription_form_date_confirm),
+        cancelLabel = stringResource(R.string.prescription_form_date_cancel),
+        testTags =
+            PickerTestTags(
+                picker = C.Tag.prescription_form_date_picker,
+                confirm = C.Tag.prescription_form_date_picker_confirm,
+                cancel = C.Tag.prescription_form_date_picker_cancel,
+            ),
+    )
   }
 }
 
-/** Save, enabled when the form is valid; a spinner replaces its text while saving. */
+/**
+ * Save, enabled when the form is valid; in the bottom bar, or after the fields on a short screen.
+ */
 @Composable
-private fun SaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit) {
-  Button(
-      onClick = onSave,
+private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit) {
+  SaveButton(
+      text = stringResource(R.string.prescription_form_save),
       enabled = uiState.canSave,
-      modifier =
-          Modifier.fillMaxWidth()
-              // Keeps the button above the system navigation bar (the app draws edge to edge)
-              .navigationBarsPadding()
-              .padding(horizontal = 24.dp, vertical = 16.dp)
-              .heightIn(min = 56.dp)
-              .testTag(C.Tag.prescription_form_save_button),
-  ) {
-    if (uiState.isSaving) {
-      Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(
-            strokeWidth = 2.dp,
-            modifier = Modifier.fillMaxSize().testTag(C.Tag.prescription_form_saving),
-        )
-      }
-    } else {
-      Text(stringResource(R.string.prescription_form_save))
-    }
-  }
+      isSaving = uiState.isSaving,
+      onClick = onSave,
+      testTag = C.Tag.prescription_form_save_button,
+      savingTestTag = C.Tag.prescription_form_saving,
+  )
 }
 
 private fun textKeyboard(capitalization: KeyboardCapitalization) =
