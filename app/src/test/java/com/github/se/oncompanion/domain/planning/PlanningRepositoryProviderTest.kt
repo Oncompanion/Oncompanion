@@ -8,12 +8,19 @@ import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRepository
+import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,20 +32,23 @@ class PlanningRepositoryProviderTest {
   private val original = PlanningRepositoryProvider.repository
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appAuthRepository = AuthRepositoryProvider.repository
+  private val appEventRepository = EventRepositoryProvider.repository
 
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = original
     AppointmentRepositoryProvider.repository = appAppointmentRepository
     AuthRepositoryProvider.repository = appAuthRepository
+    EventRepositoryProvider.repository = appEventRepository
   }
 
   /**
-   * Planning shows the signed-in patient's appointments from the appointment and auth providers,
-   * even when they were replaced after the planning provider was first used.
+   * Planning shows the signed-in patient's appointments and the upcoming Ligue events from their
+   * providers, sorted by time, even when they were replaced after the planning provider was first
+   * used.
    */
   @Test
-  fun showsTheAppointmentsOfTheAppointmentAndAuthProvidersByDefault() = runTest {
+  fun showsTheAppointmentsAndTheEventsOfTheProvidersByDefault() = runTest {
     val day = LocalDate.of(2026, 10, 25)
     val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
     val auth = FakeAuthRepository { AuthUser(it) }
@@ -55,6 +65,47 @@ class PlanningRepositoryProviderTest {
     )
     AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = appointments
+    // An event two hours after the appointment; the fake's "now" is before the day starts
+    val event =
+        FakeEventRepository.sampleEvents(day)
+            .first()
+            .copy(
+                startDateTime =
+                    LocalDateTime.ofInstant(range.startInclusive, range.zoneId).plusHours(2)
+            )
+    EventRepositoryProvider.repository =
+        FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
+
+    val items = original.observeItems(range).first { it.size == 2 }
+
+    assertEquals(listOf("Saved consultation", event.title), items.map { it.title })
+  }
+
+  /** If the events can't be read, the default provider still shows the appointments. */
+  @Test
+  fun failingEvents_keepTheAppointmentsByDefault() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
+    val auth = FakeAuthRepository { AuthUser(it) }
+    auth.signInWithGoogle("patient")
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        "patient",
+        Appointment(
+            "saved",
+            "Saved consultation",
+            range.startInclusive,
+            AppointmentType.CONSULTATION,
+        ),
+    )
+    AuthRepositoryProvider.repository = auth
+    AppointmentRepositoryProvider.repository = appointments
+    EventRepositoryProvider.repository =
+        object : EventRepository by FakeEventRepository(emptyList()) {
+          override fun getUpcomingEvents(): Flow<List<Event>> = flow {
+            error("Events couldn't be read")
+          }
+        }
 
     val items = original.observeItems(range).first { it.isNotEmpty() }
 
