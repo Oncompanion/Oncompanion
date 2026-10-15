@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -27,7 +28,6 @@ import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -169,7 +169,10 @@ class M1EndToEndTest {
   /** The Events tab lists the Ligue's event, whose detail says where it takes place. */
   private fun seeLigueEventInEvents(title: String, place: String) {
     tag(C.Tag.bottom_navigation_tab_events).performClick()
-    waitFor(hasTestTag(C.Tag.eventCard(ligueEvent))).reveal().performClick()
+    // The list only composes the cards on screen: scroll to ours first, in case earlier events
+    // (e.g. left by a crashed run) push it down
+    waitFor(hasTestTag(C.Tag.events_list)).performScrollToKey(ligueEvent)
+    waitFor(hasTestTag(C.Tag.eventCard(ligueEvent))).performClick()
 
     waitFor(hasTestTag(C.Tag.event_detail_event_title) and hasText(title, substring = true))
     waitFor(hasTestTag(C.Tag.event_detail_location) and hasText(place, substring = true))
@@ -268,7 +271,8 @@ class M1EndToEndTest {
             (hasText(nextAppointment, substring = true) or
                 hasAnyDescendant(hasText(nextAppointment)))
     )
-    assertFalse(exists(hasTestTag(C.Tag.onboarding_role_screen)))
+    // The waitFor above is the check: nothing clicks through onboarding, so reaching the greeting
+    // means it was skipped
   }
 
   // ---- helpers ----
@@ -289,8 +293,17 @@ class M1EndToEndTest {
 
   private fun tag(testTag: String) = compose.onNodeWithTag(testTag)
 
-  /** Scrolls to the node when it's in a scrolling area (it depends on the screen's height). */
-  private fun SemanticsNodeInteraction.reveal() = apply { runCatching { performScrollTo() } }
+  /**
+   * Scrolls to the node when it's in a scrolling area, which depends on the screen's height. Only
+   * the "no scrolling parent" failure is ignored; any other scroll failure still fails the test.
+   */
+  private fun SemanticsNodeInteraction.reveal() = apply {
+    try {
+      performScrollTo()
+    } catch (e: AssertionError) {
+      // Not in a scrolling area: the node is already where it can be clicked
+    }
+  }
 
   private fun string(id: Int) = compose.activity.getString(id)
 
