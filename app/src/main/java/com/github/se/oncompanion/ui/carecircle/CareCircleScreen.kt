@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -43,9 +44,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
@@ -54,10 +58,12 @@ import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 
 /**
- * The members of the signed-in user's care circle (US-13), following the "US-13 / Circle members"
- * Figma mockup. The empty state has no mockup yet. Tapping a member opens their details (US-14).
+ * Displays the members of the signed-in user's care circle (US-13), following the "US-13 / Circle
+ * members" as well as the people invited who haven't joined yet. Tapping a member opens their
+ * details (US-14). @TODO: Invitations don't open anything yet: the invite code screen comes in a
+ * later PR.
  *
- * Adding a member (US-13) comes in a later PR: for now it shows a toast.
+ * @TODO: Adding a member (US-13) comes in a later PR: for now it shows a toast.
  */
 @Composable
 fun CareCircleScreen(
@@ -68,6 +74,11 @@ fun CareCircleScreen(
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
   val resources = LocalResources.current
+  // Back from another screen or app: an invitation may have expired in the meantime
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshExpiry()
+    onPauseOrDispose {}
+  }
 
   CareCircleContent(
       uiState = uiState,
@@ -116,7 +127,7 @@ fun CareCircleContent(
       },
       floatingActionButton = {
         // In the empty state, the add button is part of the content instead
-        if (uiState is CareCircleUiState.Members) {
+        if (uiState is CareCircleUiState.CareCircleMembers) {
           ExtendedFloatingActionButton(
               text = { Text(stringResource(R.string.care_circle_add_member)) },
               icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
@@ -131,7 +142,8 @@ fun CareCircleContent(
       CareCircleUiState.Loading -> LoadingState(contentModifier)
       CareCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
       CareCircleUiState.Error -> ErrorState(onRetry, contentModifier)
-      is CareCircleUiState.Members -> MemberList(uiState.members, onMemberClick, contentModifier)
+      is CareCircleUiState.CareCircleMembers ->
+          CareCircleMemberList(uiState, onMemberClick, contentModifier)
     }
   }
 }
@@ -143,9 +155,13 @@ private fun LoadingState(modifier: Modifier) {
   }
 }
 
+/**
+ * The circle in two sections: "Members (n)", the people who can see the patient's data, then
+ * "Waiting to join (m)", the invitations not used yet. An empty section is not shown.
+ */
 @Composable
-private fun MemberList(
-    members: List<CareCircleMember>,
+private fun CareCircleMemberList(
+    careCircle: CareCircleUiState.CareCircleMembers,
     onMemberClick: (CareCircleMember) -> Unit,
     modifier: Modifier,
 ) {
@@ -155,20 +171,39 @@ private fun MemberList(
       contentPadding = PaddingValues(bottom = 88.dp),
   ) {
     item { Intro() }
-    item {
-      Text(
-          text = stringResource(R.string.care_circle_members_count, members.size),
-          style = MaterialTheme.typography.titleSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier =
-              Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                  .testTag(C.Tag.care_circle_members_count),
-      )
+    // People who joined
+    if (careCircle.joined.isNotEmpty()) {
+      item {
+        SectionHeader(
+            text = stringResource(R.string.care_circle_members_count, careCircle.joined.size),
+            tag = C.Tag.care_circle_members_count,
+        )
+      }
+      items(careCircle.joined, key = { it.key }) { entry ->
+        MemberItem(member = entry.member, onClick = { onMemberClick(entry.member) })
+      }
     }
-    items(members, key = { it.uid }) { member ->
-      MemberItem(member = member, onClick = { onMemberClick(member) })
+    // Invitations not used yet
+    if (careCircle.pending.isNotEmpty()) {
+      item {
+        SectionHeader(
+            text = stringResource(R.string.care_circle_pending_count, careCircle.pending.size),
+            tag = C.Tag.care_circle_pending_section,
+        )
+      }
+      items(careCircle.pending, key = { it.key }) { entry -> PendingItem(entry) }
     }
   }
+}
+
+@Composable
+private fun SectionHeader(text: String, tag: String) {
+  Text(
+      text = text,
+      style = MaterialTheme.typography.titleSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag(tag),
+  )
 }
 
 @Composable
@@ -199,6 +234,56 @@ private fun MemberItem(member: CareCircleMember, onClick: () -> Unit) {
       leadingContent = { Monogram(member.initial) },
       modifier = Modifier.clickable(onClick = onClick).testTag(C.Tag.careCircleMember(member.uid)),
   )
+}
+
+/**
+ * One invitation, laid out like a member with a "Pending" label. Its supporting text says whether
+ * the invite code can be used: pending (with what the person will see), expired, or not on the
+ * server yet. Not clickable yet: the invite code screen comes in a later PR (#150).
+ */
+@Composable
+private fun PendingItem(entry: CareCircleEntry.Pending) {
+  val invite = entry.invite
+  ListItem(
+      headlineContent = { Text(entry.details.fullName) },
+      supportingContent = {
+        when {
+          entry.expired ->
+              Text(
+                  stringResource(R.string.care_circle_invite_expired),
+                  color = MaterialTheme.colorScheme.error,
+              )
+          !invite.isSynced -> Text(stringResource(R.string.care_circle_invite_not_synced))
+          else ->
+              Text(
+                  stringResource(
+                      R.string.care_circle_member_summary,
+                      stringResource(R.string.care_circle_invite_pending),
+                      accessSummary(entry.details.permissions),
+                  )
+              )
+        }
+      },
+      leadingContent = { Monogram(entry.details.initial) },
+      trailingContent = { PendingLabel() },
+      modifier = Modifier.testTag(C.Tag.careCircleInvite(invite.inviteCode)),
+  )
+}
+
+@Composable
+private fun PendingLabel() {
+  Surface(
+      color = MaterialTheme.colorScheme.secondaryContainer,
+      contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+      shape = MaterialTheme.shapes.small,
+      modifier = Modifier.testTag(C.Tag.care_circle_pending_label),
+  ) {
+    Text(
+        text = stringResource(R.string.care_circle_pending_label),
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+  }
 }
 
 @Composable
@@ -330,23 +415,42 @@ fun CareCircleScreenPreview() {
   OncompanionTheme {
     CareCircleContent(
         uiState =
-            CareCircleUiState.Members(
-                members =
+            CareCircleUiState.CareCircleMembers(
+                joined =
                     listOf(
-                        CareCircleMember(
-                            uid = "1",
-                            firstName = "Sophie",
-                            familyName = "Dubois",
-                            relationship = Relationship.WIFE,
-                            permissions = CarePermission.entries.toSet(),
-                        ),
-                        CareCircleMember(
-                            uid = "2",
-                            firstName = "Jean",
-                            familyName = "Dupont",
-                            relationship = Relationship.FRIEND,
-                            permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
-                        ),
+                            CareCircleMember(
+                                uid = "1",
+                                firstName = "Sophie",
+                                familyName = "Dubois",
+                                relationship = Relationship.WIFE,
+                                permissions = CarePermission.entries.toSet(),
+                            ),
+                            CareCircleMember(
+                                uid = "2",
+                                firstName = "Jean",
+                                familyName = "Dupont",
+                                relationship = Relationship.FRIEND,
+                                permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+                            ),
+                        )
+                        .map { CareCircleEntry.Joined(it) },
+                pending =
+                    listOf(
+                        CareCircleEntry.Pending(
+                            CareCircleInvite(
+                                inviteCode = "K7M2PQ9XRT",
+                                ownerUid = "owner",
+                                ownerFirstName = "Anne",
+                                details =
+                                    CareCircleMemberDetails(
+                                        firstName = "Julie",
+                                        relationship = Relationship.DAUGHTER,
+                                        permissions =
+                                            setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+                                    ),
+                            ),
+                            expired = false,
+                        )
                     ),
             ),
         onBack = {},

@@ -1,5 +1,6 @@
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 
 # Architecture
@@ -44,6 +45,14 @@ dispatcher and Android JSON parsing, with no new dependency. `FakeHospitalReposi
 `app/src/test/.../model/hospital` supplies configurable outcomes and records submitted queries.
 Hospital identities use OSM object type and ID rather than provider-specific place IDs.
 
+`HospitalRepositoryProvider` follows #177's replaceable `@Volatile repository` convention.
+Deployment wiring can call `configure(searchEndpoint)` before creating field ViewModels to install
+one shared `HospitalRepositoryNominatim`, preserving its cache across consumers. There is no public
+service URL or placeholder URL by default: until configured, blank searches return an empty success
+and other searches return the existing service error without HTTP. Tests replace `repository` with
+`FakeHospitalRepository` and restore the original in `@After`. Configuring the provider does not
+implement or deploy the required proxy.
+
 The [official Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
 prohibits autocomplete. The future field (#143) must use an explicit Search button, with no
 keystroke, background, periodic or automatic nearest-hospital requests. Only public hospital
@@ -79,9 +88,10 @@ so the parent clears any previous structured selection, including for empty or u
 Parents also clear their selection when changing text externally and decide which hospital details
 to persist. Search outcomes never replace text or emit a selection. `HospitalFieldContent` renders
 idle, loading, results, empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
-receives a `HospitalRepository`; each field needs its own lifecycle-scoped ViewModel and a stable
-repository instance. It never checks connectivity before searching, so repository cache hits
-remain available offline. Cache misses report a short error while manual entry stays usable.
+receives a `HospitalRepository`, defaulting to `HospitalRepositoryProvider.repository`. Tests can
+still inject a fake directly. Each field needs its own lifecycle-scoped ViewModel, which retains the
+repository captured at construction so later provider replacements do not discard its cache. It never
+checks connectivity before searching, so repository cache hits remain available offline. Cache misses report a short error while manual entry stays usable.
 
 Editing, external text changes, disabling or removing the field cancels obsolete requests and
 clears feedback. A generation check discards late responses. Successful lookups show linked
@@ -163,6 +173,33 @@ overview identifies Profile hospital text and the reusable content alongside the
 ## Offline mode
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
+
+## Appointment creation form (issue #147)
+
+Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
+`AppointmentFormUiState` and delegates to stateless `AppointmentFormContent`. Title and explicit
+time are required; date is prefilled. Type, optional location and notes are recorded without
+interpreting treatment. The form reuses shared date/Save components and keyboard handling.
+
+Location is temporarily an ordinary optional text field. The team deferred hospital search until
+the proxy/service configuration is available; the form makes no hospital requests. Blank location
+is saved as null; entered text is trimmed and respects the existing 200-character limit. The
+reusable HospitalField remains available for later integration, with no endpoint placeholder or
+search dependency added to this form.
+
+AppointmentFormViewModel takes appointment/auth repositories from their providers by default;
+tests can still inject fakes directly. PlanningViewModel now follows the same provider convention,
+uses system clock/zone defaults and always observes a non-null authentication repository.
+AppNavHost passes only saved state or the initial date, never repositories.
+
+A local save returns a saved-day result to the existing Planning entry, selects that day (including
+another week), consumes the result and removes the form. The live appointment source supplies the
+row; no duplicate Planning write is made. Cancel preserves the original calendar selection.
+Immediate failures retain the draft; completion means enqueue, not server acknowledgement.
+
+Local times are resolved in the display zone: spring gaps require correction, autumn repeated
+times require an offset choice. Account changes clear private input and suppress stale completion.
+Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
 
 ## Appointment storage
 

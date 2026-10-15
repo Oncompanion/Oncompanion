@@ -1,5 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
-// Co-authored-by: Codex
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.resources
@@ -7,6 +7,23 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment form
+    const val appointment_screen = "appointment_screen"
+    const val appointment_back = "appointment_back"
+    const val appointment_title = "appointment_title"
+    const val appointment_date = "appointment_date"
+    const val appointment_time = "appointment_time"
+    const val appointment_location = "appointment_location"
+    const val appointment_notes = "appointment_notes"
+    const val appointment_save = "appointment_save"
+    const val appointment_saving = "appointment_saving"
+    const val appointment_picker = "appointment_picker"
+    const val appointment_confirm = "appointment_confirm"
+    const val appointment_cancel = "appointment_cancel"
+
+    /** Identifies the recorded appointment category choice. */
+    fun appointmentType(type: String) = "appointment_type_$type"
+
     // Hospital field
     const val hospital_field = "hospital_field"
     const val hospital_search = "hospital_search"
@@ -191,6 +208,12 @@ object C {
     const val care_circle_add_member_fab = "care_circle_add_member_fab"
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
+
+    const val care_circle_pending_section = "care_circle_pending_section"
+    const val care_circle_pending_label = "care_circle_pending_label"
+
+    /** The row of the invitation whose invite code is [inviteCode]. */
+    fun careCircleInvite(inviteCode: String) = "care_circle_invite_$inviteCode"
 
     // Care circle member details
     const val care_circle_member_screen = "care_circle_member_screen"
