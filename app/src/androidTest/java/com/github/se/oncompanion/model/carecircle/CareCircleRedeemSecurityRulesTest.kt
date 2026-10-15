@@ -263,6 +263,9 @@ class CareCircleRedeemSecurityRulesTest {
     EmulatorTestData.signIn("bob")
     val ownCode = createInvite()
     denied(redeemBatch(ownCode, ownerUid = bobUid))
+    denied(joined(bobUid, bobUid).set(joinedFields(ownCode)))
+    // Their link to their own circle, using up their invite (as its owner, they may delete it)
+    denied(redeemBatch(ownCode, ownerUid = bobUid, member = null))
   }
 
   @Test

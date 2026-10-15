@@ -48,8 +48,8 @@
       "width": 1220,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
       "strokeStyle": "dashed",
@@ -84,6 +84,10 @@
         {
           "id": "hospital_integration",
           "type": "arrow"
+        },
+        {
+          "id": "form_auth_call",
+          "type": "arrow"
         }
       ],
       "updated": 1791100000000,
@@ -97,9 +101,9 @@
       "x": 30,
       "y": 45.0,
       "width": 1200,
-      "height": 50.0,
+      "height": 50,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -118,8 +122,8 @@
       "link": null,
       "locked": false,
       "index": "a003",
-      "text": "Appointment screens: list \u00b7 add \u00b7 summary\n(+ ViewModels)",
-      "originalText": "Appointment screens: list \u00b7 add \u00b7 summary\n(+ ViewModels)",
+      "text": "AppointmentFormScreen (+ ViewModel): built\nList and summary planned",
+      "originalText": "AppointmentFormScreen (+ ViewModel): built\nList and summary planned",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -847,11 +851,11 @@
       "width": 84.0,
       "height": 248,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -2447,6 +2451,149 @@
         "fixedPoint": [
           0.5,
           0
+        ]
+      }
+    },
+    {
+      "id": "form_auth",
+      "type": "rectangle",
+      "x": 20,
+      "y": 380,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 909622042,
+      "version": 1,
+      "versionNonce": 1781011471,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "form_auth_t",
+          "type": "text"
+        },
+        {
+          "id": "form_auth_call",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "z_auth"
+    },
+    {
+      "id": "form_auth_t",
+      "type": "text",
+      "x": 30,
+      "y": 417.5,
+      "width": 240,
+      "height": 25,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 594166266,
+      "version": 1,
+      "versionNonce": 94675607,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "z_auth_text",
+      "text": "AuthRepository",
+      "originalText": "AuthRepository",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "form_auth",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "form_auth_call",
+      "type": "arrow",
+      "x": 44.4,
+      "y": 126,
+      "width": 44.4,
+      "height": 304,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1171646238,
+      "version": 1,
+      "versionNonce": 77369840,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "z_auth_call",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -44.4,
+          24
+        ],
+        [
+          -44.4,
+          304
+        ],
+        [
+          -30.4,
+          304
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "screens",
+        "fixedPoint": [
+          0.02,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "form_auth",
+        "fixedPoint": [
+          0,
+          0.5
         ]
       }
     }
