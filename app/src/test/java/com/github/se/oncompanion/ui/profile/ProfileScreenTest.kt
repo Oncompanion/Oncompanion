@@ -112,6 +112,7 @@ class ProfileScreenTest {
                 cancerType = "Breast cancer",
                 email = "alex@example.com",
                 memberSince = Instant.parse("2026-09-04T12:00:00Z"),
+                hospital = null,
             )
         )
     )
@@ -146,6 +147,7 @@ class ProfileScreenTest {
                 cancerType = null,
                 email = null,
                 memberSince = null,
+                hospital = null,
             )
         )
     )
@@ -202,6 +204,7 @@ class ProfileScreenTest {
                   cancerType = null,
                   email = null,
                   memberSince = Instant.parse("2026-09-01T00:30:00Z"),
+                  hospital = null,
               )
           )
       )
@@ -229,7 +232,7 @@ class ProfileScreenTest {
     var edits = 0
     composeTestRule.setContent {
       ProfileContent(
-          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null)),
+          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null, hospital = null)),
           onBack = {},
           onRetry = {},
           onEdit = { edits++ },

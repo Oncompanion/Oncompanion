@@ -2,15 +2,11 @@
 
 package com.github.se.oncompanion.ui.profile
 
-import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.Role
@@ -25,7 +21,6 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Source
-import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -168,11 +163,9 @@ class HospitalProfileTest {
         .assertIsNotEnabled()
         .performTouchInput { click() }
     compose.onNodeWithTag(C.Tag.hospital_results).assertDoesNotExist()
-    captureScreenshot("hospital-profile-edit.png")
     compose.onNodeWithTag(C.Tag.edit_profile_save).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()
     compose.onNodeWithText("Manual hospital").assertIsDisplayed()
-    captureScreenshot("hospital-profile-read.png")
     runBlocking { assertEquals("Manual hospital", repository.getCachedProfile(uid)!!.hospital) }
     compose.onNodeWithTag(C.Tag.profile_edit).performClick()
     // Reopening creates new semantics nodes; reacquire the field after the screen change.
@@ -192,18 +185,6 @@ class HospitalProfileTest {
       db.enableNetwork().await()
       withTimeout(10_000) { db.waitForPendingWrites().await() }
       assertNull(repository.getProfile(uid)!!.hospital)
-    }
-  }
-
-  // Keep device-rendered artifacts for the screen-change PR review.
-  private fun captureScreenshot(name: String) {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    File(context.cacheDir, name).outputStream().use {
-      compose
-          .onRoot()
-          .captureToImage()
-          .asAndroidBitmap()
-          .compress(Bitmap.CompressFormat.PNG, 100, it)
     }
   }
 }

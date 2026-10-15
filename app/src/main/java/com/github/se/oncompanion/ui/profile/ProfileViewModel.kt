@@ -30,7 +30,7 @@ data class ProfileDetails(
     val cancerType: String?,
     val email: String?,
     val memberSince: Instant?,
-    val hospital: String? = null,
+    val hospital: String?,
 )
 
 /** What the Profile screen displays while resolving the signed-in user's profile. */

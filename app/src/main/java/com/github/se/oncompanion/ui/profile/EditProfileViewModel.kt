@@ -171,16 +171,7 @@ class EditProfileViewModel(
     _uiState.value = state.copy(isSaving = true, saveFailed = false)
     saving = viewModelScope.launch {
       try {
-        profileRepository.updateProfile(
-            original.copy(
-                firstName = state.firstName.trim(),
-                familyName = state.familyName.trim().ifEmpty { null },
-                cancerType = state.cancerType.trim().ifEmpty { null },
-                hospital =
-                    if (state.isPatient) state.hospital.trim().ifEmpty { null }
-                    else original.hospital,
-            )
-        )
+        profileRepository.updateProfile(updatedProfile(original, state))
         if (attempt == generation && authRepository.currentUser?.uid == original.uid) {
           _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
         }
@@ -193,6 +184,16 @@ class EditProfileViewModel(
       }
     }
   }
+
+  // Normalize the captured draft without changing protected or caregiver-only data.
+  private fun updatedProfile(original: UserProfile, draft: EditProfileUiState): UserProfile =
+      original.copy(
+          firstName = draft.firstName.trim(),
+          familyName = draft.familyName.trim().ifEmpty { null },
+          cancerType = draft.cancerType.trim().ifEmpty { null },
+          hospital =
+              if (draft.isPatient) draft.hospital.trim().ifEmpty { null } else original.hospital,
+      )
 
   /** Navigation consumes completion once, so recomposition cannot pop another screen. */
   fun consumeSaved() {

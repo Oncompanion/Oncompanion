@@ -150,7 +150,7 @@ fun EditProfileContent(
               enabled = state.canEdit,
               modifier = Modifier.fillMaxWidth(),
           )
-          // M1 has no proxy: reuse the stateless hospital field without any search repository.
+          // TODO: Enable Search once the centrally managed Nominatim proxy is available.
           if (state.isPatient) {
             HospitalFieldContent(
                 value = state.hospital,
