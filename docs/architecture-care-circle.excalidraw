@@ -76,6 +76,10 @@
         {
           "type": "arrow",
           "id": "ar1"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_screens_to_invite"
         }
       ],
       "updated": 1791100000000,
@@ -102,16 +106,16 @@
       "frameId": null,
       "roundness": null,
       "seed": 819521170,
-      "version": 1,
-      "versionNonce": 1279660645,
+      "version": 2,
+      "versionNonce": 968313772,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
       "link": null,
       "locked": false,
       "index": "a003",
-      "text": "CareCircleScreen \u00b7 CareCircleMemberScreen\n(+ ViewModels)",
-      "originalText": "CareCircleScreen \u00b7 CareCircleMemberScreen\n(+ ViewModels)",
+      "text": "CareCircleScreen \u00b7 CareCircleMemberScreen \u00b7 CareCircleMemberFormScreen\n(+ ViewModels)",
+      "originalText": "CareCircleScreen \u00b7 CareCircleMemberScreen \u00b7 CareCircleMemberFormScreen\n(+ ViewModels)",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -460,11 +464,11 @@
       "width": 260,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -488,6 +492,10 @@
         {
           "type": "arrow",
           "id": "ar8"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_screens_to_invite"
         }
       ],
       "updated": 1791100000000,
@@ -503,7 +511,7 @@
       "width": 240,
       "height": 50.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -1168,11 +1176,11 @@
       "width": 20.0,
       "height": 68,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1650,6 +1658,75 @@
       "containerId": null,
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "ar_screens_to_invite",
+      "type": "arrow",
+      "x": 880,
+      "y": 14,
+      "width": 420,
+      "height": 440,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1849312117,
+      "version": 1,
+      "versionNonce": 1297341083,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -24
+        ],
+        [
+          420,
+          -24
+        ],
+        [
+          420,
+          416
+        ],
+        [
+          386,
+          416
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "screens",
+        "fixedPoint": [
+          0.9555555555555556,
+          0
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "invite",
+        "fixedPoint": [
+          1,
+          0.5
+        ]
+      },
+      "index": "a026V"
     }
   ],
   "appState": {

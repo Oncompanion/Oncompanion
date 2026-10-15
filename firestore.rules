@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 rules_version = '2';
@@ -18,9 +19,9 @@ service cloud.firestore {
 
     // ---------- Users ----------
     // Each user has one profile document: /users/{uid}. Only they can read or write it.
-    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH).
+    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH, MAX_HOSPITAL_LENGTH).
     function isValidProfile(data) {
-      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'createdAt'])
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt'])
           && data.keys().hasAll(['role', 'firstName', 'createdAt'])
           && data.role in ['PATIENT', 'CAREGIVER']
           && data.firstName is string
@@ -28,6 +29,7 @@ service cloud.firestore {
           && data.firstName.size() <= 50
           && optionalString(data, 'familyName', 50)
           && optionalString(data, 'cancerType', 100)
+          && optionalString(data, 'hospital', 100)
           && data.createdAt is timestamp;
     }
 
@@ -217,6 +219,7 @@ service cloud.firestore {
       match /patients/{patientUid} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
+                      && patientUid != uid
                       && request.resource.data.keys().hasOnly(
                              ['patientFirstName', 'inviteCode', 'joinedAt'])
                       && request.resource.data.joinedAt == request.time

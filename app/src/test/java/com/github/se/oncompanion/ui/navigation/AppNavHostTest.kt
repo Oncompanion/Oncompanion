@@ -38,9 +38,15 @@ import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleInvite
+import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.EventRepository
@@ -50,6 +56,10 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.*
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
@@ -81,19 +91,23 @@ class AppNavHostTest {
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
+  private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appMedicationRepository = MedicationRepositoryProvider.repository
+  private val appUserProfileRepository = UserProfileRepositoryProvider.repository
 
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
     CareCircleRepositoryProvider.repository = appCareCircleRepository
+    CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
     AuthRepositoryProvider.repository = appAuthRepository
     AppointmentRepositoryProvider.repository = appAppointmentRepository
     MedicationRepositoryProvider.repository = appMedicationRepository
+    UserProfileRepositoryProvider.repository = appUserProfileRepository
   }
 
   /** Shows the NavHost with these repositories in the providers its ViewModels read. */
@@ -102,11 +116,13 @@ class AppNavHostTest {
       planningRepository: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
+      careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
     CareCircleRepositoryProvider.repository = careCircleRepository
+    CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
     AuthRepositoryProvider.repository = authRepository
     MedicationRepositoryProvider.repository = medicationRepository
@@ -381,6 +397,96 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_screen).assertDoesNotExist()
   }
 
+  @Test
+  fun careCircle_listsPendingInvitesWithTheMembers() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val careCircle = FakeCareCircleRepository()
+    careCircle.setMembers("owner", listOf(CareCircleMember(uid = "sophie", firstName = "Sophie")))
+    val invites = FakeCareCircleInviteRepository()
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "JJJJJ23456",
+                ownerUid = "owner",
+                ownerFirstName = "Anne",
+                details = CareCircleMemberDetails(firstName = "Julie"),
+            )
+        )
+    )
+    setNavHost(
+        Route.CARE_CIRCLE,
+        careCircleRepository = careCircle,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+
+    // The shared invite repository reaches the list's ViewModel
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("sophie")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).assertIsDisplayed()
+  }
+
+  @Test
+  fun careCircle_addingAMemberFromOverview_showsThemAsPendingInTheList() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository().apply { nextInviteCode = { "K7M2PQ9XRT" } }
+    UserProfileRepositoryProvider.repository =
+        FakeUserProfileRepository().apply {
+          seed(UserProfile(uid = "owner", role = Role.PATIENT, firstName = "Anne"))
+        }
+    setNavHost(Route.OVERVIEW, careCircleInviteRepository = invites, authRepository = auth)
+
+    // Two taps from Overview (#74): the shortcut, then "Add a member" in the empty circle
+    composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_ADD, NavigationActions(navController).currentRoute())
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_first_name).performTextInput("Julie")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_relationship).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleFormRelationshipOption(Relationship.DAUGHTER.name))
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_save_button)
+        .performScrollTo()
+        .performClick()
+
+    // Back on the list, Julie waits to join with the access she was given
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleInvite("K7M2PQ9XRT"))
+        .assertIsDisplayed()
+        .assertTextContains("Julie", substring = true)
+        .assertTextContains(context.getString(R.string.permission_symptoms), substring = true)
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun careCircleForm_backArrow_returnsToTheList() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    setNavHost(Route.CARE_CIRCLE, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_back_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
+  }
+
   private fun assertOnTab(tab: Tab, screenTag: String) {
     composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(tab.testTag).assertIsSelected()
@@ -438,7 +544,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
     val heading =
         composeTestRule
@@ -773,6 +879,6 @@ class AppNavHostTest {
     )
     composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
     composeTestRule.onNodeWithText("Gentle yoga for patients").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
   }
 }

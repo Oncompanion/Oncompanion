@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -18,8 +19,8 @@ import kotlinx.coroutines.flow.update
  * - [createProfile] requires [UserProfile.isValid] (else [IllegalArgumentException]) and stores the
  *   profile with `createdAt = clock()`, ignoring the given `createdAt`.
  * - [updateProfile] requires [UserProfile.isValid] and only changes `firstName`, `familyName` and
- *   `cancerType` of an existing profile. The stored `role` and `createdAt` never change. It does
- *   nothing if no profile exists for that uid.
+ *   `cancerType` and `hospital` of an existing profile. The stored `role` and `createdAt` never
+ *   change. It does nothing if no profile exists for that uid.
  * - [getProfile] returns the stored profile, or null.
  * - [observeProfile] emits the current value, then every change.
  *
@@ -78,6 +79,7 @@ class FakeUserProfileRepository(private val clock: () -> Instant = Instant::now)
                   firstName = profile.firstName,
                   familyName = profile.familyName,
                   cancerType = profile.cancerType,
+                  hospital = profile.hospital,
               ))
     }
   }

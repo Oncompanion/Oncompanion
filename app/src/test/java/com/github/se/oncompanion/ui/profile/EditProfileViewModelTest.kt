@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -427,5 +428,106 @@ class EditProfileViewModelTest {
     val vm = EditProfileViewModel(auth, cancelling)
     advanceUntilIdle()
     assertEquals(EditProfileStatus.LOADING, vm.uiState.value.status)
+  }
+
+  /** A legacy profile without hospital can be saved without supplying one. */
+  @Test
+  fun legacyProfileCanSaveWithoutHospital() = runTest {
+    signIn()
+    val model = vm()
+    advanceUntilIdle()
+    assertEquals("", model.uiState.value.hospital)
+    assertTrue(model.uiState.value.canSave)
+    model.saveProfile()
+    advanceUntilIdle()
+    assertEquals(original, writes.single())
+  }
+
+  /** Adding, editing and clearing free text preserves every unrelated profile property. */
+  @Test
+  fun hospitalCanBeAddedEditedAndClearedWithoutASelectedSearchResult() = runTest {
+    signIn()
+    for (text in listOf("  Local hospital  ", "Updated hospital", "  ")) {
+      val model = vm()
+      advanceUntilIdle()
+      model.onHospitalChange(text)
+      model.saveProfile()
+      advanceUntilIdle()
+      val expected = text.trim().ifEmpty { null }
+      assertEquals(original.copy(hospital = expected), profiles.profiles[original.uid])
+    }
+    assertEquals(listOf("Local hospital", "Updated hospital", null), writes.map { it.hospital })
+  }
+
+  /** Hospital drafts follow the same per-field snapshot ownership as the existing fields. */
+  @Test
+  fun hospitalPrefillsAndDraftSurvivesRemoteUpdatesIncludingClear() = runTest {
+    signIn()
+    profiles.seed(original.copy(hospital = "Saved"))
+    val model = vm()
+    advanceUntilIdle()
+    assertEquals("Saved", model.uiState.value.hospital)
+    profiles.seed(original.copy(hospital = "New saved"))
+    advanceUntilIdle()
+    assertEquals("New saved", model.uiState.value.hospital)
+    model.onHospitalChange("")
+    profiles.seed(original.copy(hospital = "Remote", familyName = "Remote family"))
+    advanceUntilIdle()
+    assertEquals("", model.uiState.value.hospital)
+    model.saveProfile()
+    advanceUntilIdle()
+    assertEquals(original.copy(hospital = null, familyName = "Remote family"), writes.single())
+  }
+
+  /** Input is bounded by the model limit and optionality never disables Save. */
+  @Test
+  fun hospitalLengthLimitAndEmptyDraftMatchModelValidation() = runTest {
+    signIn()
+    val model = vm()
+    advanceUntilIdle()
+    model.onHospitalChange("h".repeat(UserProfile.MAX_HOSPITAL_LENGTH + 1))
+    assertEquals(UserProfile.MAX_HOSPITAL_LENGTH, model.uiState.value.hospital.length)
+    assertTrue(model.uiState.value.canSave)
+    assertFalse(model.uiState.value.copy(hospital = "h".repeat(101)).canSave)
+    model.onHospitalChange("")
+    assertTrue(model.uiState.value.canSave)
+  }
+
+  /** A failed local save retains the hospital draft and supports retry. */
+  @Test
+  fun hospitalDraftSurvivesSaveFailureAndAccountChangeClearsIt() = runTest {
+    signIn()
+    val model = vm()
+    advanceUntilIdle()
+    model.onHospitalChange("Draft hospital")
+    profiles.writeError = IllegalStateException("Local failure")
+    model.saveProfile()
+    advanceUntilIdle()
+    assertTrue(model.uiState.value.saveFailed)
+    assertEquals("Draft hospital", model.uiState.value.hospital)
+    profiles.writeError = null
+    model.saveProfile()
+    advanceUntilIdle()
+    assertEquals("Draft hospital", profiles.profiles[original.uid]!!.hospital)
+    signIn("uid-2")
+    profiles.seed(original.copy(uid = "uid-2"))
+    advanceUntilIdle()
+    assertEquals("", model.uiState.value.hospital)
+  }
+
+  /** This patient feature does not introduce a hospital editor for caregivers. */
+  @Test
+  fun caregiverHospitalIsNotEditableAndIsPreserved() = runTest {
+    signIn()
+    val caregiver = original.copy(role = Role.CAREGIVER, hospital = "Existing")
+    profiles.seed(caregiver)
+    val model = vm()
+    advanceUntilIdle()
+    assertFalse(model.uiState.value.isPatient)
+    model.onHospitalChange("Must be ignored")
+    model.onFirstNameChange("Updated")
+    model.saveProfile()
+    advanceUntilIdle()
+    assertEquals(caregiver.copy(firstName = "Updated"), profiles.profiles[original.uid])
   }
 }

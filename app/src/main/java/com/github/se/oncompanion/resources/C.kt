@@ -1,4 +1,5 @@
-// Co-authored-by: Codex
+// Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.resources
@@ -6,6 +7,23 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment form
+    const val appointment_screen = "appointment_screen"
+    const val appointment_back = "appointment_back"
+    const val appointment_title = "appointment_title"
+    const val appointment_date = "appointment_date"
+    const val appointment_time = "appointment_time"
+    const val appointment_location = "appointment_location"
+    const val appointment_notes = "appointment_notes"
+    const val appointment_save = "appointment_save"
+    const val appointment_saving = "appointment_saving"
+    const val appointment_picker = "appointment_picker"
+    const val appointment_confirm = "appointment_confirm"
+    const val appointment_cancel = "appointment_cancel"
+
+    /** Identifies the recorded appointment category choice. */
+    fun appointmentType(type: String) = "appointment_type_$type"
+
     // Hospital field
     const val hospital_field = "hospital_field"
     const val hospital_search = "hospital_search"
@@ -163,6 +181,7 @@ object C {
     const val profile_sign_out_cancel = "profile_sign_out_cancel"
     const val profile_sign_out_error = "profile_sign_out_error"
     const val profile_signing_out = "profile_signing_out"
+    const val profile_hospital = "profile_hospital"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
     const val cancer_type_suggestion = "cancer_type_suggestion"
@@ -190,6 +209,12 @@ object C {
 
     fun careCircleMember(uid: String) = "care_circle_member_$uid"
 
+    const val care_circle_pending_section = "care_circle_pending_section"
+    const val care_circle_pending_label = "care_circle_pending_label"
+
+    /** The row of the invitation whose invite code is [inviteCode]. */
+    fun careCircleInvite(inviteCode: String) = "care_circle_invite_$inviteCode"
+
     // Care circle member details
     const val care_circle_member_screen = "care_circle_member_screen"
     const val care_circle_member_back_button = "care_circle_member_back_button"
@@ -208,6 +233,27 @@ object C {
     /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
     fun careCircleMemberPermission(permissionName: String) =
         "care_circle_member_permission_$permissionName"
+
+    // Add a care circle member
+    const val care_circle_form_screen = "care_circle_form_screen"
+    const val care_circle_form_back_button = "care_circle_form_back_button"
+    const val care_circle_form_first_name = "care_circle_form_first_name"
+    const val care_circle_form_family_name = "care_circle_form_family_name"
+    const val care_circle_form_relationship = "care_circle_form_relationship"
+    const val care_circle_form_email = "care_circle_form_email"
+    const val care_circle_form_can_see = "care_circle_form_can_see"
+    const val care_circle_form_save_button = "care_circle_form_save_button"
+    const val care_circle_form_saving = "care_circle_form_saving"
+    const val care_circle_form_missing = "care_circle_form_missing"
+    const val care_circle_form_save_error = "care_circle_form_save_error"
+
+    /** The relationship [relationshipName] in the relationship menu, e.g. "DAUGHTER". */
+    fun careCircleFormRelationshipOption(relationshipName: String) =
+        "care_circle_form_relationship_$relationshipName"
+
+    /** The switch giving access to [permissionName], e.g. "PLANNING". */
+    fun careCircleFormPermission(permissionName: String) =
+        "care_circle_form_permission_$permissionName"
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"

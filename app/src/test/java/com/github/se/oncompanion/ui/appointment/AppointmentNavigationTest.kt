@@ -1,0 +1,141 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
+package com.github.se.oncompanion.ui.appointment
+
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.navigation.compose.ComposeNavigator
+import androidx.navigation.testing.TestNavHostController
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
+import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.navigation.*
+import com.github.se.oncompanion.ui.planning.PlanningDates
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/** Checks the create flow with actual navigation, form and live Planning adapter. */
+@RunWith(AndroidJUnit4::class)
+class AppointmentNavigationTest {
+  @get:Rule val compose = createComposeRule()
+  private val repository = FakeAppointmentRepository()
+  private val auth = FakeAuthRepository()
+  private lateinit var nav: TestNavHostController
+
+  private val originalAuth = AuthRepositoryProvider.repository
+  private val originalAppointments = AppointmentRepositoryProvider.repository
+  private val originalPlanning = PlanningRepositoryProvider.repository
+
+  /** Provider overrides never leak into another test. */
+  @After
+  fun restoreProviders() {
+    AuthRepositoryProvider.repository = originalAuth
+    AppointmentRepositoryProvider.repository = originalAppointments
+    PlanningRepositoryProvider.repository = originalPlanning
+  }
+
+  private fun show() {
+    AuthRepositoryProvider.repository = auth
+    AppointmentRepositoryProvider.repository = repository
+    runTest { auth.signInWithGoogle("patient") }
+    compose.setContent {
+      val context = LocalContext.current
+      nav = remember {
+        TestNavHostController(context).apply { navigatorProvider.addNavigator(ComposeNavigator()) }
+      }
+      AppNavHost(
+          navController = nav,
+          startRoute = Route.PLANNING,
+      )
+    }
+  }
+
+  private fun fill(title: String = "Visit") {
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput(title)
+    compose.onNodeWithTag(C.Tag.appointment_time).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_confirm).performClick()
+  }
+
+  /** Cancel retains the selected week and creates no record. */
+  @Test
+  fun selectedDayPrefillsFormAndCancelReturnsWithoutWriting() {
+    show()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    val day = LocalDate.now().plusWeeks(1)
+    compose.onNodeWithTag(C.Tag.planning_add).performClick()
+    compose
+        .onNodeWithTag(C.Tag.appointment_date)
+        .assertTextContains(day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)))
+    compose.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Discarded")
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
+    assertTrue(repository.appointments("uid-patient").isEmpty())
+  }
+
+  /** Local save updates the live agenda once and a reopened form starts empty. */
+  @Test
+  fun manualLocationSaveReturnsToExistingPlanningAndReopensFresh() {
+    show()
+    compose.onNodeWithTag(C.Tag.planning_add).performClick()
+    compose.onNodeWithTag(C.Tag.hospital_search).assertDoesNotExist()
+    fill()
+    compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().performTextInput("Room 12")
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+    compose.onNodeWithText("Visit").assertIsDisplayed()
+    compose.onNodeWithText("Room 12").assertIsDisplayed()
+    assertEquals(1, repository.appointments("uid-patient").size)
+    compose.runOnIdle { assertEquals(Screen.PLANNING, nav.currentDestination?.route) }
+    compose.onNodeWithTag(C.Tag.planning_add).performClick()
+    assertEquals(
+        "",
+        compose
+            .onNodeWithTag(C.Tag.appointment_title)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText]
+            .text,
+    )
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
+  }
+
+  /** A changed date returns to its week rather than hiding the newly saved appointment. */
+  @Test
+  fun savedDateResultChangesSelectionAndIsConsumed() {
+    show()
+    val savedDay = LocalDate.now().plusWeeks(2)
+    // Exercise the same dated route used by Add, starting from an existing Planning entry.
+    compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.appointmentAdd(savedDay)) }
+    fill("Later visit")
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(savedDay))
+    compose.onNodeWithText("Later visit").assertIsDisplayed()
+    compose.runOnIdle {
+      assertNull(
+          nav.currentBackStackEntry?.savedStateHandle?.get<String>(Screen.APPOINTMENT_SAVED_DATE)
+      )
+    }
+  }
+
+  /** Add stays usable when the agenda's read fails; writing is independent of that read. */
+  @Test
+  fun agendaReadErrorDoesNotPreventOpeningForm() {
+    repository.observeError = IllegalStateException("read failed")
+    show()
+    compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_add).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_screen).assertIsDisplayed()
+  }
+}

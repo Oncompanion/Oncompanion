@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
 
@@ -57,6 +58,7 @@ fun PlanningScreen(
     navigationActions: NavigationActions,
     viewModel: PlanningViewModel,
     modifier: Modifier = Modifier,
+    onAddAppointment: ((LocalDate) -> Unit)? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   LifecycleResumeEffect(viewModel) {
@@ -74,6 +76,7 @@ fun PlanningScreen(
               viewModel::nextWeek,
               viewModel::goToToday,
               viewModel::retry,
+              onAddAppointment = onAddAppointment,
           ),
       modifier = modifier,
       bottomBar = {

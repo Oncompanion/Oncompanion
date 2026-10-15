@@ -33,8 +33,15 @@ data class CareCircleInvite(
     val redeemerUid: String? = null,
     val isSynced: Boolean = true,
 ) {
+  /**
+   * When the invite code stops working, [VALIDITY] after the server received it, or null while the
+   * server doesn't have it.
+   */
+  val expiresAt: Instant?
+    get() = createdAt?.plus(VALIDITY)
+
   /** True once [VALIDITY] has passed since the server received the invite. */
-  fun isExpired(now: Instant): Boolean = createdAt != null && now >= createdAt + VALIDITY
+  fun isExpired(now: Instant): Boolean = expiresAt?.let { now >= it } ?: false
 
   /** The invite code split in two, e.g. "ABCDE-FGHJK", easier to read aloud or type. */
   val displayInviteCode: String
