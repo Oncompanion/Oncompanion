@@ -26,4 +26,11 @@ interface SymptomRepository {
    * @throws IllegalArgumentException if the entry is not [SymptomEntry.isValid]
    */
   suspend fun addSymptom(uid: String, entry: SymptomEntry): String
+
+  /**
+   * Deletes the symptom [id] of [uid]. Does nothing if it doesn't exist. Like [addSymptom], returns
+   * as soon as the entry is deleted on the device (also offline), so it disappears from
+   * [observeSymptoms] right away; the server deletes it when there is a connection.
+   */
+  suspend fun deleteSymptom(uid: String, id: String)
 }

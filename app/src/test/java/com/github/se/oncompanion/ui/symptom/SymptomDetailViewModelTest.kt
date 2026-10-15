@@ -2,14 +2,17 @@
 
 package com.github.se.oncompanion.ui.symptom
 
+import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
+import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -18,6 +21,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 
 // Robolectric provides the main dispatcher used by viewModelScope
 @RunWith(AndroidJUnit4::class)
@@ -39,8 +43,20 @@ class SymptomDetailViewModelTest {
         runBlocking { it.signInWithGoogle("token") }
       }
 
-  private fun viewModel(id: String = "s1", auth: AuthRepository = signedIn()) =
-      SymptomDetailViewModel(id, auth, repository)
+  private fun viewModel(
+      id: String = "s1",
+      auth: AuthRepository = signedIn(),
+      symptoms: SymptomRepository = repository,
+  ) = SymptomDetailViewModel(id, auth, symptoms)
+
+  /** A ViewModel showing [fatigue], with the deletion confirmation open. */
+  private fun confirmingDelete(
+      auth: AuthRepository = signedIn(),
+      symptoms: SymptomRepository = repository,
+  ): SymptomDetailViewModel {
+    repository.seed("alice", fatigue)
+    return viewModel(auth = auth, symptoms = symptoms).apply { requestDelete() }
+  }
 
   @Test
   fun existingEntry_isLoaded() {
@@ -76,6 +92,18 @@ class SymptomDetailViewModelTest {
     assertTrue(loading.isLoading)
     assertFalse(loading.isNotFound)
     assertFalse(loading.copy(isLoading = false, hasError = true).isNotFound)
+  }
+
+  @Test
+  fun canDelete_onlyAShownEntry() {
+    val shown = SymptomDetailUiState(entry = fatigue, isLoading = false)
+
+    assertTrue(shown.canDelete)
+    assertFalse(SymptomDetailUiState().canDelete)
+    assertFalse(shown.copy(entry = null).canDelete)
+    assertFalse(shown.copy(hasError = true).canDelete)
+    assertFalse(shown.copy(isDeleting = true).canDelete)
+    assertFalse(shown.copy(isDeleted = true).canDelete)
   }
 
   @Test
@@ -119,5 +147,194 @@ class SymptomDetailViewModelTest {
   @Test
   fun defaultRepositories_canBeCreatedWithoutFirebase() {
     assertTrue(SymptomDetailViewModel("s1").uiState.value.hasError)
+  }
+
+  // ----- Delete -----
+
+  @Test
+  fun requestDelete_asksForConfirmation_andDeletesNothing() {
+    val vm = confirmingDelete()
+
+    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertEquals(listOf(fatigue), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun cancelDelete_closesTheConfirmation_andKeepsTheEntry() {
+    val vm = confirmingDelete()
+
+    vm.cancelDelete()
+
+    assertFalse(vm.uiState.value.isConfirmingDelete)
+    assertEquals(fatigue, vm.uiState.value.entry)
+    assertEquals(listOf(fatigue), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun confirmDelete_deletesTheEntry_andTheScreenIsDone() {
+    val vm = confirmingDelete()
+
+    vm.confirmDelete()
+
+    val state = vm.uiState.value
+    assertTrue(repository.symptoms("alice").isEmpty())
+    assertTrue(state.isDeleted)
+    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.isDeleting)
+    // Still shows the entry until the screen closes, not "no longer exists"
+    assertEquals(fatigue, state.entry)
+    assertFalse(state.isNotFound)
+    assertFalse(state.canDelete)
+  }
+
+  @Test
+  fun confirmDelete_withoutConfirmation_deletesNothing() {
+    repository.seed("alice", fatigue)
+    val vm = viewModel()
+
+    vm.confirmDelete()
+
+    assertFalse(vm.uiState.value.isDeleted)
+    assertEquals(listOf(fatigue), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun requestDelete_isIgnoredWithoutAnEntry() {
+    val notFound = viewModel("missing")
+    notFound.requestDelete()
+    assertFalse(notFound.uiState.value.isConfirmingDelete)
+
+    repository.observeError = IllegalStateException("no cache")
+    val error = viewModel()
+    error.requestDelete()
+    assertFalse(error.uiState.value.isConfirmingDelete)
+  }
+
+  @Test
+  fun deleteError_keepsTheEntryAndTheDialog_andRetryDeletes() {
+    val vm = confirmingDelete()
+    repository.writeError = IllegalStateException("rejected")
+
+    vm.confirmDelete()
+
+    var state = vm.uiState.value
+    assertTrue(state.hasDeleteError)
+    assertTrue(state.isConfirmingDelete)
+    // No loading state in between: the dialog stays open with the error
+    assertFalse(state.isLoading)
+    assertTrue(state.isDeleteDialogShown)
+    assertFalse(state.isDeleted)
+    assertEquals(fatigue, state.entry)
+    assertEquals(listOf(fatigue), repository.symptoms("alice"))
+
+    repository.writeError = null
+    vm.confirmDelete()
+
+    state = vm.uiState.value
+    assertTrue(state.isDeleted)
+    assertFalse(state.hasDeleteError)
+    assertTrue(repository.symptoms("alice").isEmpty())
+  }
+
+  @Test
+  fun deleteError_isClearedWhenTheDialogIsClosed() {
+    val vm = confirmingDelete()
+    repository.writeError = IllegalStateException("rejected")
+    vm.confirmDelete()
+
+    vm.cancelDelete()
+    vm.requestDelete()
+
+    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertFalse(vm.uiState.value.hasDeleteError)
+  }
+
+  @Test
+  fun signedOutBeforeConfirming_showsTheErrorAndDeletesNothing() {
+    val auth = signedIn()
+    val vm = confirmingDelete(auth = auth)
+    auth.signOut()
+
+    vm.confirmDelete()
+
+    assertTrue(vm.uiState.value.hasDeleteError)
+    assertFalse(vm.uiState.value.isDeleted)
+    assertEquals(listOf(fatigue), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun whileDeleting_theDialogCantBeClosedOrConfirmedAgain() {
+    val deleted = CompletableDeferred<Unit>()
+    var deletes = 0
+    val slow =
+        object : SymptomRepository by repository {
+          override suspend fun deleteSymptom(uid: String, id: String) {
+            deletes++
+            deleted.await()
+            repository.deleteSymptom(uid, id)
+          }
+        }
+    val vm = confirmingDelete(symptoms = slow)
+
+    vm.confirmDelete()
+    assertTrue(vm.uiState.value.isDeleting)
+    assertFalse(vm.uiState.value.canDelete)
+    vm.cancelDelete()
+    vm.confirmDelete()
+    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertEquals(1, deletes)
+
+    deleted.complete(Unit)
+    shadowOf(Looper.getMainLooper()).idle()
+
+    assertTrue(vm.uiState.value.isDeleted)
+    assertFalse(vm.uiState.value.isDeleting)
+  }
+
+  @Test
+  fun deleteDialog_isShownOnlyWhileDeleteCanDoSomething() {
+    val confirming =
+        SymptomDetailUiState(entry = fatigue, isLoading = false, isConfirmingDelete = true)
+
+    assertTrue(confirming.isDeleteDialogShown)
+    assertTrue(confirming.copy(isDeleting = true).isDeleteDialogShown)
+    assertFalse(confirming.copy(isConfirmingDelete = false).isDeleteDialogShown)
+    assertFalse(confirming.copy(entry = null).isDeleteDialogShown)
+    assertFalse(confirming.copy(isLoading = true).isDeleteDialogShown)
+    assertFalse(confirming.copy(hasError = true).isDeleteDialogShown)
+  }
+
+  @Test
+  fun entryDeletedElsewhereWhileConfirming_closesTheConfirmation() {
+    val vm = confirmingDelete()
+
+    // Deleted on another device
+    runBlocking { repository.deleteSymptom("alice", "s1") }
+
+    var state = vm.uiState.value
+    assertTrue(state.isNotFound)
+    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.isDeleteDialogShown)
+
+    // Coming back (e.g. the deletion was rolled back) doesn't reopen the dialog
+    repository.seed("alice", fatigue)
+    state = vm.uiState.value
+    assertEquals(fatigue, state.entry)
+    assertFalse(state.isDeleteDialogShown)
+  }
+
+  @Test
+  fun loadErrorAfterAFailedDelete_closesTheConfirmation() {
+    val vm = confirmingDelete()
+    repository.writeError = IllegalStateException("rejected")
+    repository.observeError = IllegalStateException("no cache")
+
+    vm.confirmDelete()
+
+    val state = vm.uiState.value
+    assertTrue(state.hasError)
+    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.hasDeleteError)
+    assertFalse(state.isDeleteDialogShown)
   }
 }
