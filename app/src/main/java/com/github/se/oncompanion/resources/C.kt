@@ -143,6 +143,11 @@ object C {
     const val symptom_add_picker_confirm = "symptom_add_picker_confirm"
     const val symptom_add_picker_cancel = "symptom_add_picker_cancel"
     const val symptom_journal_add = "symptom_journal_add"
+    const val symptom_detail_delete = "symptom_detail_delete"
+    const val symptom_delete_dialog = "symptom_delete_dialog"
+    const val symptom_delete_confirm = "symptom_delete_confirm"
+    const val symptom_delete_cancel = "symptom_delete_cancel"
+    const val symptom_delete_error = "symptom_delete_error"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile

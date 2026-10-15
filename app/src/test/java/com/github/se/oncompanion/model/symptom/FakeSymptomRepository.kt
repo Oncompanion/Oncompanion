@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.update
  *   returns the ID.
  * - [observeSymptoms] emits the user's entries newest `occurredAt` first, then every change.
  * - [observeSymptom] emits the entry (or null), then every change.
+ * - [deleteSymptom] removes the entry, and does nothing if it doesn't exist.
  *
  * Test hooks: [observeError] and [writeError] simulate failures, [symptoms] exposes the stored
  * data.
@@ -36,7 +37,7 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
   /** When non-null, both observe flows fail with it (checked when collection starts). */
   var observeError: Exception? = null
 
-  /** When non-null, [addSymptom] throws it and stores nothing. */
+  /** When non-null, [addSymptom] and [deleteSymptom] throw it and change nothing. */
   var writeError: Exception? = null
 
   /** Snapshot of the stored entries of [uid], in no particular order. */
@@ -69,5 +70,10 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
     val id = "symptom-${nextId++}"
     seed(uid, entry.copy(id = id, createdAt = clock()))
     return id
+  }
+
+  override suspend fun deleteSymptom(uid: String, id: String) {
+    writeError?.let { throw it }
+    store.update { current -> current + (uid to current[uid].orEmpty() - id) }
   }
 }

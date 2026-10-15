@@ -77,6 +77,13 @@ class SymptomRepositoryFirestore(
     return document.id
   }
 
+  override suspend fun deleteSymptom(uid: String, id: String) {
+    // Not awaited: the task only completes once the server confirms, which never happens offline
+    collection(uid).document(id).delete().addOnFailureListener { e ->
+      Log.e(TAG, "The server rejected deleting the symptom $id; it was restored", e)
+    }
+  }
+
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
 

@@ -5,6 +5,8 @@ package com.github.se.oncompanion.ui.symptom
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
@@ -28,6 +31,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,12 +67,18 @@ class SymptomDetailScreenTest {
       state: SymptomDetailUiState,
       onBack: () -> Unit = {},
       onRetry: () -> Unit = {},
+      onDelete: () -> Unit = {},
+      onConfirmDelete: () -> Unit = {},
+      onCancelDelete: () -> Unit = {},
   ) {
     composeTestRule.setContent {
       SymptomDetailContent(
           uiState = state,
           onBack = onBack,
           onRetry = onRetry,
+          onDelete = onDelete,
+          onConfirmDelete = onConfirmDelete,
+          onCancelDelete = onCancelDelete,
           zone = ZoneOffset.UTC,
       )
     }
@@ -186,6 +196,109 @@ class SymptomDetailScreenTest {
     assertEquals(1, backs)
   }
 
+  // ----- Delete -----
+
+  @Test
+  fun entry_hasTheDeleteButton_whichAsksToConfirm() {
+    var deletes = 0
+    setContent(loaded.copy(entry = fatigue), onDelete = { deletes++ })
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).performClick()
+
+    assertEquals(1, deletes)
+  }
+
+  @Test
+  fun notFound_hasNoDeleteButton() {
+    setContent(loaded)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertDoesNotExist()
+  }
+
+  @Test
+  fun confirmation_explainsIt_andConfirmOrCancelCallBack() {
+    var confirms = 0
+    var cancels = 0
+    setContent(
+        loaded.copy(entry = fatigue, isConfirmingDelete = true),
+        onConfirmDelete = { confirms++ },
+        onCancelDelete = { cancels++ },
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+    assertTextInside(context.getString(R.string.symptom_delete_title), C.Tag.symptom_delete_dialog)
+    assertTextInside(
+        context.getString(R.string.symptom_delete_message),
+        C.Tag.symptom_delete_dialog,
+    )
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_error).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsEnabled().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).assertIsEnabled().performClick()
+
+    assertEquals(1, confirms)
+    assertEquals(1, cancels)
+  }
+
+  @Test
+  fun confirmingWithoutAnEntry_showsNoDialog() {
+    setContent(loaded.copy(isConfirmingDelete = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
+  }
+
+  @Test
+  fun backInTheDialog_cancelsTheDeletion() {
+    var cancels = 0
+    setContent(
+        loaded.copy(entry = fatigue, isConfirmingDelete = true),
+        onCancelDelete = { cancels++ },
+    )
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    Espresso.pressBack()
+
+    composeTestRule.runOnIdle { assertEquals(1, cancels) }
+  }
+
+  @Test
+  fun backWhileDeleting_doesNotCancel() {
+    var cancels = 0
+    setContent(
+        loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true),
+        onCancelDelete = { cancels++ },
+    )
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    Espresso.pressBack()
+
+    composeTestRule.runOnIdle { assertEquals(0, cancels) }
+  }
+
+  @Test
+  fun whileDeleting_theDialogButtonsAreDisabled() {
+    setContent(loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertDoesNotExist()
+  }
+
+  @Test
+  fun deleteError_isShownInTheDialog() {
+    setContent(loaded.copy(entry = fatigue, isConfirmingDelete = true, hasDeleteError = true))
+
+    composeTestRule
+        .onNode(
+            hasTestTag(C.Tag.symptom_delete_error) and
+                hasText(context.getString(R.string.symptom_delete_error))
+        )
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsEnabled()
+  }
+
   // ----- With the ViewModel -----
 
   @Test
@@ -224,5 +337,46 @@ class SymptomDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_retry).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_confirmedDelete_deletesTheEntry_andGoesBackToTheJournal() {
+    val repository = FakeSymptomRepository().apply { seed("alice", fatigue) }
+    val viewModel = SymptomDetailViewModel("s1", signedInAsAlice(), repository)
+    lateinit var navigationActions: RecordingNavigationActions
+    composeTestRule.setContent {
+      navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
+      SymptomDetailScreen(navigationActions = navigationActions, viewModel = viewModel)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).performClick()
+
+    composeTestRule.runOnIdle {
+      assertTrue(repository.symptoms("alice").isEmpty())
+      assertEquals(1, navigationActions.backCount)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertDoesNotExist()
+  }
+
+  @Test
+  fun screen_cancelledDelete_keepsTheEntry_andStays() {
+    val repository = FakeSymptomRepository().apply { seed("alice", fatigue) }
+    val viewModel = SymptomDetailViewModel("s1", signedInAsAlice(), repository)
+    lateinit var navigationActions: RecordingNavigationActions
+    composeTestRule.setContent {
+      navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
+      SymptomDetailScreen(navigationActions = navigationActions, viewModel = viewModel)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(fatigue), repository.symptoms("alice"))
+      assertEquals(0, navigationActions.backCount)
+    }
   }
 }

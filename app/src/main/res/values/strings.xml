@@ -140,6 +140,12 @@
     <string name="symptom_add_save">Save</string>
     <string name="symptom_add_error_not_signed_in">You\'re signed out. Sign in again to save your symptoms.</string>
     <string name="symptom_add_error_save_failed">Couldn\'t save your symptoms. Please try again.</string>
+    <string name="symptom_detail_delete">Delete entry</string>
+    <string name="symptom_delete_title">Delete this entry?</string>
+    <string name="symptom_delete_message">It will be removed from your symptom journal. You can\'t undo this.</string>
+    <string name="symptom_delete_confirm">Delete</string>
+    <string name="symptom_delete_cancel">Cancel</string>
+    <string name="symptom_delete_error">Couldn\'t delete this entry. Try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
