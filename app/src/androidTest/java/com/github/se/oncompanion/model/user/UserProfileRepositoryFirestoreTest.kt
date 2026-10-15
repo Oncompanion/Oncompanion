@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -579,5 +580,89 @@ class UserProfileRepositoryFirestoreTest {
     } finally {
       db.enableNetwork().await()
     }
+  }
+
+  /** Firestore profiles written before hospital existed still deserialize and can be saved. */
+  @Test
+  fun legacyProfileWithoutHospitalLoadsAndSaves(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users",
+        aliceUid,
+        """{"role":{"stringValue":"PATIENT"},"firstName":{"stringValue":"Alice"},
+           "familyName":{"stringValue":"Martin"},"cancerType":{"stringValue":"Breast cancer"},
+           "createdAt":{"timestampValue":"2024-01-01T00:00:00Z"}}""",
+    )
+    val before = serverSnapshot(aliceUid)
+    assertFalse(before.contains(UserProfileRepositoryFirestore.FIELD_HOSPITAL))
+    val loaded = repository.getProfile(aliceUid)!!
+    assertNull(loaded.hospital)
+    repository.updateProfile(loaded.copy(firstName = "Alicia"))
+    awaitServerAck()
+    assertSameContent(loaded.copy(firstName = "Alicia"), repository.getProfile(aliceUid))
+    assertNull(serverSnapshot(aliceUid).get(UserProfileRepositoryFirestore.FIELD_HOSPITAL))
+    assertEquals(
+        before.getTimestamp("createdAt"),
+        serverSnapshot(aliceUid).getTimestamp("createdAt"),
+    )
+  }
+
+  /** Optional manual names round-trip on create and can subsequently be changed and cleared. */
+  @Test
+  fun hospitalCreateEditClearAndEmptyValuesRoundTrip(): Unit = runBlocking {
+    val original = alice().copy(hospital = "Manual Hospital")
+    repository.createProfile(original)
+    awaitServerAck()
+    assertSameContent(original, repository.getProfile(aliceUid))
+    val createdAt = serverSnapshot(aliceUid).getTimestamp("createdAt")
+    for (name in listOf("Another Hospital", "", null)) {
+      repository.updateProfile(original.copy(hospital = name))
+      awaitServerAck()
+      assertSameContent(original.copy(hospital = name), repository.getProfile(aliceUid))
+      val snapshot = serverSnapshot(aliceUid)
+      assertEquals(name, snapshot.get(UserProfileRepositoryFirestore.FIELD_HOSPITAL))
+      assertEquals("PATIENT", snapshot.getString("role"))
+      assertEquals(createdAt, snapshot.getTimestamp("createdAt"))
+    }
+  }
+
+  /** The repository validates the same hospital boundary as the model and security rules. */
+  @Test
+  fun hospitalLimitIsAcceptedAndOversizedWritesAreRejectedLocally(): Unit = runBlocking {
+    val allowed = alice().copy(hospital = "h".repeat(UserProfile.MAX_HOSPITAL_LENGTH))
+    repository.createProfile(allowed)
+    awaitServerAck()
+    assertSameContent(allowed, repository.getProfile(aliceUid))
+    val invalid = allowed.copy(hospital = "h".repeat(UserProfile.MAX_HOSPITAL_LENGTH + 1))
+    for (create in listOf(true, false)) {
+      try {
+        if (create) repository.createProfile(invalid) else repository.updateProfile(invalid)
+        fail("Oversized hospital must be rejected before writing")
+      } catch (_: IllegalArgumentException) {
+        /* Expected local validation. */
+      }
+    }
+    assertSameContent(allowed, repository.getProfile(aliceUid))
+  }
+
+  /** Offline hospital edits and clearing complete locally and sync when connectivity returns. */
+  @Test
+  fun offlineHospitalEditsAndClearingKeepOtherProfileData(): Unit = runBlocking {
+    val original = alice().copy(hospital = "Saved hospital")
+    repository.createProfile(original)
+    awaitServerAck()
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.updateProfile(original.copy(hospital = "Offline hospital")) }
+      assertSameContent(
+          original.copy(hospital = "Offline hospital"),
+          repository.getCachedProfile(aliceUid),
+      )
+      withTimeout(5_000) { repository.updateProfile(original.copy(hospital = null)) }
+      assertSameContent(original.copy(hospital = null), repository.getCachedProfile(aliceUid))
+    } finally {
+      db.enableNetwork().await()
+    }
+    awaitServerAck()
+    assertSameContent(original.copy(hospital = null), repository.getProfile(aliceUid))
   }
 }

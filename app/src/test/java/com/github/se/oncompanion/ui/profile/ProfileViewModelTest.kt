@@ -86,6 +86,7 @@ class ProfileViewModelTest {
                 cancerType = null,
                 email = user.email,
                 memberSince = memberSince,
+                hospital = null,
             )
         ),
         vm.uiState.value,
@@ -122,6 +123,7 @@ class ProfileViewModelTest {
                 cancerType = "Breast cancer",
                 email = "alex@example.com",
                 memberSince = memberSince,
+                hospital = null,
             )
         ),
         vm.uiState.value,
@@ -153,6 +155,7 @@ class ProfileViewModelTest {
                 cancerType = "Lymphoma",
                 email = user.email,
                 memberSince = null,
+                hospital = null,
             )
         ),
         vm.uiState.value,
@@ -171,7 +174,9 @@ class ProfileViewModelTest {
     advanceUntilIdle()
 
     assertEquals(
-        ProfileUiState.Loaded(ProfileDetails("Sam", null, null, "sam@example.com", null)),
+        ProfileUiState.Loaded(
+            ProfileDetails("Sam", null, null, "sam@example.com", null, hospital = null)
+        ),
         vm.uiState.value,
     )
   }
@@ -201,7 +206,7 @@ class ProfileViewModelTest {
     advanceUntilIdle()
 
     assertEquals(
-        ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null)),
+        ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null, hospital = null)),
         vm.uiState.value,
     )
   }

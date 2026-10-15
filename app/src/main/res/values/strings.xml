@@ -1,3 +1,6 @@
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Co-authored-by: Codex <noreply@openai.com> -->
 <resources>
     <string name="app_name">oncompanion</string>
     <!-- Planning -->
@@ -52,6 +55,7 @@
     <string name="edit_profile_save">Save</string>
     <string name="edit_profile_cancel">Cancel</string>
     <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
+    <string name="profile_hospital">Hospital</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>
@@ -206,8 +210,12 @@
     <string name="care_circle_access_none">No access</string>
     <!-- Joins the last section to the others, e.g. "Planning, events & symptoms" -->
     <string name="care_circle_access_and">%1$s &amp; %2$s</string>
-    <!-- Temporary message until the add member screen exists -->
-    <string name="care_circle_add_member_not_implemented">Adding members isn\'t available yet. This will let you add someone and choose what they can see.</string>
+    <!-- Invitations not used yet -->
+    <string name="care_circle_pending_count">Waiting to join (%1$d)</string>
+    <string name="care_circle_invite_pending">Invitation pending</string>
+    <string name="care_circle_invite_expired">Invitation expired</string>
+    <string name="care_circle_invite_not_synced">Waiting to sync</string>
+    <string name="care_circle_pending_label">Pending</string>
 
     <string name="permission_planning">Planning</string>
     <string name="permission_events">Events</string>
@@ -247,6 +255,25 @@
     <string name="permission_events_description">Activities you join</string>
     <string name="permission_symptoms_description">Your symptom log</string>
     <string name="permission_prescriptions_description">Your saved prescriptions</string>
+
+    <!-- Add a care circle member (#79) -->
+    <string name="care_circle_form_add_title">Add a member</string>
+    <string name="care_circle_form_back">Back</string>
+    <string name="care_circle_form_first_name">First name</string>
+    <string name="care_circle_form_family_name">Last name</string>
+    <string name="care_circle_form_relationship">Relationship</string>
+    <string name="care_circle_form_email">Email</string>
+    <string name="care_circle_form_email_hint">We\'ll prepare an email with the invite code</string>
+    <string name="care_circle_form_required">Required</string>
+    <string name="care_circle_form_invalid_email">Enter a valid email</string>
+    <!-- Title of the access switches, e.g. "What can Julie see?" -->
+    <string name="care_circle_form_can_see">What can %1$s see?</string>
+    <string name="care_circle_form_can_see_unnamed">What can they see?</string>
+    <string name="care_circle_form_send_invitation">Send invitation</string>
+    <string name="care_circle_form_missing_first_name">Add a first name to send the invitation.</string>
+    <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
+    <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
+    <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>
@@ -304,6 +331,18 @@
     <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
+    <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
+    <string name="prescription_scan_camera_unavailable_explanation">oncompanion couldn\'t turn on your phone\'s camera. You can enter the prescription yourself instead.</string>
+    <string name="prescription_scan_take_photo">Take a photo</string>
+    <string name="prescription_scan_check_title">Check the photo</string>
+    <string name="prescription_scan_check_hint">Is all the text sharp and inside the photo?</string>
+    <string name="prescription_scan_retake">Retake</string>
+    <string name="prescription_scan_use_photo">Use this photo</string>
+    <string name="prescription_scan_reading_coming_soon">Reading the prescription is coming soon</string>
+    <string name="prescription_scan_photo_description">Photo of the prescription</string>
+    <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
+    <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
+
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>
     <string name="hospital_field_hint">Enter a hospital name or another location</string>
@@ -311,4 +350,32 @@
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
     <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
+    <!-- Appointment form -->
+    <string name="appointment_add">Add appointment</string>
+    <string name="appointment_back">Back</string>
+    <string name="appointment_title">Title</string>
+    <string name="appointment_date">Date</string>
+    <string name="appointment_time">Time</string>
+    <string name="appointment_pick_date">Choose a date</string>
+    <string name="appointment_pick_time">Choose a time</string>
+    <string name="appointment_required">Required</string>
+    <string name="appointment_title_missing">Please enter a title</string>
+    <plurals name="appointment_text_limit">
+        <item quantity="one">Use at most %1$d character</item>
+        <item quantity="other">Use at most %1$d characters</item>
+    </plurals>
+    <string name="appointment_missing_time">This time does not exist on this date. Choose another time.</string>
+    <string name="appointment_repeated_time">This time occurs twice. Choose its UTC offset.</string>
+    <string name="appointment_offset">UTC %1$s</string>
+    <string name="appointment_type">Type</string>
+    <string name="appointment_treatment">Treatment</string>
+    <string name="appointment_consultation">Consultation</string>
+    <string name="appointment_other">Other</string>
+    <string name="appointment_location">Location (optional)</string>
+    <string name="appointment_notes">Notes (optional)</string>
+    <string name="appointment_save">Save appointment</string>
+    <string name="appointment_confirm">OK</string>
+    <string name="appointment_cancel">Cancel</string>
+    <string name="appointment_signed_out">Sign in again to save your appointment.</string>
+    <string name="appointment_save_failed">Couldn\'t save your appointment. Please try again.</string>
 </resources>

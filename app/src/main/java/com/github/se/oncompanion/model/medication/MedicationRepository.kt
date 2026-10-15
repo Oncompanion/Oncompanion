@@ -24,10 +24,10 @@ interface MedicationRepository {
   fun observePrescriptions(uid: String): Flow<List<Prescription>>
 
   /**
-   * Returns the prescription [id] of [uid] with its medications, or `null` if it doesn't exist.
-   * Offline, also `null` if this device has never loaded it.
+   * Emits the prescription [id] of [uid] with its medications (or `null` if it doesn't exist) now
+   * and every time it changes. Offline, also `null` if this device has never loaded it.
    */
-  suspend fun getPrescription(uid: String, id: String): Prescription?
+  fun observePrescription(uid: String, id: String): Flow<Prescription?>
 
   /**
    * Emits all the medications of [uid] now and every time they change, earliest start date first

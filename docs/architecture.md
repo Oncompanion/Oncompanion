@@ -1,4 +1,6 @@
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 
 # Architecture
@@ -17,10 +19,10 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 
 **UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes; the defaults come from one provider object per repository (`XRepositoryProvider.repository`), the only place that names an implementation. No Firebase or Android `Context` here. Overview, Planning and Events are the bottom-bar tabs. Overview shows what comes next (the next appointment, medication intake or Ligue event) by taking the first upcoming item from `ObservePlanning`. It is read-only: symptoms are logged from the symptom tracker, not from Overview.
 
-**Domain layer** (`domain/<feature>/`, optional). One class per use case with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (directory, events, appointments list) go straight from the ViewModel to the repository.
+**Domain layer** (`domain/<feature>/`, optional). One class per use case, usually with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (directory, events, appointments list) go straight from the ViewModel to the repository.
 
 - `LogSymptom` is planned with the voice journal. The add symptom form saves through `SymptomRepository` directly for now: it only uses that repository, so there is no logic to share yet. `LogSymptom` will turn a voice transcript into a draft of the same form, which the patient confirms before it is saved, and log it for the right patient once caregivers can log on a patient's behalf. The form's rule for when a symptom was felt (the pure function `occurredAt` in `AddSymptomViewModel.kt`) then moves to `domain/symptom` with it, so both use the same one.
-- `ManageMedicationSchedule` saves a confirmed prescription with its medications and keeps their reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule.
+- `ManageMedicationSchedule` saves a confirmed prescription with its medications and keeps their reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule; that is why it exposes three named operations (`add`, `update`, `delete`) instead of a single `invoke`.
 - `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
 - `GenerateAppointmentSummary` gathers the symptoms and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
 - `ObservePlanning` is the planned integration that will merge appointments, medications and Ligue events for Planning. `AppointmentPlanningSource` implements the `PlanningRepository` read contract for the signed-in patient: it adapts cached appointment observations to the requested date range and clears entries when the uid changes. Production Planning uses this source through `PlanningRepositoryProvider`. `PlanningViewModel` defaults to the planning and auth providers, while navigation supplies only its saved state; its clock and display zone default to the system settings. Its ViewModel separately observes authentication and restarts the agenda on uid changes, so read failures cannot leave the previous patient's entries visible after an account change. Live aggregation with other features is not implemented yet. Planning has no store of its own: each `PlanningSource` references the feature that owns the data and handles editing.
@@ -42,6 +44,14 @@ access HTTP. `HospitalRepositoryNominatim` uses platform `HttpURLConnection` on 
 dispatcher and Android JSON parsing, with no new dependency. `FakeHospitalRepository` in
 `app/src/test/.../model/hospital` supplies configurable outcomes and records submitted queries.
 Hospital identities use OSM object type and ID rather than provider-specific place IDs.
+
+`HospitalRepositoryProvider` follows #177's replaceable `@Volatile repository` convention.
+Deployment wiring can call `configure(searchEndpoint)` before creating field ViewModels to install
+one shared `HospitalRepositoryNominatim`, preserving its cache across consumers. There is no public
+service URL or placeholder URL by default: until configured, blank searches return an empty success
+and other searches return the existing service error without HTTP. Tests replace `repository` with
+`FakeHospitalRepository` and restore the original in `@After`. Configuring the provider does not
+implement or deploy the required proxy.
 
 The [official Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
 prohibits autocomplete. The future field (#143) must use an explicit Search button, with no
@@ -78,20 +88,45 @@ so the parent clears any previous structured selection, including for empty or u
 Parents also clear their selection when changing text externally and decide which hospital details
 to persist. Search outcomes never replace text or emit a selection. `HospitalFieldContent` renders
 idle, loading, results, empty and error states without a service. `HospitalFieldViewModel` exposes one state flow and
-receives a `HospitalRepository`; each field needs its own lifecycle-scoped ViewModel and a stable
-repository instance. It never checks connectivity before searching, so repository cache hits
-remain available offline. Cache misses report a short error while manual entry stays usable.
+receives a `HospitalRepository`, defaulting to `HospitalRepositoryProvider.repository`. Tests can
+still inject a fake directly. Each field needs its own lifecycle-scoped ViewModel, which retains the
+repository captured at construction so later provider replacements do not discard its cache. It never
+checks connectivity before searching, so repository cache hits remain available offline. Cache misses report a short error while manual entry stays usable.
 
 Editing, external text changes, disabling or removing the field cancels obsolete requests and
 clears feedback. A generation check discards late responses. Successful lookups show linked
 OpenStreetMap attribution, including empty and cached results. The field has no screen-specific
-navigation, patient data or persistence; Profile (#144) and Add Appointment integration remain
-separate tasks. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
+navigation, patient data or persistence. Profile (#144) uses its stateless content for manual entry;
+Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
 The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Connections from Edit Profile and Add
-Appointment remain planned; no screen integration is introduced by #143.
+HospitalFieldViewModel → HospitalRepository path. Edit Profile now uses the manual-only content; its search ViewModel connection and
+Add Appointment integration remain planned.
+
+## Optional profile hospital (issue #144)
+
+`UserProfile.hospital` is nullable text, limited to `MAX_HOSPITAL_LENGTH = 100`. Firestore's
+`hospital` field is optional: missing, null and empty strings are accepted, with non-string and
+oversized values denied by `isValidProfile`. Repository validation uses the same model limit.
+Missing fields deserialize to null. As with family name and cancer type, new and updated profiles
+write a null field when no hospital is supplied. Edit Profile trims text and saves blank input as
+null; updating uses `update()` and retains role, creation time and unrelated document fields.
+
+Profile displays only a nonblank saved hospital. Patient Edit Profile drafts initialize from the
+saved hospital, track hospital edits separately from incoming snapshots, and allow adding, editing
+or clearing it. Empty hospital text never makes Save unavailable. Input is bounded by the shared
+model limit like the existing fields. Caregivers gain no hospital editor.
+
+For M1, Edit Profile reuses `HospitalFieldContent` with `searchEnabled = false`: the Search button
+is visible and disabled while text remains editable. It supplies idle feedback and no search action,
+so no hospital repository, endpoint or search ViewModel is constructed for this screen. The shared
+field's `searchEnabled` parameter defaults to true for other consumers; disabling it also clears
+obsolete results in `HospitalField`. Existing Nominatim behavior is unchanged. This integration does
+not depend on the pending hospital-provider PR, deploy a proxy or integrate Add Appointment.
+
+The Account diagram shows the built manual-entry connection and planned search connection. The
+overview identifies Profile hospital text and the reusable content alongside the search ViewModel.
 
 ## Feature diagrams
 
@@ -129,9 +164,42 @@ Appointment remain planned; no screen integration is introduced by #143.
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
+## Appointment creation form (issue #147)
+
+Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
+`AppointmentFormUiState` and delegates to stateless `AppointmentFormContent`. Title and explicit
+time are required; date is prefilled. Type, optional location and notes are recorded without
+interpreting treatment. The form reuses shared date/Save components and keyboard handling.
+
+Location is temporarily an ordinary optional text field. The team deferred hospital search until
+the proxy/service configuration is available; the form makes no hospital requests. Blank location
+is saved as null; entered text is trimmed and respects the existing 200-character limit. The
+reusable HospitalField remains available for later integration, with no endpoint placeholder or
+search dependency added to this form.
+
+AppointmentFormViewModel takes appointment/auth repositories from their providers by default;
+tests can still inject fakes directly. PlanningViewModel now follows the same provider convention,
+uses system clock/zone defaults and always observes a non-null authentication repository.
+AppNavHost passes only saved state or the initial date, never repositories.
+
+A local save returns a saved-day result to the existing Planning entry, selects that day (including
+another week), consumes the result and removes the form. The live appointment source supplies the
+row; no duplicate Planning write is made. Cancel preserves the original calendar selection.
+Immediate failures retain the draft; completion means enqueue, not server acknowledgement.
+
+Local times are resolved in the display zone: spring gaps require correction, autumn repeated
+times require an offset choice. Account changes clear private input and suppress stale completion.
+Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
+
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
+
+## Prescription scan
+
+The scan screen (`ui/prescription/scan/`) uses the camera through CameraX. The camera stays in the UI layer, behind a small `ScanCamera` interface so the screen can be tested with a fake: its preview has to be drawn inside the screen, so it can't sit behind a device service like `TextRecognizer`. Only its result, the photo file, leaves the screen.
+
+The photo of a prescription is a medical document, so it is never uploaded and never kept: `ScanPhotoStore` (`model/medication/scan/`) writes it to a `scans/` folder of the app's private cache, which is never backed up. There is at most one photo at a time. It is first shown on the same screen for the user to check (Retake deletes it and shows the camera again), and it is deleted when the scan screen is closed or destroyed, including when the screen is left while the photo is still being written. Photos left behind by an interrupted scan (e.g. the app was killed) are deleted the next time the scan screen opens. When text recognition exists, the photo is handed to `DraftMedicationFromScan`, which deletes it once read.
 
 ## Care circle invitations
 

@@ -1,9 +1,11 @@
 // Co-authored-by: Codex
+// Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.ui.common
 
 import com.github.se.oncompanion.model.hospital.FakeHospitalRepository
 import com.github.se.oncompanion.model.hospital.Hospital
 import com.github.se.oncompanion.model.hospital.HospitalRepository
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.hospital.HospitalSearchError
 import com.github.se.oncompanion.model.hospital.HospitalSearchResult
 import kotlinx.coroutines.CancellationException
@@ -26,6 +28,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HospitalFieldViewModelTest {
   private val dispatcher = StandardTestDispatcher()
+  private val originalRepository = HospitalRepositoryProvider.repository
   private val fake = FakeHospitalRepository()
   private val hospital = Hospital("way/1", "Hospital", "Geneva", 46.2, 6.1)
 
@@ -36,7 +39,38 @@ class HospitalFieldViewModelTest {
 
   @After
   fun tearDown() {
+    HospitalRepositoryProvider.repository = originalRepository
     Dispatchers.resetMain()
+  }
+
+  /** Default construction reads the current provider; an existing field keeps its repository. */
+  @Test
+  fun defaultsUseProviderAndKeepTheRepositoryForTheFieldLifetime() = runTest {
+    fake.result = HospitalSearchResult.Success(listOf(hospital))
+    HospitalRepositoryProvider.repository = fake
+    val first = HospitalFieldViewModel()
+    val replacement = FakeHospitalRepository()
+    HospitalRepositoryProvider.repository = replacement
+    val second = HospitalFieldViewModel()
+    first.search("Geneva")
+    second.search("Lausanne")
+    advanceUntilIdle()
+    assertEquals(listOf("Geneva"), fake.queries)
+    assertEquals(listOf("Lausanne"), replacement.queries)
+    assertEquals(HospitalFieldUiState.Results(listOf(hospital)), first.uiState.value)
+    assertEquals(HospitalFieldUiState.Results(emptyList()), second.uiState.value)
+  }
+
+  /** A constructor-injected fake still takes precedence over the provider. */
+  @Test
+  fun explicitRepositoryOverridesTheProvider() = runTest {
+    val unused = FakeHospitalRepository()
+    HospitalRepositoryProvider.repository = unused
+    val vm = HospitalFieldViewModel(fake)
+    vm.search("Geneva")
+    advanceUntilIdle()
+    assertEquals(listOf("Geneva"), fake.queries)
+    assertTrue(unused.queries.isEmpty())
   }
 
   @Test

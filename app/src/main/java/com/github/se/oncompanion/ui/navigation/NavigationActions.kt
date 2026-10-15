@@ -1,9 +1,11 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.navigation
 
 import android.net.Uri
 import androidx.navigation.NavHostController
+import java.time.LocalDate
 
 /**
  * Top-level navigation graphs. Navigating to a route opens the graph at its start screen.
@@ -37,6 +39,12 @@ object Screen {
 
   // Route.PLANNING
   const val PLANNING = "planning_home"
+  const val APPOINTMENT_DATE = "appointmentDate"
+  const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
+  const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
+
+  /** Opens a new appointment on the selected calendar day. */
+  fun appointmentAdd(date: LocalDate) = "appointment_add?date=$date"
 
   // Route.EVENTS
   const val EVENTS = "events_home"
@@ -71,6 +79,9 @@ object Screen {
 
   /** The [CARE_CIRCLE_MEMBER] screen of [memberUid]. Firebase uids are safe in a route. */
   fun careCircleMember(memberUid: String) = "care_circle_member/$memberUid"
+
+  /** The form adding someone to the circle. */
+  const val CARE_CIRCLE_ADD = "care_circle_add"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"

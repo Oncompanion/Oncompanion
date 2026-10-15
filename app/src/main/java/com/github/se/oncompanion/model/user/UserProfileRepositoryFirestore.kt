@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -91,6 +92,7 @@ class UserProfileRepositoryFirestore(
           FIELD_FIRST_NAME to profile.firstName,
           FIELD_FAMILY_NAME to profile.familyName,
           FIELD_CANCER_TYPE to profile.cancerType,
+          FIELD_HOSPITAL to profile.hospital,
       )
 
   private fun fromDocument(doc: DocumentSnapshot): UserProfile? {
@@ -102,6 +104,7 @@ class UserProfileRepositoryFirestore(
           firstName = doc.getString(FIELD_FIRST_NAME)!!,
           familyName = doc.getString(FIELD_FAMILY_NAME),
           cancerType = doc.getString(FIELD_CANCER_TYPE),
+          hospital = doc.getString(FIELD_HOSPITAL),
           // Pending server timestamps read as null until the write reaches the server
           createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
       )
@@ -117,6 +120,8 @@ class UserProfileRepositoryFirestore(
     const val FIELD_FIRST_NAME = "firstName"
     const val FIELD_FAMILY_NAME = "familyName"
     const val FIELD_CANCER_TYPE = "cancerType"
+    /** Optional hospital text; missing and null fields both deserialize to null. */
+    const val FIELD_HOSPITAL = "hospital"
     const val FIELD_CREATED_AT = "createdAt"
     private const val TAG = "UserProfileRepository"
   }

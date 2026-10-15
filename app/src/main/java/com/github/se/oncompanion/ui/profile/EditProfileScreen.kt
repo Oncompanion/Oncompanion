@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -42,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.HospitalFieldContent
+import com.github.se.oncompanion.ui.common.HospitalFieldUiState
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
 
@@ -66,6 +69,7 @@ fun EditProfileScreen(
       onFirstNameChange = viewModel::onFirstNameChange,
       onFamilyNameChange = viewModel::onFamilyNameChange,
       onCancerTypeChange = viewModel::onCancerTypeChange,
+      onHospitalChange = viewModel::onHospitalChange,
       onSave = viewModel::saveProfile,
   )
 }
@@ -81,6 +85,7 @@ fun EditProfileContent(
     onFamilyNameChange: (String) -> Unit,
     onCancerTypeChange: (String) -> Unit,
     onSave: () -> Unit,
+    onHospitalChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
@@ -145,6 +150,18 @@ fun EditProfileContent(
               enabled = state.canEdit,
               modifier = Modifier.fillMaxWidth(),
           )
+          // TODO: Enable Search once the centrally managed Nominatim proxy is available.
+          if (state.isPatient) {
+            HospitalFieldContent(
+                value = state.hospital,
+                onValueChange = onHospitalChange,
+                uiState = HospitalFieldUiState.Idle,
+                onSearch = {},
+                onHospitalSelected = {},
+                enabled = state.canEdit,
+                searchEnabled = false,
+            )
+          }
           if (state.saveFailed) {
             Text(
                 stringResource(R.string.edit_profile_save_failed),

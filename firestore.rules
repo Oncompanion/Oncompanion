@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 rules_version = '2';
@@ -18,9 +19,9 @@ service cloud.firestore {
 
     // ---------- Users ----------
     // Each user has one profile document: /users/{uid}. Only they can read or write it.
-    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH).
+    // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH, MAX_HOSPITAL_LENGTH).
     function isValidProfile(data) {
-      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'createdAt'])
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt'])
           && data.keys().hasAll(['role', 'firstName', 'createdAt'])
           && data.role in ['PATIENT', 'CAREGIVER']
           && data.firstName is string
@@ -28,6 +29,7 @@ service cloud.firestore {
           && data.firstName.size() <= 50
           && optionalString(data, 'familyName', 50)
           && optionalString(data, 'cancerType', 100)
+          && optionalString(data, 'hospital', 100)
           && data.createdAt is timestamp;
     }
 
@@ -113,8 +115,32 @@ service cloud.firestore {
     function detailKeys() {
       return ['firstName', 'familyName', 'relationship', 'permissions'];
     }
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
     function invitePath(inviteCode) {
       return /databases/$(database)/documents/invites/$(inviteCode);
+    }
+    // How long an invite code can be used. Keep in sync with CareCircleInvite.VALIDITY.
+    function isUnexpired(invite) {
+      return request.time < invite.createdAt + duration.value(7, 'd');
+    }
+    // The unexpired invite for ownerUid's circle exists before this request, and the same request
+    // deletes it. `get` reads the database before the request and `existsAfter` as if it succeeded.
+    // A used invite no longer exists, so an invite code works once and can't be used again after
+    // the member is removed.
+    function redeemsInvite(inviteCode, ownerUid) {
+      let invite = get(invitePath(inviteCode)).data;
+      return invite.ownerUid == ownerUid
+          && isUnexpired(invite)
+          && !existsAfter(invitePath(inviteCode));
+    }
+    // The member doc repeats exactly what the patient decided on the invite.
+    function copiesInvite(member, invite) {
+      return member.firstName == invite.firstName
+          && member.get('familyName', null) == invite.get('familyName', null)
+          && member.relationship == invite.relationship
+          && member.permissions == invite.permissions;
     }
 
     match /users/{uid} {
@@ -164,10 +190,44 @@ service cloud.firestore {
 
       // ---------- Care circle ----------
       // /users/{uid}/circle/{memberUid}: the people the user shares their care with, keyed by the
-      // member's uid. Only the owner can read it. Writes stay denied until adding a member comes
-      // with their validation.
+      // member's uid. The owner and that member can read it. Only created by the member redeeming
+      // an invite, as a copy of it with their account email; then only the owner changes what
+      // they decided about the member (not the email, invite code or join time) or removes them.
       match /circle/{memberUid} {
+        allow read: if isOwner(uid) || isOwner(memberUid);
+        allow create: if isOwner(memberUid)
+                      && memberUid != uid
+                      && request.resource.data.keys().hasOnly(detailKeys().concat(
+                             ['email', 'inviteCode', 'addedAt']))
+                      && request.resource.data.get('email', null)
+                             == request.auth.token.get('email', null)
+                      && request.resource.data.addedAt == request.time
+                      && redeemsInvite(request.resource.data.inviteCode, uid)
+                      && copiesInvite(request.resource.data,
+                             get(invitePath(request.resource.data.inviteCode)).data);
+        allow update: if isOwner(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(detailKeys())
+                      && isValidCareCircleMemberDetails(request.resource.data);
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- Care circles joined ----------
+      // /users/{uid}/patients/{patientUid}: the circles this caregiver joined, created with the
+      // member doc when redeeming an invite. The patient deletes it when removing the caregiver:
+      // the only write a patient makes into another user's data, so no link to a circle the
+      // caregiver can no longer read is left behind.
+      match /patients/{patientUid} {
         allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && patientUid != uid
+                      && request.resource.data.keys().hasOnly(
+                             ['patientFirstName', 'inviteCode', 'joinedAt'])
+                      && request.resource.data.joinedAt == request.time
+                      && redeemsInvite(request.resource.data.inviteCode, patientUid)
+                      && request.resource.data.patientFirstName
+                             == get(invitePath(request.resource.data.inviteCode)).data.ownerFirstName;
+        allow delete: if isOwner(patientUid);
       }
 
       // Everything personal (entries, records, reminders...) goes under the user, in a collection
@@ -182,11 +242,15 @@ service cloud.firestore {
     }
 
     // ---------- Care circle invites ----------
-    // /invites/{inviteCode}: a pending care circle member. The invite code is the secret: anyone
-    // signed in can get one invite by its code, only the owner can list theirs. Keep the invite
-    // code format in sync with CareCircleInvite and the email limit with MAX_EMAIL_LENGTH.
+    // /invites/{inviteCode}: a pending care circle member, deleted once used. The invite code is
+    // the secret: anyone signed in can get a valid invite by its code, only the owner can list
+    // theirs. Unknown, used (deleted) and expired invite codes are all refused alike, so nobody but
+    // the owner learns that an invite code existed. Keep the invite code format in sync with
+    // CareCircleInvite and the email limit with MAX_EMAIL_LENGTH.
     match /invites/{inviteCode} {
-      allow get: if signedIn();
+      allow get: if signedIn()
+                 && resource != null
+                 && (isOwner(resource.data.ownerUid) || isUnexpired(resource.data));
       allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
       allow create: if signedIn()
                     && inviteCode.matches('^[A-HJKMNP-Z2-9]{10}$')
@@ -202,14 +266,24 @@ service cloud.firestore {
                     && request.resource.data.redeemerUid == null
                     && request.resource.data.createdAt == request.time
                     && isValidCareCircleMemberDetails(request.resource.data);
-      // The patient edits an invite that hasn't been used. Redeeming it comes with the join flow.
+      // The patient edits an invite that hasn't been used
       allow update: if isOwner(resource.data.ownerUid)
                     && resource.data.redeemerUid == null
                     && request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(detailKeys().concat(['email']))
                     && optionalString(request.resource.data, 'email', 254)
                     && isValidCareCircleMemberDetails(request.resource.data);
-      allow delete: if isOwner(resource.data.ownerUid);
+      allow delete: if
+          // The patient cancels it
+          isOwner(resource.data.ownerUid)
+          // A caregiver uses it up: before it expires, in the same request that creates their
+          // member doc (with this invite code) and their own link to the patient
+          || (signedIn()
+              && resource.data.ownerUid != request.auth.uid
+              && isUnexpired(resource.data)
+              && get(userPath(request.auth.uid)).data.role == 'CAREGIVER'
+              && getAfter(/databases/$(database)/documents/users/$(resource.data.ownerUid)/circle/$(request.auth.uid)).data.inviteCode == inviteCode
+              && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/patients/$(resource.data.ownerUid)));
     }
 
     // ---------- Everything else ----------

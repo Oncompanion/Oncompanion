@@ -57,7 +57,7 @@ class PlanningNavigationTest {
     compose.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     compose.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
     compose.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
     val heading = compose.onNodeWithTag(C.Tag.planning_heading).fetchSemanticsNode().boundsInRoot
     val bar = compose.onNodeWithTag(C.Tag.bottom_navigation_bar).fetchSemanticsNode().boundsInRoot
@@ -118,7 +118,7 @@ class PlanningNavigationTest {
     }
     compose.onNodeWithText("Frequency: Twice a day").assertIsDisplayed()
     compose.onNodeWithContentDescription("Medication", useUnmergedTree = true).assertExists()
-    compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
     val med =
         compose.onNodeWithTag(C.Tag.planningItem(medication.key)).fetchSemanticsNode().boundsInRoot
     val scheduled =

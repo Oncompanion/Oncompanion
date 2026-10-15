@@ -2,12 +2,15 @@
 
 package com.github.se.oncompanion.model.carecircle
 
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 
 /**
  * In-memory [CareCircleInviteRepository] for ViewModel and screen tests (no Firebase).
@@ -17,15 +20,35 @@ import kotlinx.coroutines.flow.map
  * invite (or null), and writes refuse invalid details or emails. New invites are stored with
  * `isSynced = true` (the server has them); call [setInvites] to test unsynced ones. Test hooks:
  * [setInvites] replaces every invite, [observeError], [createError], [updateError] and
- * [cancelError] make the matching calls fail, [created] records the invites created (including
- * renewed ones), and [nextInviteCode] picks the next invite code.
+ * [cancelError] make the matching calls fail, [failObservations] makes the running observations
+ * fail, [created] records the invites created (including renewed ones), and [nextInviteCode] picks
+ * the next invite code.
+ *
+ * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
+ * [joinedCircles]; [isOffline] makes it fail like without a connection. The caregiver's role isn't
+ * checked.
+ *
+ * @param circle when given, a successful [redeem] adds the member to it, so screens can watch a
+ *   pending invite turn into a member
  */
-class FakeCareCircleInviteRepository : CareCircleInviteRepository {
+class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepository? = null) :
+    CareCircleInviteRepository {
 
   private val invites = MutableStateFlow<Map<String, CareCircleInvite>>(emptyMap())
 
   /** When non-null, collecting [observePendingInvites] or [observeInvite] fails with it. */
   var observeError: Exception? = null
+
+  /** Errors sent to the observations running when [failObservations] is called. */
+  private val listenerFailures = MutableSharedFlow<Exception>(extraBufferCapacity = 1)
+
+  /**
+   * Makes every running [observePendingInvites] and [observeInvite] collection fail with [error],
+   * like a snapshot listener that fails after its first results. Later collections aren't affected.
+   */
+  fun failObservations(error: Exception) {
+    listenerFailures.tryEmit(error)
+  }
 
   /** When non-null, [createInvite] and [renewInvite] throw it. */
   var createError: Exception? = null
@@ -41,6 +64,14 @@ class FakeCareCircleInviteRepository : CareCircleInviteRepository {
 
   /** Returns the invite code of the next created invite; random ones by default. */
   var nextInviteCode: () -> String = { CareCircleInvite.generateInviteCode() }
+
+  /** When true, [redeem] returns [RedeemResult.Offline] and saves nothing. */
+  var isOffline = false
+
+  private val joined = mutableMapOf<String, List<JoinedCareCircle>>()
+
+  /** The circles [caregiverUid] joined with [redeem], in order. */
+  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> = joined[caregiverUid].orEmpty()
 
   /** The invite stored with [inviteCode], whatever its state, or null. */
   fun invite(inviteCode: String): CareCircleInvite? = invites.value[inviteCode]
@@ -73,11 +104,12 @@ class FakeCareCircleInviteRepository : CareCircleInviteRepository {
         .distinctUntilChanged()
   }
 
-  override fun observeInvite(inviteCode: String): Flow<CareCircleInvite?> = observed {
-    invites
-        .map { it[inviteCode]?.takeIf { invite -> invite.redeemerUid == null } }
-        .distinctUntilChanged()
-  }
+  override fun observeInvite(ownerUid: String, inviteCode: String): Flow<CareCircleInvite?> =
+      observed {
+        invites
+            .map { it[inviteCode]?.takeIf { invite -> invite.ownerUid == ownerUid } }
+            .distinctUntilChanged()
+      }
 
   override suspend fun updateInvite(
       inviteCode: String,
@@ -103,6 +135,47 @@ class FakeCareCircleInviteRepository : CareCircleInviteRepository {
     return store(expired.copy(inviteCode = nextInviteCode(), createdAt = null, redeemerUid = null))
   }
 
+  override suspend fun redeem(
+      inviteCode: String,
+      caregiverUid: String,
+      caregiverEmail: String?,
+  ): RedeemResult {
+    if (isOffline) return RedeemResult.Offline
+    val invite =
+        invites.value[CareCircleInvite.normalizeInviteCode(inviteCode)]?.takeIf {
+          it.ownerUid != caregiverUid && !it.isExpired(Instant.now())
+        } ?: return RedeemResult.InvalidOrUsed
+    val joinedBefore = joinedCircles(caregiverUid)
+    if (
+        joinedBefore.any { it.patientUid == invite.ownerUid } ||
+            circle?.members(invite.ownerUid)?.any { it.uid == caregiverUid } == true
+    ) {
+      return RedeemResult.AlreadyMember(invite.ownerFirstName)
+    }
+    // Like the Firestore transaction: the invite is used up, and the caregiver's index and the
+    // member are added together
+    val now = Instant.now()
+    invites.value -= invite.inviteCode
+    joined[caregiverUid] =
+        joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
+    circle?.let {
+      val details = invite.details
+      val member =
+          CareCircleMember(
+              uid = caregiverUid,
+              firstName = details.firstName,
+              familyName = details.familyName,
+              relationship = details.relationship,
+              permissions = details.permissions,
+              email = caregiverEmail,
+              addedAt = now,
+              inviteCode = invite.inviteCode,
+          )
+      it.setMembers(invite.ownerUid, it.members(invite.ownerUid) + member)
+    }
+    return RedeemResult.Joined(invite.ownerUid, invite.ownerFirstName)
+  }
+
   private fun store(invite: CareCircleInvite): CareCircleInvite {
     invites.value += invite.inviteCode to invite
     created += invite
@@ -116,6 +189,6 @@ class FakeCareCircleInviteRepository : CareCircleInviteRepository {
 
   private fun <T> observed(source: () -> Flow<T>): Flow<T> = flow {
     observeError?.let { throw it }
-    emitAll(source())
+    emitAll(merge(source(), listenerFailures.map { throw it }))
   }
 }
