@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -34,9 +35,9 @@ interface UserProfileRepository {
   suspend fun createProfile(profile: UserProfile)
 
   /**
-   * Updates the names and cancer type of an existing profile. The role and [UserProfile.createdAt]
-   * can't change after onboarding: [UserProfile.role] is ignored. Returns as soon as the change is
-   * saved on the device (also offline).
+   * Updates the names, cancer type and optional hospital of an existing profile. The role and
+   * [UserProfile.createdAt] can't change after onboarding: [UserProfile.role] is ignored. Returns
+   * as soon as the change is saved on the device (also offline).
    *
    * @throws IllegalArgumentException if the profile is not [UserProfile.isValid]
    */

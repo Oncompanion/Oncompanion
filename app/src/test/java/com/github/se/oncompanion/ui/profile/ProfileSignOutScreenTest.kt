@@ -24,7 +24,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ProfileSignOutScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-  private val loaded = ProfileUiState.Loaded(ProfileDetails("Alex", null, "Private", null, null))
+  private val loaded =
+      ProfileUiState.Loaded(ProfileDetails("Alex", null, "Private", null, null, hospital = null))
 
   private fun node(tag: String) = compose.onNodeWithTag(tag)
 

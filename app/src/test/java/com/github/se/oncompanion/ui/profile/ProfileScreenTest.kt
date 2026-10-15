@@ -1,13 +1,18 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
@@ -107,6 +112,7 @@ class ProfileScreenTest {
                 cancerType = "Breast cancer",
                 email = "alex@example.com",
                 memberSince = Instant.parse("2026-09-04T12:00:00Z"),
+                hospital = null,
             )
         )
     )
@@ -141,6 +147,7 @@ class ProfileScreenTest {
                 cancerType = null,
                 email = null,
                 memberSince = null,
+                hospital = null,
             )
         )
     )
@@ -151,6 +158,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_family_name).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.profile_email).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.profile_cancer_type).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.profile_hospital).assertDoesNotExist()
   }
 
   @Test
@@ -165,6 +173,7 @@ class ProfileScreenTest {
                   firstName = "Alex",
                   familyName = "Moreau",
                   cancerType = "Breast cancer",
+                  hospital = "Geneva Hospital",
               )
           )
         }
@@ -178,6 +187,8 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()
     composeTestRule.onNodeWithText("alex@example.com").assertIsDisplayed()
     composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("Geneva Hospital").assertIsDisplayed()
   }
 
   @Test
@@ -193,6 +204,7 @@ class ProfileScreenTest {
                   cancerType = null,
                   email = null,
                   memberSince = Instant.parse("2026-09-01T00:30:00Z"),
+                  hospital = null,
               )
           )
       )
@@ -220,7 +232,7 @@ class ProfileScreenTest {
     var edits = 0
     composeTestRule.setContent {
       ProfileContent(
-          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null)),
+          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null, hospital = null)),
           onBack = {},
           onRetry = {},
           onEdit = { edits++ },
@@ -231,5 +243,29 @@ class ProfileScreenTest {
     }
     composeTestRule.onNodeWithTag(C.Tag.profile_edit).performClick()
     composeTestRule.runOnIdle { assertEquals(1, edits) }
+  }
+
+  /** Hospital text is displayed only when nonblank, without placeholder patient data. */
+  @Test
+  fun hospitalShownOnlyWhenPresent() {
+    var hospital by mutableStateOf<String?>("Manual hospital")
+    composeTestRule.setContent {
+      ProfileContent(
+          ProfileUiState.Loaded(ProfileDetails("Alex", null, null, null, null, hospital)),
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("Manual hospital").assertIsDisplayed()
+    for (absent in listOf(null, "", "  ")) {
+      composeTestRule.runOnIdle { hospital = absent }
+      composeTestRule.onNodeWithTag(C.Tag.profile_hospital).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
+    }
   }
 }

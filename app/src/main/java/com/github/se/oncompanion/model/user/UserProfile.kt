@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.user
@@ -19,6 +20,7 @@ enum class Role {
  * @property firstName required, see [isValid]
  * @property familyName optional
  * @property cancerType optional free text (picked from suggestions or typed by the user)
+ * @property hospital optional hospital name, including manually entered text
  * @property createdAt set by the server when the profile is created; `null` before that
  */
 data class UserProfile(
@@ -28,6 +30,7 @@ data class UserProfile(
     val familyName: String? = null,
     val cancerType: String? = null,
     val createdAt: Instant? = null,
+    val hospital: String? = null,
 ) {
   /** Whether the profile satisfies the same constraints as the Firestore security rules. */
   fun isValid(): Boolean =
@@ -35,12 +38,15 @@ data class UserProfile(
           firstName.isNotBlank() &&
           firstName.length <= MAX_NAME_LENGTH &&
           (familyName == null || familyName.length <= MAX_NAME_LENGTH) &&
-          (cancerType == null || cancerType.length <= MAX_CANCER_TYPE_LENGTH)
+          (cancerType == null || cancerType.length <= MAX_CANCER_TYPE_LENGTH) &&
+          (hospital == null || hospital.length <= MAX_HOSPITAL_LENGTH)
 
   companion object {
     /** Keep in sync with `firestore.rules`. */
     const val MAX_NAME_LENGTH = 50
     /** Keep in sync with `firestore.rules`. */
     const val MAX_CANCER_TYPE_LENGTH = 100
+    /** Keep in sync with `firestore.rules`; hospital is optional. */
+    const val MAX_HOSPITAL_LENGTH = 100
   }
 }

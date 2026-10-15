@@ -1,3 +1,4 @@
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 <resources>
@@ -54,6 +55,7 @@
     <string name="edit_profile_save">Save</string>
     <string name="edit_profile_cancel">Cancel</string>
     <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
+    <string name="profile_hospital">Hospital</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>

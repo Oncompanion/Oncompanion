@@ -38,7 +38,7 @@ import com.github.se.oncompanion.resources.C
  * unmatched text. The form decides what to persist and clears selection on external text changes.
  * Supply a separate lifecycle scoped [viewModel] per field, using a stable repository instance to
  * retain cached results. Search feedback is cleared when the text changes, the field is disabled or
- * it leaves composition.
+ * it leaves composition. [searchEnabled] disables only search while preserving manual entry.
  */
 @Composable
 fun HospitalField(
@@ -48,10 +48,11 @@ fun HospitalField(
     onHospitalSelected: (Hospital?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    searchEnabled: Boolean = true,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // External form changes invalidate suggestions too, without triggering a new search.
-  LaunchedEffect(value, enabled, viewModel) { viewModel.clearSearch() }
+  LaunchedEffect(value, enabled, searchEnabled, viewModel) { viewModel.clearSearch() }
   DisposableEffect(viewModel) { onDispose { viewModel.clearSearch() } }
   HospitalFieldContent(
       value = value,
@@ -64,12 +65,14 @@ fun HospitalField(
       onSearch = { viewModel.search(value) },
       modifier = modifier,
       enabled = enabled,
+      searchEnabled = searchEnabled,
   )
 }
 
 /**
  * Stateless field and search feedback. Selection sends the name through [onValueChange], then the
  * complete object through [onHospitalSelected]; manual edits first send null to clear selection.
+ * [searchEnabled] can disable search independently of the editable text field.
  */
 @Composable
 fun HospitalFieldContent(
@@ -80,6 +83,7 @@ fun HospitalFieldContent(
     onHospitalSelected: (Hospital?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    searchEnabled: Boolean = true,
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedTextField(
@@ -95,13 +99,17 @@ fun HospitalFieldContent(
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.hospital_field),
     )
     Button(
-        onClick = onSearch,
-        enabled = enabled && value.isNotBlank() && uiState != HospitalFieldUiState.Loading,
+        onClick = { if (searchEnabled) onSearch() },
+        enabled =
+            enabled &&
+                searchEnabled &&
+                value.isNotBlank() &&
+                uiState != HospitalFieldUiState.Loading,
         modifier = Modifier.testTag(C.Tag.hospital_search),
     ) {
       Text(stringResource(R.string.hospital_search))
     }
-    if (enabled)
+    if (enabled && searchEnabled)
         HospitalSearchFeedback(uiState) { hospital ->
           onValueChange(hospital.name)
           onHospitalSelected(hospital)

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -298,6 +299,13 @@ private fun ProfileDetailsContent(
             label = stringResource(R.string.profile_email),
             value = email,
             testTag = C.Tag.profile_email,
+        )
+      }
+      details.hospital?.takeIf(String::isNotBlank)?.let { hospital ->
+        ProfileField(
+            label = stringResource(R.string.profile_hospital),
+            value = hospital,
+            testTag = C.Tag.profile_hospital,
         )
       }
       details.cancerType?.takeIf(String::isNotBlank)?.let { cancerType ->
