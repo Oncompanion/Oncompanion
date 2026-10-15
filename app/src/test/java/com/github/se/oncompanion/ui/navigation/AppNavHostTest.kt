@@ -28,6 +28,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
@@ -50,9 +51,16 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.*
+import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
+import com.github.se.oncompanion.model.symptom.SymptomEntry
+import com.github.se.oncompanion.model.symptom.SymptomRepository
+import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
@@ -60,6 +68,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -84,6 +93,7 @@ class AppNavHostTest {
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appMedicationRepository = MedicationRepositoryProvider.repository
+  private val appSymptomRepository = SymptomRepositoryProvider.repository
 
   @After
   fun restoreProviders() {
@@ -93,6 +103,7 @@ class AppNavHostTest {
     AuthRepositoryProvider.repository = appAuthRepository
     AppointmentRepositoryProvider.repository = appAppointmentRepository
     MedicationRepositoryProvider.repository = appMedicationRepository
+    SymptomRepositoryProvider.repository = appSymptomRepository
   }
 
   /** Shows the NavHost with these repositories in the providers its ViewModels read. */
@@ -103,12 +114,14 @@ class AppNavHostTest {
       eventRepository: EventRepository = FakeEventRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
+      symptomRepository: SymptomRepository = FakeSymptomRepository(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
     CareCircleRepositoryProvider.repository = careCircleRepository
     EventRepositoryProvider.repository = eventRepository
     AuthRepositoryProvider.repository = authRepository
     MedicationRepositoryProvider.repository = medicationRepository
+    SymptomRepositoryProvider.repository = symptomRepository
     composeTestRule.setContent {
       activity = checkNotNull(LocalActivity.current)
       navController =
@@ -524,6 +537,85 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+  }
+
+  /**
+   * Opens the journal from Overview as Alice, who has one symptom (`s1`), then deletes it from its
+   * detail. Returns the repository, which no longer holds it.
+   */
+  private fun deleteTheOnlySymptomFromTheJournal(): FakeSymptomRepository {
+    val symptoms =
+        FakeSymptomRepository().apply {
+          seed(
+              "alice",
+              SymptomEntry(
+                  id = "s1",
+                  types = listOf(SymptomType.FATIGUE),
+                  occurredAt = Instant.now().minus(Duration.ofHours(1)),
+              ),
+          )
+        }
+    val alice =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    setNavHost(Route.OVERVIEW, authRepository = alice, symptomRepository = symptoms)
+    openTheJournalFromOverview()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("s1")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).performClick()
+    // Back on the journal before doing anything else, as the user sees it
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.waitForIdle()
+    return symptoms
+  }
+
+  private fun openTheJournalFromOverview() {
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+  }
+
+  /** After going back from the journal, reopening it still doesn't show the deleted symptom. */
+  private fun assertTheDeletedSymptomStaysGone() {
+    assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+    openTheJournalFromOverview()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("s1")).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_empty).assertIsDisplayed()
+  }
+
+  @Test
+  fun deletedSymptom_returnsToTheJournalWithoutIt() {
+    val symptoms = deleteTheOnlySymptomFromTheJournal()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("s1")).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOMS, NavigationActions(navController).currentRoute())
+      assertTrue(symptoms.symptoms("alice").isEmpty())
+    }
+  }
+
+  @Test
+  fun deletedSymptom_staysGone_afterTheBackArrow() {
+    deleteTheOnlySymptomFromTheJournal()
+
+    // The detail of the deleted symptom is no longer behind the journal
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+
+    assertTheDeletedSymptomStaysGone()
+  }
+
+  @Test
+  fun deletedSymptom_staysGone_afterSystemBack() {
+    deleteTheOnlySymptomFromTheJournal()
+
+    Espresso.pressBack()
+
+    assertTheDeletedSymptomStaysGone()
   }
 
   @Test
