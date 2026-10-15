@@ -38,6 +38,14 @@
           }
         },
         {
+          "client_id": "782199763007-fdt37civ83v8mq61ruu9dna5cqlg7soc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.github.se.oncompanion",
+            "certificate_hash": "4e1be3e25fc0e4bd0d1409975bd68f6849d9208c"
+          }
+        },
+        {
           "client_id": "782199763007-fkqgkdvb948p2f3oni5md47jet5a271m.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
