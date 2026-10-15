@@ -5,20 +5,24 @@ package com.github.se.oncompanion.ui.overview
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
-import com.github.se.oncompanion.model.overview.FakeOverviewRepository
-import com.github.se.oncompanion.model.overview.NextAppointment
-import com.github.se.oncompanion.model.overview.OverviewRepository
-import com.github.se.oncompanion.model.overview.TodayItem
-import com.github.se.oncompanion.model.overview.TodayItemKind
+import com.github.se.oncompanion.model.planning.FakePlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,22 +36,47 @@ import org.robolectric.shadows.ShadowLooper
 @RunWith(AndroidJUnit4::class)
 class OverviewViewModelTest {
 
+  private val zone = ZoneOffset.UTC
+
+  /** Saturday 3 October 2026, 9:00. */
   private val now = LocalDateTime.of(2026, 10, 3, 9, 0)
 
-  private fun item(id: String, hour: Int, isTaken: Boolean = false) =
-      TodayItem(
-          id = id,
-          kind = TodayItemKind.MEDICATION,
-          time = now.withHour(hour),
-          title = "Item $id",
-          isTaken = isTaken,
+  /** A clock the tests can move forward. */
+  private class TestClock(var time: LocalDateTime) : Clock() {
+    override fun getZone(): ZoneId = ZoneOffset.UTC
+
+    override fun withZone(zone: ZoneId?): Clock = this
+
+    override fun instant(): Instant = time.toInstant(ZoneOffset.UTC)
+  }
+
+  private fun at(time: LocalDateTime): PlanningTiming = PlanningTiming.Timed(time.toInstant(zone))
+
+  private fun appointment(id: String, time: LocalDateTime, place: String? = null) =
+      PlanningItem(PlanningSource.Appointment(id), at(time), "Appointment $id", subtitle = place)
+
+  private fun event(id: String, time: LocalDateTime) =
+      PlanningItem(PlanningSource.Event(id), at(time), "Event $id", subtitle = "Place $id")
+
+  private fun medication(
+      id: String,
+      date: LocalDate = now.toLocalDate(),
+      frequency: String? = null,
+  ) =
+      PlanningItem(
+          PlanningSource.Medication("prescription", id),
+          PlanningTiming.DateOnly(date),
+          "Medication $id",
+          frequency = frequency,
       )
 
-  private fun event(id: String, start: LocalDateTime, end: LocalDateTime? = null) =
-      TodayItem(id = id, kind = TodayItemKind.EVENT, time = start, endTime = end, title = id)
+  private fun planning(vararg items: PlanningItem) =
+      FakePlanningRepository().apply { this.items.value = items.toList() }
+
+  private fun titlesOf(vm: OverviewViewModel) = vm.uiState.value.todayEntries.map { it.title }
 
   private fun statusesOf(vm: OverviewViewModel) =
-      vm.uiState.value.todayEntries.associate { it.item.id to it.status }
+      vm.uiState.value.todayEntries.associate { it.title to it.status }
 
   private fun signedIn(user: AuthUser) =
       FakeAuthRepository(onSignIn = { user }).also { runBlocking { it.signInWithGoogle("token") } }
@@ -55,8 +84,9 @@ class OverviewViewModelTest {
   private fun viewModel(
       auth: AuthRepository = FakeAuthRepository(),
       profiles: FakeUserProfileRepository = FakeUserProfileRepository(),
-      overview: OverviewRepository = FakeOverviewRepository(),
-  ) = OverviewViewModel(auth, profiles, overview, clock = { now })
+      planning: PlanningRepository = FakePlanningRepository(),
+      clock: Clock = TestClock(now),
+  ) = OverviewViewModel(auth, profiles, planning, clock, zone)
 
   // ----- First name -----
 
@@ -110,10 +140,10 @@ class OverviewViewModelTest {
     assertFalse(state.hasError)
   }
 
-  // ----- The day -----
+  // ----- Reading the planning data -----
 
   @Test
-  fun emptyRepository_givesAnEmptyLoadedDay() {
+  fun emptyPlanning_givesAnEmptyLoadedDay() {
     val state = viewModel().uiState.value
 
     assertFalse(state.isLoading)
@@ -123,62 +153,41 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun nextAppointment_isShown() {
-    val appointment = NextAppointment(title = "Check-up", dateTime = now.plusDays(1))
+  fun planningIsObserved_fromTodayForAYear_inTheGivenZone() {
+    val planning = FakePlanningRepository()
+    viewModel(planning = planning)
 
-    val state = viewModel(overview = FakeOverviewRepository(appointment)).uiState.value
-
-    assertEquals(appointment, state.nextAppointment)
+    val range = planning.ranges.single()
+    assertEquals(now.toLocalDate(), range.startDateInclusive)
+    assertEquals(now.toLocalDate().plusYears(1), range.endDateExclusive)
+    assertEquals(zone, range.zoneId)
   }
 
   @Test
-  fun todayItems_areSorted_andTheFirstNotDoneIsNext() {
-    val items = listOf(item("late", 18), item("taken", 8, isTaken = true), item("soon", 13))
+  fun nextAppointment_monthsAway_isStillFound() {
+    // Oncology check-ups are often months apart
+    val vm = viewModel(planning = planning(appointment("check-up", now.plusMonths(4))))
 
-    val entries =
-        viewModel(overview = FakeOverviewRepository(todayItems = items)).uiState.value.todayEntries
-
-    assertEquals(listOf("taken", "soon", "late"), entries.map { it.item.id })
     assertEquals(
-        listOf(TodayItemStatus.DONE, TodayItemStatus.NEXT, TodayItemStatus.LATER),
-        entries.map { it.status },
+        NextAppointment("Appointment check-up", now.plusMonths(4)),
+        vm.uiState.value.nextAppointment,
     )
+    assertTrue(vm.uiState.value.todayEntries.isEmpty())
   }
 
   @Test
-  fun whenEverythingIsDone_nothingIsNext() {
-    val items = listOf(item("a", 8, isTaken = true), item("b", 9, isTaken = true))
-
-    val entries =
-        viewModel(overview = FakeOverviewRepository(todayItems = items)).uiState.value.todayEntries
-
-    assertTrue(entries.all { it.status == TodayItemStatus.DONE })
-  }
-
-  @Test
-  fun newItems_updateTheState() {
-    val repository = FakeOverviewRepository()
-    val vm = viewModel(overview = repository)
-
-    repository.todayItems.value = listOf(item("a", 10))
-    ShadowLooper.idleMainLooper()
-
-    assertEquals(listOf("a"), vm.uiState.value.todayEntries.map { it.item.id })
-  }
-
-  @Test
-  fun stateIsLoading_untilTheRepositoryEmits() {
+  fun stateIsLoading_untilThePlanningEmits() {
     val release = CompletableDeferred<Unit>()
     val slow =
-        object : OverviewRepository {
-          override fun observeNextAppointment(): Flow<NextAppointment?> = flow {
-            release.await()
-            emit(null)
+        FakePlanningRepository().apply {
+          observation = {
+            flow {
+              release.await()
+              emit(emptyList())
+            }
           }
-
-          override fun observeTodayItems(): Flow<List<TodayItem>> = flowOf(emptyList())
         }
-    val vm = viewModel(overview = slow)
+    val vm = viewModel(planning = slow)
 
     assertTrue(vm.uiState.value.isLoading)
 
@@ -189,145 +198,187 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun failingRepository_givesAnError_andReloadRecovers() {
-    var observations = 0
-    val failingOnce =
-        object : OverviewRepository {
-          override fun observeNextAppointment(): Flow<NextAppointment?> = flow {
-            if (observations++ == 0) throw IllegalStateException("no network")
-            emit(null)
-          }
-
-          override fun observeTodayItems(): Flow<List<TodayItem>> = flowOf(listOf(item("a", 10)))
-        }
-    val vm = viewModel(overview = failingOnce)
+  fun failingPlanning_givesAnError_andReloadRecovers() {
+    val planning = planning(event("yoga", now.withHour(10))).apply { fail = true }
+    val vm = viewModel(planning = planning)
 
     assertTrue(vm.uiState.value.hasError)
     assertFalse(vm.uiState.value.isLoading)
 
+    planning.fail = false
     vm.loadDay()
 
     assertFalse(vm.uiState.value.hasError)
-    assertEquals(1, vm.uiState.value.todayEntries.size)
+    assertEquals(listOf("Event yoga"), titlesOf(vm))
   }
 
-  // ----- Status decided with the clock -----
+  @Test
+  fun planningChanges_updateTheState() {
+    val planning = FakePlanningRepository()
+    val vm = viewModel(planning = planning)
+
+    planning.items.value = listOf(event("yoga", now.withHour(10)))
+    ShadowLooper.idleMainLooper()
+
+    assertEquals(listOf("Event yoga"), titlesOf(vm))
+  }
+
+  // ----- Next appointment -----
 
   @Test
-  fun pastMedicationNotTaken_isNotTaken_andTheNextOneIsNext() {
-    val items = listOf(item("morning", 8), item("lunch", 13))
-
-    val vm = viewModel(overview = FakeOverviewRepository(todayItems = items))
+  fun nextAppointment_isTheFirstThatHasntStarted_withItsPlace() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    appointment("started", now.minusMinutes(30)),
+                    appointment("later", now.plusDays(3)),
+                    appointment("soon", now.plusDays(1), place = "HUG"),
+                    event("yoga", now.plusHours(2)),
+                )
+        )
 
     assertEquals(
-        mapOf("morning" to TodayItemStatus.NOT_TAKEN, "lunch" to TodayItemStatus.NEXT),
-        statusesOf(vm),
+        NextAppointment("Appointment soon", now.plusDays(1), "HUG"),
+        vm.uiState.value.nextAppointment,
     )
   }
 
   @Test
-  fun eventsAndAppointments_areNowWhileHappening_andDoneOnceOver() {
-    val items =
-        listOf(
-            event("ended", now.withHour(7), end = now.withHour(8)),
-            event("no-end-over", now.withHour(7).withMinute(30)),
-            event("in-progress", now.withHour(8), end = now.withHour(10)),
-            event("later", now.withHour(15)),
-            event("evening", now.withHour(18)),
+  fun eventsAndMedications_areNeverTheNextAppointment() {
+    val vm = viewModel(planning = planning(event("yoga", now.plusHours(2)), medication("m")))
+
+    assertNull(vm.uiState.value.nextAppointment)
+  }
+
+  @Test
+  fun nextAppointment_movesOn_onceItStarts() {
+    val clock = TestClock(now)
+    val vm =
+        viewModel(
+            planning =
+                planning(appointment("a", now.plusHours(1)), appointment("b", now.plusDays(1))),
+            clock = clock,
+        )
+    assertEquals("Appointment a", vm.uiState.value.nextAppointment?.title)
+
+    clock.time = now.plusHours(2)
+    vm.refreshNow()
+
+    assertEquals("Appointment b", vm.uiState.value.nextAppointment?.title)
+  }
+
+  // ----- Today -----
+
+  @Test
+  fun today_keepsOnlyTodaysEntries_untimedFirst_thenByTime() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    event("evening", now.withHour(18)),
+                    appointment("tomorrow", now.plusDays(1)),
+                    appointment("morning", now.withHour(10)),
+                    medication("today", frequency = "Twice a day"),
+                    medication("tomorrow", now.toLocalDate().plusDays(1)),
+                )
         )
 
-    val vm = viewModel(overview = FakeOverviewRepository(todayItems = items))
+    val entries = vm.uiState.value.todayEntries
+    assertEquals(
+        listOf("Medication today", "Appointment morning", "Event evening"),
+        entries.map { it.title },
+    )
+    assertEquals(listOf(null, LocalTime.of(10, 0), LocalTime.of(18, 0)), entries.map { it.time })
+    assertEquals(
+        listOf(TodayItemKind.MEDICATION, TodayItemKind.APPOINTMENT, TodayItemKind.EVENT),
+        entries.map { it.kind },
+    )
+  }
+
+  @Test
+  fun medication_showsItsFrequency_andNoStatus() {
+    val vm = viewModel(planning = planning(medication("m", frequency = "Twice a day")))
+
+    val entry = vm.uiState.value.todayEntries.single()
+    assertEquals("Twice a day", entry.subtitle)
+    // The app never decides whether a medication was taken
+    assertNull(entry.status)
+  }
+
+  @Test
+  fun timedEntries_areDoneNowNextOrLater_withTheClock() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    event("over", now.withHour(7)),
+                    appointment("now", now.minusMinutes(10)),
+                    event("next", now.withHour(15)),
+                    event("later", now.withHour(18)),
+                )
+        )
 
     assertEquals(
         mapOf(
-            "ended" to TodayItemStatus.DONE,
-            "no-end-over" to TodayItemStatus.DONE,
-            "in-progress" to TodayItemStatus.NOW,
-            "later" to TodayItemStatus.NEXT,
-            "evening" to TodayItemStatus.LATER,
+            "Event over" to TodayItemStatus.DONE,
+            "Appointment now" to TodayItemStatus.NOW,
+            "Event next" to TodayItemStatus.NEXT,
+            "Event later" to TodayItemStatus.LATER,
         ),
         statusesOf(vm),
     )
   }
 
   @Test
-  fun appointmentWithoutEnd_isNowForAnHour_thenDone() {
-    var time = now // 9:00
-    val chemo =
-        TodayItem(
-            id = "chemo",
-            kind = TodayItemKind.APPOINTMENT,
-            time = now.minusMinutes(10),
-            title = "Chemotherapy session",
-        )
+  fun anEntry_isNowForAnHour_thenDone() {
+    val clock = TestClock(now)
     val vm =
-        OverviewViewModel(
-            FakeAuthRepository(),
-            FakeUserProfileRepository(),
-            FakeOverviewRepository(todayItems = listOf(chemo, item("lunch", 13))),
-            clock = { time },
-        )
+        viewModel(planning = planning(appointment("chemo", now.minusMinutes(10))), clock = clock)
+    assertEquals(TodayItemStatus.NOW, statusesOf(vm)["Appointment chemo"])
 
-    // Started 10 minutes ago: still happening, and the medication after it is next
-    assertEquals(
-        mapOf("chemo" to TodayItemStatus.NOW, "lunch" to TodayItemStatus.NEXT),
-        statusesOf(vm),
-    )
-
-    time = now.plusMinutes(50) // an hour after it started
+    clock.time = now.plusMinutes(50) // an hour after it started
     vm.refreshNow()
 
-    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["chemo"])
+    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["Appointment chemo"])
+  }
+
+  @Test
+  fun whenEverythingIsOver_nothingIsNext() {
+    val vm =
+        viewModel(planning = planning(event("a", now.withHour(6)), event("b", now.withHour(7))))
+
+    assertTrue(vm.uiState.value.todayEntries.all { it.status == TodayItemStatus.DONE })
   }
 
   @Test
   fun refreshNow_updatesTheTime_andTheStatuses() {
-    var time = now
-    val vm =
-        OverviewViewModel(
-            FakeAuthRepository(),
-            FakeUserProfileRepository(),
-            FakeOverviewRepository(todayItems = listOf(item("lunch", 13))),
-            clock = { time },
-        )
-    assertEquals(TodayItemStatus.NEXT, statusesOf(vm)["lunch"])
+    val clock = TestClock(now)
+    val vm = viewModel(planning = planning(event("lunch", now.withHour(13))), clock = clock)
+    assertEquals(TodayItemStatus.NEXT, statusesOf(vm)["Event lunch"])
 
-    time = now.withHour(20)
+    clock.time = now.withHour(20)
     vm.refreshNow()
 
     assertEquals(now.withHour(20), vm.uiState.value.now)
-    assertEquals(TodayItemStatus.NOT_TAKEN, statusesOf(vm)["lunch"])
+    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["Event lunch"])
   }
 
   @Test
   fun refreshNow_reloadsTheDay_onlyWhenTheDateChanges() {
-    var time = now
-    var observations = 0
-    val counting =
-        object : OverviewRepository {
-          override fun observeNextAppointment(): Flow<NextAppointment?> = flowOf(null)
+    val clock = TestClock(now)
+    val planning = FakePlanningRepository()
+    val vm = viewModel(planning = planning, clock = clock)
+    assertEquals(1, planning.ranges.size)
 
-          override fun observeTodayItems(): Flow<List<TodayItem>> = flow {
-            observations++
-            emit(emptyList())
-          }
-        }
-    val vm =
-        OverviewViewModel(
-            FakeAuthRepository(),
-            FakeUserProfileRepository(),
-            counting,
-            clock = { time },
-        )
-    assertEquals(1, observations)
-
-    time = now.withHour(23)
+    clock.time = now.withHour(23)
     vm.refreshNow()
-    assertEquals(1, observations)
+    assertEquals(1, planning.ranges.size)
 
-    time = now.plusDays(1).withHour(7)
+    clock.time = now.plusDays(1).withHour(7)
     vm.refreshNow()
-    assertEquals(2, observations)
+    assertEquals(2, planning.ranges.size)
+    assertEquals(now.toLocalDate().plusDays(1), planning.ranges.last().startDateInclusive)
     assertEquals(now.plusDays(1).toLocalDate(), vm.uiState.value.now.toLocalDate())
   }
 }

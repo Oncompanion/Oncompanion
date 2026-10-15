@@ -30,18 +30,22 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.model.overview.FakeOverviewRepository
-import com.github.se.oncompanion.model.overview.NextAppointment
-import com.github.se.oncompanion.model.overview.OverviewSampleData
-import com.github.se.oncompanion.model.overview.TodayItem
-import com.github.se.oncompanion.model.overview.TodayItemKind
+import com.github.se.oncompanion.model.planning.FakePlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Tab
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -64,22 +68,22 @@ class OverviewScreenTest {
       NextAppointment(
           title = "Oncology check-up",
           dateTime = LocalDateTime.of(2026, 10, 4, 9, 30),
-          doctor = "Dr. Martin",
           place = "HUG, Oncology day unit",
       )
 
-  private fun entry(id: String, hour: Int, status: TodayItemStatus, kind: TodayItemKind) =
+  private fun entry(id: String, hour: Int?, status: TodayItemStatus?, kind: TodayItemKind) =
       TodayEntry(
-          TodayItem(
-              id = id,
-              kind = kind,
-              time = morning.withHour(hour),
-              title = "Title $id",
-              subtitle = "Subtitle $id",
-              isTaken = status == TodayItemStatus.DONE,
-          ),
-          status,
+          key = id,
+          kind = kind,
+          time = hour?.let { LocalTime.of(it, 0) },
+          title = "Title $id",
+          subtitle = "Subtitle $id",
+          status = status,
       )
+
+  /** A clock stopped at [time], in UTC like the ViewModel's zone in these tests. */
+  private fun clockAt(time: LocalDateTime) =
+      Clock.fixed(time.toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
   private val loaded = OverviewUiState(now = morning, isLoading = false)
 
@@ -110,14 +114,15 @@ class OverviewScreenTest {
   }
 
   private fun setOverviewScreen(
-      repository: FakeOverviewRepository = FakeOverviewRepository()
+      planning: FakePlanningRepository = FakePlanningRepository()
   ): RecordingNavigationActions {
     val viewModel =
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
             profileRepository = FakeUserProfileRepository(),
-            overviewRepository = repository,
-            clock = { morning },
+            planningRepository = planning,
+            clock = clockAt(morning),
+            zoneId = ZoneOffset.UTC,
         )
     lateinit var navigationActions: RecordingNavigationActions
     composeTestRule.setContent {
@@ -198,13 +203,12 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun nextAppointment_showsTitleDoctorDateAndPlace() {
+  fun nextAppointment_showsTitleDateAndPlace() {
     setContent(loaded.copy(nextAppointment = appointment))
 
     val card = C.Tag.overview_next_appointment
     composeTestRule.onNodeWithTag(card).assertIsDisplayed()
     assertTextInside("Oncology check-up", card)
-    assertTextInside("With Dr. Martin", card)
     assertTextInside("Tomorrow, Sun 4 Oct · 09:30", card)
     assertTextInside("HUG, Oncology day unit", card)
   }
@@ -223,7 +227,7 @@ class OverviewScreenTest {
   fun appointmentInSomeDays_showsOnlyItsDate() {
     setContent(
         loaded.copy(
-            nextAppointment = appointment.copy(dateTime = morning.plusDays(5), doctor = null)
+            nextAppointment = appointment.copy(dateTime = morning.plusDays(5), place = null)
         )
     )
     assertTextInside("Thu 8 Oct · 09:00", C.Tag.overview_next_appointment)
@@ -241,10 +245,10 @@ class OverviewScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.overview_today_list).assertIsDisplayed()
     entries.forEach { entry ->
-      val row = C.Tag.overviewTodayItem(entry.item.id)
+      val row = C.Tag.overviewTodayItem(entry.key)
       composeTestRule.onNodeWithTag(row).performScrollTo().assertIsDisplayed()
-      assertTextInside(entry.item.title, row)
-      assertTextInside(entry.item.subtitle!!, row)
+      assertTextInside(entry.title, row)
+      assertTextInside(entry.subtitle!!, row)
     }
     assertTextInside("08:00", C.Tag.overviewTodayItem("med"))
     composeTestRule
@@ -260,16 +264,38 @@ class OverviewScreenTest {
   // ----- Screen wired to the ViewModel and navigation -----
 
   @Test
-  fun screen_showsTheRepositoryData() {
-    setOverviewScreen(OverviewSampleData.repository(morning.toLocalDate()))
+  fun screen_showsThePlanningData() {
+    val yoga =
+        PlanningItem(
+            PlanningSource.Event("gentle-yoga"),
+            PlanningTiming.Timed(morning.withHour(10).toInstant(ZoneOffset.UTC)),
+            "Gentle yoga for patients",
+            subtitle = "Wellness center",
+        )
+    val checkUp =
+        PlanningItem(
+            PlanningSource.Appointment("check-up"),
+            PlanningTiming.Timed(appointment.dateTime.toInstant(ZoneOffset.UTC)),
+            appointment.title,
+            subtitle = appointment.place,
+        )
+    setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(yoga, checkUp) })
 
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem("gentle-yoga")).assertExists()
+    assertTextInside("Oncology check-up", C.Tag.overview_next_appointment)
+    composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem(yoga.key)).assertExists()
   }
 
   @Test
   fun appointmentCard_andSeePlanning_openPlanning() {
-    val navigationActions = setOverviewScreen(FakeOverviewRepository(appointment))
+    val checkUp =
+        PlanningItem(
+            PlanningSource.Appointment("check-up"),
+            PlanningTiming.Timed(appointment.dateTime.toInstant(ZoneOffset.UTC)),
+            appointment.title,
+        )
+    val navigationActions =
+        setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(checkUp) })
 
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
     composeTestRule.onNodeWithTag(C.Tag.overview_see_planning).performScrollTo().performClick()
@@ -335,25 +361,40 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun notTakenMedication_showsANeutralChip() {
+  fun medicationWithoutTime_showsNoSetTime_andNoStatus() {
     setContent(
-        loaded.copy(
-            todayEntries =
-                listOf(entry("med", 8, TodayItemStatus.NOT_TAKEN, TodayItemKind.MEDICATION))
-        )
+        loaded.copy(todayEntries = listOf(entry("med", null, null, TodayItemKind.MEDICATION)))
     )
-    assertTextInside(context.getString(R.string.overview_not_taken), C.Tag.overviewTodayItem("med"))
+    val row = C.Tag.overviewTodayItem("med")
+    assertTextInside(context.getString(R.string.overview_no_set_time), row)
+    listOf(R.string.overview_next, R.string.overview_now).forEach {
+      composeTestRule
+          .onNode(
+              hasText(context.getString(it)) and hasAnyAncestor(hasTestTag(row)),
+              useUnmergedTree = true,
+          )
+          .assertDoesNotExist()
+    }
   }
 
   @Test
   fun screen_refreshesTheTime_whenItComesBack() {
     var time = morning
+    val clock =
+        object : Clock() {
+          override fun getZone(): ZoneId = ZoneOffset.UTC
+
+          override fun withZone(zone: ZoneId?): Clock = this
+
+          override fun instant(): Instant = time.toInstant(ZoneOffset.UTC)
+        }
     val viewModel =
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
             profileRepository = FakeUserProfileRepository(),
-            overviewRepository = FakeOverviewRepository(),
-            clock = { time },
+            planningRepository = FakePlanningRepository(),
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
         )
     // Hours later, the user comes back to the Overview
     time = morning.withHour(20)

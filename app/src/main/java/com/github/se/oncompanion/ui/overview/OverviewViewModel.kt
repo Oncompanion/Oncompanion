@@ -5,52 +5,89 @@ package com.github.se.oncompanion.ui.overview
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
-import com.github.se.oncompanion.model.overview.NextAppointment
-import com.github.se.oncompanion.model.overview.OverviewRepository
-import com.github.se.oncompanion.model.overview.OverviewRepositoryProvider
-import com.github.se.oncompanion.model.overview.TodayItem
-import com.github.se.oncompanion.model.overview.TodayItemKind
+import com.github.se.oncompanion.model.planning.PlanningItem
+import com.github.se.oncompanion.model.planning.PlanningRange
+import com.github.se.oncompanion.model.planning.PlanningRepository
+import com.github.se.oncompanion.model.planning.PlanningSource
+import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
+import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.Period
+import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Where a [TodayItem] stands in the day, at the current time. */
+/** What a [TodayEntry] is, which decides its icon. */
+enum class TodayItemKind {
+  MEDICATION,
+  EVENT,
+  APPOINTMENT,
+}
+
+/** Where a timed [TodayEntry] stands in the day, at the current time. */
 enum class TodayItemStatus {
-  /** A medication the user took, or an event or appointment that is over. */
+  /** An event or appointment that is over. */
   DONE,
-  /** A medication whose time has passed without the user confirming the intake. */
-  NOT_TAKEN,
   /** An event or appointment happening right now. */
   NOW,
-  /** The first item still to come. */
+  /** The first timed entry still to come. */
   NEXT,
   /** Planned after the next one. */
   LATER,
 }
 
-/** A [TodayItem] with its [status] in the day. */
-data class TodayEntry(val item: TodayItem, val status: TodayItemStatus)
+/**
+ * The user's next appointment, as shown on the Overview.
+ *
+ * @property title what the appointment is (e.g. "Oncology check-up")
+ * @property dateTime when it starts, in the phone's time zone
+ * @property place where it takes place, if the user entered it
+ */
+data class NextAppointment(
+    val title: String,
+    val dateTime: LocalDateTime,
+    val place: String? = null,
+)
+
+/**
+ * One entry of the Overview's "Today" list, taken from the planning data.
+ *
+ * @property key identifies the entry, the same as in Planning
+ * @property time when it starts, or `null` for an entry with a date but no time (a medication)
+ * @property subtitle a short detail line (place, recorded frequency...), if any
+ * @property status where a timed entry stands now; `null` for an entry without a time, since the
+ *   app never decides whether a medication was taken
+ */
+data class TodayEntry(
+    val key: String,
+    val kind: TodayItemKind,
+    val time: LocalTime?,
+    val title: String,
+    val subtitle: String? = null,
+    val status: TodayItemStatus? = null,
+)
 
 /**
  * What the Overview shows.
  *
- * @property now the current time, for the greeting, today's date and the items' status
+ * @property now the current time, for the greeting, today's date and the entries' status
  * @property firstName the user's first name, or `null` for a greeting without a name
- * @property todayEntries today's items, in time order
- * @property isLoading true until the appointment and today's items arrive
- * @property hasError true if they couldn't be loaded
+ * @property todayEntries today's entries: those without a time first, then by time
+ * @property isLoading true until the planning data arrives
+ * @property hasError true if it couldn't be loaded
  */
 data class OverviewUiState(
     val now: LocalDateTime,
@@ -63,70 +100,133 @@ data class OverviewUiState(
 
 /**
  * Loads the user's day for the Overview (US-23): their first name, their next appointment and
- * today's items.
+ * today's entries. The appointment and the entries come from the same planning data as the Planning
+ * screen, so both always agree.
  *
  * @param clock the current time
+ * @param zoneId the time zone the day is shown in
  */
 class OverviewViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
-    private val overviewRepository: OverviewRepository = OverviewRepositoryProvider.repository,
-    private val clock: () -> LocalDateTime = LocalDateTime::now,
+    private val planningRepository: PlanningRepository = PlanningRepositoryProvider.repository,
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
 
-  private val _uiState = MutableStateFlow(OverviewUiState(now = clock()))
+  private val _uiState = MutableStateFlow(OverviewUiState(now = now()))
   val uiState: StateFlow<OverviewUiState> = _uiState.asStateFlow()
 
   private var dayObservation: Job? = null
 
-  /** Today's items as the repository gave them; their status depends on [OverviewUiState.now]. */
-  private var todayItems: List<TodayItem> = emptyList()
+  /** The planning entries as the repository gave them; what they show depends on the time. */
+  private var items: List<PlanningItem> = emptyList()
 
   init {
     loadFirstName()
     loadDay()
   }
 
-  /** Starts (or, after an error, restarts) observing the next appointment and today's items. */
+  /**
+   * Starts (or, after an error, restarts) observing the planning data from today to [LOOKAHEAD]
+   * later, so the next appointment is found even months ahead, as between two oncology check-ups.
+   */
   fun loadDay() {
     dayObservation?.cancel()
-    _uiState.update { it.copy(now = clock(), isLoading = true, hasError = false) }
+    val now = now()
+    _uiState.update { it.copy(now = now, isLoading = true, hasError = false) }
+    val today = now.toLocalDate()
+    val range = PlanningRange(today, today.plus(LOOKAHEAD), zoneId)
     dayObservation = viewModelScope.launch {
-      combine(
-              overviewRepository.observeNextAppointment(),
-              overviewRepository.observeTodayItems(),
-          ) { appointment, items ->
-            appointment to items
-          }
+      planningRepository
+          .observeItems(range)
           .catch { e ->
             Log.e(TAG, "Failed to load the day", e)
             _uiState.update { it.copy(isLoading = false, hasError = true) }
           }
-          .collect { (appointment, items) ->
-            todayItems = items
-            _uiState.update {
-              it.copy(
-                  nextAppointment = appointment,
-                  todayEntries = entriesOf(items, it.now),
-                  isLoading = false,
-                  hasError = false,
-              )
+          .collect { planned ->
+            items = planned
+            _uiState.update { state ->
+              state.copy(isLoading = false, hasError = false).withItems(planned, state.now)
             }
           }
     }
   }
 
   /**
-   * Updates the time, so the greeting, the date and the items' status stay right while the
-   * ViewModel lives (the screen calls it each time it comes back). On a new day, it also reloads
-   * the day, so the repository can give the new day's items.
+   * Updates the time, so the greeting, the date, the next appointment and the entries' status stay
+   * right while the ViewModel lives (the screen calls it each time it comes back). On a new day, it
+   * also reloads the planning data from the new day.
    */
   fun refreshNow() {
-    val now = clock()
+    val now = now()
     val newDay = now.toLocalDate() != _uiState.value.now.toLocalDate()
-    _uiState.update { it.copy(now = now, todayEntries = entriesOf(todayItems, now)) }
+    _uiState.update { it.copy(now = now).withItems(items, now) }
     if (newDay) loadDay()
   }
+
+  private fun now(): LocalDateTime = LocalDateTime.ofInstant(clock.instant(), zoneId)
+
+  /** The next appointment and today's entries from [planned], at [now]. */
+  private fun OverviewUiState.withItems(planned: List<PlanningItem>, now: LocalDateTime) =
+      copy(
+          nextAppointment = nextAppointmentOf(planned, now),
+          todayEntries = entriesOf(planned, now),
+      )
+
+  /** The first appointment that hasn't started yet. */
+  private fun nextAppointmentOf(planned: List<PlanningItem>, now: LocalDateTime): NextAppointment? =
+      planned
+          .filter { it.source is PlanningSource.Appointment }
+          .mapNotNull { item -> item.startIn()?.let { item to it } }
+          .filter { (_, start) -> start.isAfter(now) }
+          .minByOrNull { (_, start) -> start }
+          ?.let { (item, start) -> NextAppointment(item.title, start, item.subtitle) }
+
+  /**
+   * Today's entries: those without a time first, as in Planning, then the timed ones by time. A
+   * timed entry is happening from its start until [DEFAULT_DURATION] later (the planning data has
+   * no end time), then it's done; the first one still to come is the next.
+   */
+  private fun entriesOf(planned: List<PlanningItem>, now: LocalDateTime): List<TodayEntry> {
+    val today = now.toLocalDate()
+    val ofToday = planned.filter { it.timing.dateIn(zoneId) == today }
+    val untimed = ofToday.filter { it.timing is PlanningTiming.DateOnly }
+    val timed =
+        ofToday.mapNotNull { item -> item.startIn()?.let { item to it } }.sortedBy { it.second }
+    val next = timed.firstOrNull { (_, start) -> start.isAfter(now) }?.first
+    return untimed.map { it.toEntry(time = null, status = null) } +
+        timed.map { (item, start) ->
+          val status =
+              when {
+                !start.plus(DEFAULT_DURATION).isAfter(now) -> TodayItemStatus.DONE
+                !start.isAfter(now) -> TodayItemStatus.NOW
+                item == next -> TodayItemStatus.NEXT
+                else -> TodayItemStatus.LATER
+              }
+          item.toEntry(time = start.toLocalTime(), status = status)
+        }
+  }
+
+  /** When a timed entry starts, in [zoneId]; `null` for an entry without a time. */
+  private fun PlanningItem.startIn(): LocalDateTime? =
+      (timing as? PlanningTiming.Timed)?.let { LocalDateTime.ofInstant(it.instant, zoneId) }
+
+  private fun PlanningItem.toEntry(time: LocalTime?, status: TodayItemStatus?) =
+      TodayEntry(
+          key = key,
+          kind =
+              when (source) {
+                is PlanningSource.Medication -> TodayItemKind.MEDICATION
+                is PlanningSource.Event -> TodayItemKind.EVENT
+                is PlanningSource.Appointment -> TodayItemKind.APPOINTMENT
+              },
+          time = time,
+          title = title,
+          // A medication's detail is its recorded frequency, as in Planning
+          subtitle = subtitle ?: frequency,
+          status = status,
+      )
 
   /**
    * Shows the first name from the user's profile, or else from their Google account. The greeting
@@ -155,38 +255,15 @@ class OverviewViewModel(
     }
   }
 
-  /**
-   * Decides each item's status at [now]: a medication is done once taken; an event or an
-   * appointment is happening from its start until its end (or [DEFAULT_DURATION] after its start
-   * when its end isn't known), then it's done.
-   */
-  private fun entriesOf(items: List<TodayItem>, now: LocalDateTime): List<TodayEntry> {
-    val sorted = items.sortedBy { it.time }
-    fun statusWithoutNext(item: TodayItem): TodayItemStatus? =
-        when {
-          item.kind == TodayItemKind.MEDICATION && item.isTaken -> TodayItemStatus.DONE
-          item.kind == TodayItemKind.MEDICATION && item.time.isBefore(now) ->
-              TodayItemStatus.NOT_TAKEN
-          item.kind == TodayItemKind.MEDICATION -> null
-          !(item.endTime ?: item.time.plus(DEFAULT_DURATION)).isAfter(now) -> TodayItemStatus.DONE
-          !item.time.isAfter(now) -> TodayItemStatus.NOW
-          else -> null
-        }
-    val next = sorted.firstOrNull { statusWithoutNext(it) == null }
-    return sorted.map { item ->
-      val status =
-          statusWithoutNext(item)
-              ?: if (item == next) TodayItemStatus.NEXT else TodayItemStatus.LATER
-      TodayEntry(item, status)
-    }
-  }
-
   private companion object {
     const val TAG = "OverviewViewModel"
 
+    /** How far ahead the next appointment is looked for. */
+    val LOOKAHEAD: Period = Period.ofYears(1)
+
     /**
-     * How long an event or appointment counts as happening when its end isn't known (the planning
-     * data only has start times), so it isn't ticked as done the minute it starts.
+     * How long an event or appointment counts as happening (the planning data only has start
+     * times), so it isn't ticked as done the minute it starts.
      */
     val DEFAULT_DURATION: Duration = Duration.ofHours(1)
   }
