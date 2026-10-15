@@ -27,8 +27,23 @@ android {
     vectorDrawables { useSupportLibrary = true }
   }
 
+  // Release key, given by CI from GitHub secrets. Without it the release build stays unsigned
+  // (local builds, PRs from forks). Its SHA-1 is registered in Firebase for Google Sign-In.
+  val releaseKeystore = System.getenv("RELEASE_KEYSTORE_PATH")
+  signingConfigs {
+    if (releaseKeystore != null) {
+      create("release") {
+        storeFile = file(releaseKeystore)
+        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+        keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+      }
+    }
+  }
+
   buildTypes {
     release {
+      signingConfig = signingConfigs.findByName("release")
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(
