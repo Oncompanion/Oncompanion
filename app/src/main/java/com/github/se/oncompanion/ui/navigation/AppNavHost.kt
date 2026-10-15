@@ -25,6 +25,8 @@ import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.carecircle.CareCircleMemberFormScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleMemberFormViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
@@ -251,6 +253,14 @@ fun AppNavHost(
             navigationActions = navigationActions,
             // The SavedStateHandle holds the route's member uid
             viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
+        )
+      }
+      composable(Screen.CARE_CIRCLE_ADD) {
+        CareCircleMemberFormScreen(
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the list, where the person is shown as waiting to join
+            onSaved = { navigationActions.goBack() },
+            viewModel = viewModel { CareCircleMemberFormViewModel() },
         )
       }
     }

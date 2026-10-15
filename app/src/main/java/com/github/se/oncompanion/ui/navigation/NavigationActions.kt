@@ -80,6 +80,9 @@ object Screen {
   /** The [CARE_CIRCLE_MEMBER] screen of [memberUid]. Firebase uids are safe in a route. */
   fun careCircleMember(memberUid: String) = "care_circle_member/$memberUid"
 
+  /** The form adding someone to the circle. */
+  const val CARE_CIRCLE_ADD = "care_circle_add"
+
   // Route.PROFILE
   const val PROFILE = "profile_home"
   const val EDIT_PROFILE = "edit_profile"
