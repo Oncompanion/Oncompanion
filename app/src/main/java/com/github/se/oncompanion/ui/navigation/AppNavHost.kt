@@ -64,6 +64,9 @@ import java.time.LocalDate
  *
  * The ViewModels take their repositories from the providers; tests put fakes there to check the
  * screens together, e.g. that a route's argument reaches its ViewModel.
+ *
+ * @param credentialProvider gets the Google ID token, for signing in and out; end-to-end tests pass
+ *   one that signs in against the Auth emulator, as Google's account picker can't be driven
  */
 @Composable
 fun AppNavHost(
@@ -77,6 +80,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
       composable(Screen.SIGN_IN) {
         SignInScreen(
+            credentialProvider = credentialProvider,
             onSignedIn = { next ->
               navigationActions.navigateAndClearBackStack(
                   when (next) {
@@ -84,7 +88,7 @@ fun AppNavHost(
                     AfterSignIn.OVERVIEW -> Route.OVERVIEW
                   }
               )
-            }
+            },
         )
       }
     }
