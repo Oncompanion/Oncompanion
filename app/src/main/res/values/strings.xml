@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
 <resources>
     <string name="app_name">oncompanion</string>
@@ -203,6 +204,12 @@
     <string name="care_circle_access_and">%1$s &amp; %2$s</string>
     <!-- Temporary message until the add member screen exists -->
     <string name="care_circle_add_member_not_implemented">Adding members isn\'t available yet. This will let you add someone and choose what they can see.</string>
+    <!-- Invitations not used yet -->
+    <string name="care_circle_pending_count">Waiting to join (%1$d)</string>
+    <string name="care_circle_invite_pending">Invitation pending</string>
+    <string name="care_circle_invite_expired">Invitation expired</string>
+    <string name="care_circle_invite_not_synced">Waiting to sync</string>
+    <string name="care_circle_pending_label">Pending</string>
 
     <string name="permission_planning">Planning</string>
     <string name="permission_events">Events</string>

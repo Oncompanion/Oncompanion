@@ -4,13 +4,16 @@ package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,8 +24,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
@@ -65,6 +71,38 @@ class CareCircleScreenTest {
           familyName = "Petit",
           relationship = Relationship.HOME_NURSE,
           permissions = setOf(CarePermission.SYMPTOMS, CarePermission.PLANNING),
+      )
+
+  private val julie =
+      CareCircleInvite(
+          inviteCode = "JJJJJ23456",
+          ownerUid = "owner",
+          ownerFirstName = "Anne",
+          details =
+              CareCircleMemberDetails(
+                  firstName = "Julie",
+                  familyName = "Martin",
+                  relationship = Relationship.DAUGHTER,
+                  permissions = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+              ),
+      )
+  private val bruno =
+      CareCircleInvite(
+          inviteCode = "BBBBB23456",
+          ownerUid = "owner",
+          ownerFirstName = "Anne",
+          details =
+              CareCircleMemberDetails(firstName = "Bruno", relationship = Relationship.FRIEND),
+      )
+
+  /** The circle with [joined] members and [pending] invitations that haven't expired. */
+  private fun circle(
+      joined: List<CareCircleMember> = emptyList(),
+      pending: List<CareCircleInvite> = emptyList(),
+  ) =
+      CareCircleUiState.CareCircleMembers(
+          joined = joined.map { CareCircleEntry.Joined(it) },
+          pending = pending.map { CareCircleEntry.Pending(it, expired = false) },
       )
 
   /** Records the clicks of [CareCircleContent]. */
@@ -166,7 +204,7 @@ class CareCircleScreenTest {
 
   @Test
   fun members_showsIntroCountAndEveryMember() {
-    setContent(CareCircleUiState.Members(listOf(laura, marc, sophie)))
+    setContent(circle(listOf(laura, marc, sophie)))
     composeTestRule.onNodeWithText(string(R.string.care_circle_intro)).assertIsDisplayed()
     composeTestRule
         .onNode(
@@ -182,11 +220,13 @@ class CareCircleScreenTest {
       composeTestRule.onNodeWithText(member.fullName).assertIsDisplayed()
     }
     composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertDoesNotExist()
+    // Nobody is waiting to join, so there is no pending section
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
   }
 
   @Test
   fun members_showRelationshipAndAccessSummary_likeTheMockup() {
-    setContent(CareCircleUiState.Members(listOf(laura, marc, sophie)))
+    setContent(circle(listOf(laura, marc, sophie)))
     composeTestRule.onNodeWithText("Wife · Full access").assertIsDisplayed()
     composeTestRule.onNodeWithText("Son · Planning & events").assertIsDisplayed()
     composeTestRule.onNodeWithText("Home nurse · Planning & symptoms").assertIsDisplayed()
@@ -194,20 +234,20 @@ class CareCircleScreenTest {
 
   @Test
   fun members_showTheirInitial() {
-    setContent(CareCircleUiState.Members(listOf(sophie)))
+    setContent(circle(listOf(sophie)))
     composeTestRule.onNodeWithText("S").assertIsDisplayed()
   }
 
   @Test
   fun clickingAMember_reportsIt() {
-    val events = setContent(CareCircleUiState.Members(listOf(marc, sophie)))
+    val events = setContent(circle(listOf(marc, sophie)))
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).performClick()
     composeTestRule.runOnIdle { assertEquals(listOf(sophie), events.memberClicks) }
   }
 
   @Test
   fun members_fabAddsAMember() {
-    val events = setContent(CareCircleUiState.Members(listOf(sophie)))
+    val events = setContent(circle(listOf(sophie)))
     // The FAB clears its label's semantics, so the label is only in the unmerged tree
     composeTestRule
         .onNode(
@@ -227,11 +267,104 @@ class CareCircleScreenTest {
   fun longCircle_lastMemberCanBeScrolledTo() {
     val members =
         (1..20).map { CareCircleMember(uid = "m$it", firstName = "Member", familyName = "$it") }
-    setContent(CareCircleUiState.Members(members))
+    setContent(circle(members))
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_member_list)
         .performScrollToNode(hasTestTag(C.Tag.careCircleMember("m20")))
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember("m20")).assertIsDisplayed()
+  }
+
+  // ---- pending invitations ----
+
+  @Test
+  fun membersAndInvites_areShownInTwoSections_andTheMembersCountExcludesInvites() {
+    setContent(circle(joined = listOf(marc, sophie), pending = listOf(bruno, julie)))
+    composeTestRule
+        .onNode(
+            hasTestTag(C.Tag.care_circle_members_count) and
+                hasText(string(R.string.care_circle_members_count, 2))
+        )
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_member_list)
+        .performScrollToNode(hasTestTag(C.Tag.careCircleInvite(julie.inviteCode)))
+    composeTestRule
+        .onNode(
+            hasTestTag(C.Tag.care_circle_pending_section) and
+                hasText(string(R.string.care_circle_pending_count, 2))
+        )
+        .assertIsDisplayed()
+    listOf(bruno, julie).forEach { invite ->
+      composeTestRule.onNodeWithTag(C.Tag.careCircleInvite(invite.inviteCode)).assertIsDisplayed()
+      composeTestRule.onNodeWithText(invite.details.fullName).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun invitesOnly_showOnlyThePendingSection() {
+    setContent(circle(pending = listOf(julie)))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_members_count).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite(julie.inviteCode)).assertIsDisplayed()
+    // Someone was invited, so the circle isn't empty: adding more goes through the FAB
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).assertIsDisplayed()
+  }
+
+  @Test
+  fun pendingInvite_saysItIsPending_withWhatThePersonWillSee() {
+    setContent(circle(pending = listOf(julie)))
+    composeTestRule.onNodeWithText("Invitation pending · Planning & symptoms").assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasTestTag(C.Tag.care_circle_pending_label) and
+                hasAnyAncestor(hasTestTag(C.Tag.careCircleInvite(julie.inviteCode))),
+            // The row merges its children, so the label is only in the unmerged tree
+            useUnmergedTree = true,
+        )
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_pending_label)).assertIsDisplayed()
+    composeTestRule.onNodeWithText("J").assertIsDisplayed()
+  }
+
+  @Test
+  fun expiredInvite_saysItExpired() {
+    setContent(
+        CareCircleUiState.CareCircleMembers(
+            joined = emptyList(),
+            pending = listOf(CareCircleEntry.Pending(julie, expired = true)),
+        )
+    )
+    composeTestRule.onNodeWithText(string(R.string.care_circle_invite_expired)).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Invitation pending", substring = true).assertDoesNotExist()
+  }
+
+  @Test
+  fun inviteNotOnTheServerYet_saysWaitingToSync() {
+    setContent(circle(pending = listOf(julie.copy(createdAt = null, isSynced = false))))
+    composeTestRule
+        .onNodeWithText(string(R.string.care_circle_invite_not_synced))
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithText("Invitation pending", substring = true).assertDoesNotExist()
+  }
+
+  @Test
+  fun everyInvite_hasAPendingLabel() {
+    setContent(circle(pending = listOf(bruno, julie)))
+    composeTestRule
+        .onAllNodesWithTag(C.Tag.care_circle_pending_label, useUnmergedTree = true)
+        .assertCountEquals(2)
+  }
+
+  @Test
+  fun onlyMembersAreClickable_notInvites() {
+    val events = setContent(circle(joined = listOf(sophie), pending = listOf(julie)))
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).assertHasClickAction()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleInvite(julie.inviteCode))
+        .assertHasNoClickAction()
+        .performClick()
+    composeTestRule.runOnIdle { assertEquals(emptyList<CareCircleMember>(), events.memberClicks) }
   }
 
   // ---- access summary and labels ----
@@ -279,12 +412,17 @@ class CareCircleScreenTest {
     }
   }
 
-  private fun setScreen(members: List<CareCircleMember>): RecordingNavigationActions {
+  private fun setScreen(
+      members: List<CareCircleMember>,
+      invites: List<CareCircleInvite> = emptyList(),
+  ): RecordingNavigationActions {
     val repository = FakeCareCircleRepository()
+    val inviteRepository = FakeCareCircleInviteRepository()
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }
     repository.setMembers("owner", members)
-    val viewModel = CareCircleViewModel(repository, auth)
+    inviteRepository.setInvites(invites)
+    val viewModel = CareCircleViewModel(repository, inviteRepository, auth)
     lateinit var navigationActions: RecordingNavigationActions
     composeTestRule.setContent {
       navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
@@ -299,6 +437,19 @@ class CareCircleScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_back_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, navigationActions.backCalls) }
+  }
+
+  @Test
+  fun screen_showsTheViewModelsInvitesAsPending() {
+    setScreen(listOf(sophie), invites = listOf(julie))
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite(julie.inviteCode)).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.care_circle_members_count, 1))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.care_circle_pending_count, 1))
+        .assertIsDisplayed()
   }
 
   @Test
