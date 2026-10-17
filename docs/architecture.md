@@ -33,7 +33,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
   - Repositories are injected through the existing screen/ViewModel boundary. Tests and previews can supply mixed entries; production supplies appointments through `AppointmentPlanningSource`. No new collection, layer or dependency is introduced by the mixed-entry contract.
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
 
-**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
+**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. The patient's confirmations that they registered for an event with its organizer (US-25) are in `EventRegistrationRepository`: one document per event, keyed by the event's id, so confirming twice never creates a duplicate. Oncompanion only records what the patient says; registering stays on the organizer's website, linked from the event's `websiteUrl`. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
 
 ## External hospital search (issue #142)
 
@@ -251,6 +251,7 @@ Firestore disk persistence is retained, including pending offline writes. Signin
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /users/{uid}/patients/{patientUid}    circles this caregiver joined
+/users/{uid}/eventRegistrations/{eventId}   events the user says they registered for (owner only)
 /invites/{inviteCode}                 pending care-circle members (invitations), deleted when redeemed
 /events/{id}                          Ligue events, read: signed in, write: nobody from the app
 /directory/{contacts|programs}/items/{id}   read: signed in, write: staff
