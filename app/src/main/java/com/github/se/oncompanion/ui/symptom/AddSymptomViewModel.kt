@@ -167,7 +167,8 @@ class AddSymptomViewModel(
       return
     }
     viewModelScope.launch {
-      val entry =
+      // Null when the symptom no longer exists (e.g. deleted on another device)
+      val entry: SymptomEntry? =
           try {
             symptomRepository.observeSymptom(uid, id).first()
           } catch (e: CancellationException) {
