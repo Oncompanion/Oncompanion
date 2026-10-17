@@ -145,6 +145,9 @@
     <string name="symptom_delete_confirm">Delete</string>
     <string name="symptom_delete_cancel">Cancel</string>
     <string name="symptom_delete_error">Couldn\'t delete this entry. Try again.</string>
+    <string name="symptom_edit_title">Edit entry</string>
+    <string name="symptom_edit_save">Save changes</string>
+    <string name="symptom_edit_error_title">Couldn\'t load this entry</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
