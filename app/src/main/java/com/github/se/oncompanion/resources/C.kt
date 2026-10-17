@@ -152,6 +152,7 @@ object C {
     const val symptom_edit_error = "symptom_edit_error"
     const val symptom_edit_retry = "symptom_edit_retry"
     const val symptom_edit_not_found = "symptom_edit_not_found"
+    const val symptom_detail_edit = "symptom_detail_edit"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
