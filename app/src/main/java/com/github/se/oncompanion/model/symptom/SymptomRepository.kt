@@ -28,6 +28,17 @@ interface SymptomRepository {
   suspend fun addSymptom(uid: String, entry: SymptomEntry): String
 
   /**
+   * Replaces the symptom [SymptomEntry.id] of [uid] with [entry], keeping when it was first logged
+   * ([SymptomEntry.createdAt] is ignored). Like [addSymptom], returns as soon as the change is
+   * saved on the device (also offline). Does nothing if the symptom doesn't exist (e.g. it was
+   * deleted on another device): an edit never brings a deleted symptom back.
+   *
+   * @throws IllegalArgumentException if [SymptomEntry.id] is blank or the entry is not
+   *   [SymptomEntry.isValid]
+   */
+  suspend fun updateSymptom(uid: String, entry: SymptomEntry)
+
+  /**
    * Deletes the symptom [id] of [uid]. Does nothing if it doesn't exist. Like [addSymptom], returns
    * as soon as the entry is deleted on the device (also offline), so it disappears from
    * [observeSymptoms] right away; the server deletes it when there is a connection.

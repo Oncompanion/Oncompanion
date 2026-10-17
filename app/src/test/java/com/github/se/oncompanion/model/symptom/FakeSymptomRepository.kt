@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.update
  *   returns the ID.
  * - [observeSymptoms] emits the user's entries newest `occurredAt` first, then every change.
  * - [observeSymptom] emits the entry (or null), then every change.
+ * - [updateSymptom] requires a non-blank ID and [SymptomEntry.isValid] at `clock()`, replaces the
+ *   entry keeping its `createdAt`, and does nothing if it doesn't exist.
  * - [deleteSymptom] removes the entry, and does nothing if it doesn't exist.
  *
  * Test hooks: [observeError] and [writeError] simulate failures, [symptoms] exposes the stored
@@ -37,7 +39,9 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
   /** When non-null, both observe flows fail with it (checked when collection starts). */
   var observeError: Exception? = null
 
-  /** When non-null, [addSymptom] and [deleteSymptom] throw it and change nothing. */
+  /**
+   * When non-null, [addSymptom], [updateSymptom] and [deleteSymptom] throw it and change nothing.
+   */
   var writeError: Exception? = null
 
   /** Snapshot of the stored entries of [uid], in no particular order. */
@@ -70,6 +74,17 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
     val id = "symptom-${nextId++}"
     seed(uid, entry.copy(id = id, createdAt = clock()))
     return id
+  }
+
+  override suspend fun updateSymptom(uid: String, entry: SymptomEntry) {
+    writeError?.let { throw it }
+    require(entry.id.isNotBlank()) { "The symptom to update has no ID" }
+    require(entry.isValid(now = clock())) { "Invalid symptom entry: $entry" }
+    store.update { current ->
+      val stored = current[uid]?.get(entry.id) ?: return@update current
+      current +
+          (uid to current[uid].orEmpty() + (entry.id to entry.copy(createdAt = stored.createdAt)))
+    }
   }
 
   override suspend fun deleteSymptom(uid: String, id: String) {
