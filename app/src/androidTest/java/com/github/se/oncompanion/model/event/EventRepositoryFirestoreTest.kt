@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.
 import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.FIELD_START_AT
 import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.FIELD_SUMMARY
 import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.FIELD_TITLE
+import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.FIELD_WEBSITE_URL
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import java.time.Clock
@@ -86,6 +87,7 @@ class EventRepositoryFirestoreTest {
       category: Any? = null,
       summary: Any? = "Short summary",
       description: Any? = "Full description",
+      websiteUrl: Any? = null,
   ) {
     val fields =
         mapOf(
@@ -96,6 +98,7 @@ class EventRepositoryFirestoreTest {
                 FIELD_CATEGORY to category,
                 FIELD_SUMMARY to summary,
                 FIELD_DESCRIPTION to description,
+                FIELD_WEBSITE_URL to websiteUrl,
             )
             .filterValues { it != null }
     val json = JSONObject()
@@ -160,6 +163,7 @@ class EventRepositoryFirestoreTest {
     assertEquals("category", FIELD_CATEGORY)
     assertEquals("summary", FIELD_SUMMARY)
     assertEquals("description", FIELD_DESCRIPTION)
+    assertEquals("websiteUrl", FIELD_WEBSITE_URL)
   }
 
   // ---- getUpcomingEvents ----
@@ -187,6 +191,7 @@ class EventRepositoryFirestoreTest {
         category = "Wellbeing",
         summary = "A relaxing session.",
         description = "A relaxing session adapted to people in treatment.",
+        websiteUrl = "https://example.org/yoga",
     )
 
     val event = awaitUpcomingEvent("yoga")
@@ -200,6 +205,7 @@ class EventRepositoryFirestoreTest {
             category = "Wellbeing",
             summary = "A relaxing session.",
             description = "A relaxing session adapted to people in treatment.",
+            websiteUrl = "https://example.org/yoga",
         ),
         event,
     )
@@ -212,6 +218,18 @@ class EventRepositoryFirestoreTest {
     val event = repository.getEvent(id("walk"))!!
     assertNull(event.endDateTime)
     assertNull(event.category)
+    assertNull(event.websiteUrl)
+  }
+
+  @Test
+  fun websiteLinksThatAreNotWebAddresses_areLeftOut(): Unit = runBlocking {
+    addEvent("app-link", websiteUrl = "intent://scan/#Intent;end")
+    addEvent("typo", websiteUrl = "example.org/yoga")
+
+    val appLink = repository.getEvent(id("app-link"))!!
+    val typo = repository.getEvent(id("typo"))!!
+    assertNull(appLink.websiteUrl)
+    assertNull(typo.websiteUrl)
   }
 
   @Test

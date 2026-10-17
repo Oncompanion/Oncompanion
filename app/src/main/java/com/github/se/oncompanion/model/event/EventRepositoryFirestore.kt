@@ -74,6 +74,7 @@ class EventRepositoryFirestore(
             category = doc.getString(FIELD_CATEGORY),
             summary = doc.getString(FIELD_SUMMARY)!!,
             description = doc.getString(FIELD_DESCRIPTION)!!,
+            websiteUrl = webLinkOrNull(doc.getString(FIELD_WEBSITE_URL)),
         )
       } catch (e: RuntimeException) {
         // One bad document from the console shouldn't hide the other events
@@ -93,6 +94,7 @@ class EventRepositoryFirestore(
     const val FIELD_CATEGORY = "category"
     const val FIELD_SUMMARY = "summary"
     const val FIELD_DESCRIPTION = "description"
+    const val FIELD_WEBSITE_URL = "websiteUrl"
     private const val TAG = "EventRepository"
   }
 }
