@@ -218,6 +218,129 @@ class SymptomRepositoryFirestoreTest {
     }
   }
 
+  // ---- update ----
+
+  /** A different symptom than [fatigue], with no intensity: every field the user can edit. */
+  private fun editedToHiccups(id: String) = hiccups().copy(id = id)
+
+  @Test
+  fun updateReplacesTheFieldsAndKeepsCreatedAt(): Unit = runBlocking {
+    val id = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+    val createdAt = observeOnce(id)!!.createdAt
+
+    repository.updateSymptom(aliceUid, editedToHiccups(id).copy(createdAt = Instant.EPOCH))
+    awaitServerAck()
+
+    val stored = observeOnce(id)
+    assertSameContent(hiccups(), stored)
+    assertNull("the cleared intensity is cleared", stored!!.intensity)
+    assertEquals(createdAt, stored.createdAt)
+  }
+
+  @Test
+  fun updateMissingEntryDoesNotCreateIt(): Unit = runBlocking {
+    repository.updateSymptom(aliceUid, editedToHiccups("missing"))
+    // The server refuses to update a document that doesn't exist: waits until it answered
+    awaitServerAck()
+
+    assertNull(observeOnce("missing"))
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(aliceUid)).document("missing").get(Source.SERVER).await()
+        }
+    assertFalse(server.exists())
+  }
+
+  @Test
+  fun updateWithoutIdOrInvalidThrowsAndChangesNothing(): Unit = runBlocking {
+    val id = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+
+    for (invalid in listOf(fatigue(), fatigue().copy(id = id, types = emptyList()))) {
+      try {
+        repository.updateSymptom(aliceUid, invalid)
+        fail("Expected IllegalArgumentException for $invalid")
+      } catch (e: IllegalArgumentException) {
+        // expected
+      }
+    }
+    assertSameContent(fatigue(), observeOnce(id))
+  }
+
+  @Test
+  fun updateOfAnotherUsersEntryReturnsButIsRejectedByServer(): Unit = runBlocking {
+    val bobUid = EmulatorTestData.createUser("bob")
+    val id = repository.addSymptom(bobUid, fatigue())
+    awaitServerAck()
+    EmulatorTestData.signIn("alice")
+
+    val elapsed = timed {
+      withTimeout(5_000) { repository.updateSymptom(bobUid, editedToHiccups(id)) }
+    }
+    assertTrue("updateSymptom took $elapsed ms", elapsed < 1_000)
+    awaitServerAck()
+
+    EmulatorTestData.signIn("bob")
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(bobUid)).document(id).get(Source.SERVER).await()
+        }
+    assertEquals("the rejected edit isn't saved", listOf("FATIGUE"), server.get("types"))
+  }
+
+  @Test
+  fun offlineUpdateReturnsImmediately_showsTheChange_andSyncsWhenBackOnline(): Unit = runBlocking {
+    val id = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+    db.disableNetwork().await()
+    try {
+      val elapsed = timed {
+        withTimeout(5_000) { repository.updateSymptom(aliceUid, editedToHiccups(id)) }
+      }
+      assertTrue("updateSymptom took $elapsed ms", elapsed < 1_000)
+
+      // Shown in the detail and the journal while still offline
+      assertSameContent(hiccups(), observeOnce(id))
+      assertEquals(
+          listOf(SymptomType.HEADACHE, SymptomType.OTHER),
+          observeListOnce().single().types,
+      )
+    } finally {
+      db.enableNetwork().await()
+    }
+
+    awaitServerAck()
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(aliceUid)).document(id).get(Source.SERVER).await()
+        }
+    assertEquals("the edit reaches the server once online", "Hiccups", server.getString("notes"))
+  }
+
+  @Test
+  fun symptomLoggedThenEditedOfflineSyncsBoth(): Unit = runBlocking {
+    // createdAt is still a pending server timestamp when the edit is made
+    lateinit var id: String
+    db.disableNetwork().await()
+    try {
+      id = repository.addSymptom(aliceUid, fatigue())
+      repository.updateSymptom(aliceUid, editedToHiccups(id))
+      assertSameContent(hiccups(), observeOnce(id))
+    } finally {
+      db.enableNetwork().await()
+    }
+
+    awaitServerAck()
+    val server =
+        withTimeout(10_000) {
+          db.collection(symptomsPath(aliceUid)).document(id).get(Source.SERVER).await()
+        }
+    assertEquals(listOf("HEADACHE", "OTHER"), server.get("types"))
+    assertEquals("Hiccups", server.getString("notes"))
+    assertNotNull(server.getTimestamp("createdAt"))
+  }
+
   // ---- delete ----
 
   @Test
