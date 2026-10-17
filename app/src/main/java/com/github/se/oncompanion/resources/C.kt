@@ -148,6 +148,11 @@ object C {
     const val symptom_delete_confirm = "symptom_delete_confirm"
     const val symptom_delete_cancel = "symptom_delete_cancel"
     const val symptom_delete_error = "symptom_delete_error"
+    const val symptom_edit_loading = "symptom_edit_loading"
+    const val symptom_edit_error = "symptom_edit_error"
+    const val symptom_edit_retry = "symptom_edit_retry"
+    const val symptom_edit_not_found = "symptom_edit_not_found"
+    const val symptom_detail_edit = "symptom_detail_edit"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -100,7 +101,8 @@ private enum class WhenPicker {
 
 /**
  * The add symptom screen (US-07 "Log a symptom", Figma: "US-04 / Log symptoms"): the user picks
- * what they feel and saves it, optionally with how bad, when and notes.
+ * what they feel and saves it, optionally with how bad, when and notes. With a ViewModel editing a
+ * symptom, it is the edit screen instead (US-09, Figma: "US-9 / Edit symptom entry").
  *
  * @param onBack called when the user leaves without saving
  * @param onSaved called once the symptom is saved
@@ -141,6 +143,7 @@ fun AddSymptomScreen(
       onNotesChange = viewModel::onNotesChange,
       onSave = viewModel::save,
       onErrorShown = viewModel::clearError,
+      onRetry = viewModel::load,
       modifier = modifier,
   )
 }
@@ -149,6 +152,7 @@ fun AddSymptomScreen(
  * Stateless content of the add symptom screen, so each state can be tested without a ViewModel.
  *
  * @param onErrorShown called once the error snackbar is gone
+ * @param onRetry loads the symptom to edit again after an error
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,6 +168,7 @@ fun AddSymptomContent(
     onSave: () -> Unit,
     onErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
 ) {
   // Not while saving or once saved: the screen then leaves by itself, and going back as well would
   // also leave the journal
@@ -184,7 +189,14 @@ fun AddSymptomContent(
       modifier = modifier.testTag(C.Tag.symptom_add_screen),
       topBar = {
         TopAppBar(
-            title = { Text(stringResource(R.string.symptom_add_title)) },
+            title = {
+              Text(
+                  stringResource(
+                      if (uiState.isEditing) R.string.symptom_edit_title
+                      else R.string.symptom_add_title
+                  )
+              )
+            },
             navigationIcon = {
               // Not while saving or once saved: the screen then leaves by itself, and a second way
               // out would go back twice
@@ -201,36 +213,94 @@ fun AddSymptomContent(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = {
-        SaveButton(
-            text = stringResource(R.string.symptom_add_save),
-            enabled = uiState.canSave,
-            isSaving = uiState.isSaving,
-            onClick = onSave,
-            testTag = C.Tag.symptom_add_save,
-            savingTestTag = C.Tag.symptom_add_saving,
-        )
+        if (uiState.isFormShown) {
+          SaveButton(
+              text =
+                  stringResource(
+                      if (uiState.isEditing) R.string.symptom_edit_save
+                      else R.string.symptom_add_save
+                  ),
+              enabled = uiState.canSave,
+              isSaving = uiState.isSaving,
+              onClick = onSave,
+              testTag = C.Tag.symptom_add_save,
+              savingTestTag = C.Tag.symptom_add_saving,
+          )
+        }
       },
   ) { innerPadding ->
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      SectionTitle(stringResource(R.string.symptom_add_types))
-      TypeChips(uiState.types, onToggleType)
-
-      SectionTitle(stringResource(R.string.symptom_add_intensity))
-      IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
-
-      SectionTitle(stringResource(R.string.symptom_add_when))
-      WhenField(uiState, onDateChange, onTimeChange)
-
-      SectionTitle(stringResource(R.string.symptom_add_notes_title))
-      NotesField(uiState, onNotesChange)
+    // When editing, the symptom is loaded before the form can show it
+    when {
+      uiState.isLoading ->
+          Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            CircularProgressIndicator(
+                Modifier.align(Alignment.Center).testTag(C.Tag.symptom_edit_loading)
+            )
+          }
+      uiState.hasLoadError ->
+          Box(Modifier.padding(innerPadding)) {
+            SymptomMessage(
+                title = stringResource(R.string.symptom_edit_error_title),
+                hint = stringResource(R.string.symptom_error_hint),
+                testTag = C.Tag.symptom_edit_error,
+                onRetry = onRetry,
+                retryTestTag = C.Tag.symptom_edit_retry,
+            )
+          }
+      uiState.isNotFound ->
+          Box(Modifier.padding(innerPadding)) {
+            SymptomMessage(
+                title = stringResource(R.string.symptom_detail_not_found_title),
+                hint = stringResource(R.string.symptom_detail_not_found_hint),
+                testTag = C.Tag.symptom_edit_not_found,
+            )
+          }
+      else ->
+          SymptomFields(
+              uiState = uiState,
+              onToggleType = onToggleType,
+              onIntensityChange = onIntensityChange,
+              onClearIntensity = onClearIntensity,
+              onDateChange = onDateChange,
+              onTimeChange = onTimeChange,
+              onNotesChange = onNotesChange,
+              modifier = Modifier.padding(innerPadding),
+          )
     }
+  }
+}
+
+/** The fields of the form, which scroll between the top bar and Save. */
+@Composable
+private fun SymptomFields(
+    uiState: AddSymptomUiState,
+    onToggleType: (SymptomType) -> Unit,
+    onIntensityChange: (Int) -> Unit,
+    onClearIntensity: () -> Unit,
+    onDateChange: (LocalDate) -> Unit,
+    onTimeChange: (LocalTime) -> Unit,
+    onNotesChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  Column(
+      modifier =
+          modifier
+              .fillMaxSize()
+              .verticalScroll(rememberScrollState())
+              .padding(horizontal = 24.dp, vertical = 8.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    SectionTitle(stringResource(R.string.symptom_add_types))
+    TypeChips(uiState.types, onToggleType)
+
+    SectionTitle(stringResource(R.string.symptom_add_intensity))
+    IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
+
+    SectionTitle(stringResource(R.string.symptom_add_when))
+    WhenField(uiState, onDateChange, onTimeChange)
+
+    SectionTitle(stringResource(R.string.symptom_add_notes_title))
+    NotesField(uiState, onNotesChange)
   }
 }
 
