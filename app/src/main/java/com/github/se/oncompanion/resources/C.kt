@@ -112,6 +112,19 @@ object C {
 
     fun eventCard(eventId: String) = "event_card_$eventId"
 
+    const val event_detail_back_to_events = "event_detail_back_to_events"
+    const val event_detail_visit_website = "event_detail_visit_website"
+    const val event_detail_confirm = "event_detail_confirm"
+    const val event_detail_registration_note = "event_detail_registration_note"
+    const val event_detail_registration_closed = "event_detail_registration_closed"
+    const val event_detail_registration_confirmed = "event_detail_registration_confirmed"
+    const val event_detail_remove = "event_detail_remove"
+    const val event_detail_remove_dialog = "event_detail_remove_dialog"
+    const val event_detail_remove_cancel = "event_detail_remove_cancel"
+    const val event_detail_remove_confirm = "event_detail_remove_confirm"
+    const val event_detail_registration_error = "event_detail_registration_error"
+    const val event_detail_registration_retry = "event_detail_registration_retry"
+
     const val symptoms_screen = "symptoms_screen"
     const val symptom_back_button = "symptom_back_button"
     const val symptom_journal_loading = "symptom_journal_loading"
