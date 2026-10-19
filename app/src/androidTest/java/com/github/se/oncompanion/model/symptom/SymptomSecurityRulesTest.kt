@@ -8,6 +8,7 @@ import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
@@ -284,14 +285,110 @@ class SymptomSecurityRulesTest {
     denied(doc.delete())
   }
 
-  // ---- entries can't change yet ----
+  // ---- update ----
+
+  /** Saves a valid symptom of alice and returns it, to be edited. */
+  private suspend fun savedSymptom(data: Map<String, Any?> = validSymptom()): DocumentReference {
+    val doc = symptoms(aliceUid).document()
+    allowed(doc.set(data))
+    return doc
+  }
+
+  private fun assertUpdateAllowed(changes: Map<String, Any?>) = runBlocking {
+    allowed(savedSymptom().update(changes))
+  }
+
+  private fun assertUpdateDenied(changes: Map<String, Any?>) = runBlocking {
+    denied(savedSymptom().update(changes))
+  }
 
   @Test
-  fun ownerCannotUpdate(): Unit = runBlocking {
-    val doc = symptoms(aliceUid).document()
-    allowed(doc.set(validSymptom()))
+  fun ownerCanUpdateEveryField(): Unit = runBlocking {
+    val doc = savedSymptom()
+    val yesterday = Timestamp(Instant.now().minus(Duration.ofDays(1)))
+    allowed(
+        doc.update(
+            mapOf(
+                "types" to listOf("PAIN", "FEVER"),
+                "intensity" to 3,
+                "occurredAt" to yesterday,
+                "notes" to "Worse in the evening",
+            )
+        )
+    )
+    val saved = allowed(doc.get(Source.SERVER))
+    assertEquals(listOf("PAIN", "FEVER"), saved.get("types"))
+    assertEquals(3L, saved.getLong("intensity"))
+    assertEquals(yesterday, saved.getTimestamp("occurredAt"))
+    assertEquals("Worse in the evening", saved.getString("notes"))
+  }
+
+  @Test
+  fun ownerCanClearIntensityAndNotes() {
+    assertUpdateAllowed(mapOf("intensity" to null, "notes" to null))
+  }
+
+  @Test
+  fun ownerCanTickOtherWhenNotesAreAlreadyFilled() {
+    // The notes saved with the entry are enough to say which symptom it was
+    assertUpdateAllowed(mapOf("types" to listOf("FATIGUE", "OTHER")))
+  }
+
+  @Test
+  fun ownerCanMoveTheSymptomAfterItWasLogged(): Unit = runBlocking {
+    // Later than createdAt is fine as long as it isn't in the future
+    val doc = savedSymptom()
+    val createdAt = allowed(doc.get(Source.SERVER)).getTimestamp("createdAt")!!
+    allowed(doc.update("occurredAt", Timestamp(createdAt.toInstant().plusMillis(1))))
+  }
+
+  @Test
+  fun updateInTheFutureIsDenied() {
+    val inOneHour = Timestamp(Instant.now().plus(Duration.ofHours(1)))
+    assertUpdateDenied(mapOf("occurredAt" to inOneHour))
+  }
+
+  @Test
+  fun updateChangingCreatedAtIsDenied() {
+    assertUpdateDenied(mapOf("createdAt" to Timestamp.now()))
+    assertUpdateDenied(mapOf("createdAt" to FieldValue.serverTimestamp()))
+    assertUpdateDenied(mapOf("createdAt" to FieldValue.delete()))
+  }
+
+  @Test
+  fun updateWithInvalidDataIsDenied() {
+    assertUpdateDenied(mapOf("types" to emptyList<String>()))
+    assertUpdateDenied(mapOf("types" to listOf("PAIN", "PAIN")))
+    assertUpdateDenied(mapOf("intensity" to 11))
+    assertUpdateDenied(mapOf("notes" to "n".repeat(1001)))
+    assertUpdateDenied(mapOf("isUrgent" to true))
+    assertUpdateDenied(mapOf("types" to FieldValue.delete()))
+  }
+
+  @Test
+  fun tickingOtherWithoutNotesIsDenied() {
+    assertUpdateDenied(mapOf("types" to listOf("OTHER"), "notes" to null))
+    assertUpdateDenied(mapOf("types" to listOf("FATIGUE", "OTHER"), "notes" to "  "))
+  }
+
+  @Test
+  fun clearingTheNotesOfOtherIsDenied(): Unit = runBlocking {
+    denied(savedSymptom(validOther()).update("notes", null))
+  }
+
+  @Test
+  fun otherUserCannotUpdate(): Unit = runBlocking {
+    val doc = savedSymptom()
+    EmulatorTestData.signIn("bob")
     denied(doc.update("intensity", 2))
     denied(doc.set(mapOf("intensity" to 2), SetOptions.merge()))
+  }
+
+  @Test
+  fun signedOutCannotUpdate(): Unit = runBlocking {
+    val doc = savedSymptom()
+    EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
+    denied(doc.update("intensity", 2))
   }
 
   @Test

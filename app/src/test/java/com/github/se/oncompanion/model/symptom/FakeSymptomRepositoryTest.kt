@@ -128,6 +128,84 @@ class FakeSymptomRepositoryTest {
   }
 
   @Test
+  fun updateReplacesTheEntryAndKeepsCreatedAt() = runTest {
+    val createdAt = Instant.parse("2026-10-01T10:00:00Z")
+    repository.seed("alice", entry("2026-10-01T09:00:00Z").copy(id = "s1", createdAt = createdAt))
+    val edited =
+        SymptomEntry(
+            id = "s1",
+            types = listOf(SymptomType.PAIN, SymptomType.OTHER),
+            occurredAt = Instant.parse("2026-10-02T09:00:00Z"),
+            notes = "Hiccups",
+            createdAt = Instant.parse("2026-10-05T00:00:00Z"),
+        )
+
+    repository.updateSymptom("alice", edited)
+
+    assertEquals(listOf(edited.copy(createdAt = createdAt)), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun updateMissingEntryDoesNothing() = runTest {
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+
+    repository.updateSymptom("alice", entry("2026-10-05T09:00:00Z").copy(id = "missing"))
+    repository.updateSymptom("bob", entry("2026-10-05T09:00:00Z").copy(id = "s1"))
+
+    assertEquals(listOf(stored), repository.symptoms("alice"))
+    assertTrue(repository.symptoms("bob").isEmpty())
+  }
+
+  @Test
+  fun updateWithoutIdOrInvalidThrowsAndKeepsTheEntry() = runTest {
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+
+    for (invalid in listOf(stored.copy(id = ""), stored.copy(intensity = 11))) {
+      try {
+        repository.updateSymptom("alice", invalid)
+        fail("Expected IllegalArgumentException for $invalid")
+      } catch (e: IllegalArgumentException) {
+        // expected
+      }
+    }
+    assertEquals(listOf(stored), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun writeErrorFailsUpdateAndKeepsTheEntry() = runTest {
+    val error = IllegalStateException("rejected")
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+    repository.writeError = error
+
+    try {
+      repository.updateSymptom("alice", stored.copy(intensity = 9))
+      fail("Expected the write error")
+    } catch (e: IllegalStateException) {
+      assertSame(error, e)
+    }
+    assertEquals(listOf(stored), repository.symptoms("alice"))
+  }
+
+  @Test
+  fun observeSymptomEmitsTheUpdate() = runTest {
+    val stored = entry("2026-10-05T08:00:00Z").copy(id = "s1")
+    repository.seed("alice", stored)
+    val emissions = mutableListOf<SymptomEntry?>()
+    val job =
+        launch(UnconfinedTestDispatcher(testScheduler)) {
+          repository.observeSymptom("alice", "s1").take(2).toList(emissions)
+        }
+
+    repository.updateSymptom("alice", stored.copy(intensity = 9))
+    job.join()
+
+    assertEquals(listOf(4, 9), emissions.map { it?.intensity })
+  }
+
+  @Test
   fun deleteRemovesOnlyThatEntryOfThatUser() = runTest {
     val kept = entry("2026-10-05T08:00:00Z").copy(id = "kept")
     repository.seed("alice", entry("2026-10-05T09:00:00Z").copy(id = "s1"), kept)
