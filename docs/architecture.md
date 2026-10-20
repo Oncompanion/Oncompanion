@@ -86,6 +86,7 @@ Firebase Authentication and App Check, and calls a provider-independent `Hospita
 The service depends on a shared-store interface and an upstream-client interface; the Firestore
 adapter implements caching and global coordination, and `NominatimClient` owns the fixed upstream.
 The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
+The repository-to-proxy arrows remain planned until the authenticated transport is integrated.
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -101,6 +102,8 @@ availability for compliance under paused instances and overlapping revisions. Se
 
 The Android Search button remains disabled. Its response parser is compatible; its transport
 still needs Auth/App Check headers in a later PR before this endpoint can be wired into the app.
+The auth interface currently exposes identity but no Firebase ID-token accessor, and App Check is
+not integrated; add an injectable model/transport token boundary rather than Firebase calls in UI.
 No production deployment or automatic Functions deployment workflow is included.
 
 ## Reusable hospital field (issue #143)

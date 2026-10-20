@@ -1,12 +1,13 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 import { Hospital, HospitalClient, SearchError } from "./contracts.js";
+import { HospitalTransport, requestOnce } from "./https-transport.js";
 
 /** Fixed-origin HTTP client with bounded response size, no redirects and no retries. */
 export class NominatimClient implements HospitalClient {
   /** Injects the deployment contact and transport for isolated tests. */
   constructor(
     private readonly contact: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly transport: HospitalTransport = requestOnce,
   ) {}
   /** Fetches and validates hospital-only results within the upstream request budget. */
   async search(query: string): Promise<Hospital[]> {
@@ -26,17 +27,21 @@ export class NominatimClient implements HospitalClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await this.fetcher(url, {
-        redirect: "error",
+      const response = await this.transport(url, {
         signal: controller.signal,
         headers: {
           "User-Agent": `Oncompanion/1.0 (+https://github.com/Oncompanion/Oncompanion; ${this.contact})`,
           Accept: "application/json",
           "Accept-Language": "en",
+          "Accept-Encoding": "identity",
         },
       });
       if (response.status === 429)
-        throw new SearchError(429, "upstream_rate_limited");
+        throw new SearchError(
+          429,
+          "upstream_rate_limited",
+          retryAfter(response.headers.get("Retry-After")),
+        );
       if (!response.ok) throw new SearchError(502, "upstream_unavailable");
       const reader = response.body?.getReader();
       if (!reader) throw new SearchError(502, "invalid_upstream_response");
@@ -59,6 +64,8 @@ export class NominatimClient implements HospitalClient {
       for (const item of results) {
         if (!item || typeof item !== "object")
           throw new SearchError(502, "invalid_upstream_response");
+        if (typeof item.type !== "string" || typeof item.category !== "string")
+          throw new SearchError(502, "invalid_upstream_response");
         if (
           item.type !== "hospital" ||
           !["amenity", "healthcare"].includes(item.category)
@@ -71,27 +78,30 @@ export class NominatimClient implements HospitalClient {
           typeof item.display_name !== "string" ||
           !item.display_name.trim() ||
           typeof item.lat !== "string" ||
-          !item.lat.trim() ||
+          !decimal.test(item.lat.trim()) ||
           !Number.isFinite(+item.lat) ||
           Math.abs(+item.lat) > 90 ||
           typeof item.lon !== "string" ||
-          !item.lon.trim() ||
+          !decimal.test(item.lon.trim()) ||
           !Number.isFinite(+item.lon) ||
           Math.abs(+item.lon) > 180
         )
           throw new SearchError(502, "invalid_upstream_response");
+        const name = (
+          typeof item.name === "string" && item.name.trim()
+            ? item.name
+            : item.display_name.split(",")[0]
+        ).trim();
+        if (!name) throw new SearchError(502, "invalid_upstream_response");
         hospitals.push({
           osm_type: item.osm_type,
           osm_id: item.osm_id,
           category: item.category,
           type: item.type,
-          name:
-            typeof item.name === "string" && item.name.trim()
-              ? item.name
-              : item.display_name.split(",")[0],
+          name,
           display_name: item.display_name,
-          lat: item.lat,
-          lon: item.lon,
+          lat: item.lat.trim(),
+          lon: item.lon.trim(),
         });
       }
       return hospitals;
@@ -106,4 +116,16 @@ export class NominatimClient implements HospitalClient {
       clearTimeout(timer);
     }
   }
+}
+
+// Keep coordinates compatible with Kotlin Double parsing, excluding JavaScript-only hex syntax.
+const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+// Preserve a valid upstream retry interval across all instances, with a sixty-second minimum.
+function retryAfter(value: string | null): number {
+  if (!value) return 60;
+  const seconds = /^\d+$/.test(value)
+    ? Number(value)
+    : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+  return Number.isSafeInteger(seconds * 1000) ? Math.max(60, seconds) : 60;
 }

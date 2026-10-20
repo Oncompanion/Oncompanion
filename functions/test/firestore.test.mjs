@@ -172,6 +172,17 @@ test("unchanged rules deny cache and control access to anonymous and authenticat
   const b64 = (value) =>
     Buffer.from(JSON.stringify(value)).toString("base64url");
   const token = `${b64({ alg: "none", typ: "JWT" })}.${b64({ aud: projectId, iss: `https://securetoken.google.com/${projectId}`, sub: "patient", user_id: "patient", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600, firebase: { sign_in_provider: "google.com" } })}.`;
+  // Prove that this test token is recognized as signed in before asserting backend denials.
+  const profile = firstDb.doc("users/patient");
+  await profile.set({ firstName: "Emulator fixture" });
+  const profileUrl = `http://${host}/v1/projects/${projectId}/databases/(default)/documents/users/patient`;
+  assert.equal(
+    (await fetch(profileUrl, { headers: { Authorization: `Bearer ${token}` } }))
+      .status,
+    200,
+  );
+  assert.equal((await fetch(profileUrl)).status, 403);
+  await profile.delete();
   for (const path of [
     "hospitalSearchCache/example",
     "hospitalSearchControl/nominatim",
@@ -192,5 +203,68 @@ test("unchanged rules deny cache and control access to anonymous and authenticat
         403,
       );
     }
+  }
+});
+
+test("unknown acquisition commit outcome leaves the lock held without upstream work", async () => {
+  await reset();
+  let calls = 0;
+  const uncertainStore = {
+    cached: firstStore.cached.bind(firstStore),
+    save: firstStore.save.bind(firstStore),
+    release: firstStore.release.bind(firstStore),
+    async acquire(owner) {
+      assert.equal(await firstStore.acquire(owner), true);
+      throw new Error("Commit acknowledgement lost");
+    },
+  };
+  await assert.rejects(
+    new HospitalSearchService(uncertainStore, {
+      async search() {
+        calls++;
+        return [];
+      },
+    }).search("geneva"),
+    (e) => e.status === 503,
+  );
+  assert.equal(calls, 0);
+  assert.equal(await secondStore.acquire("replacement"), false);
+});
+
+test("failed release stays safe both before and after an unknown commit acknowledgement", async () => {
+  for (const committed of [false, true]) {
+    await reset();
+    let calls = 0;
+    const uncertainStore = {
+      cached: firstStore.cached.bind(firstStore),
+      save: firstStore.save.bind(firstStore),
+      acquire: firstStore.acquire.bind(firstStore),
+      async release(owner, cooldown) {
+        if (committed) await firstStore.release(owner, cooldown);
+        throw new Error("Release failed");
+      },
+    };
+    await assert.rejects(
+      new HospitalSearchService(uncertainStore, {
+        async search() {
+          calls++;
+          return [];
+        },
+      }).search("geneva"),
+      (e) => e.status === 503,
+    );
+    assert.equal(calls, 1);
+    assert.deepEqual(
+      await new HospitalSearchService(secondStore, {
+        search() {
+          assert.fail();
+        },
+      }).search("geneva"),
+      [],
+    );
+    assert.equal(await secondStore.acquire("replacement"), false);
+    const state = (await control.get()).data();
+    if (committed) assert(state.releasedAt instanceof Timestamp);
+    else assert.equal(typeof state.owner, "string");
   }
 });

@@ -40,7 +40,10 @@ export function createHandler(
           ? error
           : new SearchError(503, "service_unavailable");
       if (safe.status === 429 || safe.status === 503)
-        response.set("Retry-After", "60");
+        response.set(
+          "Retry-After",
+          String(Math.max(60, safe.retryAfterSeconds ?? 60)),
+        );
       response.status(safe.status).json({ error: { code: safe.code } });
     }
   };

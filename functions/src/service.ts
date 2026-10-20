@@ -35,7 +35,7 @@ export class HospitalSearchService {
         // Back off all users after upstream failures; failures are never cached.
         cooldown =
           error instanceof SearchError && error.status === 429
-            ? 60_000
+            ? Math.max(60, error.retryAfterSeconds ?? 60) * 1000
             : 10_000;
         throw error;
       } finally {

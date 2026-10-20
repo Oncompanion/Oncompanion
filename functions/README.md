@@ -37,7 +37,9 @@ The isolated test configuration runs Firestore on 127.0.0.1:8185, avoiding the A
 on 8080. Integration tests refuse non-loopback connections and use only `demo-oncompanion-proxy`.
 They exercise actual transactions across independent Admin SDK clients, shared cache expiry,
 contention, cooldowns, permanent locks, ownership and default-deny rules for anonymous and signed-in
-clients. Unit tests inject HTTP responses; timeout tests use virtual time. No tests call Nominatim.
+clients. Unit tests inject HTTP responses; transport regression tests use a loopback HTTP server to
+count wire attempts on 421, 408, redirects and socket failures. Timeout tests use virtual time.
+No tests call Nominatim.
 The TypeScript compiler provides strict static checks; Prettier provides formatting. There is no
 new CI workflow; run these commands manually until the team approves backend CI integration.
 
@@ -77,7 +79,8 @@ A successful response is a JSON array, including `[]`. Each hospital contains `o
 `osm_id`, `category`, `type`, `name`, `display_name`, `lat` and `lon`, exactly as consumed by
 `HospitalRepositoryNominatim`. Only hospital classifications are returned. Object type and OSM ID
 remain the identity. Response size is bounded to 256 KiB, results to ten, coordinates and required
-fields are validated. Android's parser and generated request parameters remain compatible.
+fields are validated, including decimal coordinate syntax accepted by Kotlin. Android's parser
+and generated request parameters remain compatible for supported hospital queries.
 **Its current transport does not send the required headers**: add Auth/App Check support and
 remote endpoint configuration in a later PR before enabling Search. Do not configure a public
 Nominatim URL directly.
@@ -96,8 +99,9 @@ queries, credentials, stack traces or internal exception details:
 | 503 | Storage, limiter or configuration failure |
 | 504 | Five-second upstream timeout |
 
-Responses disable HTTP caching. 429/503 include a conservative `Retry-After: 60` hint; clients
-must not retry automatically. Platform rejections (for example oversized headers, infrastructure
+Responses disable HTTP caching. 429/503 include a minimum `Retry-After: 60` hint; a valid longer
+upstream Retry-After (seconds or HTTP date) extends both the shared cooldown and the response hint.
+Clients must not retry automatically. Platform rejections (for example oversized headers, infrastructure
 queues or timeouts) can have platform-defined bodies/statuses.
 
 ## Shared cache
@@ -130,7 +134,11 @@ snapshot's server `readTime` against `releasedAt + cooldownMs`. Thus the next ou
 starts **at least one second after the previous operation completed**, which is stricter than
 one second between starts, without relying on instance clock synchronization. No future slots
 are reserved and no sleep is needed to enforce them. Upstream errors extend the cooldown to ten
-seconds, or sixty seconds for 429. There are no redirects or automatic upstream retries.
+seconds, or at least sixty seconds for 429 (honoring valid longer upstream Retry-After values).
+The core `node:https` transport makes one wire attempt using a fresh connection. It does not
+follow redirects or retry errors. Native `fetch` is deliberately avoided: the Fetch standard
+allows an automatic retry after HTTP 421 even when redirects are disabled, which could otherwise
+send two requests under one limiter grant.
 
 There is **no automatic lock expiry**. If an owner pauses before its HTTP call, another instance
 cannot steal the lock and race it. A crash, unknown transaction commit outcome, function timeout
@@ -145,6 +153,16 @@ then wait at least one second after the final possible upstream request has comp
 replace the control document with a fresh server timestamp `releasedAt` and `cooldownMs: 1000`,
 and restore traffic after cooldown. Never delete/reset a held lock while an owner could resume.
 This procedure is intentionally manual and cannot be inferred safely from lock age alone.
+
+A time-based lease, heartbeat, or final ownership recheck alone cannot safely automate recovery:
+a process can pause immediately after its last check and send after its lease expires. A fencing
+token in Firestore does not stop that request because public Nominatim does not validate the token.
+The Functions/Cloud Run request timeout is not proof of process termination; code can continue
+running after the response times out. Automatic recovery would need verified termination of every
+potential owner (including old revisions), or a separate final egress service that enforces fencing
+and spacing itself. Neither exists in this deployment. Keep this fail-closed design for the
+undeployed backend; an assigned recovery operator and monitoring for stuck control state are
+required before rollout. Do not replace it with TTL-based unlocking to improve availability.
 
 These guarantees assume all Oncompanion Nominatim calls use this same coordinator and operators
 do not mutate it during live traffic. Do not deploy another region/project with a separate lock
@@ -172,7 +190,12 @@ Before a separately approved deployment:
    traffic and Firestore reads/writes/storage can incur charges. Set budgets/alerts; they are
    not hard spending limits. Keep minimum instances zero.
 2. Register the Android app with App Check (Play Integrity for production), initialize its SDK,
-   and implement Auth/App Check headers in the Android transport. Console enforcement alone
+   and implement Auth/App Check headers in the Android transport. Use the **Firebase Auth ID
+   token** obtained from the signed-in Firebase user, not the Google ID token passed into
+   `AuthRepository.signInWithGoogle`. The current auth interface has no ID-token accessor and
+   the Android app has no App Check integration. Add an injectable token-provider boundary in
+   the model/transport layer in that later PR, with lazy Firebase access; ViewModels and
+   composables must not fetch tokens directly. Console enforcement alone
    does not protect a custom `onRequest` endpoint; this handler explicitly verifies the token
    and app ID. Debug tokens belong only in approved staging/local testing.
 3. Select/review runtime service-account IAM, generated endpoint permissions and the single
@@ -201,4 +224,6 @@ future Functions rollout must be separately authorized and scoped to the hospita
 
 References: [Firebase scaling and runtime](https://firebase.google.com/docs/functions/manage-functions),
 [custom-backend App Check verification](https://firebase.google.com/docs/app-check/custom-resource-backend),
-[Functions billing/setup](https://firebase.google.com/docs/functions/get-started).
+[Functions billing/setup](https://firebase.google.com/docs/functions/get-started),
+[Cloud Run timeout behavior](https://docs.cloud.google.com/run/docs/configuring/request-timeout),
+[Fetch HTTP 421 retry algorithm](https://fetch.spec.whatwg.org/#http-network-or-cache-fetch).

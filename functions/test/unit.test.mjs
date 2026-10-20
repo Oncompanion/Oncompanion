@@ -246,7 +246,7 @@ test("Nominatim sends fixed URL, identity, bounded contract and projects Android
       assert.equal(u.searchParams.get("q"), "genève [hospital]");
       assert.equal(u.searchParams.get("format"), "jsonv2");
       assert.equal(u.searchParams.get("limit"), "10");
-      assert.equal(options.redirect, "error");
+      assert.equal(options.headers["Accept-Encoding"], "identity");
       assert.match(
         options.headers["User-Agent"],
         /Oncompanion.*maintainer@example.org/,
@@ -385,4 +385,155 @@ test("deployed entry point preserves conservative scaling and rejects unauthenti
   };
   await hospitalSearch(req, again);
   assert.equal(again.statusCode, 401);
+});
+
+test("core transport makes one wire request for 421, 408, redirects and server errors", async (t) => {
+  const { createServer, request: httpRequest } = await import("node:http");
+  const { requestOnce } = await import("../lib/https-transport.js");
+  let calls = 0;
+  let status = 421;
+  const server = createServer((req, res) => {
+    calls++;
+    res.writeHead(status, {
+      Location: "/redirect-target",
+      "Retry-After": "900",
+    });
+    res.end("[]");
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  for (status of [421, 408, 302, 503, 204, 304]) {
+    const before = calls;
+    const response = await requestOnce(
+      new URL(`http://127.0.0.1:${server.address().port}/search`),
+      {
+        headers: { Accept: "application/json" },
+        signal: new AbortController().signal,
+      },
+      httpRequest,
+    );
+    assert.equal(response.status, status);
+    assert.equal(response.headers.get("Retry-After"), "900");
+    await response.arrayBuffer();
+    assert.equal(calls, before + 1);
+  }
+  status = 600;
+  await assert.rejects(
+    requestOnce(
+      new URL(`http://127.0.0.1:${server.address().port}/search`),
+      { headers: {}, signal: new AbortController().signal },
+      httpRequest,
+    ),
+  );
+  assert.equal(calls, 7);
+});
+
+test("core transport never retries socket errors and cancels a partially read response", async (t) => {
+  const { createServer, request: httpRequest } = await import("node:http");
+  const { requestOnce } = await import("../lib/https-transport.js");
+  let calls = 0;
+  const server = createServer((req, res) => {
+    calls++;
+    if (req.url === "/reset") req.socket.destroy();
+    else {
+      res.writeHead(200);
+      res.write("[");
+    }
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.closeAllConnections();
+        server.close(resolve);
+      }),
+  );
+  const endpoint = `http://127.0.0.1:${server.address().port}`;
+  await assert.rejects(
+    requestOnce(
+      new URL(endpoint + "/reset"),
+      { headers: {}, signal: new AbortController().signal },
+      httpRequest,
+    ),
+  );
+  assert.equal(calls, 1);
+  const controller = new AbortController();
+  const response = await requestOnce(
+    new URL(endpoint + "/partial"),
+    { headers: {}, signal: controller.signal },
+    httpRequest,
+  );
+  const reader = response.body.getReader();
+  assert.equal((await reader.read()).done, false);
+  controller.abort();
+  await assert.rejects(reader.read());
+  assert.equal(calls, 2);
+});
+
+test("proxy rejects JavaScript-only coordinate syntax and empty Android fallback names", async () => {
+  for (const invalid of [
+    {},
+    { type: "hospital" },
+    { ...hospital, lat: "0b10" },
+    { ...hospital, lon: "0o10" },
+    { ...hospital, lat: "0x1" },
+    { ...hospital, name: "", display_name: " , Genève" },
+  ])
+    await assert.rejects(
+      new NominatimClient("a@example.org", async () =>
+        Response.json([invalid]),
+      ).search("geneva"),
+      failure(502),
+    );
+  const result = await new NominatimClient("a@example.org", async () =>
+    Response.json([
+      {
+        ...hospital,
+        name: " ",
+        display_name: " Hôpital , Genève",
+        lat: " +4.62e1 ",
+        lon: " .61e1 ",
+      },
+    ]),
+  ).search("geneva");
+  assert.equal(result[0].name, "Hôpital");
+  assert.equal(result[0].lat, "+4.62e1");
+  assert.equal(result[0].lon, ".61e1");
+});
+
+test("upstream Retry-After is enforced in shared cooldown and HTTP response", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2026-10-20T00:00:00Z"),
+  });
+  for (const [header, seconds] of [
+    ["900", 900],
+    ["Tue, 20 Oct 2026 00:30:00 GMT", 1800],
+    ["1", 60],
+    ["invalid", 60],
+    ["99999999999999999999999999", 60],
+    ["", 60],
+  ]) {
+    const store = fakeStore();
+    const client = new NominatimClient(
+      "a@example.org",
+      async () =>
+        new Response("", { status: 429, headers: { "Retry-After": header } }),
+    );
+    const handler = createHandler(
+      new HospitalSearchService(store, client),
+      async () => {},
+    );
+    const res = response();
+    await handler(request(), res);
+    assert.equal(res.statusCode, 429);
+    assert.equal(res.headers["Retry-After"], String(seconds));
+    assert.deepEqual(store.releases, [seconds * 1000]);
+  }
 });
