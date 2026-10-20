@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -136,10 +137,12 @@ class EventRegistrationRepositoryFirestoreTest {
 
   @Test
   fun startedEvent_isRolledBack_whenTheServerRejectsIt(): Unit = runBlocking {
+    // Offline, so the confirmation is observed on the phone before the server can reject it
+    db.disableNetwork().await()
     repository.confirm(uid, startedId)
-
-    // Saved on the phone first, then undone once the rules reject it
     awaitRegistered(startedId, true)
+
+    db.enableNetwork().await()
     awaitRegistered(startedId, false)
   }
 
@@ -158,6 +161,39 @@ class EventRegistrationRepositoryFirestoreTest {
     awaitSynced()
     val saved = registrations().get(Source.SERVER).await()
     assertEquals(listOf(upcomingId), saved.documents.map { it.id })
+  }
+
+  @Test
+  fun offline_removingASyncedConfirmation_deletesItOnTheServerLater(): Unit = runBlocking {
+    repository.confirm(uid, upcomingId)
+    awaitSynced()
+    db.disableNetwork().await()
+
+    repository.remove(uid, upcomingId)
+    awaitRegistered(upcomingId, false)
+
+    db.enableNetwork().await()
+    awaitSynced()
+    assertTrue(registrations().get(Source.SERVER).await().isEmpty)
+  }
+
+  @Test
+  fun offline_confirmation_isRolledBack_whenTheEventStartsBeforeItSyncs(): Unit = runBlocking {
+    db.disableNetwork().await()
+    repository.confirm(uid, upcomingId)
+    awaitRegistered(upcomingId, true)
+
+    // The event starts while the phone is still offline
+    EmulatorTestData.replaceRawDocument(
+        "events",
+        upcomingId,
+        """{"title": {"stringValue": "Gentle yoga"}, """ +
+            """"startAt": {"timestampValue": "${Instant.now().minus(Duration.ofMinutes(5))}"}}""",
+    )
+
+    db.enableNetwork().await()
+    awaitRegistered(upcomingId, false)
+    assertTrue(registrations().get(Source.SERVER).await().isEmpty)
   }
 
   @Test
