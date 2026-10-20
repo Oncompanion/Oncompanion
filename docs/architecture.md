@@ -78,6 +78,34 @@ without an app update, as the policy requires. Proxy deployment/configuration is
 the repository is not yet wired into production. No profile fields, Firestore rules, hospital
 field UI (#143), or profile integration (#144) are added.
 
+## Shared hospital search proxy
+
+`functions/` implements the hospital-only JSON v2 endpoint using TypeScript and second-generation
+Firebase Functions. The HTTP adapter validates the existing Android request contract, verifies
+Firebase Authentication and App Check, and calls a provider-independent `HospitalSearchService`.
+The service depends on a shared-store interface and an upstream-client interface; the Firestore
+adapter implements caching and global coordination, and `NominatimClient` owns the fixed upstream.
+The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
+The repository-to-proxy arrows remain planned until the authenticated transport is integrated.
+
+`hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
+`hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
+collections remain inaccessible to mobile clients under the existing default-deny rules. They
+contain no user IDs or raw search queries. They are backend stores, independent of Android's
+in-memory repository cache and Firestore's offline SDK cache.
+
+A transaction admits only one upstream owner, with no automatic lock expiry. After completion,
+a server timestamp starts a minimum one-second cooldown, measured using Firestore read timestamps.
+A crashed owner blocks further misses until safe operator recovery. This deliberately trades
+availability for compliance under paused instances and overlapping revisions. See the
+[backend runbook](../functions/README.md) for the guarantee, recovery procedure, tests and setup.
+
+The Android Search button remains disabled. Its response parser is compatible; its transport
+still needs Auth/App Check headers in a later PR before this endpoint can be wired into the app.
+The auth interface currently exposes identity but no Firebase ID-token accessor, and App Check is
+not integrated; add an injectable model/transport token boundary rather than Firebase calls in UI.
+No production deployment or automatic Functions deployment workflow is included.
+
 ## Reusable hospital field (issue #143)
 
 `ui/common/HospitalField` is an outlined free-text location field with an explicit Search button.
