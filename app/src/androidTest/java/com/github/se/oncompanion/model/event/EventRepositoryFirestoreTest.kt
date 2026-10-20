@@ -33,6 +33,7 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -230,6 +231,15 @@ class EventRepositoryFirestoreTest {
     val typo = repository.getEvent(id("typo"))!!
     assertNull(appLink.websiteUrl)
     assertNull(typo.websiteUrl)
+  }
+
+  @Test
+  fun websiteLinkOfTheWrongType_isLeftOut_andTheEventKept(): Unit = runBlocking {
+    addEvent("number-link", websiteUrl = 42)
+
+    val event = repository.getEvent(id("number-link"))
+    assertNotNull(event)
+    assertNull(event!!.websiteUrl)
   }
 
   @Test
