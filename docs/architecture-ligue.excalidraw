@@ -45,7 +45,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 20,
-      "width": 580,
+      "width": 740,
       "height": 100,
       "angle": 0,
       "strokeColor": "#2f9e44",
@@ -61,8 +61,8 @@
         "type": 3
       },
       "seed": 247694516,
-      "version": 1,
-      "versionNonce": 1883425646,
+      "version": 2,
+      "versionNonce": 459659779,
       "isDeleted": false,
       "boundElements": [
         {
@@ -72,6 +72,10 @@
         {
           "type": "arrow",
           "id": "ar0"
+        },
+        {
+          "type": "arrow",
+          "id": "ar4"
         }
       ],
       "updated": 1791100000000,
@@ -84,7 +88,7 @@
       "type": "text",
       "x": 30,
       "y": 45.0,
-      "width": 560,
+      "width": 720,
       "height": 50.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -98,8 +102,8 @@
       "frameId": null,
       "roundness": null,
       "seed": 2083919442,
-      "version": 1,
-      "versionNonce": 560955367,
+      "version": 2,
+      "versionNonce": 1999251318,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -119,7 +123,7 @@
     {
       "id": "directory",
       "type": "rectangle",
-      "x": 700,
+      "x": 1000,
       "y": 20,
       "width": 260,
       "height": 100,
@@ -137,8 +141,8 @@
         "type": 3
       },
       "seed": 383471470,
-      "version": 1,
-      "versionNonce": 1246806959,
+      "version": 2,
+      "versionNonce": 809520380,
       "isDeleted": false,
       "boundElements": [
         {
@@ -158,7 +162,7 @@
     {
       "id": "directory_t",
       "type": "text",
-      "x": 710,
+      "x": 1010,
       "y": 45.0,
       "width": 240,
       "height": 50.0,
@@ -174,8 +178,8 @@
       "frameId": null,
       "roundness": null,
       "seed": 2067026700,
-      "version": 1,
-      "versionNonce": 2112158782,
+      "version": 2,
+      "versionNonce": 1650312367,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -275,7 +279,7 @@
     {
       "id": "dirrepo",
       "type": "rectangle",
-      "x": 700,
+      "x": 1000,
       "y": 380,
       "width": 260,
       "height": 100,
@@ -293,8 +297,8 @@
         "type": 3
       },
       "seed": 933218567,
-      "version": 1,
-      "versionNonce": 742357411,
+      "version": 2,
+      "versionNonce": 1990263159,
       "isDeleted": false,
       "boundElements": [
         {
@@ -318,7 +322,7 @@
     {
       "id": "dirrepo_t",
       "type": "text",
-      "x": 710,
+      "x": 1010,
       "y": 405.0,
       "width": 240,
       "height": 50.0,
@@ -334,8 +338,8 @@
       "frameId": null,
       "roundness": null,
       "seed": 1564538605,
-      "version": 1,
-      "versionNonce": 1688841650,
+      "version": 2,
+      "versionNonce": 1811482372,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -357,7 +361,7 @@
       "type": "rectangle",
       "x": 180,
       "y": 560,
-      "width": 780,
+      "width": 1080,
       "height": 100,
       "angle": 0,
       "strokeColor": "#2f9e44",
@@ -373,8 +377,8 @@
         "type": 3
       },
       "seed": 673616912,
-      "version": 1,
-      "versionNonce": 937148729,
+      "version": 2,
+      "versionNonce": 654449116,
       "isDeleted": false,
       "boundElements": [
         {
@@ -388,6 +392,10 @@
         {
           "type": "arrow",
           "id": "ar3"
+        },
+        {
+          "type": "arrow",
+          "id": "ar5"
         }
       ],
       "updated": 1791100000000,
@@ -399,9 +407,9 @@
       "id": "firestore_t",
       "type": "text",
       "x": 190,
-      "y": 585.0,
-      "width": 760,
-      "height": 50.0,
+      "y": 572.5,
+      "width": 1060,
+      "height": 75.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -414,16 +422,16 @@
       "frameId": null,
       "roundness": null,
       "seed": 1301823595,
-      "version": 2,
-      "versionNonce": 2113630399,
+      "version": 3,
+      "versionNonce": 1366791198,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791200000000,
       "link": null,
       "locked": false,
       "index": "a011",
-      "text": "Cloud Firestore\n/events \u00b7 /directory/{contacts | programs}",
-      "originalText": "Cloud Firestore\n/events \u00b7 /directory/{contacts | programs}",
+      "text": "Cloud Firestore\n/events \u00b7 /users/{uid}/eventRegistrations\n/directory/{contacts | programs}",
+      "originalText": "Cloud Firestore\n/events \u00b7 /users/{uid}/eventRegistrations\n/directory/{contacts | programs}",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -453,8 +461,8 @@
         "type": 2
       },
       "seed": 1098272663,
-      "version": 1,
-      "versionNonce": 248347437,
+      "version": 2,
+      "versionNonce": 1871978919,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -478,7 +486,7 @@
         "mode": "orbit",
         "elementId": "events",
         "fixedPoint": [
-          0.5,
+          0.3918918918918919,
           1
         ]
       },
@@ -494,7 +502,7 @@
     {
       "id": "ar1",
       "type": "arrow",
-      "x": 830.0,
+      "x": 1130.0,
       "y": 126,
       "width": 0.0,
       "height": 248,
@@ -512,8 +520,8 @@
         "type": 2
       },
       "seed": 827200882,
-      "version": 1,
-      "versionNonce": 1931671701,
+      "version": 2,
+      "versionNonce": 1811288086,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -571,8 +579,8 @@
         "type": 2
       },
       "seed": 1238213399,
-      "version": 2,
-      "versionNonce": 408191070,
+      "version": 3,
+      "versionNonce": 1016987037,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791200000000,
@@ -604,7 +612,7 @@
         "mode": "orbit",
         "elementId": "firestore",
         "fixedPoint": [
-          0.17,
+          0.12037037037037036,
           0
         ]
       }
@@ -612,7 +620,7 @@
     {
       "id": "ar3",
       "type": "arrow",
-      "x": 830.0,
+      "x": 1130.0,
       "y": 486,
       "width": 2.6000000000000227,
       "height": 68,
@@ -630,8 +638,8 @@
         "type": 2
       },
       "seed": 547012423,
-      "version": 1,
-      "versionNonce": 95319350,
+      "version": 2,
+      "versionNonce": 32938633,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
@@ -663,7 +671,7 @@
         "mode": "orbit",
         "elementId": "firestore",
         "fixedPoint": [
-          0.83,
+          0.8796296296296297,
           0
         ]
       }
@@ -673,8 +681,8 @@
       "type": "text",
       "x": 20,
       "y": 700,
-      "width": 792.0000000000001,
-      "height": 25.0,
+      "width": 880.0,
+      "height": 50.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -687,16 +695,16 @@
       "frameId": null,
       "roundness": null,
       "seed": 1522104809,
-      "version": 1,
-      "versionNonce": 936426395,
+      "version": 2,
+      "versionNonce": 867309009,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1791100000000,
       "link": null,
       "locked": false,
       "index": "a016",
-      "text": "Public Ligue content, not patient data: no ResolveCareCircleAccess here.",
-      "originalText": "Public Ligue content, not patient data: no ResolveCareCircleAccess here.",
+      "text": "Events and the directory are public Ligue content. Registrations are the patient's own data:\nowner only, no ResolveCareCircleAccess yet.",
+      "originalText": "Events and the directory are public Ligue content. Registrations are the patient's own data:\nowner only, no ResolveCareCircleAccess yet.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -709,7 +717,7 @@
       "id": "lg0",
       "type": "rectangle",
       "x": 20,
-      "y": 750,
+      "y": 775,
       "width": 50,
       "height": 30,
       "angle": 0,
@@ -726,7 +734,7 @@
         "type": 3
       },
       "seed": 3631986,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1116520443,
       "isDeleted": false,
       "boundElements": [],
@@ -739,7 +747,7 @@
       "id": "lg0_t",
       "type": "text",
       "x": 82,
-      "y": 753,
+      "y": 778,
       "width": 121.00000000000001,
       "height": 25.0,
       "angle": 0,
@@ -754,7 +762,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 1987657532,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1731968897,
       "isDeleted": false,
       "boundElements": [],
@@ -776,7 +784,7 @@
       "id": "lg1",
       "type": "rectangle",
       "x": 253.0,
-      "y": 750,
+      "y": 775,
       "width": 50,
       "height": 30,
       "angle": 0,
@@ -793,7 +801,7 @@
         "type": 3
       },
       "seed": 1156316855,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1475014483,
       "isDeleted": false,
       "boundElements": [],
@@ -806,7 +814,7 @@
       "id": "lg1_t",
       "type": "text",
       "x": 315.0,
-      "y": 753,
+      "y": 778,
       "width": 132.0,
       "height": 25.0,
       "angle": 0,
@@ -821,7 +829,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 1544964155,
-      "version": 1,
+      "version": 2,
       "versionNonce": 2019199670,
       "isDeleted": false,
       "boundElements": [],
@@ -843,7 +851,7 @@
       "id": "lg2",
       "type": "rectangle",
       "x": 497.0,
-      "y": 750,
+      "y": 775,
       "width": 50,
       "height": 30,
       "angle": 0,
@@ -860,7 +868,7 @@
         "type": 3
       },
       "seed": 1593325654,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1582776385,
       "isDeleted": false,
       "boundElements": [],
@@ -873,7 +881,7 @@
       "id": "lg2_t",
       "type": "text",
       "x": 559.0,
-      "y": 753,
+      "y": 778,
       "width": 319.0,
       "height": 25.0,
       "angle": 0,
@@ -888,7 +896,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 1440163746,
-      "version": 1,
+      "version": 2,
       "versionNonce": 423129726,
       "isDeleted": false,
       "boundElements": [],
@@ -910,7 +918,7 @@
       "id": "lg3",
       "type": "rectangle",
       "x": 928.0,
-      "y": 750,
+      "y": 775,
       "width": 50,
       "height": 30,
       "angle": 0,
@@ -927,7 +935,7 @@
         "type": 3
       },
       "seed": 782159660,
-      "version": 1,
+      "version": 2,
       "versionNonce": 926204114,
       "isDeleted": false,
       "boundElements": [],
@@ -940,7 +948,7 @@
       "id": "lg3_t",
       "type": "text",
       "x": 990.0,
-      "y": 753,
+      "y": 778,
       "width": 77.0,
       "height": 25.0,
       "angle": 0,
@@ -955,7 +963,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 150267606,
-      "version": 1,
+      "version": 2,
       "versionNonce": 2037692439,
       "isDeleted": false,
       "boundElements": [],
@@ -977,7 +985,7 @@
       "id": "lga0",
       "type": "arrow",
       "x": 1117.0,
-      "y": 765,
+      "y": 790,
       "width": 60,
       "height": 0,
       "angle": 0,
@@ -994,7 +1002,7 @@
         "type": 2
       },
       "seed": 1426439563,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1977340355,
       "isDeleted": false,
       "boundElements": [],
@@ -1022,7 +1030,7 @@
       "id": "lga0_t",
       "type": "text",
       "x": 1189.0,
-      "y": 753,
+      "y": 778,
       "width": 176.0,
       "height": 25.0,
       "angle": 0,
@@ -1037,7 +1045,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 709099176,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1338216052,
       "isDeleted": false,
       "boundElements": [],
@@ -1059,7 +1067,7 @@
       "id": "lga1",
       "type": "arrow",
       "x": 1415.0,
-      "y": 765,
+      "y": 790,
       "width": 60,
       "height": 0,
       "angle": 0,
@@ -1076,7 +1084,7 @@
         "type": 2
       },
       "seed": 674128708,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1424613748,
       "isDeleted": false,
       "boundElements": [],
@@ -1104,7 +1112,7 @@
       "id": "lga1_t",
       "type": "text",
       "x": 1487.0,
-      "y": 753,
+      "y": 778,
       "width": 132.0,
       "height": 25.0,
       "angle": 0,
@@ -1119,7 +1127,7 @@
       "frameId": null,
       "roundness": null,
       "seed": 1821098954,
-      "version": 1,
+      "version": 2,
       "versionNonce": 267630828,
       "isDeleted": false,
       "boundElements": [],
@@ -1136,6 +1144,204 @@
       "containerId": null,
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "eventreg",
+      "type": "rectangle",
+      "x": 480,
+      "y": 380,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 91036393,
+      "version": 1,
+      "versionNonce": 1842633483,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "eventreg_t"
+        },
+        {
+          "type": "arrow",
+          "id": "ar4"
+        },
+        {
+          "type": "arrow",
+          "id": "ar5"
+        }
+      ],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a028V0"
+    },
+    {
+      "id": "eventreg_t",
+      "type": "text",
+      "x": 490,
+      "y": 392.5,
+      "width": 240,
+      "height": 75.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 2046491916,
+      "version": 2,
+      "versionNonce": 549076498,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a028V1",
+      "text": "EventRegistration\nRepository\n(+ Firestore)",
+      "originalText": "EventRegistration\nRepository\n(+ Firestore)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "eventreg",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "ar4",
+      "type": "arrow",
+      "x": 610.0,
+      "y": 126,
+      "width": 0.0,
+      "height": 248,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 74560729,
+      "version": 1,
+      "versionNonce": 656917356,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a028V2",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          248
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "events",
+        "fixedPoint": [
+          0.7972972972972973,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "eventreg",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ar5",
+      "type": "arrow",
+      "x": 610.0,
+      "y": 486,
+      "width": 2.6000000000000227,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1212764781,
+      "version": 1,
+      "versionNonce": 910705216,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a028V3",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.6000000000000227,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "eventreg",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "firestore",
+        "fixedPoint": [
+          0.39814814814814814,
+          0
+        ]
+      }
     }
   ],
   "appState": {

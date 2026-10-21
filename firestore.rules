@@ -191,6 +191,24 @@ service cloud.firestore {
                       && request.resource.data.createdAt == request.time;
       }
 
+      // ---------- Event registrations ----------
+      // /users/{uid}/eventRegistrations/{eventId}: the user's own statement that they registered
+      // with the organizer of /events/{eventId}. It is keyed by the event, so confirming twice
+      // writes the same document instead of a duplicate. Only the owner reads, saves and removes
+      // it. Saving needs an existing event that hasn't started yet, by the server's clock: a
+      // confirmation made offline that only syncs once the event has started is rejected.
+      match /eventRegistrations/{eventId} {
+        function isUpcomingEvent() {
+          let event = /databases/$(database)/documents/events/$(eventId);
+          return exists(event) && get(event).data.startAt > request.time;
+        }
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+                      && request.resource.data.keys().hasOnly(['confirmedAt'])
+                      && request.resource.data.confirmedAt == request.time
+                      && isUpcomingEvent();
+      }
+
       // ---------- Care circle ----------
       // /users/{uid}/circle/{memberUid}: the people the user shares their care with, keyed by the
       // member's uid. The owner and that member can read it. Only created by the member redeeming
