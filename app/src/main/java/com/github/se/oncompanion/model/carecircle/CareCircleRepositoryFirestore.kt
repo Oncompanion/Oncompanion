@@ -1,15 +1,16 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.carecircle
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * [CareCircleRepository] backed by Cloud Firestore, documents at `/users/{ownerUid}/circle/{uid}`.
@@ -20,31 +21,35 @@ import kotlinx.coroutines.flow.callbackFlow
  * it (e.g. as a ViewModel default) even where Firebase isn't initialized, like unit tests.
  */
 class CareCircleRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : CareCircleRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
   constructor(db: FirebaseFirestore) : this({ db })
 
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
-  override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> = callbackFlow {
-    val registration =
-        circle(ownerUid).addSnapshotListener { snapshot, error ->
-          if (error != null) {
-            close(error)
-          } else if (snapshot != null) {
-            // Sorted here rather than in the query, so no Firestore index is needed
-            trySend(
-                snapshot.documents.mapNotNull(::fromDocument).sortedWith(CareCircleMember.BY_NAME)
-            )
-          }
-        }
-    awaitClose { registration.remove() }
-  }
+  override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> =
+      SessionAccess.snapshots {
+        val registration =
+            circle(ownerUid).addSnapshotListener { snapshot, error ->
+              if (error != null) {
+                close(error)
+              } else if (snapshot != null) {
+                // Sorted here rather than in the query, so no Firestore index is needed
+                trySend(
+                    snapshot.documents
+                        .mapNotNull(::fromDocument)
+                        .sortedWith(CareCircleMember.BY_NAME)
+                )
+              }
+            }
+        awaitClose { registration.remove() }
+      }
 
   override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> =
-      callbackFlow {
+      SessionAccess.snapshots {
         val registration =
             circle(ownerUid).document(memberUid).addSnapshotListener { snapshot, error ->
               if (error != null) {
@@ -63,7 +68,7 @@ class CareCircleRepositoryFirestore(
       ownerUid: String,
       memberUid: String,
       details: CareCircleMemberDetails,
-  ) {
+  ): Unit = SessionAccess.operation {
     require(details.isValid()) { "Invalid care circle member details" }
     // update, never set: a member removed on another device must not come back
     circle(ownerUid).document(memberUid).update(detailFields(details)).addOnFailureListener { e ->
@@ -71,19 +76,21 @@ class CareCircleRepositoryFirestore(
     }
   }
 
-  override suspend fun removeMember(ownerUid: String, memberUid: String) {
-    // One batch, so going offline halfway can't leave the caregiver a link to a circle they left
-    db.batch()
-        .delete(circle(ownerUid).document(memberUid))
-        .delete(
-            users()
-                .document(memberUid)
-                .collection(CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION)
-                .document(ownerUid)
-        )
-        .commit()
-        .addOnFailureListener { e -> logRejected("removal of member $memberUid", e) }
-  }
+  override suspend fun removeMember(ownerUid: String, memberUid: String): Unit =
+      SessionAccess.operation {
+        // One batch, so going offline halfway can't leave the caregiver a link to a circle they
+        // left
+        db.batch()
+            .delete(circle(ownerUid).document(memberUid))
+            .delete(
+                users()
+                    .document(memberUid)
+                    .collection(CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION)
+                    .document(ownerUid)
+            )
+            .commit()
+            .addOnFailureListener { e -> logRejected("removal of member $memberUid", e) }
+      }
 
   private fun users() = db.collection(UserProfileRepositoryFirestore.COLLECTION)
 

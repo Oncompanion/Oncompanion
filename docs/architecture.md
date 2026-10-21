@@ -234,13 +234,90 @@ Known limitations:
 - Someone with a patient account can't join a circle; they would need to sign in with another Google account.
 - An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.
 
-## Sign-out
+## Sign-out (issue #35)
 
-Profile asks for confirmation before reusing `AuthRepository.signOut()`. Its ViewModel drops profile details and cancels the profile listener as soon as Firebase sign-out returns, then asks the existing Google credential provider to clear the account-picker state. Credential cleanup is best effort, as in sign-in; an immediate authentication error keeps the user on Profile with retry available.
+`ProfileViewModel` delegates to the process-scoped `SignOut` coordinator. Confirmation freezes
+repository entry points and cancels/drains their active child jobs, including operations that
+suspended before enqueueing a write. SDK transactions are tracked separately because cancelling
+`Task.await()` does not cancel the task. The coordinator waits for transactions, then calls
+`waitForPendingWrites()` with a 10-second deadline while authentication is unchanged. This is an
+acknowledgement barrier for a closed queue, including writes from previous processes, rather
+than a pending-write query or a connectivity check.
 
-The host opens the Auth graph with `navigateAndClearBackStack`. That helper also clears saved bottom-tab stacks, so both active and saved authenticated ViewModels are destroyed and cannot be restored by Back or a later session. Profile observation is keyed to the currently authenticated uid; with no signed-in user it never requests a cached profile.
+Timeouts and failures preserve local changes and show **Stay signed in** (also Back/outside
+dismissal) and **Discard changes and sign out**. Staying reopens the operation gate and retains
+the session, listeners and mutations. Only acknowledgements or explicit discard consent authorize
+cleanup. Each attempt creates a fresh acknowledgement barrier; a previous timeout is never reused.
+The cleanup journal records interrupted cleanup only. Installation history (`managed_cache` in
+older development builds) is not evidence of pending writes and must not force a discard warning
+after successful acknowledgement. The public barrier covers the current authenticated user's queue,
+including writes restored from disk; it cannot certify queues belonging to other SDK users.
+Older versions only called Firebase Auth sign-out, leaving cached documents and per-user mutation
+queues on disk. Consequently, `SignOut.initialize()` asks
+`LocalSessionRepositoryFirestore.prepare()` to read the default database's persisted mutation
+**owners** before any SDK operations start. The read-only `FirestoreMutationQueue` helper retains
+only a set of uids in process memory, never document contents. Firestore holds an exclusive SQLite
+lock while running, so the cache must not be inspected live. After each successful public barrier,
+the adapter removes the acknowledged active uid from that set. Any remaining legacy owner, or
+an inspection failure, requires explicit discard consent. A synchronized legacy cache does not.
+Restarting the process reconstructs this set from the actual disk queue; no app migration marker
+or historical account list is needed. The SDK remains live on cancellation, preserving listeners
+and offline changes. Successful cleanup resets the owner set for the next session.
 
-Firestore disk persistence is retained, including pending offline writes. Signing out makes cached data inaccessible through the app's navigation and Profile state; it does not securely erase the SDK's disk cache. `clearPersistence()` requires a stopped Firestore instance and also deletes pending writes, so physical cache clearing from US-19 subtask #35 needs a separate decision compatible with offline mode. No Firebase rules or persistence settings are changed by sign-out.
+This compatibility helper deliberately depends on Firebase's SQLite filename and schema versions
+16–18 because the public API has no all-user queue query. A new installation has no cache file;
+an unknown schema, missing table or unreadable existing cache fails closed. The reader overrides
+Android's default corruption handler so a failed read cannot delete the SDK database. Firebase
+dependency updates must revalidate this helper and run the migration emulator tests. Initialization must stay
+before all Firestore operations. Do not replace this check with snapshot metadata: snapshots show
+the current user's overlays and cannot enumerate another user's pending writes or deletes.
+The emulator tests seed raw SDK writes without app metadata, terminate/reopen the persistent SDK,
+and cover both the active-user and a previous-user queue before sign-out. This simulates a cache
+left by the old app; it is not an APK-to-APK or older-SDK binary compatibility test.
+
+**Alternatives reviewed:** the supported `waitForPendingWrites()` API remains the normal
+synchronization barrier, but only certifies the active user. Snapshot metadata cannot enumerate
+other users' queues. Clearing persistence on upgrade or switching to a fresh cache would abandon
+legacy mutations; a blanket first-upgrade consent prompt would warn even for fully synchronized
+caches. The SQLite helper is retained as a migration compatibility risk requiring team review,
+not a supported Firebase API. It assumes the default database and stable SDK filename, must run
+before SDK startup, and cannot generically interpret future storage layouts.
+
+Before cleanup, a synchronous SharedPreferences commit records a recovery flag. `SessionBoundary`
+removes personal screens and registers its navigation ViewModelStore for synchronous clearing,
+including saved tabs, before the operation gate can reopen. Cancelled consumers also check
+coroutine cancellation before accessing Firestore.
+A session generation counter also destroys the store if a fast cleanup completes between UI
+observations. Listener jobs are cancelled and joined before SDK termination. Old flows reject
+recollection in another session. SDK authentication tasks are drained so a late sign-in result
+cannot reopen authentication after sign-out.
+
+Cleanup signs out Firebase Authentication, clears Credential Manager state and awaits Firestore
+`terminate()` followed by `clearPersistence()`. Independent stages are attempted even when another
+fails. Every failure keeps the privacy boundary closed, offers retry, and retains the recovery
+flag across process death. Credential clearing and SDK cleanup have bounded waits. The adapter
+retains SDK tasks across timeouts so retries await the original termination. The recovery flag is
+removed only after every stage succeeds. Android does not restore authenticated navigation while
+recovery is pending or authentication is absent.
+
+Repositories resolve Firestore lazily on each use through `SessionAccess`, rather than retaining
+a terminated instance. The next session obtains a fresh `getInstance()` with normal persistent
+offline caching. No remote documents are deleted. Repositories hold no additional patient caches;
+screen drafts and lists belong to the destroyed ViewModels. Scan photos retain their existing
+disposal cleanup.
+
+The Account and overview diagrams include `SignOut` and `LocalSessionRepository`. No dependencies,
+Firebase rules or normal persistence settings change. Future Firestore repositories must use
+`SessionAccess.operation`, `snapshots` and the shared instance accessor. Server transactions must
+also use the tracker; bypassing the fence invalidates the acknowledgement barrier.
+
+**Limits:** Firebase's `clearPersistence()` drops SDK data but does not securely overwrite disk
+bytes. This prevents subsequent app sessions from accessing the old cache; forensic erasure would
+need a separate storage/encryption design compatible with offline persistence. Discard cannot
+retract writes already accepted by the server. Failed cleanup keeps the app locked until retry
+succeeds and never reports completion.
+
+See the [Firebase Android lifecycle reference](https://firebase.google.com/docs/reference/android/com/google/firebase/firestore/FirebaseFirestore).
 
 ## Firestore layout
 

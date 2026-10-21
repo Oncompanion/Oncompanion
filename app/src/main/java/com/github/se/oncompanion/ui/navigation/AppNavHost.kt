@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -19,10 +20,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.SessionBoundary
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberFormScreen
@@ -70,9 +73,24 @@ import java.time.LocalDate
  */
 @Composable
 fun AppNavHost(
-    navController: NavHostController = rememberNavController(),
+    navController: NavHostController? = null,
     startRoute: String = Route.AUTH,
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
+) {
+  SessionBoundary(credentialProvider) { afterCleanup ->
+    SessionNavHost(
+        navController ?: rememberNavController(),
+        if (afterCleanup) Route.AUTH else startRoute,
+        credentialProvider,
+    )
+  }
+}
+
+@Composable
+private fun SessionNavHost(
+    navController: NavHostController,
+    startRoute: String,
+    credentialProvider: GoogleCredentialProvider,
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
 
@@ -82,6 +100,7 @@ fun AppNavHost(
         SignInScreen(
             credentialProvider = credentialProvider,
             onSignedIn = { next ->
+              SignOutProvider.signOut.sessionStarted()
               navigationActions.navigateAndClearBackStack(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING

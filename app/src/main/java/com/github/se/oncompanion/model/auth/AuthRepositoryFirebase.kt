@@ -1,7 +1,9 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.auth
 
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -39,14 +41,14 @@ class AuthRepositoryFirebase(authProvider: () -> FirebaseAuth = { FirebaseAuth.g
     return states.distinctUntilChanged()
   }
 
-  override suspend fun signInWithGoogle(idToken: String): AuthUser {
+  override suspend fun signInWithGoogle(idToken: String): AuthUser = SessionAccess.operation {
     val credential = GoogleAuthProvider.getCredential(idToken, null)
-    val result = auth.signInWithCredential(credential).await()
+    val result = SessionAccess.authentication { auth.signInWithCredential(credential) }.await()
     val user = result.user ?: throw IllegalStateException("Firebase returned no user after sign-in")
     // Google's profile claims (given_name, family_name...) are only available in the sign-in result
     val givenName = result.additionalUserInfo?.profile?.get(GOOGLE_GIVEN_NAME) as? String
     lastGivenName = givenName?.let { user.uid to it }
-    return user.toAuthUser()
+    return@operation user.toAuthUser()
   }
 
   override fun signOut() {

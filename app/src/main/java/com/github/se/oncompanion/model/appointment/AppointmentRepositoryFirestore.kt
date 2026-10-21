@@ -1,6 +1,8 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.model.appointment
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -8,7 +10,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * Appointment storage at `/users/{uid}/appointments/{id}`, using Firestore's offline cache. Writes
@@ -16,17 +17,18 @@ import kotlinx.coroutines.flow.callbackFlow
  * Firestore rolls back the local write; returned IDs do not confirm server acceptance.
  */
 class AppointmentRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : AppointmentRepository {
   /** Uses the supplied Firestore instance, allowing tests to connect to the emulator. */
   constructor(db: FirebaseFirestore) : this({ db })
 
   // Default ViewModel construction must also work before Firebase is initialized in unit tests.
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
   override fun observeAppointments(uid: String): Flow<List<Appointment>> {
     requirePathSegment(uid)
-    return callbackFlow {
+    return SessionAccess.snapshots {
       val registration =
           collection(uid)
               .orderBy(FIELD_SCHEDULED_AT, Query.Direction.ASCENDING)
@@ -45,7 +47,7 @@ class AppointmentRepositoryFirestore(
   override fun observeAppointment(uid: String, id: String): Flow<Appointment?> {
     requirePathSegment(uid)
     requirePathSegment(id)
-    return callbackFlow {
+    return SessionAccess.snapshots {
       val registration =
           collection(uid).document(id).addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -58,31 +60,33 @@ class AppointmentRepositoryFirestore(
     }
   }
 
-  override suspend fun addAppointment(uid: String, appointment: Appointment): String {
-    requirePathSegment(uid)
-    require(appointment.isValid()) { "Invalid appointment" }
-    // Generate a fresh ID locally, ignoring any identity or creation time supplied by the caller.
-    val document = collection(uid).document()
-    document
-        .set(
-            mapOf(
-                FIELD_TITLE to appointment.title,
-                FIELD_SCHEDULED_AT to Timestamp(appointment.scheduledAt),
-                FIELD_TYPE to appointment.type.name,
-                FIELD_LOCATION to appointment.location,
-                FIELD_NOTES to appointment.notes,
-                FIELD_CREATED_AT to FieldValue.serverTimestamp(),
+  override suspend fun addAppointment(uid: String, appointment: Appointment): String =
+      SessionAccess.operation {
+        requirePathSegment(uid)
+        require(appointment.isValid()) { "Invalid appointment" }
+        // Generate a fresh ID locally, ignoring any identity or creation time supplied by the
+        // caller.
+        val document = collection(uid).document()
+        document
+            .set(
+                mapOf(
+                    FIELD_TITLE to appointment.title,
+                    FIELD_SCHEDULED_AT to Timestamp(appointment.scheduledAt),
+                    FIELD_TYPE to appointment.type.name,
+                    FIELD_LOCATION to appointment.location,
+                    FIELD_NOTES to appointment.notes,
+                    FIELD_CREATED_AT to FieldValue.serverTimestamp(),
+                )
             )
-        )
-        .addOnFailureListener { error ->
-          Log.e(
-              TAG,
-              "Appointment write ${document.id} was rejected; the local write was rolled back",
-              error,
-          )
-        }
-    return document.id
-  }
+            .addOnFailureListener { error ->
+              Log.e(
+                  TAG,
+                  "Appointment write ${document.id} was rejected; the local write was rolled back",
+                  error,
+              )
+            }
+        return@operation document.id
+      }
 
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)

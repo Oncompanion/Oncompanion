@@ -1,18 +1,26 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.session.FakeCleanupJournal
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
@@ -38,11 +46,13 @@ class SignOutNavigationTest {
   private lateinit var actions: NavigationActions
 
   // The app's repositories, put back after each test
+  private val originalSignOut = SignOutProvider.signOut
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appProfileRepository = UserProfileRepositoryProvider.repository
 
   @After
   fun restoreProviders() {
+    SignOutProvider.signOut = originalSignOut
     AuthRepositoryProvider.repository = appAuthRepository
     UserProfileRepositoryProvider.repository = appProfileRepository
   }
@@ -60,12 +70,24 @@ class SignOutNavigationTest {
     profiles.seed(UserProfile(user.uid, Role.PATIENT, "Alex", cancerType = "Private diagnosis"))
     AuthRepositoryProvider.repository = auth
     UserProfileRepositoryProvider.repository = profiles
+    SignOutProvider.signOut =
+        SignOut(auth, FakeLocalSessionRepository()).apply { initialize(FakeCleanupJournal()) }
     compose.setContent {
-      val context = LocalContext.current
-      nav = remember {
-        TestNavHostController(context).apply { navigatorProvider.addNavigator(ComposeNavigator()) }
+      val generation by SignOutProvider.signOut.generation.collectAsStateWithLifecycle()
+      key(generation) {
+        val context = LocalContext.current
+        nav = remember {
+          TestNavHostController(context).apply {
+            navigatorProvider.addNavigator(ComposeNavigator())
+          }
+        }
+        actions = remember(nav) { NavigationActions(nav) }
+        AppNavHost(
+            nav,
+            if (generation > 0) Route.AUTH else Route.OVERVIEW,
+            credentialProvider = credentials,
+        )
       }
-      AppNavHost(nav, Route.OVERVIEW, credentialProvider = credentials)
     }
     compose.runOnIdle { actions = NavigationActions(nav) }
   }
@@ -141,21 +163,19 @@ class SignOutNavigationTest {
   }
 
   @Test
-  fun firebaseSignOutFailureKeepsProfileAndNeverOpensLogin() {
+  fun firebaseSignOutFailureBlocksAllPersonalScreensUntilCleanupRetry() {
     content()
     compose.onNodeWithTag(C.Tag.overview_shortcut_profile).performClick()
     compose.runOnIdle { auth.signOutError = IllegalStateException("Immediate failure") }
     compose.onNodeWithTag(C.Tag.profile_sign_out).performClick()
     compose.onNodeWithTag(C.Tag.profile_sign_out_confirm).performClick()
-    compose.onNodeWithTag(C.Tag.profile_sign_out_error).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.auth_cleanup_retry).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
-    compose.runOnIdle {
-      assertEquals(Screen.PROFILE, actions.currentRoute())
-      assertNotNull(auth.currentUser)
-      assertTrue(credentials.clearRequests.isEmpty())
-    }
-    compose.onNodeWithTag(C.Tag.profile_sign_out_cancel).performClick()
-    compose.onNodeWithTag(C.Tag.profile_cancer_type).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.profile_cancer_type).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+    compose.runOnIdle { auth.signOutError = null }
+    compose.onNodeWithTag(C.Tag.auth_cleanup_retry).performClick()
+    compose.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
   }
 
   @Test

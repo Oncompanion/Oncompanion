@@ -36,8 +36,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -98,7 +101,13 @@ fun ProfileContent(
     modifier: Modifier = Modifier,
 ) {
   val confirmation = uiState as? ProfileUiState.ConfirmingSignOut
-  val profile = confirmation?.profile ?: uiState
+  val stayFocus = remember { FocusRequester() }
+  LaunchedEffect(confirmation?.pendingChanges) {
+    if (confirmation?.pendingChanges == true) stayFocus.requestFocus()
+  }
+  val profile =
+      if (confirmation?.isSigningOut == true) ProfileUiState.Loading
+      else confirmation?.profile ?: uiState
   val signingOut = confirmation?.isSigningOut == true
   // Credential cleanup may suspend after Firebase sign-out; Back must not reveal the old session.
   BackHandler(enabled = signingOut) {}
@@ -110,7 +119,12 @@ fun ProfileContent(
         title = { Text(stringResource(R.string.profile_sign_out_title)) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.profile_sign_out_message))
+            Text(
+                stringResource(
+                    if (confirmation.pendingChanges) R.string.profile_sign_out_unsynced
+                    else R.string.profile_sign_out_message
+                )
+            )
             if (confirmation.failed) {
               Text(
                   stringResource(R.string.profile_sign_out_failed),
@@ -127,16 +141,26 @@ fun ProfileContent(
               enabled = !signingOut,
               modifier = Modifier.testTag(C.Tag.profile_sign_out_confirm),
           ) {
-            Text(stringResource(R.string.profile_sign_out))
+            Text(
+                stringResource(
+                    if (confirmation.pendingChanges) R.string.profile_sign_out_discard
+                    else R.string.profile_sign_out
+                )
+            )
           }
         },
         dismissButton = {
           TextButton(
               onClick = onCancelSignOut,
               enabled = !signingOut,
-              modifier = Modifier.testTag(C.Tag.profile_sign_out_cancel),
+              modifier = Modifier.testTag(C.Tag.profile_sign_out_cancel).focusRequester(stayFocus),
           ) {
-            Text(stringResource(R.string.profile_sign_out_cancel))
+            Text(
+                stringResource(
+                    if (confirmation.pendingChanges) R.string.profile_sign_out_stay
+                    else R.string.profile_sign_out_cancel
+                )
+            )
           }
         },
     )
