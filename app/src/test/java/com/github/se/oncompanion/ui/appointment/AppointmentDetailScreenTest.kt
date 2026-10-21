@@ -2,9 +2,14 @@
 
 package com.github.se.oncompanion.ui.appointment
 
+import android.content.Context
+import android.provider.Settings
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.unit.Density
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
@@ -92,5 +97,43 @@ class AppointmentDetailScreenTest {
     compose.onNodeWithText("Follow-up").assertIsDisplayed()
     compose.runOnIdle { repository.seed("uid-patient", appointment.copy(title = "Updated")) }
     compose.onNodeWithText("Updated").assertIsDisplayed()
+  }
+
+  /** Calendar date includes the year and time follows the device clock preference and zone. */
+  @Test
+  fun dateAndTimeUseDisplayZoneAndClockPreference() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val previous = Settings.System.getString(context.contentResolver, Settings.System.TIME_12_24)
+    try {
+      Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, "24")
+      compose.setContent {
+        AppointmentDetailContent(
+            AppointmentDetailUiState.Loaded(appointment),
+            {},
+            {},
+            ZoneId.of("Europe/Zurich"),
+        )
+      }
+      compose.onNodeWithText("Fri 23 Oct 2026 · 01:00").assertIsDisplayed()
+    } finally {
+      Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, previous)
+    }
+  }
+
+  /** Optional fields vary independently and long text remains reachable at large font sizes. */
+  @Test
+  fun optionalFieldsAndLargeText() {
+    var current by mutableStateOf(appointment.copy(location = null))
+    compose.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+        AppointmentDetailContent(AppointmentDetailUiState.Loaded(current), {}, {})
+      }
+    }
+    compose.onNodeWithText("Location").assertDoesNotExist()
+    compose.onNodeWithText("Bring documents").performScrollTo().assertIsDisplayed()
+    compose.runOnIdle { current = appointment.copy(notes = null) }
+    compose.onNodeWithText("Notes").assertDoesNotExist()
+    compose.onNodeWithText("Room 3").performScrollTo().assertIsDisplayed()
   }
 }

@@ -19,6 +19,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
@@ -134,7 +136,16 @@ fun AppNavHost(
             navigationActions,
             planningViewModel,
             onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+            onOpenAppointment = { navigationActions.navigateTo(Screen.appointmentDetail(it)) },
         )
+      }
+      composable(
+          Screen.APPOINTMENT_DETAIL,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
       }
       composable(
           Screen.APPOINTMENT_ADD,

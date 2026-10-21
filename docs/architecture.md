@@ -198,7 +198,10 @@ Figma's entry-detail layout using the recorded type, title, start date/time and 
 and notes. No end time or reminder is inferred. `AppointmentDetailViewModel` reads the appointment
 repository directly, cancels old observations and clears private content on account changes.
 An unavailable cached snapshot does not confirm server-side deletion; read errors offer retry.
-Edit and Delete actions are separate follow-up tasks.
+Planning appointment rows and Overview's next-appointment card open the same detail destination.
+Overview preserves the source appointment ID rather than deriving it from display text. Back pops
+the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
+Unsupported Planning rows do not expose a clickable action. Edit and Delete are separate tasks.
 
 ## Appointment storage
 
