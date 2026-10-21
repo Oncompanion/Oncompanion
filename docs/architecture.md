@@ -191,6 +191,15 @@ Local times are resolved in the display zone: spring gaps require correction, au
 times require an offset choice. Account changes clear private input and suppress stale completion.
 Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
 
+## Appointment details (issue #205)
+
+`AppointmentDetailScreen` collects one `AppointmentDetailUiState`; its stateless Content follows
+Figma's entry-detail layout using the recorded type, title, start date/time and optional location
+and notes. No end time or reminder is inferred. `AppointmentDetailViewModel` reads the appointment
+repository directly, cancels old observations and clears private content on account changes.
+An unavailable cached snapshot does not confirm server-side deletion; read errors offer retry.
+Edit and Delete actions are separate follow-up tasks.
+
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
