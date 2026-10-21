@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -39,6 +40,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.Clock
 import java.time.Instant
@@ -66,6 +68,7 @@ class OverviewScreenTest {
 
   private val appointment =
       NextAppointment(
+          id = "check-up",
           title = "Oncology check-up",
           dateTime = LocalDateTime.of(2026, 10, 4, 9, 30),
           place = "HUG, Oncology day unit",
@@ -108,6 +111,7 @@ class OverviewScreenTest {
           uiState = state,
           onShortcutClick = {},
           onOpenPlanning = {},
+          onOpenAppointment = {},
           onRetry = onRetry,
       )
     }
@@ -144,7 +148,13 @@ class OverviewScreenTest {
   fun greeting_usesTheTimeOfDay_andTheFirstName() {
     var state by mutableStateOf(loaded.copy(firstName = "Alex"))
     composeTestRule.setContent {
-      OverviewContent(uiState = state, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+      OverviewContent(
+          uiState = state,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+      )
     }
     listOf(
             9 to R.string.overview_greeting_morning_name,
@@ -287,7 +297,7 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun appointmentCard_andSeePlanning_openPlanning() {
+  fun appointmentCardOpensDetailsAndSeePlanningOpensTab() {
     val checkUp =
         PlanningItem(
             PlanningSource.Appointment("check-up"),
@@ -302,8 +312,8 @@ class OverviewScreenTest {
 
     composeTestRule.runOnIdle {
       // Planning is a tab: it opens with tab navigation, not stacked on the Overview
-      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedTabs)
-      assertEquals(emptyList<String>(), navigationActions.openedRoutes)
+      assertEquals(listOf(Route.PLANNING), navigationActions.openedTabs)
+      assertEquals(listOf(Screen.appointmentDetail("check-up")), navigationActions.openedRoutes)
     }
   }
 
@@ -341,6 +351,7 @@ class OverviewScreenTest {
           uiState = loaded,
           onShortcutClick = {},
           onOpenPlanning = {},
+          onOpenAppointment = {},
           onRetry = {},
           bottomBar = { Text("bar", Modifier.testTag("bar")) },
       )
@@ -434,7 +445,13 @@ class OverviewScreenTest {
     composeTestRule.setContent {
       val density = LocalDensity.current
       CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
-        OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+        OverviewContent(
+            uiState = loaded,
+            onShortcutClick = {},
+            onOpenPlanning = {},
+            onOpenAppointment = {},
+            onRetry = {},
+        )
       }
     }
     val tops = tileTops()
@@ -464,7 +481,13 @@ class OverviewScreenTest {
   @Test
   fun overviewContent_hasNoBottomBarByDefault() {
     composeTestRule.setContent {
-      OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+      OverviewContent(
+          uiState = loaded,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+      )
     }
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
   }

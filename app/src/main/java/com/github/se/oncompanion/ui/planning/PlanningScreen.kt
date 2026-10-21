@@ -25,7 +25,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -50,6 +52,7 @@ data class PlanningActions(
     val onRetry: () -> Unit,
     val onAddAppointment: ((LocalDate) -> Unit)? = null,
     val onItemClick: ((PlanningItem) -> Unit)? = null,
+    val canOpenItem: (PlanningItem) -> Boolean = { true },
 )
 
 /** The Planning tab, collecting calendar state and reusing the app's bottom navigation. */
@@ -59,8 +62,14 @@ fun PlanningScreen(
     viewModel: PlanningViewModel,
     modifier: Modifier = Modifier,
     onAddAppointment: ((LocalDate) -> Unit)? = null,
+    onOpenAppointment: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  val openAppointment: (PlanningItem) -> Unit = { item ->
+    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        onOpenAppointment((item.source as PlanningSource.Appointment).appointmentId)
+  }
   LifecycleResumeEffect(viewModel) {
     viewModel.refreshToday()
     onPauseOrDispose {}
@@ -77,6 +86,8 @@ fun PlanningScreen(
               viewModel::goToToday,
               viewModel::retry,
               onAddAppointment = onAddAppointment,
+              onItemClick = openAppointment,
+              canOpenItem = { it.source is PlanningSource.Appointment },
           ),
       modifier = modifier,
       bottomBar = {
@@ -164,6 +175,7 @@ fun PlanningContent(
             actions.onRetry,
             actions.onItemClick,
             Modifier.weight(1f),
+            canOpenItem = actions.canOpenItem,
         )
       }
       actions.onAddAppointment?.let { onAdd ->
@@ -277,6 +289,7 @@ internal fun PlanningAgenda(
     onItemClick: ((PlanningItem) -> Unit)?,
     modifier: Modifier = Modifier,
     canAdd: Boolean = false,
+    canOpenItem: (PlanningItem) -> Boolean = { true },
 ) {
   // Save scrolling with the tab, but start at the top when a different day is selected.
   val listState =
@@ -331,7 +344,7 @@ internal fun PlanningAgenda(
             AgendaHeading(R.string.planning_no_set_time, C.Tag.planning_no_set_time)
           }
           items(state.untimedItems, key = { it.key }) { item ->
-            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick.takeIf { canOpenItem(item) })
           }
         }
         if (state.scheduledItems.isNotEmpty()) {
@@ -339,7 +352,7 @@ internal fun PlanningAgenda(
             AgendaHeading(R.string.planning_scheduled, C.Tag.planning_scheduled)
           }
           items(state.scheduledItems, key = { it.key }) { item ->
-            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick.takeIf { canOpenItem(item) })
           }
         }
       }

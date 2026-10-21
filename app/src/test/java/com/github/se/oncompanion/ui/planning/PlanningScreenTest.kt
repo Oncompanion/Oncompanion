@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.planning
@@ -52,6 +53,7 @@ class PlanningScreenTest {
       next: () -> Unit = {},
       today: () -> Unit = {},
       fontScale: Float = 1f,
+      canOpen: (PlanningItem) -> Boolean = { true },
   ) {
     compose.setContent {
       CompositionLocalProvider(
@@ -62,7 +64,7 @@ class PlanningScreenTest {
               state,
               date,
               zone,
-              PlanningActions(onDate, previous, next, today, onRetry, onAdd, onItem),
+              PlanningActions(onDate, previous, next, today, onRetry, onAdd, onItem, canOpen),
           )
         }
       }
@@ -346,4 +348,21 @@ class PlanningScreenTest {
   @Test fun displays24HourTime() = checkTimeFormat("24", "09:00")
 
   @Test fun displays12HourTime() = checkTimeFormat("12", "9:00 AM")
+
+  /** Unsupported source types have no misleading clickable accessibility action. */
+  @Test
+  fun onlySupportedItemsAreClickable() {
+    val med = medication()
+    val event = item.copy(source = PlanningSource.Event("event"), title = "Event")
+    var opened: PlanningItem? = null
+    render(
+        state(listOf(item, med, event)),
+        onItem = { opened = it },
+        canOpen = { it.source is PlanningSource.Appointment },
+    )
+    compose.onNodeWithTag(C.Tag.planningItem(med.key)).assertHasNoClickAction()
+    compose.onNodeWithTag(C.Tag.planningItem(event.key)).assertHasNoClickAction()
+    compose.onNodeWithTag(C.Tag.planningItem(item.key)).assertHasClickAction().performClick()
+    assertEquals(item, opened)
+  }
 }

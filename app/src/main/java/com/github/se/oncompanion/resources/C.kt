@@ -8,6 +8,10 @@ package com.github.se.oncompanion.resources
 object C {
   object Tag {
     // Appointment form
+    const val appointment_detail = "appointment_detail"
+    const val appointment_detail_loading = "appointment_detail_loading"
+    const val appointment_detail_feedback = "appointment_detail_feedback"
+    const val appointment_detail_retry = "appointment_detail_retry"
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
     const val appointment_title = "appointment_title"

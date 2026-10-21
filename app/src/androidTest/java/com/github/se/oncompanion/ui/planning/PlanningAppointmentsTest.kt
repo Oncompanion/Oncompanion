@@ -68,6 +68,7 @@ class PlanningAppointmentsTest {
                 scheduledAt =
                     LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
                 location = "HUG",
+                notes = "Bring appointment documents",
             ),
         )
         db.waitForPendingWrites().await()
@@ -94,6 +95,19 @@ class PlanningAppointmentsTest {
           .asAndroidBitmap()
           .compress(Bitmap.CompressFormat.PNG, 100, it)
     }
+    // The same cached document remains readable in details without reconnecting.
+    compose.onNodeWithText("Offline consultation").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail).assertIsDisplayed()
+    compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
+    File(context.cacheDir, "appointment-details-offline.png").outputStream().use {
+      compose
+          .onRoot()
+          .captureToImage()
+          .asAndroidBitmap()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithText("Offline consultation").assertIsDisplayed()
   }
 
   /** Confirms the actual form enqueues offline and its new row appears before reconnecting. */
