@@ -111,6 +111,14 @@ class AppointmentRepositoryFirestore(
         }
   }
 
+  override suspend fun deleteAppointment(uid: String, id: String) {
+    requirePathSegment(uid)
+    requirePathSegment(id)
+    collection(uid).document(id).delete().addOnFailureListener { error ->
+      Log.e(TAG, "Appointment deletion $id was rejected; the local removal was rolled back", error)
+    }
+  }
+
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
 

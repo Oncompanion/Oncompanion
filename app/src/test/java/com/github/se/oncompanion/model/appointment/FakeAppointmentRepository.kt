@@ -119,6 +119,17 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     }
   }
 
+  override suspend fun deleteAppointment(uid: String, id: String) {
+    requirePathSegment(uid)
+    requirePathSegment(id)
+    writeError?.let { throw it }
+    store.update { current ->
+      val appointments = current[uid]
+      if (appointments == null || id !in appointments) current
+      else current + (uid to (appointments - id))
+    }
+  }
+
   private fun requirePathSegment(value: String) {
     require(value.isNotBlank() && '/' !in value) { "Invalid document path segment" }
   }

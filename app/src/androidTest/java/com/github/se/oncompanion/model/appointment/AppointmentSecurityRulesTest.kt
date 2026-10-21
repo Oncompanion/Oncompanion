@@ -272,7 +272,7 @@ class AppointmentSecurityRulesTest {
    * Valid updates work through partial, merged and replacement writes without changing metadata.
    */
   @Test
-  fun ownerCanUpdateWhileCreationMetadataAndDeletionStayProtected(): Unit = runBlocking {
+  fun ownerCanUpdateWhileCreationMetadataStaysProtected(): Unit = runBlocking {
     val document = appointments().document()
     allowed(document.set(validFields()))
     val createdAt = allowed(document.get(Source.SERVER)).getTimestamp("createdAt")
@@ -289,7 +289,6 @@ class AppointmentSecurityRulesTest {
     denied(document.update("createdAt", Timestamp(Instant.EPOCH)))
     denied(document.update("createdAt", com.google.firebase.firestore.FieldValue.delete()))
     denied(document.set(validFields()))
-    denied(document.delete())
     assertEquals("Replacement", allowed(document.get(Source.SERVER)).getString("title"))
   }
 
@@ -319,6 +318,16 @@ class AppointmentSecurityRulesTest {
       denied(document.update(field, com.google.firebase.firestore.FieldValue.delete()))
     }
     assertEquals("Oncology consultation", allowed(document.get(Source.SERVER)).getString("title"))
+  }
+
+  /** Only the owner can remove a valid appointment, including repeated deletion. */
+  @Test
+  fun ownerCanDeleteAppointment(): Unit = runBlocking {
+    val document = appointments().document()
+    allowed(document.set(validFields()))
+    allowed(document.delete())
+    allowed(document.delete())
+    assertTrue(!allowed(document.get(Source.SERVER)).exists())
   }
 
   /** Does not accidentally grant access to unrecognized subcollections under appointments. */

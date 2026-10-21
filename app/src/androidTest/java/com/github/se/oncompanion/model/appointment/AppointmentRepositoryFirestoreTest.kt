@@ -172,6 +172,83 @@ class AppointmentRepositoryFirestoreTest {
     assertEquals(original, storedAppointment(id))
   }
 
+  /** Public mutations update both observers, and repeated deletion is harmless. */
+  @Test
+  fun publicMutationsReachActiveListAndDetailObservers(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val lists = Channel<List<Appointment>>(Channel.UNLIMITED)
+    val details = Channel<Appointment?>(Channel.UNLIMITED)
+    val listJob = launch { repository.observeAppointments(uid).collect { lists.send(it) } }
+    val detailJob = launch { repository.observeAppointment(uid, id).collect { details.send(it) } }
+    suspend fun expect(title: String?) =
+        withTimeout(10_000) {
+          while (lists.receive().firstOrNull()?.title != title) {
+            /* Wait for the matching snapshot. */
+          }
+          while (details.receive()?.title != title) {
+            /* Wait for the matching snapshot. */
+          }
+        }
+    try {
+      expect(original.title)
+      repository.updateAppointment(uid, original.copy(title = "Changed"))
+      expect("Changed")
+      repository.deleteAppointment(uid, id)
+      expect(null)
+      acknowledgeWrites()
+      assertFalse(serverDocument(id).exists())
+      repository.deleteAppointment(uid, id)
+      repository.deleteAppointment(uid, "missing")
+      acknowledgeWrites()
+      assertFalse(serverDocument(id).exists())
+    } finally {
+      listJob.cancel()
+      detailJob.cancel()
+    }
+  }
+
+  /** Offline deletion is applied locally before reconnecting, then synchronized to the server. */
+  @Test
+  fun offlineDeletionIsVisibleAndThenSynchronizes(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    requireNotNull(storedAppointment(id))
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.deleteAppointment(uid, id) }
+      withTimeout(10_000) { repository.observeAppointment(uid, id).first { it == null } }
+      assertFalse(collection().document(id).get(Source.CACHE).await().exists())
+      assertTrue(
+          withTimeout(10_000) { repository.observeAppointments(uid).first { it.isEmpty() } }
+              .isEmpty()
+      )
+    } finally {
+      db.enableNetwork().await()
+    }
+    acknowledgeWrites()
+    assertFalse(serverDocument(id).exists())
+  }
+
+  /** Invalid owner/document paths cannot enqueue a deletion. */
+  @Test
+  fun invalidDeletionPathsLeaveStoredAppointmentUnchanged(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.deleteAppointment(value, id) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.deleteAppointment(uid, value) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    assertTrue(serverDocument(id).exists())
+  }
+
   /** Keeps the default instance constructor compatible with the emulator-connected SDK. */
   @Test
   fun defaultConstructorUsesTheSharedInstance(): Unit = runBlocking {

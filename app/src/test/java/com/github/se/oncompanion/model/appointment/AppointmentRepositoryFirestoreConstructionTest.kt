@@ -67,6 +67,10 @@ class AppointmentRepositoryFirestoreConstructionTest {
             )
         for (uid in listOf("", " ", "alice/nested")) {
           assertTrue(
+              runCatching { repository.deleteAppointment(uid, "entry") }.exceptionOrNull()
+                  is IllegalArgumentException
+          )
+          assertTrue(
               runCatching { repository.updateAppointment(uid, valid.copy(id = "entry")) }
                   .exceptionOrNull() is IllegalArgumentException
           )
@@ -85,6 +89,10 @@ class AppointmentRepositoryFirestoreConstructionTest {
         }
         for (id in listOf("", " ", "entry/nested")) {
           assertTrue(
+              runCatching { repository.deleteAppointment("alice", id) }.exceptionOrNull()
+                  is IllegalArgumentException
+          )
+          assertTrue(
               runCatching { repository.updateAppointment("alice", valid.copy(id = id)) }
                   .exceptionOrNull() is IllegalArgumentException
           )
@@ -95,8 +103,8 @@ class AppointmentRepositoryFirestoreConstructionTest {
         }
         assertTrue(
             runCatching {
-                  repository.updateAppointment("alice", valid.copy(id = "entry", title = ""))
-                }
+              repository.updateAppointment("alice", valid.copy(id = "entry", title = ""))
+            }
                 .exceptionOrNull() is IllegalArgumentException
         )
         assertTrue(

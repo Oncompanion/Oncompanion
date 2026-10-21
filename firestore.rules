@@ -182,10 +182,10 @@ service cloud.firestore {
       }
 
       // ---------- Appointments ----------
-      // /users/{uid}/appointments/{appointmentId}: owner reads, creates and valid updates.
-      // Deletion and caregiver access remain denied.
+      // /users/{uid}/appointments/{appointmentId}: owner reads, validated writes and deletion.
+      // Caregiver access remains denied.
       match /appointments/{appointmentId} {
-        allow read: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidAppointment(request.resource.data)
                       && request.resource.data.createdAt == request.time;

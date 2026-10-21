@@ -127,6 +127,59 @@ class FakeAppointmentRepositoryTest {
     assertEquals(listOf(changed), repository.appointments("alice"))
   }
 
+  /** Removal reaches existing list/detail observers while another patient's data is untouched. */
+  @Test
+  fun deletionNotifiesObserversAndKeepsUsersSeparated() = runTest {
+    val original = appointment(id = "shared")
+    repository.seed("alice", original)
+    repository.seed("bob", original)
+    val lists = mutableListOf<List<Appointment>>()
+    val details = mutableListOf<Appointment?>()
+    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+      repository.observeAppointments("alice").toList(lists)
+    }
+    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+      repository.observeAppointment("alice", original.id).toList(details)
+    }
+    runCurrent()
+    repository.deleteAppointment("alice", original.id)
+    runCurrent()
+    repository.deleteAppointment("alice", original.id)
+    repository.deleteAppointment("nobody", "missing")
+    runCurrent()
+    assertEquals(listOf(listOf(original), emptyList<Appointment>()), lists)
+    assertEquals(listOf(original, null), details)
+    assertEquals(listOf(original), repository.appointments("bob"))
+    assertTrue(repository.appointments("nobody").isEmpty())
+  }
+
+  /** Invalid paths and simulated failures leave the appointment available for a retry. */
+  @Test
+  fun invalidAndFailedDeletionsLeaveStorageUnchanged() = runTest {
+    val original = appointment(id = "saved")
+    repository.seed("alice", original)
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.deleteAppointment(value, original.id) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.deleteAppointment("alice", value) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    val failure = IllegalStateException("Write failed")
+    repository.writeError = failure
+    assertSame(
+        failure,
+        runCatching { repository.deleteAppointment("alice", original.id) }.exceptionOrNull(),
+    )
+    assertEquals(listOf(original), repository.appointments("alice"))
+    repository.writeError = null
+    repository.deleteAppointment("alice", original.id)
+    assertTrue(repository.appointments("alice").isEmpty())
+  }
+
   /** Distinguishes an empty collection from an existing appointment. */
   @Test
   fun emptyStoreEmitsAnEmptyListAndMissingObservationEmitsNull() = runTest {

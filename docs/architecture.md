@@ -197,7 +197,9 @@ Drafts survive rotation via their ViewModel, but process-death restoration is no
 changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
 is not recreated. Writes return after enqueueing, including offline; later server rejection is logged
 and may roll back local changes. Return does not confirm server acceptance or a disk flush. Owner
-updates validate the resulting document and preserve creation metadata. Detail/edit UI remains planned.
+updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
+owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
+list/detail observations, with no second Planning write. Detail/edit/delete UI remains planned.
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 

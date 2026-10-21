@@ -43,6 +43,16 @@ interface AppointmentRepository {
   suspend fun updateAppointment(uid: String, appointment: Appointment)
 
   /**
+   * Enqueues deletion of appointment [id] for [uid], including offline. Deleting an absent document
+   * is harmless. Returns without server acknowledgement or an independently verified disk flush.
+   * Immediate enqueue failures are thrown; deferred server rejection is logged and may restore the
+   * locally removed appointment.
+   *
+   * @throws IllegalArgumentException if [uid] or [id] is blank or contains a path separator
+   */
+  suspend fun deleteAppointment(uid: String, id: String)
+
+  /**
    * Enqueues a new appointment for [uid] and returns its generated ID without waiting for server
    * acknowledgement, including offline. The supplied ID and creation timestamp are ignored.
    *
