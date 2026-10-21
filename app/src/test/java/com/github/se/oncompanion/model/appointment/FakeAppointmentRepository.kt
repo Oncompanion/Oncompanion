@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.model.appointment
@@ -34,7 +36,7 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   /** When set, either observation fails with this exception when collection starts. */
   var observeError: Exception? = null
 
-  /** When set, adding an appointment fails without changing storage. */
+  /** When set, writing an appointment fails without changing storage. */
   var writeError: Exception? = null
 
   /** Returns a snapshot of [uid]'s stored appointments, without imposing an order. */
@@ -98,6 +100,23 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     } while (store.value.values.any { id in it })
     seed(uid, appointment.copy(id = id, createdAt = clock.instant()))
     return id
+  }
+
+  override suspend fun updateAppointment(uid: String, appointment: Appointment) {
+    requirePathSegment(uid)
+    requirePathSegment(appointment.id)
+    require(appointment.isValid()) { "Invalid appointment" }
+    writeError?.let { throw it }
+    // An absent record stays absent; this fake does not simulate deferred server rejection.
+    store.update { current ->
+      val existing = current[uid]?.get(appointment.id)
+      if (existing == null) current
+      else
+          current +
+              (uid to
+                  (current.getValue(uid) +
+                      (appointment.id to appointment.copy(createdAt = existing.createdAt))))
+    }
   }
 
   private fun requirePathSegment(value: String) {

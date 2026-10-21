@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -266,16 +268,56 @@ class AppointmentSecurityRulesTest {
     }
   }
 
-  /** Leaves every update path and deletion denied until those features are implemented. */
+  /**
+   * Valid updates work through partial, merged and replacement writes without changing metadata.
+   */
   @Test
-  fun ownerCannotUpdateReplaceMergeOrDelete(): Unit = runBlocking {
+  fun ownerCanUpdateWhileCreationMetadataAndDeletionStayProtected(): Unit = runBlocking {
     val document = appointments().document()
     allowed(document.set(validFields()))
-    denied(document.update("title", "Changed"))
-    denied(document.set(validFields()))
-    denied(document.set(mapOf("title" to "Changed"), SetOptions.merge()))
+    val createdAt = allowed(document.get(Source.SERVER)).getTimestamp("createdAt")
+    allowed(document.update("title", "Changed", "location", null, "notes", null))
+    allowed(document.set(mapOf("title" to "Merged"), SetOptions.merge()))
+    allowed(
+        document.set(
+            validFields().apply {
+              put("createdAt", createdAt)
+              put("title", "Replacement")
+            }
+        )
+    )
     denied(document.update("createdAt", Timestamp(Instant.EPOCH)))
+    denied(document.update("createdAt", com.google.firebase.firestore.FieldValue.delete()))
+    denied(document.set(validFields()))
     denied(document.delete())
+    assertEquals("Replacement", allowed(document.get(Source.SERVER)).getString("title"))
+  }
+
+  /** Updates must retain the full schema and enforce the same bounds and types as creation. */
+  @Test
+  fun invalidUpdatesAreDenied(): Unit = runBlocking {
+    val document = appointments().document()
+    allowed(document.set(validFields()))
+    for (fields in
+        listOf(
+            mapOf("title" to " "),
+            mapOf("title" to "x".repeat(101)),
+            mapOf("title" to 42),
+            mapOf("type" to "UNKNOWN"),
+            mapOf("type" to null),
+            mapOf("scheduledAt" to "tomorrow"),
+            mapOf("location" to "x".repeat(201)),
+            mapOf("location" to 42),
+            mapOf("notes" to "x".repeat(1001)),
+            mapOf("notes" to 42),
+            mapOf("ownerUid" to "another-patient"),
+            mapOf("extra" to true),
+        )) {
+      denied(document.update(fields))
+    }
+    for (field in listOf("title", "scheduledAt", "type", "createdAt")) {
+      denied(document.update(field, com.google.firebase.firestore.FieldValue.delete()))
+    }
     assertEquals("Oncology consultation", allowed(document.get(Source.SERVER)).getString("title"))
   }
 

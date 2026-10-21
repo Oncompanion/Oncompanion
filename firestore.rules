@@ -182,13 +182,16 @@ service cloud.firestore {
       }
 
       // ---------- Appointments ----------
-      // /users/{uid}/appointments/{appointmentId}: only the owner can read and create.
-      // Editing, deletion and caregiver access stay denied until their features are implemented.
+      // /users/{uid}/appointments/{appointmentId}: owner reads, creates and valid updates.
+      // Deletion and caregiver access remain denied.
       match /appointments/{appointmentId} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidAppointment(request.resource.data)
                       && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+                      && isValidAppointment(request.resource.data)
+                      && request.resource.data.createdAt == resource.data.createdAt;
       }
 
       // ---------- Care circle ----------

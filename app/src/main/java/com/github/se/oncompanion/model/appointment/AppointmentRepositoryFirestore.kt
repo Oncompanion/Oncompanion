@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import android.util.Log
@@ -82,6 +84,31 @@ class AppointmentRepositoryFirestore(
           )
         }
     return document.id
+  }
+
+  override suspend fun updateAppointment(uid: String, appointment: Appointment) {
+    requirePathSegment(uid)
+    requirePathSegment(appointment.id)
+    require(appointment.isValid()) { "Invalid appointment" }
+    // Update only editable fields so missing documents and creation metadata stay protected.
+    collection(uid)
+        .document(appointment.id)
+        .update(
+            mapOf(
+                FIELD_TITLE to appointment.title,
+                FIELD_SCHEDULED_AT to Timestamp(appointment.scheduledAt),
+                FIELD_TYPE to appointment.type.name,
+                FIELD_LOCATION to appointment.location,
+                FIELD_NOTES to appointment.notes,
+            )
+        )
+        .addOnFailureListener { error ->
+          Log.e(
+              TAG,
+              "Appointment update ${appointment.id} was rejected; local changes rolled back",
+              error,
+          )
+        }
   }
 
   private fun collection(uid: String) =

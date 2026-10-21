@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -85,6 +87,90 @@ class AppointmentRepositoryFirestoreTest {
             "type":{"stringValue":"CONSULTATION"},
             "createdAt":{"timestampValue":"2026-10-10T12:00:00Z"}}"""
       )
+
+  /** Editable fields change in place while server-assigned creation metadata stays intact. */
+  @Test
+  fun updateChangesFieldsAndPreservesCreationMetadata(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val changed =
+        original.copy(
+            title = "Treatment",
+            scheduledAt = Instant.parse("2026-10-18T14:00:00Z"),
+            type = AppointmentType.TREATMENT,
+            location = null,
+            notes = null,
+            createdAt = Instant.EPOCH,
+        )
+    repository.updateAppointment(uid, changed)
+    acknowledgeWrites()
+    assertEquals(changed.copy(createdAt = original.createdAt), storedAppointment(id))
+    assertEquals(1, withTimeout(10_000) { collection().get(Source.SERVER).await() }.size())
+  }
+
+  /** Local updates are visible offline and reach the server after reconnection. */
+  @Test
+  fun offlineUpdateIsVisibleAndThenSynchronizes(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val changed = original.copy(title = "Rescheduled", location = null, notes = null)
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.updateAppointment(uid, changed) }
+      val visible =
+          withTimeout(10_000) {
+            repository.observeAppointment(uid, id).first { it?.title == changed.title }
+          }
+      assertEquals(changed, visible)
+      assertTrue(collection().document(id).get(Source.CACHE).await().metadata.hasPendingWrites())
+    } finally {
+      db.enableNetwork().await()
+    }
+    acknowledgeWrites()
+    assertEquals(changed.title, serverDocument(id).getString("title"))
+    assertEquals(original.createdAt, serverDocument(id).getTimestamp("createdAt")!!.toInstant())
+  }
+
+  /** Updating a missing document never silently creates a replacement appointment. */
+  @Test
+  fun updateMissingDocumentDoesNotCreateIt(): Unit = runBlocking {
+    repository.updateAppointment(uid, appointment().copy(id = "missing"))
+    acknowledgeWrites()
+    assertFalse(serverDocument("missing").exists())
+  }
+
+  /** Invalid document paths and patient fields fail before any mutation is enqueued. */
+  @Test
+  fun invalidUpdatesLeaveStoredAppointmentUnchanged(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.updateAppointment(value, original) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.updateAppointment(uid, original.copy(id = value)) }
+              .exceptionOrNull() is IllegalArgumentException
+      )
+    }
+    for (invalid in
+        listOf(
+            original.copy(title = " "),
+            original.copy(location = "x".repeat(201)),
+            original.copy(notes = "x".repeat(1001)),
+            original.copy(scheduledAt = Instant.MAX),
+        )) {
+      assertTrue(
+          runCatching { repository.updateAppointment(uid, invalid) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    assertEquals(original, storedAppointment(id))
+  }
 
   /** Keeps the default instance constructor compatible with the emulator-connected SDK. */
   @Test

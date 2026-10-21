@@ -193,6 +193,12 @@ Drafts survive rotation via their ViewModel, but process-death restoration is no
 
 ## Appointment storage
 
+`AppointmentRepository.updateAppointment` updates editable fields on an existing document without
+changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
+is not recreated. Writes return after enqueueing, including offline; later server rejection is logged
+and may roll back local changes. Return does not confirm server acceptance or a disk flush. Owner
+updates validate the resulting document and preserve creation metadata. Detail/edit UI remains planned.
+
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 
 ## Prescription scan
