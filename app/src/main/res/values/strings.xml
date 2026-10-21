@@ -48,6 +48,11 @@
     <string name="profile_retry">Retry</string>
     <string name="profile_sign_out">Sign out</string>
     <string name="profile_sign_out_title">Sign out?</string>
+    <string name="profile_sign_out_unsynced">Some changes could not be confirmed as saved online. Signing out now will permanently discard any unsynchronized changes on this device. Changes already saved online will be kept.</string>
+    <string name="profile_sign_out_discard">Discard changes and sign out</string>
+    <string name="profile_sign_out_stay">Stay signed in</string>
+    <string name="auth_cleanup_loading">Clearing local account data…</string>
+    <string name="auth_cleanup_failed">Sign-out cleanup could not be completed. Your account data is locked on this device. Retry cleanup before signing in again.</string>
     <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
     <string name="profile_sign_out_cancel">Cancel</string>
     <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>

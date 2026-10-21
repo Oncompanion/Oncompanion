@@ -181,6 +181,8 @@ object C {
     const val profile_email = "profile_email"
     const val profile_cancer_type = "profile_cancer_type"
     const val profile_sign_out = "profile_sign_out"
+    const val auth_cleanup = "auth_cleanup"
+    const val auth_cleanup_retry = "auth_cleanup_retry"
     const val profile_sign_out_dialog = "profile_sign_out_dialog"
     const val profile_sign_out_confirm = "profile_sign_out_confirm"
     const val profile_sign_out_cancel = "profile_sign_out_cancel"

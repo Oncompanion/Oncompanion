@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion
@@ -145,7 +146,14 @@ class OfflineSavedDataTest {
       )
       after.terminate().await()
     } finally {
-      app.delete()
+      FirebaseAuth.getInstance(app).signOut()
+      runCatching {
+        val db = FirebaseFirestore.getInstance(app)
+        db.terminate().await()
+        db.clearPersistence().await()
+      }
+      // Auth's emulator registry retains this app: deleting it breaks later named-app useEmulator.
+      // Release the disk cache above, but keep the app registered until the test process exits.
     }
   }
 

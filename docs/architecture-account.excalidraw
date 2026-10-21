@@ -84,6 +84,10 @@
         {
           "id": "hospital_integration",
           "type": "arrow"
+        },
+        {
+          "id": "sign_in_auth",
+          "type": "arrow"
         }
       ],
       "updated": 1791100000000,
@@ -164,6 +168,10 @@
         {
           "type": "arrow",
           "id": "ar3"
+        },
+        {
+          "id": "signout_credentials",
+          "type": "arrow"
         }
       ],
       "updated": 1791100000000,
@@ -239,11 +247,15 @@
         },
         {
           "type": "arrow",
-          "id": "ar1"
+          "id": "ar4"
         },
         {
-          "type": "arrow",
-          "id": "ar4"
+          "id": "signout_auth",
+          "type": "arrow"
+        },
+        {
+          "id": "sign_in_auth",
+          "type": "arrow"
         }
       ],
       "updated": 1791100000000,
@@ -255,9 +267,9 @@
       "id": "auth_t",
       "type": "text",
       "x": 350,
-      "y": 417.5,
+      "y": 405.0,
       "width": 240,
-      "height": 25.0,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -278,8 +290,8 @@
       "link": null,
       "locked": false,
       "index": "a007",
-      "text": "AuthRepository",
-      "originalText": "AuthRepository",
+      "text": "AuthRepository\nLocalSessionRepository",
+      "originalText": "AuthRepository\nLocalSessionRepository",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -487,9 +499,9 @@
       "id": "fauth_t",
       "type": "text",
       "x": 350,
-      "y": 597.5,
+      "y": 585.0,
       "width": 240,
-      "height": 25.0,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -510,8 +522,8 @@
       "link": null,
       "locked": false,
       "index": "a013",
-      "text": "Firebase Auth",
-      "originalText": "Firebase Auth",
+      "text": "Firebase Auth\nFirestore lifecycle",
+      "originalText": "Firebase Auth\nFirestore lifecycle",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -661,7 +673,7 @@
       "x": 470.0,
       "y": 126,
       "width": 0.0,
-      "height": 248,
+      "height": 68,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -690,8 +702,8 @@
           0
         ],
         [
-          0.0,
-          248
+          0,
+          68
         ]
       ],
       "lastCommittedPoint": null,
@@ -707,7 +719,7 @@
       },
       "endBinding": {
         "mode": "orbit",
-        "elementId": "auth",
+        "elementId": "signout",
         "fixedPoint": [
           0.5,
           0
@@ -977,8 +989,8 @@
       "link": null,
       "locked": false,
       "index": "a022",
-      "text": "Only the user's own data: no ResolveCareCircleAccess here.",
-      "originalText": "Only the user's own data: no ResolveCareCircleAccess here.",
+      "text": "SignOut fences all repository work, then clears the local Firestore cache. Remote documents stay intact.",
+      "originalText": "SignOut fences all repository work, then clears the local Firestore cache. Remote documents stay intact.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -1965,6 +1977,269 @@
       "endBinding": {
         "mode": "orbit",
         "elementId": "hospital_service",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "signout",
+      "type": "rectangle",
+      "x": 340,
+      "y": 200,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1810010707,
+      "version": 1,
+      "versionNonce": 1649940839,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "signout_t",
+          "type": "text"
+        },
+        {
+          "id": "ar1",
+          "type": "arrow"
+        },
+        {
+          "id": "signout_auth",
+          "type": "arrow"
+        },
+        {
+          "id": "signout_credentials",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a006"
+    },
+    {
+      "id": "signout_t",
+      "type": "text",
+      "x": 350,
+      "y": 212.5,
+      "width": 240,
+      "height": 75,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1666447133,
+      "version": 1,
+      "versionNonce": 120125831,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a007",
+      "text": "SignOut\nsync / confirm discard\nlegacy queue check",
+      "originalText": "SignOut\nsync / confirm discard\nlegacy queue check",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "signout",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "signout_auth",
+      "type": "arrow",
+      "x": 470,
+      "y": 306,
+      "width": 0.0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 849613033,
+      "version": 1,
+      "versionNonce": 1899842599,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a017",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "signout",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "auth",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "sign_in_auth",
+      "type": "arrow",
+      "x": 630,
+      "y": 126,
+      "width": 24,
+      "height": 304,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 849613033,
+      "version": 1,
+      "versionNonce": 1899842599,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a017",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          304
+        ],
+        [
+          -24,
+          304
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "screens",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "auth",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "signout_credentials",
+      "type": "arrow",
+      "x": 350,
+      "y": 306,
+      "width": 150,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 849613033,
+      "version": 1,
+      "versionNonce": 1899842599,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a017",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -150,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "signout",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "cred",
         "fixedPoint": [
           0.5,
           0

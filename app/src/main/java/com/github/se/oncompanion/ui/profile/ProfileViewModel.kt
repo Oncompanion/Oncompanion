@@ -6,6 +6,9 @@ package com.github.se.oncompanion.ui.profile
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.domain.auth.SignOutProvider
+import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfileRepository
@@ -50,6 +53,7 @@ sealed interface ProfileUiState {
       val profile: ProfileUiState,
       val isSigningOut: Boolean = false,
       val failed: Boolean = false,
+      val pendingChanges: Boolean = false,
   ) : ProfileUiState
 
   /** Firebase is signed out and credential cleanup has finished; the host opens Login. */
@@ -61,6 +65,7 @@ sealed interface ProfileUiState {
 class ProfileViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    private val signOut: SignOut = SignOutProvider.signOut,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
@@ -70,6 +75,28 @@ class ProfileViewModel(
 
   init {
     observeProfile()
+    viewModelScope.launch {
+      signOut.state.collect { phase ->
+        val current = _uiState.value as? ProfileUiState.ConfirmingSignOut
+        when (phase) {
+          SignOutState.NEEDS_DISCARD_CONFIRMATION ->
+              if (current != null) {
+                _uiState.value = current.copy(isSigningOut = false, pendingChanges = true)
+              }
+          SignOutState.CLEANING,
+          SignOutState.FAILED -> {
+            observation?.cancel()
+            _uiState.value = ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true)
+          }
+          SignOutState.COMPLETE ->
+              if (current != null) {
+                observation?.cancel()
+                _uiState.value = ProfileUiState.SignOutComplete
+              }
+          else -> Unit
+        }
+      }
+    }
   }
 
   /** Restarts observing after a profile or authentication error. */
@@ -97,40 +124,19 @@ class ProfileViewModel(
   /** Dismisses confirmation while keeping the current session and profile. */
   fun cancelSignOut() {
     val state = _uiState.value as? ProfileUiState.ConfirmingSignOut ?: return
-    if (!state.isSigningOut) _uiState.value = state.profile
+    if (!state.isSigningOut) {
+      if (state.pendingChanges) signOut.staySignedIn()
+      _uiState.value = state.profile
+    }
   }
 
-  /**
-   * Reuses Firebase sign-out, immediately drops profile state, then clears the account picker. The
-   * screen supplies credential cleanup because it needs a Context, like Google sign-in. Firebase
-   * errors keep the confirmation open for retry. Credential cleanup is best effort, matching
-   * GoogleCredentialProvider: it must not leave signed-out users on authenticated screens.
-   * Firestore persistence and pending offline writes are retained; the host must destroy both
-   * active and saved authenticated navigation stacks so their ViewModels cannot be restored.
-   */
+  /** Synchronizes first; only an explicit second confirmation may discard offline changes. */
   fun confirmSignOut(clearCredentialState: suspend () -> Unit) {
     val state = _uiState.value as? ProfileUiState.ConfirmingSignOut ?: return
     if (state.isSigningOut) return
     _uiState.value = state.copy(isSigningOut = true, failed = false)
-    try {
-      authRepository.signOut()
-    } catch (error: Exception) {
-      _uiState.value = state.copy(failed = true)
-      return
-    }
-    // Stop cached profile emissions before clearing every reference to the previous user's details.
-    observation?.cancel()
-    _uiState.value = ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, isSigningOut = true)
-    viewModelScope.launch {
-      try {
-        clearCredentialState()
-      } catch (error: CancellationException) {
-        throw error
-      } catch (error: Exception) {
-        Log.w(TAG, "Couldn't clear the Google credential state after sign-out", error)
-      }
-      _uiState.value = ProfileUiState.SignOutComplete
-    }
+    if (state.pendingChanges) signOut.discard(clearCredentialState)
+    else signOut.begin(clearCredentialState)
   }
 
   private fun observeProfile() {
@@ -169,10 +175,9 @@ class ProfileViewModel(
           .collect { profile ->
             val state = _uiState.value
             _uiState.value =
-                if (
-                    state is ProfileUiState.ConfirmingSignOut && profile != ProfileUiState.SignedOut
-                )
-                    state.copy(profile = profile)
+                if (state is ProfileUiState.ConfirmingSignOut)
+                    if (state.isSigningOut || profile == ProfileUiState.SignedOut) state
+                    else state.copy(profile = profile)
                 else profile
           }
     }
