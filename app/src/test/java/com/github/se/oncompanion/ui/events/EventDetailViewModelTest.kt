@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
@@ -52,6 +53,15 @@ class EventDetailViewModelTest {
     return Clock.fixed(time.atZone(zone).toInstant(), zone)
   }
 
+  /** A clock in Zurich that the tests can move forward. */
+  private class TestClock(var time: LocalDateTime) : Clock() {
+    override fun getZone(): ZoneId = ZoneId.of("Europe/Zurich")
+
+    override fun withZone(zone: ZoneId?): Clock = this
+
+    override fun instant(): Instant = time.atZone(zone).toInstant()
+  }
+
   /** The day before [yoga] starts. */
   private val beforeYoga = LocalDateTime.of(2026, 10, 9, 10, 0)
 
@@ -60,7 +70,8 @@ class EventDetailViewModelTest {
       now: LocalDateTime = beforeYoga,
       auth: AuthRepository = signedIn(),
       events: EventRepository = FakeEventRepository(listOf(event)),
-  ) = EventDetailViewModel(event.id, events, registrations, auth, clockAt(now))
+      clock: Clock = clockAt(now),
+  ) = EventDetailViewModel(event.id, events, registrations, auth, clock)
 
   /** Returns [event] from getEvent only once [release] is completed. */
   private class SlowRepository(private val event: Event) : EventRepository {
@@ -364,5 +375,65 @@ class EventDetailViewModelTest {
     assertEquals(setOf("yoga"), registrations.registeredEventIds("alice"))
     assertFalse(viewModel.uiState.value.isConfirmingRemoval)
     assertEquals(RegistrationStatus.ERROR, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun eventStartingWhileThePageIsOpen_cantBeConfirmed() {
+    val clock = TestClock(yoga.startDateTime.minusMinutes(5))
+    val viewModel = viewModel(clock = clock)
+    assertEquals(RegistrationStatus.CAN_CONFIRM, viewModel.uiState.value.registration)
+
+    // The patient comes back after the start, before the screen refreshes
+    clock.time = yoga.startDateTime.plusMinutes(5)
+    viewModel.confirmRegistration()
+    ShadowLooper.idleMainLooper()
+
+    assertTrue(registrations.registeredEventIds("alice").isEmpty())
+    assertEquals(RegistrationStatus.CLOSED, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun refreshingAfterTheStart_closesTheRegistration() {
+    val clock = TestClock(yoga.startDateTime.minusMinutes(5))
+    val viewModel = viewModel(clock = clock)
+
+    clock.time = yoga.startDateTime
+    viewModel.refreshStatus()
+
+    assertEquals(RegistrationStatus.CLOSED, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun refreshingMoreThanADayAfterTheEvent_hidesTheConfirmation() {
+    registrations.confirm("alice", "yoga")
+    val clock = TestClock(yoga.startDateTime.plusHours(2))
+    val viewModel = viewModel(clock = clock)
+    assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
+
+    clock.time = yoga.startDateTime.plusHours(24).plusMinutes(1)
+    viewModel.refreshStatus()
+
+    assertEquals(RegistrationStatus.CLOSED, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun refreshing_keepsARegistrationError() {
+    val viewModel = viewModel()
+    registrations.writeError = IllegalStateException("invalid")
+    viewModel.confirmRegistration()
+    assertEquals(RegistrationStatus.ERROR, viewModel.uiState.value.registration)
+
+    viewModel.refreshStatus()
+
+    assertEquals(RegistrationStatus.ERROR, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun refreshing_beforeTheRegistrationIsKnown_changesNothing() {
+    val viewModel = viewModel(events = SlowRepository(yoga))
+
+    viewModel.refreshStatus()
+
+    assertEquals(RegistrationStatus.LOADING, viewModel.uiState.value.registration)
   }
 }

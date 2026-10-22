@@ -79,6 +79,11 @@ class EventDetailViewModel(
 
   private var registrationObservation: Job? = null
 
+  /**
+   * The loaded event and whether the patient confirmed it, to recompute the status as time passes.
+   */
+  private var lastRegistration: Pair<Event, Boolean>? = null
+
   init {
     loadEvent()
   }
@@ -86,6 +91,7 @@ class EventDetailViewModel(
   /** Loads (or, after an error, reloads) the event, then observes the patient's registration. */
   fun loadEvent() {
     registrationObservation?.cancel()
+    lastRegistration = null
     _uiState.value = EventDetailUiState()
     viewModelScope.launch {
       val event =
@@ -109,8 +115,20 @@ class EventDetailViewModel(
    * page then shows the confirmation once it is saved on the device.
    */
   fun confirmRegistration() {
+    // The event may have started since the status was last computed
+    refreshStatus()
     if (_uiState.value.registration != RegistrationStatus.CAN_CONFIRM) return
     changeRegistration("confirm") { uid -> registrationRepository.confirm(uid, eventId) }
+  }
+
+  /**
+   * Recomputes the registration status at the current time, e.g. once the event has started (the
+   * screen calls it each time it comes back).
+   */
+  fun refreshStatus() {
+    lastRegistration?.let { (event, isRegistered) ->
+      showRegistration(statusOf(event, isRegistered))
+    }
   }
 
   /** Asks the patient to confirm the removal. Nothing is removed before [removeRegistration]. */
@@ -148,9 +166,12 @@ class EventDetailViewModel(
           .observeIsRegistered(uid, eventId)
           .catch { e ->
             Log.e(TAG, "Failed to read the registration for event $eventId", e)
-            showRegistration(RegistrationStatus.ERROR)
+            showError()
           }
-          .collect { isRegistered -> showRegistration(statusOf(event, isRegistered)) }
+          .collect { isRegistered ->
+            lastRegistration = event to isRegistered
+            showRegistration(statusOf(event, isRegistered))
+          }
     }
   }
 
@@ -174,8 +195,14 @@ class EventDetailViewModel(
       change(uid)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to $action the registration for event $eventId", e)
-      showRegistration(RegistrationStatus.ERROR)
+      showError()
     }
+  }
+
+  /** Shows the registration error, which coming back to the screen doesn't hide. */
+  private fun showError() {
+    lastRegistration = null
+    showRegistration(RegistrationStatus.ERROR)
   }
 
   /**

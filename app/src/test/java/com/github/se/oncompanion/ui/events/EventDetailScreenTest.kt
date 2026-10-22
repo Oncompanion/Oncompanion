@@ -427,4 +427,40 @@ class EventDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.event_detail_remove_dialog).assertDoesNotExist()
     composeTestRule.runOnIdle { assertTrue(registrations.registeredEventIds("alice").isEmpty()) }
   }
+
+  @Test
+  fun screen_comingBackAfterTheStart_closesTheRegistration() {
+    val auth =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    val zone = ZoneId.of("Europe/Zurich")
+    var now = yoga.startDateTime.minusMinutes(5)
+    val clock =
+        object : Clock() {
+          override fun getZone(): ZoneId = zone
+
+          override fun withZone(zone: ZoneId?): Clock = this
+
+          override fun instant() = now.atZone(zone).toInstant()
+        }
+    val viewModel =
+        EventDetailViewModel(
+            "yoga",
+            FakeEventRepository(listOf(yoga)),
+            FakeEventRegistrationRepository(),
+            auth,
+            clock,
+        )
+    assertEquals(RegistrationStatus.CAN_CONFIRM, viewModel.uiState.value.registration)
+
+    // The event starts before the screen is shown (resumed) again
+    now = yoga.startDateTime.plusMinutes(5)
+    composeTestRule.setContent {
+      EventDetailScreen(eventId = "yoga", onBack = {}, viewModel = viewModel)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_registration_closed).assertIsDisplayed()
+  }
 }

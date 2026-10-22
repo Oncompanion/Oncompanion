@@ -47,6 +47,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.event.Event
@@ -75,6 +76,11 @@ fun EventDetailScreen(
     viewModel: EventDetailViewModel = viewModel(key = eventId) { EventDetailViewModel(eventId) },
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  // The event may have started while the patient was away: recompute what can be confirmed
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshStatus()
+    onPauseOrDispose {}
+  }
   EventDetailContent(
       uiState = uiState,
       onBack = onBack,
