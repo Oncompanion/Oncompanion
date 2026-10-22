@@ -1,4 +1,4 @@
-// Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.model.appointment
 
