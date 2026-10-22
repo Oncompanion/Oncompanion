@@ -201,7 +201,7 @@ class EventDetailScreenTest {
     setContent(EventDetailUiState(isLoading = false, notFound = true), onBack = { backs++ })
 
     assertTextInside(
-        context.getString(R.string.event_detail_not_found_supporting),
+        context.getString(R.string.event_detail_not_found_hint),
         C.Tag.event_detail_not_found,
     )
     composeTestRule.onNodeWithTag(C.Tag.event_detail_back_to_events).performClick()

@@ -192,7 +192,7 @@
     <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
     <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
-    <string name="event_detail_not_found_supporting">It may have been cancelled by the organizer.</string>
+    <string name="event_detail_not_found_hint">It may have been cancelled by the organizer.</string>
     <string name="event_detail_back_to_events">Back to events</string>
     <string name="event_detail_visit_website">Visit event website</string>
     <string name="event_detail_registered">I\'m registered</string>

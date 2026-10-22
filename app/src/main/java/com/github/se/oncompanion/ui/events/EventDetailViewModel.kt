@@ -33,7 +33,10 @@ enum class RegistrationStatus {
   CAN_CONFIRM,
   /** Confirmed, until a day after the event: the patient can remove it. */
   CONFIRMED,
-  /** Not confirmed (or confirmed long ago) and the event has started: nothing can be confirmed. */
+  /**
+   * Not confirmed, or confirmed but more than a day after the event, and the event has started:
+   * nothing can be confirmed.
+   */
   CLOSED,
   /** The registration couldn't be read or changed. */
   ERROR,

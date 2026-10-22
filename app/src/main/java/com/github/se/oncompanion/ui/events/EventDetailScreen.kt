@@ -303,7 +303,9 @@ private fun RegistrationActions(
       }
     }
     when (registration) {
-      RegistrationStatus.LOADING -> {}
+      RegistrationStatus.LOADING -> {
+        // Nothing to offer until the registration status is known
+      }
       RegistrationStatus.CAN_CONFIRM,
       RegistrationStatus.CLOSED -> {
         val canConfirm = registration == RegistrationStatus.CAN_CONFIRM
@@ -403,7 +405,7 @@ private fun MissingEvent(onBack: () -> Unit, modifier: Modifier = Modifier) {
       text = stringResource(R.string.event_detail_not_found),
       modifier = modifier.testTag(C.Tag.event_detail_not_found),
       icon = R.drawable.ic_event,
-      supportingText = stringResource(R.string.event_detail_not_found_supporting),
+      supportingText = stringResource(R.string.event_detail_not_found_hint),
   ) {
     Button(onClick = onBack, modifier = Modifier.testTag(C.Tag.event_detail_back_to_events)) {
       Text(stringResource(R.string.event_detail_back_to_events))
