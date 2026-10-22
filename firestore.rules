@@ -169,13 +169,16 @@ service cloud.firestore {
       }
 
       // ---------- Symptoms ----------
-      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Entries can be deleted but not
-      // changed yet.
+      // /users/{uid}/symptoms/{symptomId}: the symptom journal. Editing an entry follows the same
+      // validation as logging it, and keeps when it was first logged.
       match /symptoms/{symptomId} {
         allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidSymptom(request.resource.data)
                       && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+                      && isValidSymptom(request.resource.data)
+                      && request.resource.data.createdAt == resource.data.createdAt;
       }
 
       // ---------- Appointments ----------

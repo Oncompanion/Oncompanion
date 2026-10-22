@@ -62,19 +62,21 @@ class SymptomRepositoryFirestore(
     // The ID is generated on the device, so it is known right away, also offline
     val document = collection(uid).document()
     document
-        .set(
-            mapOf(
-                FIELD_TYPES to entry.types.map { it.name },
-                FIELD_INTENSITY to entry.intensity,
-                FIELD_OCCURRED_AT to Timestamp(entry.occurredAt),
-                FIELD_NOTES to entry.notes,
-                FIELD_CREATED_AT to FieldValue.serverTimestamp(),
-            )
-        )
+        .set(fieldsOf(entry) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
         .addOnFailureListener { e ->
           Log.e(TAG, "The server rejected the symptom ${document.id}; it was rolled back", e)
         }
     return document.id
+  }
+
+  override suspend fun updateSymptom(uid: String, entry: SymptomEntry) {
+    require(entry.id.isNotBlank()) { "The symptom to update has no ID" }
+    require(entry.isValid()) { "Invalid symptom entry" }
+    // update() only changes an existing document, unlike set(); createdAt is left untouched. Not
+    // awaited, like deleteSymptom
+    collection(uid).document(entry.id).update(fieldsOf(entry)).addOnFailureListener { e ->
+      Log.e(TAG, "Couldn't update the symptom ${entry.id} (deleted or rejected); rolled back", e)
+    }
   }
 
   override suspend fun deleteSymptom(uid: String, id: String) {
@@ -83,6 +85,15 @@ class SymptomRepositoryFirestore(
       Log.e(TAG, "The server rejected deleting the symptom $id; it was restored", e)
     }
   }
+
+  /** What the user entered, as stored in Firestore (everything except the ID and createdAt). */
+  private fun fieldsOf(entry: SymptomEntry): Map<String, Any?> =
+      mapOf(
+          FIELD_TYPES to entry.types.map { it.name },
+          FIELD_INTENSITY to entry.intensity,
+          FIELD_OCCURRED_AT to Timestamp(entry.occurredAt),
+          FIELD_NOTES to entry.notes,
+      )
 
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
