@@ -91,12 +91,15 @@ data class AddSymptomUiState(
   val isWhenChanged: Boolean
     get() = edited == null || date != edited.date || time != edited.time
 
-  /** Something differs from the symptom being edited; always true when logging. */
+  /**
+   * Something differs from the symptom being edited; always true when logging. The order of the
+   * types doesn't count, so unticking and re-ticking one isn't a change.
+   */
   val hasChanges: Boolean
     get() =
         edited == null ||
             isWhenChanged ||
-            types != edited.entry.types ||
+            types.toSet() != edited.entry.types.toSet() ||
             intensity != edited.entry.intensity ||
             notes.trim().ifEmpty { null } != edited.entry.notes
 

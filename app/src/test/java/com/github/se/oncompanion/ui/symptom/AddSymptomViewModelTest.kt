@@ -611,6 +611,19 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun editing_untickingAndReTickingAType_isNotAChange() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(types = listOf(SymptomType.FATIGUE, SymptomType.PAIN)))
+        advanceUntilIdle()
+
+        viewModel.toggleType(SymptomType.FATIGUE)
+        viewModel.toggleType(SymptomType.FATIGUE)
+
+        assertFalse(viewModel.state.hasChanges)
+        assertFalse(viewModel.state.canSave)
+      }
+
+  @Test
   fun editing_everyField_updatesTheSymptom_keepingItsIdAndWhenItWasLogged() =
       runTest(dispatcher) {
         val viewModel = editing()
