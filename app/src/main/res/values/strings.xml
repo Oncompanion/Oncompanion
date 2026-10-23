@@ -163,7 +163,6 @@
     <string name="onboarding_role_patient_description">I\'m receiving cancer treatment and want to keep track of my care.</string>
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
-    <string name="onboarding_coming_soon">Coming soon</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>

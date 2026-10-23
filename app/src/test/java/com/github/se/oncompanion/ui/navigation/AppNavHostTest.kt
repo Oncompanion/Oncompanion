@@ -198,11 +198,29 @@ class AppNavHostTest {
   }
 
   @Test
-  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverIsDisabled() {
+  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverCanBeChosen() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsEnabled()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingAsCaregiver_informationScreenHasNoCancerType() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertDoesNotExist()
+
+    // Going back keeps the choice, and picking patient brings the cancer type back
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertExists()
   }
 
   @Test
