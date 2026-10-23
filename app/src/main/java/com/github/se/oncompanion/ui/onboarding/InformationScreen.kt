@@ -44,7 +44,7 @@ import com.github.se.oncompanion.resources.C
 
 /**
  * Second onboarding step (Figma "US-01 / Onboarding – Information"): first name (required), family
- * name and cancer type (optional, with suggestions). Continue saves the profile.
+ * name and, for a patient, cancer type (optional, with suggestions). Continue saves the profile.
  *
  * @param onSaved called once the profile is saved: onboarding is done
  */
@@ -159,12 +159,14 @@ fun InformationContent(
                 ),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_family_name_field),
         )
-        // Cancer type (optional): free text with suggestions
-        CancerTypeField(
-            value = uiState.cancerType,
-            onValueChange = onCancerTypeChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // Cancer type (optional, patients only): free text with suggestions
+        if (uiState.asksCancerType) {
+          CancerTypeField(
+              value = uiState.cancerType,
+              onValueChange = onCancerTypeChange,
+              modifier = Modifier.fillMaxWidth(),
+          )
+        }
       }
       // Pushes Continue to the bottom of the screen when there's room
       Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
