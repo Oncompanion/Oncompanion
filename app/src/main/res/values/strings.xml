@@ -149,6 +149,7 @@
     <string name="symptom_edit_save">Save changes</string>
     <string name="symptom_edit_error_title">Couldn\'t load this entry</string>
     <string name="symptom_detail_edit">Edit entry</string>
+    <string name="symptom_edit_error_hint">Please try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>

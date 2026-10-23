@@ -241,7 +241,7 @@ fun AddSymptomContent(
           Box(Modifier.padding(innerPadding)) {
             SymptomMessage(
                 title = stringResource(R.string.symptom_edit_error_title),
-                hint = stringResource(R.string.symptom_error_hint),
+                hint = stringResource(R.string.symptom_edit_error_hint),
                 testTag = C.Tag.symptom_edit_error,
                 onRetry = onRetry,
                 retryTestTag = C.Tag.symptom_edit_retry,

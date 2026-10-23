@@ -489,6 +489,9 @@ class AddSymptomScreenTest {
 
     node(C.Tag.symptom_edit_error).assertIsDisplayed()
     composeTestRule.onNodeWithText(string(R.string.symptom_edit_error_title)).assertIsDisplayed()
+    // A Firestore error isn't a connection problem: offline, the cache is served instead
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_error_hint)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.symptom_error_hint)).assertDoesNotExist()
     node(C.Tag.symptom_add_save).assertDoesNotExist()
     node(C.Tag.symptom_edit_retry).performClick()
 
