@@ -1,3 +1,5 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -85,6 +87,167 @@ class AppointmentRepositoryFirestoreTest {
             "type":{"stringValue":"CONSULTATION"},
             "createdAt":{"timestampValue":"2026-10-10T12:00:00Z"}}"""
       )
+
+  /** Editable fields change in place while server-assigned creation metadata stays intact. */
+  @Test
+  fun updateChangesFieldsAndPreservesCreationMetadata(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val changed =
+        original.copy(
+            title = "Treatment",
+            scheduledAt = Instant.parse("2026-10-18T14:00:00Z"),
+            type = AppointmentType.TREATMENT,
+            location = null,
+            notes = null,
+            createdAt = Instant.EPOCH,
+        )
+    repository.updateAppointment(uid, changed)
+    acknowledgeWrites()
+    assertEquals(changed.copy(createdAt = original.createdAt), storedAppointment(id))
+    assertEquals(1, withTimeout(10_000) { collection().get(Source.SERVER).await() }.size())
+  }
+
+  /** Local updates are visible offline and reach the server after reconnection. */
+  @Test
+  fun offlineUpdateIsVisibleAndThenSynchronizes(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val changed = original.copy(title = "Rescheduled", location = null, notes = null)
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.updateAppointment(uid, changed) }
+      val visible =
+          withTimeout(10_000) {
+            repository.observeAppointment(uid, id).first { it?.title == changed.title }
+          }
+      assertEquals(changed, visible)
+      assertTrue(collection().document(id).get(Source.CACHE).await().metadata.hasPendingWrites())
+    } finally {
+      db.enableNetwork().await()
+    }
+    acknowledgeWrites()
+    assertEquals(changed.title, serverDocument(id).getString("title"))
+    assertEquals(original.createdAt, serverDocument(id).getTimestamp("createdAt")!!.toInstant())
+  }
+
+  /** Updating a missing document never silently creates a replacement appointment. */
+  @Test
+  fun updateMissingDocumentDoesNotCreateIt(): Unit = runBlocking {
+    repository.updateAppointment(uid, appointment().copy(id = "missing"))
+    acknowledgeWrites()
+    assertFalse(serverDocument("missing").exists())
+  }
+
+  /** Invalid document paths and patient fields fail before any mutation is enqueued. */
+  @Test
+  fun invalidUpdatesLeaveStoredAppointmentUnchanged(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.updateAppointment(value, original) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.updateAppointment(uid, original.copy(id = value)) }
+              .exceptionOrNull() is IllegalArgumentException
+      )
+    }
+    for (invalid in
+        listOf(
+            original.copy(title = " "),
+            original.copy(location = "x".repeat(201)),
+            original.copy(notes = "x".repeat(1001)),
+            original.copy(scheduledAt = Instant.MAX),
+        )) {
+      assertTrue(
+          runCatching { repository.updateAppointment(uid, invalid) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    assertEquals(original, storedAppointment(id))
+  }
+
+  /** Public mutations update both observers, and repeated deletion is harmless. */
+  @Test
+  fun publicMutationsReachActiveListAndDetailObservers(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val original = requireNotNull(storedAppointment(id))
+    val lists = Channel<List<Appointment>>(Channel.UNLIMITED)
+    val details = Channel<Appointment?>(Channel.UNLIMITED)
+    val listJob = launch { repository.observeAppointments(uid).collect { lists.send(it) } }
+    val detailJob = launch { repository.observeAppointment(uid, id).collect { details.send(it) } }
+    suspend fun expect(title: String?) =
+        withTimeout(10_000) {
+          while (lists.receive().firstOrNull()?.title != title) {
+            /* Wait for the matching snapshot. */
+          }
+          while (details.receive()?.title != title) {
+            /* Wait for the matching snapshot. */
+          }
+        }
+    try {
+      expect(original.title)
+      repository.updateAppointment(uid, original.copy(title = "Changed"))
+      expect("Changed")
+      repository.deleteAppointment(uid, id)
+      expect(null)
+      acknowledgeWrites()
+      assertFalse(serverDocument(id).exists())
+      repository.deleteAppointment(uid, id)
+      repository.deleteAppointment(uid, "missing")
+      acknowledgeWrites()
+      assertFalse(serverDocument(id).exists())
+    } finally {
+      listJob.cancel()
+      detailJob.cancel()
+    }
+  }
+
+  /** Offline deletion is applied locally before reconnecting, then synchronized to the server. */
+  @Test
+  fun offlineDeletionIsVisibleAndThenSynchronizes(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    requireNotNull(storedAppointment(id))
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.deleteAppointment(uid, id) }
+      withTimeout(10_000) { repository.observeAppointment(uid, id).first { it == null } }
+      assertFalse(collection().document(id).get(Source.CACHE).await().exists())
+      assertTrue(
+          withTimeout(10_000) { repository.observeAppointments(uid).first { it.isEmpty() } }
+              .isEmpty()
+      )
+    } finally {
+      db.enableNetwork().await()
+    }
+    acknowledgeWrites()
+    assertFalse(serverDocument(id).exists())
+  }
+
+  /** Invalid owner/document paths cannot enqueue a deletion. */
+  @Test
+  fun invalidDeletionPathsLeaveStoredAppointmentUnchanged(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.deleteAppointment(value, id) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.deleteAppointment(uid, value) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    assertTrue(serverDocument(id).exists())
+  }
 
   /** Keeps the default instance constructor compatible with the emulator-connected SDK. */
   @Test

@@ -1,4 +1,3 @@
-<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
@@ -194,6 +193,14 @@ Drafts survive rotation via their ViewModel, but process-death restoration is no
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
+
+`AppointmentRepository.updateAppointment` updates editable fields on an existing document without
+changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
+is not recreated. Writes are queued locally, including offline, without waiting for server acknowledgement.
+A later server rejection is logged and may roll back local changes. Owner
+updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
+owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
+list/detail observations, with no second Planning write. Detail/edit/delete UI remains planned.
 
 ## Prescription scan
 
