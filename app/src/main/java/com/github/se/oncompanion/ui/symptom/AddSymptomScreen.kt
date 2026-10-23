@@ -185,6 +185,8 @@ fun AddSymptomContent(
     }
   }
 
+  // No imePadding() yet: the keyboard covers Save and the bottom of the form while the notes are
+  // typed. Adding it, with its keyboard tests in portrait and landscape, is left for its own PR
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptom_add_screen),
       topBar = {
