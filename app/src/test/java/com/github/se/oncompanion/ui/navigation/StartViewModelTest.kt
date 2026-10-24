@@ -395,6 +395,28 @@ class StartViewModelTest {
         assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
       }
 
+  @Test
+  fun caregiver_profileAndCirclesShareOneTimeout() =
+      runTest(dispatcher) {
+        // The profile takes most of the time, then the circles never answer
+        val viewModel =
+            StartViewModel(
+                signedIn(),
+                RecordingProfileRepository {
+                  delay(800L)
+                  caregiver
+                },
+                profileTimeoutMillis = 1_000L,
+                inviteRepository = NeverAnsweringInvites(),
+            )
+        advanceTimeBy(999L)
+        runCurrent()
+        assertNull(viewModel.startRoute.value)
+        advanceTimeBy(2L)
+        runCurrent()
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+      }
+
   /** Invites whose joined circles never arrive, like a cache and a server that don't answer. */
   private class NeverAnsweringInvites(
       private val delegate: FakeCareCircleInviteRepository = FakeCareCircleInviteRepository()

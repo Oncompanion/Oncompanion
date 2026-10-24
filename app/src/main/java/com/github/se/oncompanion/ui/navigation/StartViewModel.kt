@@ -33,8 +33,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * time, the user goes to the Overview: onboarding would try to create a profile that may already
  * exist.
  *
- * @param profileTimeoutMillis how long to wait for the profile (and for a caregiver's circles)
- *   before choosing the Overview
+ * @param profileTimeoutMillis how long to wait for the profile and, for a caregiver, their circles
+ *   (both together) before choosing the Overview
  */
 class StartViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -62,23 +62,25 @@ class StartViewModel(
           Log.w(TAG, "Couldn't read the signed-in user", e)
           null
         } ?: return Route.AUTH
-    // A list, so that "read, no profile" (empty) differs from "couldn't read in time" (null)
-    val profile =
-        try {
-          withTimeoutOrNull(profileTimeoutMillis) {
-            // Only ask the server when the phone doesn't know whether the profile exists
-            listOfNotNull(cachedProfile(user.uid) ?: profileRepository.getProfile(user.uid))
-          }
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          Log.w(TAG, "Couldn't read the profile at startup", e)
-          null
-        }
+    // One timeout for the profile and a caregiver's circles together, so the splash never waits
+    // longer than it
+    return try {
+      withTimeoutOrNull(profileTimeoutMillis) { routeFor(user.uid) }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Log.w(TAG, "Couldn't read the profile at startup", e)
+      null
+    } ?: Route.OVERVIEW
+  }
+
+  /** Where [uid] starts, from their profile and, for a caregiver, their circles. */
+  private suspend fun routeFor(uid: String): String {
+    // Only ask the server when the phone doesn't know whether the profile exists
+    val profile = cachedProfile(uid) ?: profileRepository.getProfile(uid)
     return when {
-      profile == null -> Route.OVERVIEW
-      profile.isEmpty() -> Route.ONBOARDING
-      profile.single().role == Role.CAREGIVER && !hasJoinedCircle(user.uid) -> Route.JOIN_CIRCLE
+      profile == null -> Route.ONBOARDING
+      profile.role == Role.CAREGIVER && !hasJoinedCircle(uid) -> Route.JOIN_CIRCLE
       else -> Route.OVERVIEW
     }
   }
@@ -94,10 +96,10 @@ class StartViewModel(
         null
       }
 
-  /** Whether the caregiver joined a circle; assumed when it can't be read in time. */
+  /** Whether the caregiver joined a circle; assumed when it can't be read. */
   private suspend fun hasJoinedCircle(uid: String): Boolean =
       try {
-        withTimeoutOrNull(profileTimeoutMillis) { inviteRepository.hasJoinedCircle(uid) } ?: true
+        inviteRepository.hasJoinedCircle(uid)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
