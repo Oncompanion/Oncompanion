@@ -2,8 +2,13 @@
 
 package com.github.se.oncompanion.ui.carecircle
 
+import android.app.Application
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
@@ -32,10 +37,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleInviteScreenTest {
@@ -65,6 +74,13 @@ class CareCircleInviteScreenTest {
   /** Records the events of [CareCircleInviteContent]. */
   private class Events {
     var back = 0
+    val emails = mutableListOf<CareCircleInvite>()
+    val shares = mutableListOf<CareCircleInvite>()
+    val copies = mutableListOf<CareCircleInvite>()
+    var renew = 0
+    var cancel = 0
+    var confirmCancel = 0
+    var dismissCancel = 0
     var retry = 0
   }
 
@@ -74,6 +90,13 @@ class CareCircleInviteScreenTest {
       CareCircleInviteContent(
           uiState = uiState,
           onBack = { events.back++ },
+          onSendEmail = { events.emails += it },
+          onShare = { events.shares += it },
+          onCopy = { events.copies += it },
+          onRenew = { events.renew++ },
+          onCancel = { events.cancel++ },
+          onConfirmCancel = { events.confirmCancel++ },
+          onDismissCancel = { events.dismissCancel++ },
           onRetry = { events.retry++ },
       )
     }
@@ -96,6 +119,13 @@ class CareCircleInviteScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_loading).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.back) }
+  }
+
+  @Test
+  fun cancelledAndRenewed_showASpinnerWhileLeaving() {
+    setContent(CareCircleInviteUiState.Renewed("NNNNN23456"))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_loading).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertDoesNotExist()
   }
 
   @Test
@@ -150,6 +180,7 @@ class CareCircleInviteScreenTest {
         .onNodeWithTag(C.Tag.care_circle_invite_valid)
         .assertTextEquals(string(R.string.care_circle_invite_valid_until, day(julie.expiresAt!!)))
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_offline_warning).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_renew_button).assertDoesNotExist()
   }
 
   @Test
@@ -163,6 +194,27 @@ class CareCircleInviteScreenTest {
         .onNodeWithTag(C.Tag.careCircleMemberPermission(CarePermission.EVENTS.name))
         .performScrollTo()
         .assertIsOff()
+  }
+
+  @Test
+  fun actions_sendEmailShareAndCopyTheInvite() {
+    val events = setContent(CareCircleInviteUiState.Invite(julie, expired = false))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_share_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).performClick()
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(julie), events.emails)
+      assertEquals(listOf(julie), events.shares)
+      assertEquals(listOf(julie), events.copies)
+    }
+  }
+
+  @Test
+  fun inviteWithoutEmail_hasNoEmailButton() {
+    setContent(CareCircleInviteUiState.Invite(julie.copy(email = null), expired = false))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_share_button).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).assertIsDisplayed()
   }
 
   @Test
@@ -190,8 +242,8 @@ class CareCircleInviteScreenTest {
   // ---- expired invitation ----
 
   @Test
-  fun expiredInvite_hidesTheInviteCode() {
-    setContent(CareCircleInviteUiState.Invite(julie, expired = true))
+  fun expiredInvite_hidesTheInviteCode_andOffersANewOne() {
+    val events = setContent(CareCircleInviteUiState.Invite(julie, expired = true))
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_expired).assertIsDisplayed()
     composeTestRule
         .onNodeWithText(string(R.string.care_circle_invite_expired_on, day(julie.expiresAt!!)))
@@ -200,7 +252,59 @@ class CareCircleInviteScreenTest {
         .onNodeWithTag(C.Tag.care_circle_member_subtitle)
         .assertTextEquals("Sister · Invitation expired")
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_valid).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_share_button).assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_renew_button).performClick()
+    composeTestRule.runOnIdle { assertEquals(1, events.renew) }
+  }
+
+  @Test
+  fun renewing_disablesTheButtons() {
+    setContent(CareCircleInviteUiState.Invite(julie, expired = true, isWorking = true))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_renew_button).assertIsNotEnabled()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_invite_cancel_button)
+        .performScrollTo()
+        .assertIsNotEnabled()
+  }
+
+  @Test
+  fun failedAction_saysSo() {
+    setContent(CareCircleInviteUiState.Invite(julie, expired = true, actionFailed = true))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_action_error).assertIsDisplayed()
+  }
+
+  // ---- cancelling ----
+
+  @Test
+  fun cancelButton_asksToCancel() {
+    val events = setContent(CareCircleInviteUiState.Invite(julie, expired = false))
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_invite_cancel_button)
+        .performScrollTo()
+        .assertIsEnabled()
+        .performClick()
+    composeTestRule.runOnIdle { assertEquals(1, events.cancel) }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_cancel_dialog).assertDoesNotExist()
+  }
+
+  @Test
+  fun cancelDialog_namesThePerson_andConfirmsOrKeeps() {
+    val events =
+        setContent(CareCircleInviteUiState.Invite(julie, expired = false, confirmingCancel = true))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_cancel_dialog).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Cancel Julie's invitation?").assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.care_circle_invite_cancel_body))
+        .assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_cancel_dismiss).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_cancel_confirm).performClick()
+    composeTestRule.runOnIdle {
+      assertEquals(1, events.dismissCancel)
+      assertEquals(1, events.confirmCancel)
+    }
   }
 
   // ---- preview ----
@@ -217,8 +321,11 @@ class CareCircleInviteScreenTest {
   private lateinit var invites: FakeCareCircleInviteRepository
   private lateinit var circle: FakeCareCircleRepository
 
-  /** Shows the screen of [invite] with its ViewModel and fakes. */
-  private fun setScreen(invite: CareCircleInvite) {
+  /** Shows the screen of [julie] with its ViewModel; returns the back and renewed calls. */
+  private fun setScreen(
+      // The ViewModel uses the real clock: created now, so the invite code still works
+      invite: CareCircleInvite = julie.copy(createdAt = Instant.now())
+  ): Pair<MutableList<Unit>, MutableList<String>> {
     circle = FakeCareCircleRepository()
     invites = FakeCareCircleInviteRepository(circle).apply { setInvites(listOf(invite)) }
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
@@ -230,7 +337,106 @@ class CareCircleInviteScreenTest {
             circle,
             auth,
         )
-    composeTestRule.setContent { CareCircleInviteScreen(onBack = {}, viewModel = viewModel) }
+    val backs = mutableListOf<Unit>()
+    val renewed = mutableListOf<String>()
+    composeTestRule.setContent {
+      CareCircleInviteScreen(
+          onBack = { backs += Unit },
+          onRenewed = { renewed += it },
+          viewModel = viewModel,
+      )
+    }
+    return backs to renewed
+  }
+
+  private fun nextStartedActivity(): Intent? =
+      shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity
+
+  @Test
+  fun screen_sendByEmail_opensTheEmailAppWithTheInvitation() {
+    setScreen()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).performClick()
+    composeTestRule.runOnIdle {
+      val intent = checkNotNull(nextStartedActivity())
+      assertEquals(Intent.ACTION_SENDTO, intent.action)
+      assertEquals("mailto", intent.data?.scheme)
+      assertArrayEquals(
+          arrayOf("julie@example.com"),
+          intent.getStringArrayExtra(Intent.EXTRA_EMAIL),
+      )
+      assertEquals(
+          string(R.string.care_circle_invite_email_subject),
+          intent.getStringExtra(Intent.EXTRA_SUBJECT),
+      )
+      val text = checkNotNull(intent.getStringExtra(Intent.EXTRA_TEXT))
+      assert("K7M2P-Q9XRT" in text) { text }
+      assert(text.startsWith("Hi Julie")) { text }
+      assert(text.endsWith("Anne")) { text }
+    }
+  }
+
+  @Test
+  fun screen_share_opensTheShareSheetWithTheInvitation() {
+    setScreen()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_share_button).performClick()
+    composeTestRule.runOnIdle {
+      val chooser = checkNotNull(nextStartedActivity())
+      assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+      @Suppress("DEPRECATION")
+      val shared = checkNotNull(chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT))
+      assertEquals(Intent.ACTION_SEND, shared.action)
+      assertEquals("text/plain", shared.type)
+      assert("K7M2P-Q9XRT" in shared.getStringExtra(Intent.EXTRA_TEXT).orEmpty())
+    }
+  }
+
+  @Test
+  fun screen_noAppToSendWith_saysToCopyInstead() {
+    shadowOf(ApplicationProvider.getApplicationContext<Application>()).checkActivities(true)
+    setScreen()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).performClick()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_invite_no_app)).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_copy_putsTheInviteCodeInTheClipboard() {
+    setScreen()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).performClick()
+    composeTestRule.waitForIdle()
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
+    assertEquals("K7M2P-Q9XRT", clipboard.primaryClip?.getItemAt(0)?.text.toString())
+    // Android 13+ confirms the copy itself
+    composeTestRule.onNodeWithText(string(R.string.care_circle_invite_copied)).assertDoesNotExist()
+  }
+
+  @Config(sdk = [32])
+  @Test
+  fun screen_copy_confirmsItBelowAndroid13() {
+    setScreen()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).performClick()
+    composeTestRule.onNodeWithText(string(R.string.care_circle_invite_copied)).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_confirmingCancel_deletesTheInvite_andGoesBack() {
+    val (backs, _) = setScreen()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_invite_cancel_button)
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_cancel_confirm).performClick()
+    composeTestRule.runOnIdle {
+      assertNull(invites.invite(julie.inviteCode))
+      assertEquals(1, backs.size)
+    }
+  }
+
+  @Test
+  fun screen_renewingAnExpiredInvite_opensTheNewOne() {
+    val (_, renewed) = setScreen(julie.copy(createdAt = Instant.parse("2020-01-01T00:00:00Z")))
+    invites.nextInviteCode = { "NNNNN23456" }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_renew_button).performClick()
+    composeTestRule.runOnIdle { assertEquals(listOf("NNNNN23456"), renewed) }
   }
 
   @Test

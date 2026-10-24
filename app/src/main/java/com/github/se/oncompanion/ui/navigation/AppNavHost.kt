@@ -367,6 +367,10 @@ fun AppNavHost(
       ) {
         CareCircleInviteScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The new invite code replaces the expired one: Back still returns to the list
+            onRenewed = { inviteCode ->
+              navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
+            },
             // The SavedStateHandle holds the route's invite code
             viewModel = viewModel { CareCircleInviteViewModel(createSavedStateHandle()) },
         )
