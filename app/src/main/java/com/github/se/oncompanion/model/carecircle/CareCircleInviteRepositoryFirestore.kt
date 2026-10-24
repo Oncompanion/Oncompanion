@@ -297,7 +297,6 @@ class CareCircleInviteRepositoryFirestore(
     Log.e(TAG, "The server rejected the $what; it was rolled back", e)
   }
 
-  /** Reads leniently like the member mapping: only a missing name or owner skips the invite. */
   /** The patient's first name may be missing in a damaged document: shown empty, not dropped. */
   private fun joinedFromDocument(doc: DocumentSnapshot) =
       JoinedCareCircle(
@@ -306,6 +305,7 @@ class CareCircleInviteRepositoryFirestore(
           joinedAt = (doc.get(FIELD_JOINED_AT) as? Timestamp)?.toInstant(),
       )
 
+  /** Reads leniently like the member mapping: only a missing name or owner skips the invite. */
   private fun fromDocument(doc: DocumentSnapshot): CareCircleInvite? {
     val firstName = doc.getString(FIELD_FIRST_NAME)
     val ownerUid = doc.getString(FIELD_OWNER_UID)
