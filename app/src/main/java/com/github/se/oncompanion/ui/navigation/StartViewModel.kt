@@ -9,7 +9,6 @@ import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
-import com.github.se.oncompanion.model.carecircle.hasJoinedCircle
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository

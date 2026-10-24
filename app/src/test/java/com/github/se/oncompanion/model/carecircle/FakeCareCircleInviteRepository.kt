@@ -79,6 +79,12 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     joined.value += caregiverUid to circles
   }
 
+  /** Like [observeJoinedCircles], fails with [observeError] when it is set. */
+  override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
+    observeError?.let { throw it }
+    return joinedCircles(caregiverUid).isNotEmpty()
+  }
+
   override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = observed {
     joined.map { it[caregiverUid].orEmpty() }.distinctUntilChanged()
   }

@@ -18,7 +18,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -400,8 +399,6 @@ class StartViewModelTest {
   private class NeverAnsweringInvites(
       private val delegate: FakeCareCircleInviteRepository = FakeCareCircleInviteRepository()
   ) : CareCircleInviteRepository by delegate {
-    override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = flow {
-      awaitCancellation()
-    }
+    override suspend fun hasJoinedCircle(caregiverUid: String): Boolean = awaitCancellation()
   }
 }

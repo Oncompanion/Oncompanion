@@ -17,6 +17,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.Transaction
 import java.time.Instant
 import kotlinx.coroutines.channels.awaitClose
@@ -163,8 +164,13 @@ class CareCircleInviteRepositoryFirestore(
     // A mistyped invite code is answered at once, without the network
     if (!CareCircleInvite.isWellFormedInviteCode(code)) return RedeemResult.InvalidOrUsed
     return try {
-      db.runTransaction { transaction -> redeemIn(transaction, code, caregiverUid, caregiverEmail) }
-          .await()
+      val result =
+          db.runTransaction { transaction ->
+                redeemIn(transaction, code, caregiverUid, caregiverEmail)
+              }
+              .await()
+      if (result is RedeemResult.Joined) refreshJoinedCircles(caregiverUid)
+      result
     } catch (e: FirebaseFirestoreException) {
       // Only a confirmed connection problem is reported as offline. Any rejection, such as reading
       // an unknown, used or expired invite, means the invite code can't be used. The invite code
@@ -175,12 +181,34 @@ class CareCircleInviteRepositoryFirestore(
     }
   }
 
+  override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
+    // The phone's copy may not know a circle joined a moment ago: a transaction doesn't update it
+    val snapshot =
+        try {
+          patients(caregiverUid).get(Source.SERVER).await()
+        } catch (e: FirebaseFirestoreException) {
+          if (e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
+          patients(caregiverUid).get(Source.CACHE).await()
+        }
+    return !snapshot.isEmpty
+  }
+
+  /**
+   * Reads [caregiverUid]'s circles from the server once, so the phone's copy knows the circle just
+   * joined, also at a later start offline. Only a convenience: a failure is logged and ignored.
+   */
+  private suspend fun refreshJoinedCircles(caregiverUid: String) {
+    try {
+      patients(caregiverUid).get(Source.SERVER).await()
+    } catch (e: FirebaseFirestoreException) {
+      Log.w(TAG, "Couldn't refresh the joined circles after joining", e)
+    }
+  }
+
   override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> =
       callbackFlow {
         val registration =
-            users().document(caregiverUid).collection(PATIENTS_COLLECTION).addSnapshotListener {
-                snapshot,
-                error ->
+            patients(caregiverUid).addSnapshotListener { snapshot, error ->
               if (error != null) close(error)
               else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
             }
@@ -239,6 +267,9 @@ class CareCircleInviteRepositoryFirestore(
   private fun invites() = db.collection(COLLECTION)
 
   private fun users() = db.collection(UserProfileRepositoryFirestore.COLLECTION)
+
+  private fun patients(caregiverUid: String) =
+      users().document(caregiverUid).collection(PATIENTS_COLLECTION)
 
   private fun memberDoc(ownerUid: String, memberUid: String) =
       users()

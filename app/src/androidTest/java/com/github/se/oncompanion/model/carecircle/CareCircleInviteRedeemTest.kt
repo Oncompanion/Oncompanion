@@ -120,7 +120,6 @@ class CareCircleInviteRedeemTest {
         emptyList<JoinedCareCircle>(),
         withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() },
     )
-    assertFalse(withTimeout(10_000) { repository.hasJoinedCircle(bobUid) })
 
     bobRedeems(invite.inviteCode)
 
@@ -128,6 +127,23 @@ class CareCircleInviteRedeemTest {
         withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first { it.isNotEmpty() } }
     assertEquals(listOf(aliceUid), joined.map { it.patientUid })
     assertEquals("Alice", joined.single().patientFirstName)
+  }
+
+  @Test
+  fun hasJoinedCircle_isTrueRightAfterJoining_offlineThenOnline(): Unit = runBlocking {
+    val invite = aliceInvite()
+    EmulatorTestData.signIn("bob")
+    // An empty read first, so the phone's copy says "no circle", as on a caregiver's first start
+    withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() }
+    assertFalse(withTimeout(10_000) { repository.hasJoinedCircle(bobUid) })
+
+    assertEquals(RedeemResult.Joined(aliceUid, "Alice"), bobRedeems(invite.inviteCode))
+
+    // A later start offline: the phone's copy already knows the circle
+    db.disableNetwork().await()
+    assertTrue(withTimeout(10_000) { repository.hasJoinedCircle(bobUid) })
+    // And online, from the server
+    db.enableNetwork().await()
     assertTrue(withTimeout(10_000) { repository.hasJoinedCircle(bobUid) })
   }
 
