@@ -24,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
@@ -37,7 +38,13 @@ enum class AddSymptomError {
 }
 
 /**
- * What the add symptom form shows.
+ * The symptom being edited, as it was loaded, with its day and time in the phone's time zone: what
+ * the form started from.
+ */
+data class EditedSymptom(val entry: SymptomEntry, val date: LocalDate, val time: LocalTime)
+
+/**
+ * What the symptom form shows, when logging a new symptom or editing one.
  *
  * @property now the current day and time, in the phone's time zone: what the form shows until the
  *   user picks a day or a time, kept up to date by [AddSymptomViewModel.refreshNow]
@@ -53,6 +60,11 @@ enum class AddSymptomError {
  * @property isSaving the symptom is being saved
  * @property isSaved the symptom is saved: the form is done
  * @property error why the last save failed, until the screen has shown it
+ * @property isEditing the form edits a symptom already logged instead of logging a new one
+ * @property edited the symptom being edited, once it is loaded
+ * @property isLoading the symptom to edit is loading
+ * @property hasLoadError the symptom to edit couldn't be loaded (or nobody is signed in)
+ * @property isNotFound the symptom to edit doesn't exist (e.g. deleted on another device)
  */
 data class AddSymptomUiState(
     val now: LocalDateTime,
@@ -65,7 +77,32 @@ data class AddSymptomUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val error: AddSymptomError? = null,
+    val isEditing: Boolean = false,
+    val edited: EditedSymptom? = null,
+    val isLoading: Boolean = false,
+    val hasLoadError: Boolean = false,
+    val isNotFound: Boolean = false,
 ) {
+  /** The fields are shown: always when logging, once the symptom is loaded when editing. */
+  val isFormShown: Boolean
+    get() = !isEditing || edited != null
+
+  /** The day or time differs from the symptom being edited; always true when logging. */
+  val isWhenChanged: Boolean
+    get() = edited == null || date != edited.date || time != edited.time
+
+  /**
+   * Something differs from the symptom being edited; always true when logging. The order of the
+   * types doesn't count, so unticking and re-ticking one isn't a change.
+   */
+  val hasChanges: Boolean
+    get() =
+        edited == null ||
+            isWhenChanged ||
+            types.toSet() != edited.entry.types.toSet() ||
+            intensity != edited.entry.intensity ||
+            notes.trim().ifEmpty { null } != edited.entry.notes
+
   /** "Other" is picked, so the notes have to say which symptom it was. */
   val notesRequired: Boolean
     get() = SymptomType.OTHER in types
@@ -78,25 +115,93 @@ data class AddSymptomUiState(
   val isNow: Boolean
     get() = date == null && time == null
 
-  /** The symptom can be saved: something is picked, nothing is missing or being saved. */
+  /**
+   * The symptom can be saved: something is picked, nothing is missing or being saved, and when
+   * editing, something changed.
+   */
   val canSave: Boolean
-    get() = types.isNotEmpty() && !isMissingNotes && !isInFuture && !isSaving && !isSaved
+    get() =
+        isFormShown &&
+            types.isNotEmpty() &&
+            !isMissingNotes &&
+            !isInFuture &&
+            !isSaving &&
+            !isSaved &&
+            hasChanges
 }
 
 /**
- * The add symptom form (US-07 "Log a symptom"): the user picks one or more symptoms and saves them,
- * optionally with how bad they felt, when, and notes. Nothing is saved before the user taps Save.
+ * The symptom form. Without [symptomId], it logs a new symptom (US-07 "Log a symptom"): the user
+ * picks one or more symptoms and saves them, optionally with how bad they felt, when, and notes.
+ * With [symptomId], it edits that symptom (US-09): the form starts from what was logged and every
+ * field can be changed. Nothing is saved before the user taps Save.
  *
  * @param clock the current time, and the time zone the day and time are chosen in
+ * @param symptomId the symptom to edit, or `null` to log a new one
  */
 class AddSymptomViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
+    private val symptomId: String? = null,
 ) : ViewModel() {
 
-  private val _uiState = MutableStateFlow(AddSymptomUiState(now = LocalDateTime.now(clock)))
+  private val _uiState =
+      MutableStateFlow(
+          AddSymptomUiState(now = LocalDateTime.now(clock), isEditing = symptomId != null)
+      )
   val uiState: StateFlow<AddSymptomUiState> = _uiState.asStateFlow()
+
+  init {
+    load()
+  }
+
+  /**
+   * Loads the symptom to edit (again, after an error) and fills the form with it. Loaded once: a
+   * change made on another device meanwhile doesn't replace what the user is typing. Does nothing
+   * when logging a new symptom.
+   */
+  fun load() {
+    val id = symptomId ?: return
+    _uiState.update { it.copy(isLoading = true, hasLoadError = false, isNotFound = false) }
+    val uid = authRepository.signedInUid(TAG)
+    if (uid == null) {
+      _uiState.update { it.copy(isLoading = false, hasLoadError = true) }
+      return
+    }
+    viewModelScope.launch {
+      // Null when the symptom no longer exists (e.g. deleted on another device)
+      val entry: SymptomEntry? =
+          try {
+            symptomRepository.observeSymptom(uid, id).first()
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            Log.e(TAG, "Failed to load the symptom $id", e)
+            _uiState.update { it.copy(isLoading = false, hasLoadError = true) }
+            return@launch
+          }
+      _uiState.update {
+        if (entry == null) it.copy(isLoading = false, isNotFound = true)
+        else it.filledWith(entry).withFutureCheck()
+      }
+    }
+  }
+
+  /** The form showing [entry], the symptom being edited. */
+  private fun AddSymptomUiState.filledWith(entry: SymptomEntry): AddSymptomUiState {
+    val at = entry.occurredAt.atZone(clock.zone)
+    val edited = EditedSymptom(entry, at.toLocalDate(), at.toLocalTime())
+    return copy(
+        isLoading = false,
+        edited = edited,
+        types = entry.types,
+        intensity = entry.intensity,
+        date = edited.date,
+        time = edited.time,
+        notes = entry.notes.orEmpty(),
+    )
+  }
 
   /** Picks [type], or unpicks it if it is already picked. */
   fun toggleType(type: SymptomType) {
@@ -146,9 +251,10 @@ class AddSymptomViewModel(
   }
 
   /**
-   * Saves the symptom for the signed-in user, if [AddSymptomUiState.canSave]. Without a chosen day
-   * or time, it is today or now, at the moment of saving. Saving returns as soon as the symptom is
-   * stored on the device, also offline.
+   * Saves the symptom for the signed-in user, if [AddSymptomUiState.canSave]: a new one, or the
+   * changes to the one being edited. Without a chosen day or time, it is today or now, at the
+   * moment of saving; an edit that doesn't change the day and time keeps the exact moment it had.
+   * Saving returns as soon as the symptom is stored on the device, also offline.
    *
    * [AddSymptomError.SAVE_FAILED] only covers what fails before that, on the device. If the server
    * refuses the symptom later, the form isn't told: Firestore undoes the write.
@@ -164,15 +270,17 @@ class AddSymptomViewModel(
     }
     val entry =
         SymptomEntry(
+            id = symptomId.orEmpty(),
             types = state.types,
-            occurredAt = occurredAt(state.date, state.time, ZonedDateTime.now(clock)),
+            occurredAt = state.effectiveOccurredAt(ZonedDateTime.now(clock)),
             intensity = state.intensity,
             notes = state.notes.trim().ifEmpty { null },
         )
     _uiState.update { it.copy(isSaving = true, error = null) }
     viewModelScope.launch {
       try {
-        symptomRepository.addSymptom(uid, entry)
+        if (symptomId == null) symptomRepository.addSymptom(uid, entry)
+        else symptomRepository.updateSymptom(uid, entry)
         _uiState.update { it.copy(isSaving = false, isSaved = true) }
       } catch (e: CancellationException) {
         throw e
@@ -190,16 +298,28 @@ class AddSymptomViewModel(
 
   /**
    * Applies a change the user made to the form. Ignored while the symptom is being saved and once
-   * it is saved: the form would no longer show what was saved.
+   * it is saved: the form would no longer show what was saved. Also ignored before the symptom to
+   * edit is loaded, as loading it would replace the change.
    */
   private fun edit(transform: (AddSymptomUiState) -> AddSymptomUiState) {
-    _uiState.update { state -> if (state.isSaving || state.isSaved) state else transform(state) }
+    _uiState.update { state ->
+      if (state.isSaving || state.isSaved || !state.isFormShown) state else transform(state)
+    }
   }
 
   private fun AddSymptomUiState.withFutureCheck(): AddSymptomUiState {
     val now = ZonedDateTime.now(clock)
-    return copy(isInFuture = occurredAt(date, time, now).isAfter(now.toInstant()))
+    return copy(isInFuture = effectiveOccurredAt(now).isAfter(now.toInstant()))
   }
+
+  /**
+   * When the symptom was felt, as the form says at [now]: [occurredAt] from the chosen day and
+   * time, except that an edit leaving them as they were keeps the exact moment logged. Rebuilding
+   * it from the day and time shown could move it (by its seconds, or by an hour when the clocks go
+   * back).
+   */
+  private fun AddSymptomUiState.effectiveOccurredAt(now: ZonedDateTime): Instant =
+      if (edited != null && !isWhenChanged) edited.entry.occurredAt else occurredAt(date, time, now)
 
   private companion object {
     const val TAG = "AddSymptomViewModel"

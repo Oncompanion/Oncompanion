@@ -3,10 +3,15 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -27,6 +32,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
@@ -57,9 +63,14 @@ class SymptomDetailScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     var backCount = 0
+    val opened = mutableListOf<String>()
 
     override fun goBack() {
       backCount++
+    }
+
+    override fun navigateTo(screen: String) {
+      opened += screen
     }
   }
 
@@ -70,6 +81,7 @@ class SymptomDetailScreenTest {
       onDelete: () -> Unit = {},
       onConfirmDelete: () -> Unit = {},
       onCancelDelete: () -> Unit = {},
+      onEdit: () -> Unit = {},
   ) {
     composeTestRule.setContent {
       SymptomDetailContent(
@@ -80,6 +92,7 @@ class SymptomDetailScreenTest {
           onConfirmDelete = onConfirmDelete,
           onCancelDelete = onCancelDelete,
           zone = ZoneOffset.UTC,
+          onEdit = onEdit,
       )
     }
   }
@@ -218,6 +231,48 @@ class SymptomDetailScreenTest {
   }
 
   @Test
+  fun entry_hasTheEditButton_aboveDelete_whichCallsBack() {
+    var edits = 0
+    setContent(loaded.copy(entry = fatigue), onEdit = { edits++ })
+
+    val edit = composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit)
+    edit.assertIsDisplayed().assert(hasText(context.getString(R.string.symptom_detail_edit)))
+    val editBottom = edit.getUnclippedBoundsInRoot().bottom
+    val deleteTop =
+        composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).getUnclippedBoundsInRoot().top
+    assertTrue("Edit is above Delete", editBottom <= deleteTop)
+    edit.performClick()
+
+    assertEquals(1, edits)
+  }
+
+  @Test
+  fun noEditButton_whileLoading_afterAnError_whenNotFound_orWhileDeleting() {
+    var state by mutableStateOf(SymptomDetailUiState())
+    composeTestRule.setContent {
+      SymptomDetailContent(
+          uiState = state,
+          onBack = {},
+          onRetry = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+      )
+    }
+
+    for (hidden in
+        listOf(
+            SymptomDetailUiState(),
+            loaded.copy(hasError = true),
+            loaded,
+            loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true),
+        )) {
+      state = hidden
+      composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertDoesNotExist()
+    }
+  }
+
+  @Test
   fun confirmation_explainsIt_andConfirmOrCancelCallBack() {
     var confirms = 0
     var cancels = 0
@@ -315,6 +370,23 @@ class SymptomDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
 
     composeTestRule.runOnIdle { assertEquals(1, navigationActions.backCount) }
+  }
+
+  @Test
+  fun screen_edit_opensTheEditScreenOfThatSymptom() {
+    val repository = FakeSymptomRepository().apply { seed("alice", fatigue) }
+    val viewModel = SymptomDetailViewModel("s1", signedInAsAlice(), repository)
+    lateinit var navigationActions: RecordingNavigationActions
+    composeTestRule.setContent {
+      navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
+      SymptomDetailScreen(navigationActions = navigationActions, viewModel = viewModel)
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).performClick()
+
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(Screen.symptomEdit("s1")), navigationActions.opened)
+    }
   }
 
   @Test

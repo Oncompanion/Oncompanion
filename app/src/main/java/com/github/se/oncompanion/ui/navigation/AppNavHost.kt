@@ -224,6 +224,18 @@ fun AppNavHost(
             onSaved = navigationActions::goBack,
         )
       }
+      composable(
+          Screen.SYMPTOM_EDIT,
+          arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
+        // Saving returns to the detail, which shows the change
+        AddSymptomScreen(
+            viewModel = viewModel { AddSymptomViewModel(symptomId = symptomId) },
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
+        )
+      }
     }
     navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
       composable(Screen.PRESCRIPTIONS) {

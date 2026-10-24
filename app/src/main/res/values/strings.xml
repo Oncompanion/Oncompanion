@@ -145,6 +145,11 @@
     <string name="symptom_delete_confirm">Delete</string>
     <string name="symptom_delete_cancel">Cancel</string>
     <string name="symptom_delete_error">Couldn\'t delete this entry. Try again.</string>
+    <string name="symptom_edit_title">Edit entry</string>
+    <string name="symptom_edit_save">Save changes</string>
+    <string name="symptom_edit_error_title">Couldn\'t load this entry</string>
+    <string name="symptom_detail_edit">Edit entry</string>
+    <string name="symptom_edit_error_hint">Please try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -191,6 +196,22 @@
     <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
     <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
+    <string name="event_detail_not_found_hint">It may have been cancelled by the organizer.</string>
+    <string name="event_detail_back_to_events">Back to events</string>
+    <string name="event_detail_visit_website">Visit event website</string>
+    <string name="event_detail_registered">I\'m registered</string>
+    <string name="event_detail_registration_note">This only saves it in Oncompanion. It doesn\'t register you with the organizer.</string>
+    <string name="event_detail_registration_closed">This event has already started, so it can\'t be confirmed anymore.</string>
+    <string name="event_detail_registration_confirmed">Registration confirmed</string>
+    <string name="event_detail_registration_confirmed_supporting">You told us you signed up for this event.</string>
+    <string name="event_detail_remove">Remove confirmation</string>
+    <string name="event_detail_remove_title">Remove your registration confirmation?</string>
+    <string name="event_detail_remove_message">This doesn\'t cancel your registration with the organizer.</string>
+    <string name="event_detail_remove_cancel">Cancel</string>
+    <string name="event_detail_remove_confirm">Remove</string>
+    <string name="event_detail_registration_error">Couldn\'t load or save your registration.</string>
+    <string name="event_detail_website_error">Couldn\'t open the event website.</string>
+    <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
