@@ -284,6 +284,20 @@ object C {
     const val join_circle_join_button = "join_circle_join_button"
     const val join_circle_no_code = "join_circle_no_code"
 
+    // Care circle invite code
+    const val care_circle_invite_screen = "care_circle_invite_screen"
+    const val care_circle_invite_back_button = "care_circle_invite_back_button"
+    const val care_circle_invite_loading = "care_circle_invite_loading"
+    const val care_circle_invite_error = "care_circle_invite_error"
+    const val care_circle_invite_retry_button = "care_circle_invite_retry_button"
+    const val care_circle_invite_not_found = "care_circle_invite_not_found"
+    const val care_circle_invite_code = "care_circle_invite_code"
+    const val care_circle_invite_valid = "care_circle_invite_valid"
+    const val care_circle_invite_offline_warning = "care_circle_invite_offline_warning"
+    const val care_circle_invite_expired = "care_circle_invite_expired"
+    const val care_circle_invite_joined = "care_circle_invite_joined"
+    const val care_circle_invite_back_to_circle_button = "care_circle_invite_back_to_circle_button"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
