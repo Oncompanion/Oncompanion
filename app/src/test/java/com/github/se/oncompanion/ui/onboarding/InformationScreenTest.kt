@@ -161,6 +161,16 @@ class InformationScreenTest {
   }
 
   @Test
+  fun content_caregiver_hidesTheCancerType_andKeepsTheOtherFields() {
+    setContent(OnboardingUiState(role = Role.CAREGIVER, firstName = "Alex"))
+    firstNameField().assertExists()
+    familyNameField().assertExists()
+    cancerTypeField().assertDoesNotExist()
+    assertTextDoesNotExist(R.string.cancer_type_label)
+    continueButton().assertIsEnabled()
+  }
+
+  @Test
   fun content_fieldsShowTheStateValues() {
     setContent(OnboardingUiState(firstName = "Alex", familyName = "Doe", cancerType = "Leukemia"))
     firstNameField().assertTextContains("Alex")
@@ -500,6 +510,27 @@ class InformationScreenTest {
       assertEquals("Alexandra", saved.firstName)
       assertEquals(Role.PATIENT, saved.role)
       assertNull(saved.familyName)
+      assertNull(saved.cancerType)
+    }
+  }
+
+  @Test
+  fun screen_caregiver_noCancerTypeField_andSavesACaregiverProfile() {
+    signIn(AuthUser(uid = "uid-1", givenName = "Alexandra"))
+    val viewModel = OnboardingViewModel(auth, profiles)
+    viewModel.selectRole(Role.CAREGIVER)
+    composeTestRule.setContent {
+      InformationScreen(viewModel = viewModel, onSaved = { savedCalls++ })
+    }
+    cancerTypeField().assertDoesNotExist()
+
+    continueButton().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { savedCalls > 0 }
+    composeTestRule.runOnIdle {
+      val saved = profiles.profiles["uid-1"]!!
+      assertEquals(Role.CAREGIVER, saved.role)
+      assertEquals("Alexandra", saved.firstName)
       assertNull(saved.cancerType)
     }
   }

@@ -26,8 +26,9 @@ enum class OnboardingError {
 }
 
 /**
- * @property role the chosen role; patient by default, the only one available for now
+ * @property role the chosen role; patient by default
  * @property firstName required (see [canSave])
+ * @property cancerType only asked to patients (see [asksCancerType])
  * @property isSaving the profile is being saved
  * @property isSaved the profile is saved: onboarding is done
  */
@@ -43,6 +44,10 @@ data class OnboardingUiState(
   /** The profile can be saved: a first name is filled in and nothing is being saved. */
   val canSave: Boolean
     get() = firstName.isNotBlank() && !isSaving && !isSaved
+
+  /** Only a patient is asked for their cancer type: a caregiver isn't the one being treated. */
+  val asksCancerType: Boolean
+    get() = role == Role.PATIENT
 }
 
 /**
@@ -59,9 +64,11 @@ class OnboardingViewModel(
   private val _uiState = MutableStateFlow(OnboardingUiState(firstName = prefilledFirstName()))
   val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-  /** Chooses the role. Only [Role.PATIENT] is available for now: other roles are ignored. */
+  /**
+   * Chooses the role. A cancer type already typed is kept, in case the user picks patient again.
+   */
   fun selectRole(role: Role) {
-    if (role == Role.PATIENT) _uiState.update { it.copy(role = role) }
+    _uiState.update { it.copy(role = role) }
   }
 
   /** Text longer than [UserProfile.MAX_NAME_LENGTH] is cut, as the profile can't store it. */
@@ -82,9 +89,10 @@ class OnboardingViewModel(
   }
 
   /**
-   * Saves the profile: trimmed first name, and family name and cancer type only if filled in. Does
-   * nothing unless [OnboardingUiState.canSave]. Saving returns as soon as the profile is stored on
-   * the device, also offline.
+   * Saves the profile: trimmed first name, and family name and cancer type only if filled in (the
+   * cancer type only for a patient, see [OnboardingUiState.asksCancerType]). Does nothing unless
+   * [OnboardingUiState.canSave]. Saving returns as soon as the profile is stored on the device,
+   * also offline.
    */
   fun saveProfile() {
     val state = _uiState.value
@@ -103,7 +111,8 @@ class OnboardingViewModel(
                 role = state.role,
                 firstName = state.firstName.trim(),
                 familyName = state.familyName.trim().ifEmpty { null },
-                cancerType = state.cancerType.trim().ifEmpty { null },
+                cancerType =
+                    if (state.asksCancerType) state.cancerType.trim().ifEmpty { null } else null,
             )
         )
         _uiState.update { it.copy(isSaving = false, isSaved = true) }

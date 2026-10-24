@@ -40,20 +40,22 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 
 /**
  * Second onboarding step (Figma "US-01 / Onboarding – Information"): first name (required), family
- * name and cancer type (optional, with suggestions). Continue saves the profile.
+ * name and, for a patient, cancer type (optional, with suggestions). Continue saves the profile.
  *
- * @param onSaved called once the profile is saved: onboarding is done
+ * @param onSaved called with the chosen role once the profile is saved: onboarding is done, and
+ *   what comes next depends on the role
  */
 @Composable
-fun InformationScreen(viewModel: OnboardingViewModel, onSaved: () -> Unit) {
+fun InformationScreen(viewModel: OnboardingViewModel, onSaved: (Role) -> Unit) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
   // Leaves onboarding once the profile is saved
-  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) onSaved() }
+  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) onSaved(uiState.role) }
 
   InformationContent(
       uiState = uiState,
@@ -159,12 +161,14 @@ fun InformationContent(
                 ),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_family_name_field),
         )
-        // Cancer type (optional): free text with suggestions
-        CancerTypeField(
-            value = uiState.cancerType,
-            onValueChange = onCancerTypeChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // Cancer type (optional, patients only): free text with suggestions
+        if (uiState.asksCancerType) {
+          CancerTypeField(
+              value = uiState.cancerType,
+              onValueChange = onCancerTypeChange,
+              modifier = Modifier.fillMaxWidth(),
+          )
+        }
       }
       // Pushes Continue to the bottom of the screen when there's room
       Spacer(Modifier.weight(1f).heightIn(min = 32.dp))

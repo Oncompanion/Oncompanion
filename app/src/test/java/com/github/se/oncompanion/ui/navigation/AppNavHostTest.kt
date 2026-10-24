@@ -19,6 +19,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -198,11 +199,67 @@ class AppNavHostTest {
   }
 
   @Test
-  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverIsDisabled() {
+  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverCanBeChosen() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsEnabled()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingAsCaregiver_informationScreenHasNoCancerType() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertDoesNotExist()
+
+    // Going back keeps the choice, and picking patient brings the cancer type back
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertExists()
+  }
+
+  @Test
+  fun caregiverOnboarding_endsOnJoinACareCircle_whichBackCantLeave() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val profiles = FakeUserProfileRepository()
+    UserProfileRepositoryProvider.repository = profiles
+    setNavHost(Route.ONBOARDING, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.join_circle_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Role.CAREGIVER, profiles.profiles["caregiver"]?.role)
+      assertEquals(Screen.JOIN_CIRCLE, NavigationActions(navController).currentRoute())
+      // Onboarding is done: Back doesn't return to it
+      NavigationActions(navController).goBack()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
+  }
+
+  @Test
+  fun joinACareCircle_withoutACode_continuesToOverview() {
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_no_code).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+    }
   }
 
   @Test
