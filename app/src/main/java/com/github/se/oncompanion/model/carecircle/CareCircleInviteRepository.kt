@@ -76,6 +76,13 @@ interface CareCircleInviteRepository {
       caregiverUid: String,
       caregiverEmail: String?,
   ): RedeemResult
+
+  /**
+   * Emits the circles [caregiverUid] joined with [redeem], now and on every change (e.g. when a
+   * patient removes them). Works offline from the local cache. The flow fails if they can't be
+   * read.
+   */
+  fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>>
 }
 
 /** What happened when a caregiver entered an invite code. */

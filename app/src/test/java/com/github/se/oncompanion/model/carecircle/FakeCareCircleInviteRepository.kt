@@ -25,8 +25,8 @@ import kotlinx.coroutines.flow.merge
  * the next invite code.
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
- * [joinedCircles]; [isOffline] makes it fail like without a connection. The caregiver's role isn't
- * checked.
+ * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly.
+ * [isOffline] makes [redeem] fail like without a connection. The caregiver's role isn't checked.
  *
  * @param circle when given, a successful [redeem] adds the member to it, so screens can watch a
  *   pending invite turn into a member
@@ -68,10 +68,20 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   /** When true, [redeem] returns [RedeemResult.Offline] and saves nothing. */
   var isOffline = false
 
-  private val joined = mutableMapOf<String, List<JoinedCareCircle>>()
+  private val joined = MutableStateFlow<Map<String, List<JoinedCareCircle>>>(emptyMap())
 
   /** The circles [caregiverUid] joined with [redeem], in order. */
-  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> = joined[caregiverUid].orEmpty()
+  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> =
+      joined.value[caregiverUid].orEmpty()
+
+  /** Replaces the circles [caregiverUid] joined, e.g. to start a test already in a circle. */
+  fun setJoinedCircles(caregiverUid: String, circles: List<JoinedCareCircle>) {
+    joined.value += caregiverUid to circles
+  }
+
+  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = observed {
+    joined.map { it[caregiverUid].orEmpty() }.distinctUntilChanged()
+  }
 
   /** The invite stored with [inviteCode], whatever its state, or null. */
   fun invite(inviteCode: String): CareCircleInvite? = invites.value[inviteCode]
@@ -156,8 +166,9 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     // member are added together
     val now = Instant.now()
     invites.value -= invite.inviteCode
-    joined[caregiverUid] =
-        joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
+    joined.value +=
+        caregiverUid to
+            (joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now))
     circle?.let {
       val details = invite.details
       val member =

@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.carecircle
 
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 
 /**
  * A care circle the caregiver joined, stored at `/users/{caregiverUid}/patients/{patientUid}` when
@@ -18,3 +19,10 @@ data class JoinedCareCircle(
     val patientFirstName: String,
     val joinedAt: Instant? = null,
 )
+
+/**
+ * Whether [caregiverUid] joined at least one care circle, so the app can open the join screen for a
+ * caregiver who hasn't yet. Answers from the local cache when offline.
+ */
+suspend fun CareCircleInviteRepository.hasJoinedCircle(caregiverUid: String): Boolean =
+    observeJoinedCircles(caregiverUid).first().isNotEmpty()

@@ -175,6 +175,19 @@ class CareCircleInviteRepositoryFirestore(
     }
   }
 
+  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> =
+      callbackFlow {
+        val registration =
+            users().document(caregiverUid).collection(PATIENTS_COLLECTION).addSnapshotListener {
+                snapshot,
+                error ->
+              if (error != null) close(error)
+              else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
+            }
+        awaitClose { registration.remove() }
+      }
+      .distinctUntilChanged()
+
   /**
    * Checks the invite [inviteCode] and the caregiver's membership on the server, then writes the
    * member and the caregiver's [JoinedCareCircle] and deletes the invite in [transaction]. A
@@ -254,6 +267,14 @@ class CareCircleInviteRepositoryFirestore(
   }
 
   /** Reads leniently like the member mapping: only a missing name or owner skips the invite. */
+  /** The patient's first name may be missing in a damaged document: shown empty, not dropped. */
+  private fun joinedFromDocument(doc: DocumentSnapshot) =
+      JoinedCareCircle(
+          patientUid = doc.id,
+          patientFirstName = doc.get(FIELD_PATIENT_FIRST_NAME) as? String ?: "",
+          joinedAt = (doc.get(FIELD_JOINED_AT) as? Timestamp)?.toInstant(),
+      )
+
   private fun fromDocument(doc: DocumentSnapshot): CareCircleInvite? {
     val firstName = doc.getString(FIELD_FIRST_NAME)
     val ownerUid = doc.getString(FIELD_OWNER_UID)
