@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -33,6 +34,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -263,5 +265,132 @@ class CareCircleInviteViewModelTest {
     viewModel.refreshExpiry()
     runCurrent()
     assertTrue(viewModel.invite().expired)
+  }
+
+  // ---- cancelling ----
+
+  @Test
+  fun askCancel_opensTheDialog_andDismissingKeepsTheInvite() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.askCancel()
+    assertTrue(viewModel.invite().confirmingCancel)
+
+    viewModel.dismissCancel()
+    runCurrent()
+    assertFalse(viewModel.invite().confirmingCancel)
+    assertEquals(julie(), invites.invite(inviteCode))
+  }
+
+  @Test
+  fun theDialogStaysOpen_whenTheInviteChanges() = runTest {
+    invites.setInvites(listOf(julie(createdAgo = null).copy(isSynced = false)))
+    val viewModel = createViewModel()
+    runCurrent()
+    viewModel.askCancel()
+
+    // The invite reaches the server while the dialog is open
+    invites.setInvites(listOf(julie()))
+    runCurrent()
+
+    assertTrue(viewModel.invite().confirmingCancel)
+    assertTrue(viewModel.invite().invite.isSynced)
+  }
+
+  @Test
+  fun confirmCancel_deletesTheInvite_andIsCancelled() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.askCancel()
+    viewModel.confirmCancel()
+    advanceUntilIdle()
+
+    assertNull(invites.invite(inviteCode))
+    assertEquals(CareCircleInviteUiState.Cancelled, viewModel.uiState.value)
+  }
+
+  @Test
+  fun cancelError_keepsTheInvite_andSaysItFailed() = runTest {
+    invites.setInvites(listOf(julie()))
+    invites.cancelError = IllegalStateException("boom")
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.askCancel()
+    viewModel.confirmCancel()
+    advanceUntilIdle()
+
+    val state = viewModel.invite()
+    assertTrue(state.actionFailed)
+    assertFalse(state.isWorking)
+    assertFalse(state.confirmingCancel)
+
+    // Opening the dialog again clears the error
+    viewModel.askCancel()
+    assertFalse(viewModel.invite().actionFailed)
+  }
+
+  @Test
+  fun actionsDoNothing_beforeTheInviteIsShown() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    viewModel.askCancel()
+    viewModel.confirmCancel()
+    viewModel.renew()
+    runCurrent()
+    assertEquals(julie(), invites.invite(inviteCode))
+    assertFalse(viewModel.invite().confirmingCancel)
+  }
+
+  // ---- renewing ----
+
+  @Test
+  fun renew_replacesTheExpiredInvite_andOpensTheNewOne() = runTest {
+    invites.setInvites(listOf(julie(createdAgo = Duration.ofDays(8))))
+    invites.nextInviteCode = { "NNNNN23456" }
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.renew()
+    advanceUntilIdle()
+
+    assertEquals(CareCircleInviteUiState.Renewed("NNNNN23456"), viewModel.uiState.value)
+    assertNull(invites.invite(inviteCode))
+    val renewed = invites.invite("NNNNN23456")
+    assertEquals(julie().details, renewed?.details)
+    assertEquals("julie@example.com", renewed?.email)
+  }
+
+  @Test
+  fun renew_doesNothing_whileTheInviteCodeStillWorks() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.renew()
+    advanceUntilIdle()
+
+    assertTrue(invites.created.isEmpty())
+    assertEquals(julie(), viewModel.invite().invite)
+  }
+
+  @Test
+  fun renewError_keepsTheExpiredInvite_andSaysItFailed() = runTest {
+    invites.setInvites(listOf(julie(createdAgo = Duration.ofDays(8))))
+    invites.createError = IllegalStateException("boom")
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.renew()
+    advanceUntilIdle()
+
+    val state = viewModel.invite()
+    assertTrue(state.actionFailed)
+    assertTrue(state.expired)
+    assertEquals(inviteCode, state.invite.inviteCode)
   }
 }
