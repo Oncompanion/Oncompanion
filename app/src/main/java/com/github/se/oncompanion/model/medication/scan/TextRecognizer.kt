@@ -15,7 +15,8 @@ fun interface TextRecognizer {
    * never leave the phone. Doesn't delete [photo]: that is up to whoever owns it.
    *
    * @return the lines read; [RecognizedText.isEmpty] if there is no text on the photo
-   * @throws IOException if [photo] can't be read as an image
+   * @throws IOException if [photo] can't be read as an image, or if the recognizer fails to read
+   *   it: the only failure a caller has to handle
    */
   suspend fun recognize(photo: File): RecognizedText
 }
