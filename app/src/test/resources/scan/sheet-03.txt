@@ -1,0 +1,14 @@
+# Fictional US-10 test prescription, sheet 03, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.70	0,178,75,290	23186
+0.88	668,654,925,688	Dr Marc Dubois
+0.86	668,704,984,740	Médecine générale
+0.86	665,742,1330,787	Avenue du Parc 3, 1003 Lausanne (fictif)
+0.83	660,929,1012,973	ORDONNANCE
+0.87	655,1060,1634,1110	Ondansétron 8 mg :1 comprimé 2x/jour pendant 5 jours
+0.89	654,1169,1714,1214	Paracétamol 500 mg: 2 comprimés 3 fois par jour si douleurs
+0.87	1829,646,2312,681	Lausanne, le 20 octobre 2026
+0.81	615,3218,2313,3291	SPECIMEN Ordonnance fictive créée pour tester I'application oncompanion Non valable Aucune personne ni
+0.74	614,3294,819,3333	clinique réelle
