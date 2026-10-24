@@ -18,16 +18,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -39,18 +41,25 @@ import com.github.se.oncompanion.resources.C
 
 /**
  * "Join a care circle" (US-15): a caregiver enters the invite code the patient shared, then sees
- * whose circle they joined. Opened at the end of a caregiver's onboarding.
+ * whose circle they joined. It is also where a caregiver without a circle waits for a code: opened
+ * at the end of their onboarding, and each time they open the app until they join one.
  *
- * @param onDone called when the caregiver leaves the screen: after joining, or without a code yet
+ * @param onDone called with Continue, once joined
+ * @param onOpenProfile opens the profile, from which the caregiver can also sign out
  */
 @Composable
-fun JoinCareCircleScreen(viewModel: JoinCareCircleViewModel, onDone: () -> Unit) {
+fun JoinCareCircleScreen(
+    viewModel: JoinCareCircleViewModel,
+    onDone: () -> Unit,
+    onOpenProfile: () -> Unit,
+) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   JoinCareCircleContent(
       uiState = uiState,
       onCodeChange = viewModel::onCodeChange,
       onJoin = viewModel::join,
       onDone = onDone,
+      onOpenProfile = onOpenProfile,
   )
 }
 
@@ -61,6 +70,7 @@ fun JoinCareCircleContent(
     onCodeChange: (String) -> Unit,
     onJoin: () -> Unit,
     onDone: () -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
@@ -76,20 +86,30 @@ fun JoinCareCircleContent(
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
     ) {
+      // The profile, so a caregiver waiting for a code can still sign out. It scrolls with the
+      // content instead of a fixed top bar, which would take the room left above the keyboard
+      IconButton(
+          onClick = onOpenProfile,
+          modifier = Modifier.align(Alignment.End).testTag(C.Tag.join_circle_profile),
+      ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_profile),
+            contentDescription = stringResource(R.string.profile_title),
+        )
+      }
       val joinedName = uiState.joinedPatientFirstName
       if (joinedName != null) Joined(joinedName, uiState.wasAlreadyMember, onDone)
-      else CodeForm(uiState, onCodeChange, onJoin, onDone)
+      else CodeForm(uiState, onCodeChange, onJoin)
     }
   }
 }
 
-/** The title, the invite code field, Join, and a way to leave without a code. */
+/** The title, the invite code field, Join, and what to do without a code yet. */
 @Composable
 private fun CodeForm(
     uiState: JoinCareCircleUiState,
     onCodeChange: (String) -> Unit,
     onJoin: () -> Unit,
-    onNoCode: () -> Unit,
 ) {
   Text(
       text = stringResource(R.string.join_circle_title),
@@ -143,13 +163,14 @@ private fun CodeForm(
       Text(stringResource(R.string.join_circle_join))
     }
   }
-  TextButton(
-      onClick = onNoCode,
-      enabled = !uiState.isJoining,
-      modifier = Modifier.fillMaxWidth().testTag(C.Tag.join_circle_no_code),
-  ) {
-    Text(stringResource(R.string.join_circle_no_code))
-  }
+  Spacer(Modifier.height(24.dp))
+  // Without a code yet, the caregiver waits here: the app opens this screen until they join
+  Text(
+      text = stringResource(R.string.join_circle_no_code_hint),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.testTag(C.Tag.join_circle_no_code),
+  )
 }
 
 /** Whose circle the caregiver is now in, and Continue. */

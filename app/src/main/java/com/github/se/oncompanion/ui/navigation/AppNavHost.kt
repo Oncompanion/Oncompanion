@@ -89,6 +89,7 @@ fun AppNavHost(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
                     AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                    AfterSignIn.JOIN_CIRCLE -> Route.JOIN_CIRCLE
                   }
               )
             },
@@ -120,8 +121,9 @@ fun AppNavHost(
       composable(Screen.JOIN_CIRCLE) {
         JoinCareCircleScreen(
             viewModel = viewModel { JoinCareCircleViewModel() },
-            // Joined, or no code yet: the Overview for now, until caregivers get their own home
+            // Joined: the Overview for now, until caregivers get their own home
             onDone = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
         )
       }
     }

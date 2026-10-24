@@ -281,15 +281,16 @@ class AppNavHostTest {
   }
 
   @Test
-  fun joinACareCircle_withoutACode_continuesToOverview() {
+  fun joinACareCircle_profileOpensTheProfile_andBackReturnsToJoin() {
     setNavHost(Route.JOIN_CIRCLE)
     composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).assertIsNotEnabled()
-    composeTestRule.onNodeWithTag(C.Tag.join_circle_no_code).performScrollTo().performClick()
-    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_profile).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+      assertEquals(Screen.PROFILE, NavigationActions(navController).currentRoute())
+      NavigationActions(navController).goBack()
     }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
   }
 
   @Test

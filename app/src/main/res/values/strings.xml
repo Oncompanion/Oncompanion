@@ -300,7 +300,7 @@
     <string name="join_circle_code">Invite code</string>
     <string name="join_circle_code_hint">For example ABCDE-FGHJK</string>
     <string name="join_circle_join">Join</string>
-    <string name="join_circle_no_code">I don\'t have a code yet</string>
+    <string name="join_circle_no_code_hint">No code yet? Ask the person you support to add you to their care circle in Oncompanion. This screen opens each time you start the app until you join.</string>
     <string name="join_circle_error_invalid">This code doesn\'t work. Check it, or ask for a new one.</string>
     <string name="join_circle_error_offline">You need a connection to join a care circle. Please try again online.</string>
     <string name="join_circle_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>

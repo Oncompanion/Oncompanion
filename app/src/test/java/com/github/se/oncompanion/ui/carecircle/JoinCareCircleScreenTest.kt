@@ -74,6 +74,7 @@ class JoinCareCircleScreenTest {
           onCodeChange = { uiState = uiState.copy(code = it, error = null) },
           onJoin = { events += "join" },
           onDone = { events += "done" },
+          onOpenProfile = { events += "profile" },
       )
     }
   }
@@ -87,7 +88,9 @@ class JoinCareCircleScreenTest {
     assertText(string(R.string.join_circle_code_hint))
     node(C.Tag.join_circle_code_field).assert(hasNoError)
     node(C.Tag.join_circle_join_button).assertIsNotEnabled()
-    node(C.Tag.join_circle_no_code).assertIsEnabled()
+    // The waiting state: what to do without a code, and the profile
+    assertText(string(R.string.join_circle_no_code_hint))
+    node(C.Tag.join_circle_profile).assertIsEnabled()
     node(C.Tag.join_circle_joined).assertDoesNotExist()
   }
 
@@ -108,10 +111,17 @@ class JoinCareCircleScreenTest {
   }
 
   @Test
-  fun content_noCode_callsOnDone() {
+  fun content_profile_callsOnOpenProfile() {
     setContent(JoinCareCircleUiState())
-    node(C.Tag.join_circle_no_code).performScrollTo().performClick()
-    composeTestRule.runOnIdle { assertEquals(listOf("done"), events) }
+    node(C.Tag.join_circle_profile).performClick()
+    composeTestRule.runOnIdle { assertEquals(listOf("profile"), events) }
+  }
+
+  @Test
+  fun content_joined_stillOffersTheProfile_butNotTheNoCodeHint() {
+    setContent(JoinCareCircleUiState(joinedPatientFirstName = "Marie"))
+    node(C.Tag.join_circle_profile).assertIsEnabled()
+    node(C.Tag.join_circle_no_code).assertDoesNotExist()
   }
 
   @Test
@@ -138,7 +148,6 @@ class JoinCareCircleScreenTest {
     node(C.Tag.join_circle_joining).assertExists()
     node(C.Tag.join_circle_join_button).assertIsNotEnabled()
     node(C.Tag.join_circle_code_field).assertIsNotEnabled()
-    node(C.Tag.join_circle_no_code).assertIsNotEnabled()
   }
 
   @Test
@@ -204,7 +213,7 @@ class JoinCareCircleScreenTest {
     var doneCalls = 0
     val viewModel = JoinCareCircleViewModel(auth, invites)
     composeTestRule.setContent {
-      JoinCareCircleScreen(viewModel = viewModel, onDone = { doneCalls++ })
+      JoinCareCircleScreen(viewModel = viewModel, onDone = { doneCalls++ }, onOpenProfile = {})
     }
 
     node(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
