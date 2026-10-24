@@ -1,0 +1,19 @@
+# Fictional US-10 test prescription, sheet 06, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.81	550,523,1098,593	Dr J. Roux - Oncologie
+0.88	552,532,1506,639	Cabinet des Vignes (fictif) , 1950 Sion
+0.81	555,693,1027,764	Sion, le 11. 11.2026
+0.87	557,887,805,932	Ordonnance
+0.84	560,944,1370,1032	Dexaméthasone 4 mg 1-0-0 3 jours
+0.84	561,1041,1427,1130	Métoclopramide 10 mg 1-1-1 5 jours
+0.57	592,1166,1334,1272	Paracétamot 1 g si fière
+0.77	410,1670,1300,2348	SPÉCIMEN
+0.85	1531,960,1909,1074	CABINET DES VIGNES
+0.77	1655,1031,1761,1079	FICTIF
+0.77	449,3478,676,3514	clinique réelle
+0.82	1660,1075,1737,1116	Sion
+0.78	465,3435,2353,3485	SPECIMEN Ordonnance fictve créee pour tester l'application oncompanion- Non valable Aucune personne ni
+0.80	2669,222,2998,352	cIMEN Ordonnance
+0.69	2677,271,2807,331	ue réelle
