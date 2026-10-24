@@ -226,7 +226,12 @@ class JoinCareCircleScreenTest {
     var doneCalls = 0
     val viewModel = JoinCareCircleViewModel(auth, invites)
     composeTestRule.setContent {
-      JoinCareCircleScreen(viewModel = viewModel, onDone = { doneCalls++ }, onOpenProfile = {})
+      JoinCareCircleScreen(
+          viewModel = viewModel,
+          onDone = { doneCalls++ },
+          onOpenProfile = {},
+          onSignedOut = {},
+      )
     }
 
     node(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
@@ -238,5 +243,25 @@ class JoinCareCircleScreenTest {
     assertText(string(R.string.join_circle_joined, "Marie"))
     node(C.Tag.join_circle_continue).performScrollTo().performClick()
     composeTestRule.runOnIdle { assertEquals(1, doneCalls) }
+  }
+
+  @Test
+  fun screen_signedOut_joiningSendsToSignIn() {
+    var signedOutCalls = 0
+    val viewModel = JoinCareCircleViewModel(FakeAuthRepository(), FakeCareCircleInviteRepository())
+    composeTestRule.setContent {
+      JoinCareCircleScreen(
+          viewModel = viewModel,
+          onDone = {},
+          onOpenProfile = {},
+          onSignedOut = { signedOutCalls++ },
+      )
+    }
+
+    node(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    node(C.Tag.join_circle_join_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { signedOutCalls > 0 }
+    composeTestRule.runOnIdle { assertEquals(1, signedOutCalls) }
   }
 }

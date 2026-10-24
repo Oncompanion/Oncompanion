@@ -124,6 +124,7 @@ fun AppNavHost(
             // Joined: the Overview for now, until caregivers get their own home
             onDone = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }
     }

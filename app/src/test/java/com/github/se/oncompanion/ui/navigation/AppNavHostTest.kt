@@ -281,6 +281,21 @@ class AppNavHostTest {
   }
 
   @Test
+  fun joinACareCircle_signedOut_joiningOpensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
   fun joinACareCircle_profileOpensTheProfile_andBackReturnsToJoin() {
     setNavHost(Route.JOIN_CIRCLE)
     composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()

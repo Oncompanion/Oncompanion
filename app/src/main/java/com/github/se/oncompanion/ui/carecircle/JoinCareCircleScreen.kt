@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,14 +47,21 @@ import com.github.se.oncompanion.resources.C
  *
  * @param onDone called with Continue, once joined
  * @param onOpenProfile opens the profile, from which the caregiver can also sign out
+ * @param onSignedOut called when nobody is signed in anymore (e.g. the session expired), to sign in
+ *   again: joining can't work until then
  */
 @Composable
 fun JoinCareCircleScreen(
     viewModel: JoinCareCircleViewModel,
     onDone: () -> Unit,
     onOpenProfile: () -> Unit,
+    onSignedOut: () -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  // Signed out: Join can't work, so the caregiver goes to sign in instead of tapping it again
+  LaunchedEffect(uiState.error) {
+    if (uiState.error == JoinCareCircleError.NOT_SIGNED_IN) onSignedOut()
+  }
   JoinCareCircleContent(
       uiState = uiState,
       onCodeChange = viewModel::onCodeChange,
