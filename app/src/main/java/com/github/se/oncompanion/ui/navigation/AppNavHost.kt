@@ -33,6 +33,7 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
+import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -118,8 +119,9 @@ fun AppNavHost(
     navigation(startDestination = Screen.JOIN_CIRCLE, route = Route.JOIN_CIRCLE) {
       composable(Screen.JOIN_CIRCLE) {
         JoinCareCircleScreen(
-            // No code yet: the Overview for now, until caregivers get their own home
-            onNoCode = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) }
+            viewModel = viewModel { JoinCareCircleViewModel() },
+            // Joined, or no code yet: the Overview for now, until caregivers get their own home
+            onDone = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
         )
       }
     }
