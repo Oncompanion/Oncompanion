@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
@@ -31,6 +32,7 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -103,8 +105,21 @@ fun AppNavHost(
       composable(Screen.ONBOARDING_INFORMATION) { entry ->
         InformationScreen(
             viewModel = onboardingViewModel(navController, entry),
-            // Onboarding is done: Back must not return to it
-            onSaved = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            // Onboarding is done: Back must not return to it. A caregiver then joins a circle
+            onSaved = { role ->
+              navigationActions.navigateAndClearBackStack(
+                  if (role == Role.CAREGIVER) Route.JOIN_CIRCLE else Route.OVERVIEW
+              )
+            },
+        )
+      }
+    }
+
+    navigation(startDestination = Screen.JOIN_CIRCLE, route = Route.JOIN_CIRCLE) {
+      composable(Screen.JOIN_CIRCLE) {
+        JoinCareCircleScreen(
+            // No code yet: the Overview for now, until caregivers get their own home
+            onNoCode = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) }
         )
       }
     }

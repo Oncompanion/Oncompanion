@@ -272,6 +272,15 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+
+    <!-- Join a care circle with an invite code (#137) -->
+    <string name="join_circle_title">Join a care circle</string>
+    <string name="join_circle_subtitle">Enter the invite code that the person you support shared with you.</string>
+    <string name="join_circle_code">Invite code</string>
+    <string name="join_circle_code_hint">For example ABCDE-FGHJK</string>
+    <!-- Join is disabled until joining is built -->
+    <string name="join_circle_join_coming_soon">Join · Coming soon</string>
+    <string name="join_circle_no_code">I don\'t have a code yet</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>

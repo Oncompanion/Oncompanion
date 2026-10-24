@@ -260,6 +260,12 @@ object C {
     fun careCircleFormPermission(permissionName: String) =
         "care_circle_form_permission_$permissionName"
 
+    // Join a care circle
+    const val join_circle_screen = "join_circle_screen"
+    const val join_circle_code_field = "join_circle_code_field"
+    const val join_circle_join_button = "join_circle_join_button"
+    const val join_circle_no_code = "join_circle_no_code"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
