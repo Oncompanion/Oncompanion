@@ -111,6 +111,15 @@ object Screen {
 
   /** The form adding someone to the circle. */
   const val CARE_CIRCLE_ADD = "care_circle_add"
+  /** Name of the [CARE_CIRCLE_INVITE] argument holding the invite code. */
+  const val CARE_CIRCLE_INVITE_ARG = "inviteCode"
+  /** One invitation and its invite code. Navigate with [careCircleInvite], not this pattern. */
+  const val CARE_CIRCLE_INVITE = "care_circle_invite/{$CARE_CIRCLE_INVITE_ARG}"
+
+  /**
+   * The [CARE_CIRCLE_INVITE] screen of [inviteCode]. Invite codes use [A-Z2-9], safe in a route.
+   */
+  fun careCircleInvite(inviteCode: String) = "care_circle_invite/$inviteCode"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"
@@ -123,6 +132,16 @@ open class NavigationActions(private val navController: NavHostController) {
   /** Opens [screen] on top of the current one. Back returns to the current screen. */
   open fun navigateTo(screen: String) {
     navController.navigate(screen) { launchSingleTop = true }
+  }
+
+  /**
+   * Opens [screen] in place of the current one, so Back skips the current screen: e.g. after a form
+   * is saved, Back from the result returns to where the form was opened, not to the filled form.
+   * Does nothing before the graph is set: there is no screen to replace yet.
+   */
+  open fun navigateReplacing(screen: String) {
+    val current = navController.currentDestination?.id ?: return
+    navController.navigate(screen) { popUpTo(current) { inclusive = true } }
   }
 
   /**
