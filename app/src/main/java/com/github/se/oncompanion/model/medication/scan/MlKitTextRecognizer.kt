@@ -81,7 +81,14 @@ class MlKitTextRecognizer(private val ioDispatcher: CoroutineDispatcher = Dispat
     val degrees = rotationOf(exifOrientation(photo))
     if (degrees == 0) return decoded
     val rotation = Matrix().apply { postRotate(degrees.toFloat()) }
-    val upright = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, rotation, true)
+    val upright =
+        try {
+          Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, rotation, true)
+        } catch (e: OutOfMemoryError) {
+          // Frees the decoded photo now, while memory is short, instead of at the next collection
+          decoded.recycle()
+          throw e
+        }
     if (upright !== decoded) decoded.recycle()
     return upright
   }
