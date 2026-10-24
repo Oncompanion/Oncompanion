@@ -315,4 +315,64 @@ class PrescriptionLexiconTest {
         "Service d'hémato-oncologie",
     )
   }
+
+  /** Where [part] is in [text], for comparing with the ranges the lexicon finds. */
+  private fun rangeOf(part: String, text: String): IntRange {
+    val start = text.indexOf(part)
+    return start until start + part.length
+  }
+
+  @Test
+  fun theFirstStrengthAndDoseQuantityAreFound() {
+    val text = c("Ondansétron 8 mg :1 comprimé 2x/jour, 4 mg")
+    assertEquals(rangeOf("8 mg", text), PrescriptionLexicon.strengthIn(text))
+    assertEquals(rangeOf("1 comprime", text), PrescriptionLexicon.doseQuantityIn(text))
+    assertNull(PrescriptionLexicon.strengthIn(c("1 cp le matin")))
+    assertNull(PrescriptionLexicon.doseQuantityIn(c("Ondansetron 8 mg")))
+  }
+
+  @Test
+  fun durationsAreCountedInDaysWithTheWordsBeforeThem() {
+    val cases =
+        mapOf(
+            "1-0-0, pendant 30 jours" to PrescriptionLexicon.Duration(30, true, 0..0),
+            "3 jours" to PrescriptionLexicon.Duration(3, true, 0..0),
+            "1 tablet twice a day 5 days" to PrescriptionLexicon.Duration(5, true, 0..0),
+            "1-0-0, pendant 6 mois" to PrescriptionLexicon.Duration(180, false, 0..0),
+            "pendant 2 semaines" to PrescriptionLexicon.Duration(14, false, 0..0),
+            "1-1-1 si nausées, au maximum 5 jours" to PrescriptionLexicon.Duration(5, false, 0..0),
+            "for 1 week" to PrescriptionLexicon.Duration(7, false, 0..0),
+        )
+    for ((read, expected) in cases) {
+      val duration = PrescriptionLexicon.durationIn(c(read))
+      assertEquals("\"$read\"", expected.days, duration?.days)
+      assertEquals("\"$read\"", expected.exact, duration?.exact)
+    }
+  }
+
+  @Test
+  fun aDurationsRangeIncludesThePendantOrMaximumBeforeIt() {
+    val text = c("1-1-1 si nausées, au maximum 5 jours")
+    assertEquals(rangeOf("au maximum 5 jours", text), PrescriptionLexicon.durationIn(text)?.range)
+    val other = c("1-0-0, pendant 30 jours")
+    assertEquals(rangeOf("pendant 30 jours", other), PrescriptionLexicon.durationIn(other)?.range)
+    assertNull(PrescriptionLexicon.durationIn(c("Contrôle sanguin dans 10 jours.")))
+  }
+
+  @Test
+  fun dosingStartsAtItsFirstQuantityFrequencyOrDuration() {
+    assertEquals(
+        c(", comprimés 1-0-0").indexOf("1-0-0"),
+        PrescriptionLexicon.dosingStartIn(c(", comprimés 1-0-0")),
+    )
+    assertEquals(
+        c(" :1 comprimé 2x/jour").indexOf("1 comprime"),
+        PrescriptionLexicon.dosingStartIn(c(" :1 comprimé 2x/jour")),
+    )
+    assertEquals(
+        c(" cp 5 jours").indexOf("5 jours"),
+        PrescriptionLexicon.dosingStartIn(c(" cp 5 jours")),
+    )
+    assertNull(PrescriptionLexicon.dosingStartIn(c(" cp orodispersible")))
+  }
 }

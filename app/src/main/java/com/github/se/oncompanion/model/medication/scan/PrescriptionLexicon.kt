@@ -73,6 +73,47 @@ internal object PrescriptionLexicon {
    */
   fun isContactOrIdentifier(text: String): Boolean = CONTACTS.any { it.containsMatchIn(text) }
 
+  /**
+   * A duration read in a prescription.
+   *
+   * @property days how many days, weeks and months counted as 7 and 30 days
+   * @property exact whether it is exactly what was written: in days, and not a maximum
+   * @property range where it is in the text, with "pendant" or "au maximum" before it
+   */
+  data class Duration(val days: Int, val exact: Boolean, val range: IntRange)
+
+  /** Where the first strength is in [text] ("8 mg"), if any. */
+  fun strengthIn(text: String): IntRange? = STRENGTH.find(text)?.range
+
+  /** Where the first dose quantity is in [text] ("1 comprimé"), if any. */
+  fun doseQuantityIn(text: String): IntRange? = DOSE_QUANTITY.find(text)?.range
+
+  /** The first duration in [text] ("pendant 6 mois" is 180 days, not exact), if any. */
+  fun durationIn(text: String): Duration? {
+    val match = DURATION.find(text) ?: return null
+    val (maximum, number, unit) = match.destructured
+    val days =
+        when {
+          unit.startsWith("sem") || unit.startsWith("week") -> DAYS_IN_A_WEEK
+          unit.startsWith("mois") || unit.startsWith("month") -> DAYS_IN_A_MONTH
+          else -> 1
+        }
+    return Duration(number.toInt() * days, exact = days == 1 && maximum.isEmpty(), match.range)
+  }
+
+  /**
+   * Where the words saying how to take a medication start in [text]: its first dose quantity,
+   * frequency or duration. What comes before is part of the medication's name ("comprimés", "cp
+   * orodispersible").
+   */
+  fun dosingStartIn(text: String): Int? =
+      (listOf(DOSE_QUANTITY, DURATION) + FREQUENCIES)
+          .mapNotNull { it.find(text)?.range?.first }
+          .minOrNull()
+
+  private const val DAYS_IN_A_WEEK = 7
+  private const val DAYS_IN_A_MONTH = 30
+
   private fun MatchResult.date(day: Int, month: Int, year: Int): LocalDate? {
     val y = groupValues[year].toInt().let { if (it < 100) 2000 + it else it }
     val m = groupValues[month].toIntOrNull() ?: MONTHS.getValue(groupValues[month])
@@ -147,11 +188,13 @@ internal object PrescriptionLexicon {
           ),
       )
 
-  // Not when it says when something happens ("dans 10 jours", "in 2 weeks"); "dans" and "in" as
-  // whole words, so "le matin 3 jours" is a duration
+  // A number of days, weeks or months, with the words around it that go with it ("pendant",
+  // "au maximum"). Not when it says when something happens ("dans 10 jours", "in 2 weeks"); "dans"
+  // and "in" as whole words, so "le matin 3 jours" is a duration
   private val DURATION =
       Regex(
-          """(?<!\d)(?<!\bdans )(?<!\bin )\d+\s*(?:jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
+          """(?:(au maximum|maximum|max\.?|jusqu'a|up to)\s+)?(?:(?:pendant|durant|for|sur|x)\s+)?""" +
+              """(?<!\d)(?<!\bdans )(?<!\bin )(\d+)\s*(jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
       )
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
