@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.Rect
 import androidx.exifinterface.media.ExifInterface
+import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -45,7 +46,13 @@ class MlKitTextRecognizer(private val ioDispatcher: CoroutineDispatcher = Dispat
     // One client per photo: scans are rare, and closing it frees the model's memory
     val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     try {
-      val text = client.process(InputImage.fromBitmap(image, 0)).await()
+      val text =
+          try {
+            client.process(InputImage.fromBitmap(image, 0)).await()
+          } catch (e: MlKitException) {
+            // One kind of failure for the scan to handle, whether the photo or ML Kit failed
+            throw IOException("ML Kit couldn't read the photo", e)
+          }
       val lines =
           text.textBlocks.flatMap { block ->
             block.lines.mapNotNull { line ->
@@ -74,7 +81,14 @@ class MlKitTextRecognizer(private val ioDispatcher: CoroutineDispatcher = Dispat
     val degrees = rotationOf(exifOrientation(photo))
     if (degrees == 0) return decoded
     val rotation = Matrix().apply { postRotate(degrees.toFloat()) }
-    val upright = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, rotation, true)
+    val upright =
+        try {
+          Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, rotation, true)
+        } catch (e: OutOfMemoryError) {
+          // Frees the decoded photo now, while memory is short, instead of at the next collection
+          decoded.recycle()
+          throw e
+        }
     if (upright !== decoded) decoded.recycle()
     return upright
   }
