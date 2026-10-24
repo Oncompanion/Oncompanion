@@ -747,6 +747,92 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
+  /**
+   * Opens the edit screen of Alice's only symptom (`s1`, fatigue) from the journal and its detail,
+   * as the user does. Returns the repository holding it.
+   */
+  private fun openTheEditScreenFromTheJournal(): FakeSymptomRepository {
+    val symptoms =
+        FakeSymptomRepository().apply {
+          seed(
+              "alice",
+              SymptomEntry(
+                  id = "s1",
+                  types = listOf(SymptomType.FATIGUE),
+                  occurredAt = Instant.now().minus(Duration.ofHours(1)),
+              ),
+          )
+        }
+    val alice =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    setNavHost(Route.OVERVIEW, authRepository = alice, symptomRepository = symptoms)
+    openTheJournalFromOverview()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("s1")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_EDIT, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "s1",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.SYMPTOM_DETAIL_ID),
+      )
+    }
+    return symptoms
+  }
+
+  @Test
+  fun editedSymptom_returnsToTheDetail_andBothItAndTheJournalShowTheChange() {
+    val symptoms = openTheEditScreenFromTheJournal()
+    val fatigueAndPain =
+        listOf(R.string.symptom_type_fatigue, R.string.symptom_type_pain).joinToString(", ") {
+          context.getString(it)
+        }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.PAIN.name))
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_save).performClick()
+
+    // Back on the detail of the same symptom, which shows the change
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithText(fatigueAndPain).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          listOf(SymptomType.FATIGUE, SymptomType.PAIN),
+          symptoms.symptoms("alice").single().types,
+      )
+    }
+
+    // And so does the journal behind it
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText(fatigueAndPain, substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.symptomJournalItem("s1"))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+  }
+
+  @Test
+  fun closingTheEditScreen_returnsToTheDetail_withoutSaving() {
+    val symptoms = openTheEditScreenFromTheJournal()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_close).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(listOf(SymptomType.FATIGUE), symptoms.symptoms("alice").single().types)
+    }
+  }
+
   /** Opens the prescriptions list from its Overview shortcut, as the user does. */
   private fun openPrescriptionsFromOverview(medicationRepository: MedicationRepository) {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })

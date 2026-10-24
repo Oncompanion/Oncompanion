@@ -5,18 +5,24 @@ package com.github.se.oncompanion.ui.symptom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +44,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -47,8 +54,8 @@ private val detailDateFormatter =
     DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH)
 
 /**
- * The detail of one symptom of the journal (US-8), from which the user can delete it (US-9). Goes
- * back to the journal once it is deleted.
+ * The detail of one symptom of the journal (US-8), from which the user can edit or delete it
+ * (US-9). Goes back to the journal once it is deleted.
  */
 @Composable
 fun SymptomDetailScreen(
@@ -66,6 +73,7 @@ fun SymptomDetailScreen(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onRetry = viewModel::load,
+      onEdit = { uiState.entry?.let { navigationActions.navigateTo(Screen.symptomEdit(it.id)) } },
       onDelete = viewModel::requestDelete,
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,
@@ -77,6 +85,7 @@ fun SymptomDetailScreen(
  * Stateless content of the detail, so each state can be tested without a ViewModel.
  *
  * @param onRetry reloads the symptom after an error
+ * @param onEdit opens the symptom in the edit form
  * @param onDelete asks to confirm the deletion
  * @param onConfirmDelete deletes the symptom, from the confirmation dialog
  * @param onCancelDelete closes the confirmation dialog and keeps the symptom
@@ -93,6 +102,7 @@ fun SymptomDetailContent(
     onCancelDelete: () -> Unit,
     modifier: Modifier = Modifier,
     zone: ZoneId = ZoneId.systemDefault(),
+    onEdit: () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptom_detail_screen),
@@ -105,7 +115,7 @@ fun SymptomDetailContent(
         )
       },
       // At the bottom, away from the back button, as in the Figma mockup
-      bottomBar = { if (uiState.canDelete) DeleteButton(onDelete) },
+      bottomBar = { if (uiState.canDelete) EntryActions(onEdit, onDelete) },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val entry = uiState.entry
@@ -143,12 +153,22 @@ fun SymptomDetailContent(
   }
 }
 
+/** Edit, then Delete below it, as in the Figma mockup. */
 @Composable
-private fun DeleteButton(onDelete: () -> Unit) {
-  Box(
+private fun EntryActions(onEdit: () -> Unit, onDelete: () -> Unit) {
+  Column(
       modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-      contentAlignment = Alignment.Center,
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
+    OutlinedButton(
+        onClick = onEdit,
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptom_detail_edit),
+    ) {
+      Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+      Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+      Text(stringResource(R.string.symptom_detail_edit))
+    }
     TextButton(onClick = onDelete, modifier = Modifier.testTag(C.Tag.symptom_detail_delete)) {
       Text(stringResource(R.string.symptom_detail_delete))
     }

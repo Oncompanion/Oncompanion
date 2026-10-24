@@ -493,6 +493,302 @@ class AddSymptomViewModelTest {
         }
       }
 
+  // ----- Editing a symptom -----
+
+  /** Logged yesterday at 09:12:37.5, with seconds the form doesn't show. */
+  private val logged =
+      SymptomEntry(
+          id = "s1",
+          types = listOf(SymptomType.FATIGUE),
+          intensity = 4,
+          occurredAt = at(today.minusDays(1), 9, 12).plusMillis(37_500),
+          notes = "After lunch",
+          createdAt = at(today.minusDays(1), 9, 15),
+      )
+
+  /** A ViewModel editing [entry], which is stored for [uid]. */
+  private fun editing(entry: SymptomEntry = logged): AddSymptomViewModel {
+    repository.seed(uid, entry)
+    return AddSymptomViewModel(auth, repository, clock, symptomId = entry.id)
+  }
+
+  @Test
+  fun editing_loadsTheSymptom_andFillsTheForm_withSaveDisabled() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        assertTrue(viewModel.state.isEditing)
+        assertTrue(viewModel.state.isLoading)
+        assertFalse(viewModel.state.isFormShown)
+        advanceUntilIdle()
+
+        val state = viewModel.state
+        assertFalse(state.isLoading)
+        assertTrue(state.isFormShown)
+        assertEquals(listOf(SymptomType.FATIGUE), state.types)
+        assertEquals(4, state.intensity)
+        assertEquals(today.minusDays(1), state.date)
+        assertEquals(LocalTime.of(9, 12, 37, 500_000_000), state.time)
+        assertEquals("After lunch", state.notes)
+        assertFalse(state.isNow)
+        assertFalse(state.hasChanges)
+        assertFalse(state.canSave)
+      }
+
+  @Test
+  fun editing_aSymptomThatNoLongerExists_isNotFound() =
+      runTest(dispatcher) {
+        val viewModel = AddSymptomViewModel(auth, repository, clock, symptomId = "missing")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.isNotFound)
+        assertFalse(viewModel.state.isFormShown)
+        assertFalse(viewModel.state.canSave)
+      }
+
+  @Test
+  fun editing_whenLoadingFails_showsTheError_andRetryLoads() =
+      runTest(dispatcher) {
+        repository.observeError = IOException("no cache")
+        val viewModel = editing()
+        advanceUntilIdle()
+        assertTrue(viewModel.state.hasLoadError)
+        assertFalse(viewModel.state.isFormShown)
+
+        repository.observeError = null
+        viewModel.load()
+        assertTrue(viewModel.state.isLoading)
+        assertFalse(viewModel.state.hasLoadError)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.isFormShown)
+        assertEquals("After lunch", viewModel.state.notes)
+      }
+
+  @Test
+  fun editing_whenSignedOut_showsTheLoadError() =
+      runTest(dispatcher) {
+        auth.signOut()
+        val viewModel = editing()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.hasLoadError)
+        assertFalse(viewModel.state.isLoading)
+      }
+
+  @Test
+  fun editing_changesBeforeTheSymptomIsLoaded_areIgnored() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        viewModel.toggleType(SymptomType.PAIN)
+        viewModel.onNotesChange("Typed too early")
+        advanceUntilIdle()
+
+        assertEquals(listOf(SymptomType.FATIGUE), viewModel.state.types)
+        assertEquals("After lunch", viewModel.state.notes)
+      }
+
+  @Test
+  fun editing_saveIsEnabledByAChange_andDisabledAgainWhenItIsUndone() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+
+        viewModel.toggleType(SymptomType.PAIN)
+        assertTrue(viewModel.state.canSave)
+        viewModel.toggleType(SymptomType.PAIN)
+        assertFalse(viewModel.state.canSave)
+
+        viewModel.onIntensityChange(7)
+        assertTrue(viewModel.state.canSave)
+        viewModel.onIntensityChange(4)
+        assertFalse(viewModel.state.canSave)
+
+        // Spaces around the notes aren't saved, so they aren't a change
+        viewModel.onNotesChange("  After lunch ")
+        assertFalse(viewModel.state.canSave)
+        viewModel.onNotesChange("")
+        assertTrue(viewModel.state.canSave)
+      }
+
+  @Test
+  fun editing_untickingAndReTickingAType_isNotAChange() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(types = listOf(SymptomType.FATIGUE, SymptomType.PAIN)))
+        advanceUntilIdle()
+
+        viewModel.toggleType(SymptomType.FATIGUE)
+        viewModel.toggleType(SymptomType.FATIGUE)
+
+        assertFalse(viewModel.state.hasChanges)
+        assertFalse(viewModel.state.canSave)
+      }
+
+  @Test
+  fun editing_everyField_updatesTheSymptom_keepingItsIdAndWhenItWasLogged() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        viewModel.toggleType(SymptomType.FATIGUE)
+        viewModel.toggleType(SymptomType.NAUSEA)
+        viewModel.toggleType(SymptomType.HEADACHE)
+        viewModel.clearIntensity()
+        viewModel.onDateChange(today.minusDays(2))
+        viewModel.onTimeChange(LocalTime.of(20, 30))
+        viewModel.onNotesChange("  Worse at night ")
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.isSaved)
+        assertEquals(
+            SymptomEntry(
+                id = "s1",
+                types = listOf(SymptomType.NAUSEA, SymptomType.HEADACHE),
+                intensity = null,
+                occurredAt = at(today.minusDays(2), 20, 30),
+                notes = "Worse at night",
+                createdAt = logged.createdAt,
+            ),
+            savedEntry(),
+        )
+      }
+
+  @Test
+  fun editing_withoutTouchingTheDayOrTime_keepsTheExactMoment() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        viewModel.onIntensityChange(8)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(logged.occurredAt, savedEntry().occurredAt)
+        assertEquals(8, savedEntry().intensity)
+      }
+
+  @Test
+  fun editing_aMomentInTheRepeatedHour_whenTheClocksGoBack_keepsIt() =
+      runTest(dispatcher) {
+        // 02:30 happens twice in Zurich on 25 October 2026; this is the second one (winter time)
+        current = Instant.parse("2026-10-26T12:00:00Z")
+        val repeated = logged.copy(occurredAt = Instant.parse("2026-10-25T01:30:00Z"))
+        val viewModel = editing(repeated)
+        advanceUntilIdle()
+        viewModel.onIntensityChange(8)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(repeated.occurredAt, savedEntry().occurredAt)
+      }
+
+  @Test
+  fun editing_onlyTheDay_keepsTheTime() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        viewModel.onDateChange(today.minusDays(3))
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(at(today.minusDays(3), 9, 12).plusMillis(37_500), savedEntry().occurredAt)
+      }
+
+  @Test
+  fun editing_tickingOther_withNotesAlreadyFilled_canBeSaved() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+
+        viewModel.toggleType(SymptomType.OTHER)
+        assertFalse(viewModel.state.isMissingNotes)
+        assertTrue(viewModel.state.canSave)
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(listOf(SymptomType.FATIGUE, SymptomType.OTHER), savedEntry().types)
+        assertEquals("After lunch", savedEntry().notes)
+      }
+
+  @Test
+  fun editing_tickingOther_withoutNotes_cantBeSaved() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(notes = null))
+        advanceUntilIdle()
+
+        viewModel.toggleType(SymptomType.OTHER)
+
+        assertTrue(viewModel.state.isMissingNotes)
+        assertFalse(viewModel.state.canSave)
+      }
+
+  @Test
+  fun editing_clearingTheNotesOfOther_cantBeSaved() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(types = listOf(SymptomType.OTHER), notes = "Hiccups"))
+        advanceUntilIdle()
+
+        viewModel.onNotesChange(" ")
+
+        assertTrue(viewModel.state.isMissingNotes)
+        assertFalse(viewModel.state.canSave)
+      }
+
+  @Test
+  fun editing_toLaterThanItWasLogged_canBeSaved_butNotToTheFuture() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+
+        // Logged yesterday at 09:15, moved to today at 13:00 (now is 14:00)
+        viewModel.onDateChange(today)
+        viewModel.onTimeChange(LocalTime.of(15, 0))
+        assertTrue(viewModel.state.isInFuture)
+        assertFalse(viewModel.state.canSave)
+
+        viewModel.onTimeChange(LocalTime.of(13, 0))
+        assertFalse(viewModel.state.isInFuture)
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(at(today, 13, 0), savedEntry().occurredAt)
+      }
+
+  @Test
+  fun editing_whenSavingFails_keepsTheChanges_andRetrySaves() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        viewModel.onIntensityChange(9)
+        repository.writeError = IOException("disk full")
+
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(AddSymptomError.SAVE_FAILED, viewModel.state.error)
+        assertEquals(4, savedEntry().intensity)
+
+        repository.writeError = null
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.isSaved)
+        assertEquals(9, savedEntry().intensity)
+      }
+
+  @Test
+  fun loggingANewSymptom_neverLoads() =
+      runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.isEditing)
+        assertFalse(viewModel.state.isLoading)
+        assertTrue(viewModel.state.isFormShown)
+      }
+
   // ----- When a symptom was felt -----
 
   private val zonedNow = today.atTime(14, 0).atZone(zurich)
