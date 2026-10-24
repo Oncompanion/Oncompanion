@@ -9,7 +9,7 @@ import java.io.IOException
  * Reads the text on the photo of a prescription, on the device. Behind an interface so the scan can
  * be tested with a fake, and so nothing else in the app depends on ML Kit.
  */
-interface TextRecognizer {
+fun interface TextRecognizer {
   /**
    * Reads the text on [photo], a JPEG taken by the scan. Works offline; the photo and its text
    * never leave the phone. Doesn't delete [photo]: that is up to whoever owns it.
