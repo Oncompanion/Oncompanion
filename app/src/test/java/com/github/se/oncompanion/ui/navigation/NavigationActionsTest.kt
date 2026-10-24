@@ -103,6 +103,42 @@ class NavigationActionsTest {
   }
 
   @Test
+  fun navigateReplacing_removesTheCurrentScreenFromTheBackStack() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.runOnIdle { navigationActions.navigateReplacing(Screen.ONBOARDING_INFORMATION) }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_INFORMATION, navigationActions.currentRoute())
+      assertFalse(Screen.ONBOARDING_ROLE in routesInBackStack())
+    }
+  }
+
+  @Test
+  fun navigateReplacing_keepsTheScreensBelow() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.runOnIdle {
+      navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION)
+      navigationActions.navigateReplacing(Screen.ONBOARDING_ROLE)
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.ONBOARDING_ROLE, navigationActions.currentRoute())
+      assertFalse(Screen.ONBOARDING_INFORMATION in routesInBackStack())
+      // The first screen is still below: Back returns to it
+      assertEquals(
+          Screen.ONBOARDING_ROLE,
+          navController.previousBackStackEntry?.destination?.route,
+      )
+    }
+  }
+
+  @Test
+  fun navigateReplacing_beforeTheGraphIsSet_doesNothing() {
+    val emptyController = TestNavHostController(ApplicationProvider.getApplicationContext())
+    NavigationActions(emptyController).navigateReplacing(Screen.ONBOARDING_ROLE)
+    assertEquals("", NavigationActions(emptyController).currentRoute())
+  }
+
+  @Test
   fun navigateTo_sameScreenTwice_doesNotDuplicateIt() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.runOnIdle {

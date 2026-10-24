@@ -302,6 +302,20 @@
     <!-- Join is disabled until joining is built -->
     <string name="join_circle_join_coming_soon">Join · Coming soon</string>
     <string name="join_circle_no_code">I don\'t have a code yet</string>
+
+    <!-- Care circle invite code (#150) -->
+    <string name="care_circle_invite_title">Invitation</string>
+    <string name="care_circle_invite_back">Back</string>
+    <string name="care_circle_invite_code_label">Invite code</string>
+    <string name="care_circle_invite_valid_until">Valid until %1$s</string>
+    <string name="care_circle_invite_valid_once_sent">Valid for 7 days once sent</string>
+    <string name="care_circle_invite_offline_warning">You\'re offline. This invite code will work once your phone reconnects.</string>
+    <string name="care_circle_invite_expired_on">The code stopped working on %1$s.</string>
+    <string name="care_circle_invite_joined_title">%1$s has joined your circle</string>
+    <string name="care_circle_invite_joined_body">%1$s can now see: %2$s. You can change this any time.</string>
+    <string name="care_circle_invite_back_to_circle">Back to circle</string>
+    <string name="care_circle_invite_not_found">This invitation was cancelled.</string>
+    <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>

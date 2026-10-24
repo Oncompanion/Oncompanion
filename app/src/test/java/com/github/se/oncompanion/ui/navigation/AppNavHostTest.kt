@@ -497,7 +497,7 @@ class AppNavHostTest {
   }
 
   @Test
-  fun careCircle_addingAMemberFromOverview_showsThemAsPendingInTheList() {
+  fun careCircle_addingAMemberFromOverview_showsTheInviteCode_thenThemAsPending() {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository().apply { nextInviteCode = { "K7M2PQ9XRT" } }
@@ -530,7 +530,15 @@ class AppNavHostTest {
         .performScrollTo()
         .performClick()
 
-    // Back on the list, Julie waits to join with the access she was given
+    // The form is replaced by Julie's invite code, to send or share
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("K7M2P-Q9XRT")
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_INVITE, NavigationActions(navController).currentRoute())
+    }
+
+    // Back skips the filled form: on the list, Julie waits to join with the access she was given
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertIsDisplayed()
@@ -542,6 +550,50 @@ class AppNavHostTest {
     composeTestRule.runOnIdle {
       assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
     }
+  }
+
+  @Test
+  fun careCircleInvite_opensFromTheList_andShowsWhenThePersonJoins() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val careCircle = FakeCareCircleRepository()
+    val invites = FakeCareCircleInviteRepository(careCircle)
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "JJJJJ23456",
+                ownerUid = "owner",
+                ownerFirstName = "Anne",
+                details = CareCircleMemberDetails(firstName = "Julie"),
+            )
+        )
+    )
+    setNavHost(
+        Route.CARE_CIRCLE,
+        careCircleRepository = careCircle,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+
+    // The route's argument must reach the invite code screen's ViewModel
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("JJJJJ-23456")
+    composeTestRule.runOnIdle {
+      assertEquals(
+          "JJJJJ23456",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.CARE_CIRCLE_INVITE_ARG),
+      )
+    }
+
+    // Julie uses the invite code on her phone: the screen says she joined (#150)
+    runBlocking { invites.redeem("jjjjj-23456", "julie-uid", "julie@example.com") }
+    composeTestRule.onNodeWithText("Julie has joined your circle").assertIsDisplayed()
+
+    // Back on the list, she is a regular member and no longer waiting to join
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("julie-uid")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
   }
 
   @Test
