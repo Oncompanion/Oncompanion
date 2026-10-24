@@ -258,6 +258,10 @@ class PrescriptionLexiconTest {
         "for 2 weeks",
         "pendant 3 semaines",
         "10 j",
+        // After a word ending in "in" or "dans" (a table row read as one line)
+        "2 cp le matin 3 jours",
+        "1 tablet each morning 5 days",
+        "Gardans 4 jours",
     )
     assertAll(
         PrescriptionLexicon::hasDuration,

@@ -147,9 +147,11 @@ internal object PrescriptionLexicon {
           ),
       )
 
+  // Not when it says when something happens ("dans 10 jours", "in 2 weeks"); "dans" and "in" as
+  // whole words, so "le matin 3 jours" is a duration
   private val DURATION =
       Regex(
-          """(?<!\d)(?<!dans )(?<!in )\d+\s*(?:jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
+          """(?<!\d)(?<!\bdans )(?<!\bin )\d+\s*(?:jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
       )
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
