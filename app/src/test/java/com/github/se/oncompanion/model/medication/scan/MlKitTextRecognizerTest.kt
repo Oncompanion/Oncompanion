@@ -2,7 +2,7 @@
 
 package com.github.se.oncompanion.model.medication.scan
 
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
