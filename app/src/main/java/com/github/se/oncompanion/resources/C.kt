@@ -282,7 +282,7 @@ object C {
     const val join_circle_screen = "join_circle_screen"
     const val join_circle_code_field = "join_circle_code_field"
     const val join_circle_join_button = "join_circle_join_button"
-    const val join_circle_no_code = "join_circle_no_code"
+    const val join_circle_no_code_hint = "join_circle_no_code_hint"
     const val join_circle_profile = "join_circle_profile"
     const val join_circle_joining = "join_circle_joining"
     const val join_circle_joined = "join_circle_joined"

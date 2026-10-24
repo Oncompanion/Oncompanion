@@ -121,7 +121,7 @@ class JoinCareCircleScreenTest {
   fun content_joined_stillOffersTheProfile_butNotTheNoCodeHint() {
     setContent(JoinCareCircleUiState(joinedPatientFirstName = "Marie"))
     node(C.Tag.join_circle_profile).assertIsEnabled()
-    node(C.Tag.join_circle_no_code).assertDoesNotExist()
+    node(C.Tag.join_circle_no_code_hint).assertDoesNotExist()
   }
 
   @Test

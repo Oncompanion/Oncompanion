@@ -177,7 +177,7 @@ private fun CodeForm(
       text = stringResource(R.string.join_circle_no_code_hint),
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.testTag(C.Tag.join_circle_no_code),
+      modifier = Modifier.testTag(C.Tag.join_circle_no_code_hint),
   )
 }
 
