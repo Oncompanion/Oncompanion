@@ -308,6 +308,9 @@
     <!-- e.g. "You joined Marie's care circle" -->
     <string name="join_circle_joined">You joined %1$s\'s care circle</string>
     <string name="join_circle_already_member">You\'re already in %1$s\'s care circle</string>
+    <!-- When the patient's first name is missing -->
+    <string name="join_circle_joined_unnamed">You joined their care circle</string>
+    <string name="join_circle_already_member_unnamed">You\'re already in their care circle</string>
     <string name="join_circle_joined_hint">You\'ll see what they choose to share with you.</string>
     <string name="join_circle_continue">Continue</string>
     <!-- Prescriptions -->

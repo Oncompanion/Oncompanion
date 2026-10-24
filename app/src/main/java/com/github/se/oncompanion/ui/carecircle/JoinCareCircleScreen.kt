@@ -176,13 +176,17 @@ private fun CodeForm(
 /** Whose circle the caregiver is now in, and Continue. */
 @Composable
 private fun Joined(patientFirstName: String, wasAlreadyMember: Boolean, onContinue: () -> Unit) {
+  // A damaged invite can have no name: then the title names nobody rather than "'s care circle"
+  val title =
+      when {
+        patientFirstName.isBlank() && wasAlreadyMember ->
+            stringResource(R.string.join_circle_already_member_unnamed)
+        patientFirstName.isBlank() -> stringResource(R.string.join_circle_joined_unnamed)
+        wasAlreadyMember -> stringResource(R.string.join_circle_already_member, patientFirstName)
+        else -> stringResource(R.string.join_circle_joined, patientFirstName)
+      }
   Text(
-      text =
-          stringResource(
-              if (wasAlreadyMember) R.string.join_circle_already_member
-              else R.string.join_circle_joined,
-              patientFirstName,
-          ),
+      text = title,
       style = MaterialTheme.typography.headlineMedium,
       modifier = Modifier.testTag(C.Tag.join_circle_joined),
   )

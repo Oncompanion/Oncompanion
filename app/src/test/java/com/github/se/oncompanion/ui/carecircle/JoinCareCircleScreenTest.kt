@@ -169,6 +169,19 @@ class JoinCareCircleScreenTest {
   }
 
   @Test
+  fun content_joined_withoutTheirName_namesNobody() {
+    setContent(JoinCareCircleUiState(joinedPatientFirstName = ""))
+    assertText(string(R.string.join_circle_joined_unnamed))
+    composeTestRule.onNodeWithText("'s care circle", substring = true).assertDoesNotExist()
+  }
+
+  @Test
+  fun content_alreadyMember_withoutTheirName_namesNobody() {
+    setContent(JoinCareCircleUiState(joinedPatientFirstName = " ", wasAlreadyMember = true))
+    assertText(string(R.string.join_circle_already_member_unnamed))
+  }
+
+  @Test
   fun content_keyboardOpen_joinCanBeScrolledAboveIt() {
     setContent(JoinCareCircleUiState(code = "ABCDEFGHJK"))
     val keyboardHeight = 600
