@@ -307,8 +307,17 @@ class M1EndToEndTest {
 
   private fun string(id: Int) = compose.activity.getString(id)
 
+  /**
+   * Whether a node matches. While the app is covered (a system dialog on a slow emulator), there is
+   * no Compose hierarchy to search: that is "not there yet", so [waitFor] keeps waiting.
+   */
   private fun exists(matcher: SemanticsMatcher) =
-      compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+      try {
+        compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+      } catch (e: IllegalStateException) {
+        if (e.message?.startsWith("No compose hierarchies found") != true) throw e
+        false
+      }
 
   /** Waits for the node (data comes from the emulators asynchronously), then returns it. */
   private fun waitFor(matcher: SemanticsMatcher) = compose.run {
