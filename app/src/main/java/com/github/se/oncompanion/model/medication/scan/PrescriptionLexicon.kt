@@ -51,7 +51,7 @@ internal object PrescriptionLexicon {
   fun hasFrequency(text: String): Boolean = FREQUENCIES.any { it.containsMatchIn(text) }
 
   /** Whether [text] says for how long ("pendant 5 jours", "3 days"), but not "dans 10 jours". */
-  fun hasDuration(text: String): Boolean = DURATION.containsMatchIn(text)
+  fun hasDuration(text: String): Boolean = durationsIn(text).any()
 
   /**
    * Whether [text] is the heading that opens the list of medications ("Rp/", "Rx", "Ordonnance").
@@ -72,6 +72,13 @@ internal object PrescriptionLexicon {
    * phone number, a street or postcode and town, an AVS or insurance number, the signature line.
    */
   fun isContactOrIdentifier(text: String): Boolean = CONTACTS.any { it.containsMatchIn(text) }
+
+  // Not when the words before say when something happens ("dans 10 jours", "in 2 weeks") or how
+  // often ("tous les 21 jours")
+  private fun durationsIn(text: String): Sequence<MatchResult> =
+      DURATION.findAll(text).filterNot {
+        WHEN_OR_HOW_OFTEN.containsMatchIn(text.substring(0, it.range.first))
+      }
 
   private fun MatchResult.date(day: Int, month: Int, year: Int): LocalDate? {
     val y = groupValues[year].toInt().let { if (it < 100) 2000 + it else it }
@@ -143,8 +150,7 @@ internal object PrescriptionLexicon {
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
           // Also days and weeks: chemotherapy cycles ("tous les 21 jours", "toutes les 3 semaines")
           Regex(
-              """\b(?:tous les|toutes les|every)\s+\d+\s*""" +
-                  """(?:h|heures|hours|jours?|days?|semaines?|sem|weeks?)\b"""
+              """\b(?:tous les|toutes les|every)\s+\d+\s*(?:h|heure|hour|jour|day|semaine|sem|week)s?\b"""
           ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
           Regex("""\b(?:par jour|a day|per day|daily)\b"""),
@@ -153,13 +159,9 @@ internal object PrescriptionLexicon {
           ),
       )
 
-  // Not when it says when something happens ("dans 10 jours", "in 2 weeks") or how often ("tous
-  // les 21 jours"); those words as whole words, so "le matin 3 jours" is a duration
-  private val DURATION =
-      Regex(
-          """(?<!\d)(?<!\bdans )(?<!\bin )(?<!\btous les )(?<!\btoutes les )(?<!\bevery )""" +
-              """\d+\s*(?:jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
-      )
+  private val DURATION = Regex("""(?<!\d)\d+\s*(?:jour|j|day|semaine|sem|week|mois|month)s?\b""")
+  // As whole words, so "le matin 3 jours" is a duration
+  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every)\s$""")
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
   private val LIST_STARTS = setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription")
