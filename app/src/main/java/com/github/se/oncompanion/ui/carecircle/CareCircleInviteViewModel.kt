@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 /** What the invite code screen shows. */
 sealed interface CareCircleInviteUiState {
@@ -77,7 +80,9 @@ class CareCircleInviteViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-  private val inviteCode: String? = savedStateHandle[Screen.CARE_CIRCLE_INVITE_ARG]
+  private val inviteCode: String? = savedStateHandle.get<String>(Screen.CARE_CIRCLE_INVITE_ARG)?.let {
+      CareCircleInvite.normalizeInviteCode(it)
+  }
 
   private val _uiState = MutableStateFlow<CareCircleInviteUiState>(CareCircleInviteUiState.Loading)
   val uiState: StateFlow<CareCircleInviteUiState> = _uiState.asStateFlow()
@@ -130,7 +135,7 @@ class CareCircleInviteViewModel(
                 // Show the invitation again when it expires, so it never looks valid after that
                 val expiresAt = invite?.expiresAt?.takeIf { member == null && it > now } ?: break
                 // Rounded up, so it wakes up at or after the expiry, never just before
-                delay(Duration.between(now, expiresAt).toMillis() + 1)
+                delay(Duration.between(now, expiresAt).toMillis().toDuration(DurationUnit.MILLISECONDS) + 1.milliseconds)
               }
             }
       } catch (e: CancellationException) {
