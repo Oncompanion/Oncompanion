@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
@@ -107,7 +108,7 @@ class M1EndToEndTest {
     // A new account goes to onboarding
     waitFor(hasTestTag(C.Tag.onboarding_role_patient)).performClick()
     tag(C.Tag.onboarding_continue_button).performClick()
-    waitFor(hasTestTag(C.Tag.onboarding_first_name_field)).performTextReplacement(firstName)
+    waitFor(hasTestTag(C.Tag.onboarding_first_name_field)).replaceText(firstName)
     tag(C.Tag.onboarding_save_button).reveal().performClick()
 
     waitFor(hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true))
@@ -118,10 +119,10 @@ class M1EndToEndTest {
     tag(C.Tag.overview_shortcut_prescriptions).reveal().performClick()
     waitFor(hasTestTag(C.Tag.prescriptions_enter_manually_button)).performClick()
 
-    waitFor(hasTestTag(C.Tag.prescription_form_prescribed_by_field)).performTextInput(doctor)
-    tag(C.Tag.prescription_form_medication_name_field).reveal().performTextInput(medication)
-    tag(C.Tag.prescription_form_dosage_field).reveal().performTextInput("20 mg")
-    tag(C.Tag.prescription_form_frequency_field).reveal().performTextInput("Once a day")
+    waitFor(hasTestTag(C.Tag.prescription_form_prescribed_by_field)).typeText(doctor)
+    tag(C.Tag.prescription_form_medication_name_field).reveal().typeText(medication)
+    tag(C.Tag.prescription_form_dosage_field).reveal().typeText("20 mg")
+    tag(C.Tag.prescription_form_frequency_field).reveal().typeText("Once a day")
     // Save stays at the bottom of the screen, outside the scrolling fields
     tag(C.Tag.prescription_form_save_button).performClick()
 
@@ -142,10 +143,10 @@ class M1EndToEndTest {
     waitFor(hasTestTag(tomorrow)).performClick()
 
     tag(C.Tag.planning_add).performClick()
-    waitFor(hasTestTag(C.Tag.appointment_title)).performTextInput(title)
+    waitFor(hasTestTag(C.Tag.appointment_title)).typeText(title)
     tag(C.Tag.appointment_time).performClick()
     tag(C.Tag.appointment_confirm).performClick()
-    tag(C.Tag.appointment_location).reveal().performTextInput("HUG, oncology")
+    tag(C.Tag.appointment_location).reveal().typeText("HUG, oncology")
     tag(C.Tag.appointment_save).reveal().performClick()
 
     // Saving returns to the calendar, on the appointment's day
@@ -220,7 +221,7 @@ class M1EndToEndTest {
     waitFor(hasTestTag(C.Tag.profile_name) and hasText(firstName, substring = true))
 
     tag(C.Tag.profile_edit).performClick()
-    waitFor(hasTestTag(C.Tag.hospital_field)).reveal().performTextInput(hospital)
+    waitFor(hasTestTag(C.Tag.hospital_field)).reveal().typeText(hospital)
     tag(C.Tag.edit_profile_save).reveal().performClick()
 
     waitFor(
@@ -238,7 +239,7 @@ class M1EndToEndTest {
     // A new patient's circle is empty: its add button is in the page
     waitFor(hasTestTag(C.Tag.care_circle_empty_add_button)).performClick()
 
-    waitFor(hasTestTag(C.Tag.care_circle_form_first_name)).performTextInput(firstName)
+    waitFor(hasTestTag(C.Tag.care_circle_form_first_name)).typeText(firstName)
     tag(C.Tag.care_circle_form_relationship).reveal().performClick()
     waitFor(hasTestTag(C.Tag.careCircleFormRelationshipOption("DAUGHTER"))).performClick()
     tag(C.Tag.care_circle_form_save_button).reveal().performClick()
@@ -292,6 +293,28 @@ class M1EndToEndTest {
   }
 
   private fun tag(testTag: String) = compose.onNodeWithTag(testTag)
+
+  /** Types [text] at the end of the field, then closes the keyboard (see [closeKeyboard]). */
+  private fun SemanticsNodeInteraction.typeText(text: String) = apply {
+    performTextInput(text)
+    closeKeyboard()
+  }
+
+  /** Replaces the field's text with [text], then closes the keyboard (see [closeKeyboard]). */
+  private fun SemanticsNodeInteraction.replaceText(text: String) = apply {
+    performTextReplacement(text)
+    closeKeyboard()
+  }
+
+  /**
+   * Closes the keyboard and waits until it's gone. On the slow CI emulator, a keyboard still
+   * closing covers the next button and the tap lands on the keyboard (seen in the emulator's
+   * logcat).
+   */
+  private fun closeKeyboard() {
+    Espresso.closeSoftKeyboard()
+    compose.waitForIdle()
+  }
 
   /**
    * Scrolls to the node when it's in a scrolling area, which depends on the screen's height. Only
