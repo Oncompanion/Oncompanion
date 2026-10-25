@@ -275,8 +275,9 @@ private fun PendingLabel() {
   }
 }
 
+/** A round avatar with a person's [initial], shared with "Whose care?". */
 @Composable
-private fun Monogram(initial: String) {
+internal fun Monogram(initial: String) {
   Box(
       modifier =
           Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),

@@ -288,6 +288,18 @@ object C {
     const val join_circle_joined = "join_circle_joined"
     const val join_circle_continue = "join_circle_continue"
 
+    // Whose care?
+    const val whose_care_screen = "whose_care_screen"
+    const val whose_care_back = "whose_care_back"
+    const val whose_care_loading = "whose_care_loading"
+    const val whose_care_error = "whose_care_error"
+    const val whose_care_empty = "whose_care_empty"
+    const val whose_care_action = "whose_care_action"
+    const val whose_care_join_another = "whose_care_join_another"
+
+    /** The row of the followed patient [uid] in "Whose care?". */
+    fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
