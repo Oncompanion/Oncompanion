@@ -250,7 +250,9 @@ class PrescriptionLexiconTest {
         "1 injection toutes les 3 semaines",
         "every 2 weeks",
         "toutes les 48 heures",
-        "toutes les 2 jours",
+        "tous les 2 jours",
+        "1 perfusion tous les 21 jours",
+        "toutes les 3 sem",
         "1 injection s.c. par jour",
         "après chaque selle liquide",
         "as needed",
@@ -291,6 +293,8 @@ class PrescriptionLexiconTest {
         // How often, not for how long
         "1 injection toutes les 3 semaines",
         "every 2 weeks",
+        "tous les 21 jours",
+        "toutes les 3 sem",
         "1 cp toutes les 12 heures",
         "Ondansetron 8 mg",
     )

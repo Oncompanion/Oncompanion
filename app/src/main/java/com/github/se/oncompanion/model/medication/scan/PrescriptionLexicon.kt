@@ -141,9 +141,10 @@ internal object PrescriptionLexicon {
           Regex("""(?<![\d-])\d\s*-\s*\d\s*-\s*\d(?:\s*-\s*\d)?(?![\d-])"""),
           Regex("""\b\d+\s*(?:x|fois)\s*/?\s*(?:par\s+)?(?:jour|j|day|d|semaine|week)\b"""),
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
-          // Also days and weeks: chemotherapy cycles ("toutes les 3 semaines")
+          // Also days and weeks: chemotherapy cycles ("tous les 21 jours", "toutes les 3 semaines")
           Regex(
-              """\b(?:toutes les|every)\s+\d+\s*(?:h|heures|hours|jours?|days?|semaines?|weeks?)\b"""
+              """\b(?:tous les|toutes les|every)\s+\d+\s*""" +
+                  """(?:h|heures|hours|jours?|days?|semaines?|sem|weeks?)\b"""
           ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
           Regex("""\b(?:par jour|a day|per day|daily)\b"""),
@@ -152,11 +153,11 @@ internal object PrescriptionLexicon {
           ),
       )
 
-  // Not when it says when something happens ("dans 10 jours", "in 2 weeks") or how often ("toutes
-  // les 3 semaines"); those words as whole words, so "le matin 3 jours" is a duration
+  // Not when it says when something happens ("dans 10 jours", "in 2 weeks") or how often ("tous
+  // les 21 jours"); those words as whole words, so "le matin 3 jours" is a duration
   private val DURATION =
       Regex(
-          """(?<!\d)(?<!\bdans )(?<!\bin )(?<!\btoutes les )(?<!\bevery )""" +
+          """(?<!\d)(?<!\bdans )(?<!\bin )(?<!\btous les )(?<!\btoutes les )(?<!\bevery )""" +
               """\d+\s*(?:jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
       )
 
