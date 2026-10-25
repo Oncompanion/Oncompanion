@@ -1,0 +1,21 @@
+# Fictional US-10 test prescription, sheet 05, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.83	675,737,919,763	PRESCRIPTEUR
+0.87	674,784,917,815	Dre Léa Morel
+0.83	672,825,1301,864	Oncologie, Hôpital des Cèdres (fictif)
+0.88	673,866,915,902	1700 Fribourg
+0.75	669,1026,979,1056	MÉDECIN TRAITANT
+0.88	667,1076,1197,1116	Dr Hugo Perret, 170o Fribourg
+0.87	621,1228,938,1268	Date : 05/11/2026
+0.79	1547,743,1671,769	PATIENT
+0.85	1547,785,2141,833	Mme Nora Blanc, née le o2.07.1965
+0.86	1546,832,2024,868	Assurance : Caisse fictive SA
+0.77	1547,868,2223,917	N° d'assuré : 80756000000000000000
+0.83	619,1370,1994,1413	Lopéramide 2 mg, 1 gélule après chaque selle liquide, au maximum 8 par jour
+0.88	617,1460,1730,1507	Ondansétron 8 mg, 1 comprimé matin et soir, pendant 3 jours
+0.84	586,3298,2243,3363	SPECIMEN Ordonnance fictive créée pour tester I'application oncompanion Non valable Aucune personne n
+0.83	586,3370,789,3402	clinique réelle
+0.51	2944,1009,3000,1061	SPEC
+0.48	2929,1046,3000,1097	cliniau
