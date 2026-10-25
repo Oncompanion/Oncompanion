@@ -51,7 +51,7 @@ internal object PrescriptionLexicon {
   fun hasFrequency(text: String): Boolean = FREQUENCIES.any { it.containsMatchIn(text) }
 
   /** Whether [text] says for how long ("pendant 5 jours", "3 days"), but not "dans 10 jours". */
-  fun hasDuration(text: String): Boolean = DURATION.containsMatchIn(text)
+  fun hasDuration(text: String): Boolean = durationsIn(text).any()
 
   /**
    * Whether [text] is the heading that opens the list of medications ("Rp/", "Rx", "Ordonnance").
@@ -90,15 +90,23 @@ internal object PrescriptionLexicon {
 
   /** The first duration in [text] ("pendant 6 mois" is 180 days, not exact), if any. */
   fun durationIn(text: String): Duration? {
-    val match = DURATION.find(text) ?: return null
-    val (maximum, number, unit) = match.destructured
+    val match = durationsIn(text).firstOrNull() ?: return null
+    val (number, unit) = match.destructured
     val days =
         when {
           unit.startsWith("sem") || unit.startsWith("week") -> DAYS_IN_A_WEEK
           unit.startsWith("mois") || unit.startsWith("month") -> DAYS_IN_A_MONTH
           else -> 1
         }
-    return Duration(number.toInt() * days, exact = days == 1 && maximum.isEmpty(), match.range)
+    // The words before it that go with it: "pendant", and before that "au maximum"
+    var start = match.range.first
+    DURATION_FOR.find(text.substring(0, start))?.let { start = it.range.first }
+    val maximum = DURATION_MAXIMUM.find(text.substring(0, start))?.also { start = it.range.first }
+    return Duration(
+        number.toInt() * days,
+        exact = days == 1 && maximum == null,
+        start..match.range.last,
+    )
   }
 
   /**
@@ -107,12 +115,21 @@ internal object PrescriptionLexicon {
    * orodispersible").
    */
   fun dosingStartIn(text: String): Int? =
-      (listOf(DOSE_QUANTITY, DURATION) + FREQUENCIES)
-          .mapNotNull { it.find(text)?.range?.first }
+      (FREQUENCIES.map { it.find(text)?.range } +
+              DOSE_QUANTITY.find(text)?.range +
+              durationIn(text)?.range)
+          .mapNotNull { it?.first }
           .minOrNull()
 
   private const val DAYS_IN_A_WEEK = 7
   private const val DAYS_IN_A_MONTH = 30
+
+  // Not when the words before say when something happens ("dans 10 jours", "in 2 weeks") or how
+  // often ("tous les 21 jours")
+  private fun durationsIn(text: String): Sequence<MatchResult> =
+      DURATION.findAll(text).filterNot {
+        WHEN_OR_HOW_OFTEN.containsMatchIn(text.substring(0, it.range.first))
+      }
 
   private fun MatchResult.date(day: Int, month: Int, year: Int): LocalDate? {
     val y = groupValues[year].toInt().let { if (it < 100) 2000 + it else it }
@@ -193,16 +210,11 @@ internal object PrescriptionLexicon {
           ),
       )
 
-  // A number of days, weeks or months, with the words around it that go with it ("pendant",
-  // "au maximum"). Not when it says when something happens ("dans 10 jours", "in 2 weeks") or how
-  // often ("tous les 21 jours"); those words as whole words, so "le matin 3 jours" is a
-  // duration
-  private val DURATION =
-      Regex(
-          """(?:(au maximum|maximum|max\.?|jusqu'a|up to)\s+)?(?:(?:pendant|durant|for|sur|x)\s+)?""" +
-              """(?<!\d)(?<!\bdans )(?<!\bin )(?<!\btous les )(?<!\btoutes les )(?<!\bevery )""" +
-              """(\d+)\s*(jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
-      )
+  private val DURATION = Regex("""(?<!\d)(\d+)\s*(jour|j|day|semaine|sem|week|mois|month)s?\b""")
+  // As whole words, so "le matin 3 jours" is a duration
+  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every)\s$""")
+  private val DURATION_FOR = Regex("""\b(?:pendant|durant|for|sur|x)\s+$""")
+  private val DURATION_MAXIMUM = Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to)\s+$""")
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
   private val LIST_STARTS = setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription")
