@@ -251,15 +251,61 @@ class AppNavHostTest {
   }
 
   @Test
-  fun joinACareCircle_withoutACode_continuesToOverview() {
+  fun joinACareCircle_withAValidCode_joinsThenContinuesToOverview() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository()
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "ABCDEFGHJK",
+                ownerUid = "patient",
+                ownerFirstName = "Marie",
+                details = CareCircleMemberDetails(firstName = "Sam"),
+            )
+        )
+    )
+    setNavHost(Route.JOIN_CIRCLE, careCircleInviteRepository = invites, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.join_circle_joined).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_continue).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals("patient", invites.joinedCircles("caregiver").single().patientUid)
+    }
+  }
+
+  @Test
+  fun joinACareCircle_signedOut_joiningOpensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun joinACareCircle_profileOpensTheProfile_andBackReturnsToJoin() {
     setNavHost(Route.JOIN_CIRCLE)
     composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).assertIsNotEnabled()
-    composeTestRule.onNodeWithTag(C.Tag.join_circle_no_code).performScrollTo().performClick()
-    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_profile).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+      assertEquals(Screen.PROFILE, NavigationActions(navController).currentRoute())
+      NavigationActions(navController).goBack()
     }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
   }
 
   @Test
