@@ -347,7 +347,7 @@ class AppNavHostTest {
   }
 
   @Test
-  fun caregiverMode_titleSwitchesPatient() {
+  fun caregiverMode_titleSwitchesPatient_andPlanningCantAdd() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
     setNavHost(
         Route.WHOSE_CARE,
@@ -376,6 +376,11 @@ class AppNavHostTest {
         .onNodeWithTag(C.Tag.overview_whose_care)
         .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
     composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+
+    // Only the patient adds appointments
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
   }
 
   @Test

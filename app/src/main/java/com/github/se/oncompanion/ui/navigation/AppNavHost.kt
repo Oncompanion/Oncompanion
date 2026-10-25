@@ -201,7 +201,10 @@ fun AppNavHost(
         PlanningScreen(
             navigationActions,
             planningViewModel,
-            onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+            // Only the patient adds appointments
+            onAddAppointment =
+                if (chosenPatient != null) null
+                else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
         )
       }
       composable(
@@ -251,6 +254,7 @@ fun AppNavHost(
             eventId = eventId,
             onBack = navigationActions::goBack,
             viewModel = viewModel { EventDetailViewModel(eventId) },
+            readOnly = chosenPatient != null,
         )
       }
     }

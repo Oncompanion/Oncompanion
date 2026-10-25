@@ -87,6 +87,7 @@ class EventDetailScreenTest {
       onCancelRemoval: () -> Unit = {},
       onRemoveRegistration: () -> Unit = {},
       uriHandler: UriHandler = RecordingUriHandler(),
+      readOnly: Boolean = false,
   ) {
     composeTestRule.setContent {
       CompositionLocalProvider(LocalUriHandler provides uriHandler) {
@@ -98,6 +99,7 @@ class EventDetailScreenTest {
             onRequestRemoval = onRequestRemoval,
             onCancelRemoval = onCancelRemoval,
             onRemoveRegistration = onRemoveRegistration,
+            readOnly = readOnly,
         )
       }
     }
@@ -462,5 +464,19 @@ class EventDetailScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.event_detail_registration_closed).assertIsDisplayed()
+  }
+
+  @Test
+  fun readOnly_keepsTheWebsite_butCantConfirm() {
+    setContent(loaded(RegistrationStatus.CAN_CONFIRM), readOnly = true)
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_visit_website).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_registration_note).assertDoesNotExist()
+  }
+
+  @Test
+  fun readOnly_cantRemoveARegistration() {
+    setContent(loaded(RegistrationStatus.CONFIRMED), readOnly = true)
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_remove).assertDoesNotExist()
   }
 }
