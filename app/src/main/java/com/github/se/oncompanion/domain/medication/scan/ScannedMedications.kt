@@ -114,7 +114,7 @@ private val UNREAD_DURATION =
             """\b(?:jours?|days?|semaines?|weeks?|mois|months?)\b"""
     )
 
-/** A cycle, which says how often and not for how long: "toutes les 3 semaines", "every 2 days". */
+/** A cycle, which says how often and not for how long: "tous les 21 jours", "every 2 days". */
 private val EVERY_FEW_DAYS =
-    Regex("""\b(?:toutes les|every)\s+\d+\s*(?:jours?|days?|semaines?|weeks?)\b""")
+    Regex("""\b(?:tous les|toutes les|every)\s+\d+\s*(?:jours?|days?|semaines?|sem|weeks?)\b""")
 private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·')

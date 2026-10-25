@@ -171,6 +171,8 @@ class ScannedMedicationsTest {
             // Chemotherapy cycles
             "1 injection toutes les 3 semaines",
             "1 injection every 2 weeks",
+            "1 perfusion tous les 21 jours",
+            "1 injection toutes les 3 sem",
         )) {
       val medication = medicationsOf(linesOf("Ondansetron 8 mg", dosing)).single()
       assertTrue(dosing, medication.frequency.sure)
