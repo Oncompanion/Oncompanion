@@ -147,8 +147,9 @@ internal object PrescriptionLexicon {
   // Longest names first, so "sept" isn't read as "sep" followed by "t"
   private val MONTH = MONTHS.keys.sortedByDescending { it.length }.joinToString("|")
 
+  // A full stop may end the sentence after it ("le 14.10.2026."), but not go on with a number
   private val NUMERIC_DATE =
-      Regex("""(?<![\d.])(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?![\d.])""")
+      Regex("""(?<![\d.])(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?!\d|\.\d)""")
   private val ISO_DATE = Regex("""(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)""")
   private val DAY_MONTH_YEAR =
       Regex("""(?<!\d)(\d{1,2})(?:er)?\.?\s+($MONTH)\.?,?\s+(\d{4})(?!\d)""")
@@ -172,15 +173,19 @@ internal object PrescriptionLexicon {
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
           """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?)"""
+  // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
-      Regex("""(?<![\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
+      Regex("""(?<![\p{L}\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
 
   private val FREQUENCIES =
       listOf(
           Regex("""(?<![\d-])\d\s*-\s*\d\s*-\s*\d(?:\s*-\s*\d)?(?![\d-])"""),
           Regex("""\b\d+\s*(?:x|fois)\s*/?\s*(?:par\s+)?(?:jour|j|day|d|semaine|week)\b"""),
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
-          Regex("""\b(?:toutes les|every)\s+\d+\s*(?:h|heures|hours)\b"""),
+          // Also days and weeks: chemotherapy cycles ("toutes les 3 semaines")
+          Regex(
+              """\b(?:toutes les|every)\s+\d+\s*(?:h|heures|hours|jours?|days?|semaines?|weeks?)\b"""
+          ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
           Regex("""\b(?:par jour|a day|per day|daily)\b"""),
           Regex(
@@ -189,12 +194,14 @@ internal object PrescriptionLexicon {
       )
 
   // A number of days, weeks or months, with the words around it that go with it ("pendant",
-  // "au maximum"). Not when it says when something happens ("dans 10 jours", "in 2 weeks"); "dans"
-  // and "in" as whole words, so "le matin 3 jours" is a duration
+  // "au maximum"). Not when it says when something happens ("dans 10 jours", "in 2 weeks") or how
+  // often ("toutes les 3 semaines"); those words as whole words, so "le matin 3 jours" is a
+  // duration
   private val DURATION =
       Regex(
           """(?:(au maximum|maximum|max\.?|jusqu'a|up to)\s+)?(?:(?:pendant|durant|for|sur|x)\s+)?""" +
-              """(?<!\d)(?<!\bdans )(?<!\bin )(\d+)\s*(jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
+              """(?<!\d)(?<!\bdans )(?<!\bin )(?<!\btoutes les )(?<!\bevery )""" +
+              """(\d+)\s*(jours?|j|days?|semaines?|sem|weeks?|mois|months?)\b"""
       )
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
@@ -231,8 +238,11 @@ internal object PrescriptionLexicon {
               """\b(?:tel|telephone|phone|fax|natel|mobile)\b|\+41|\b0\d{2}\s\d{3}\s\d{2}\s\d{2}\b"""
           ),
           Regex(
-              // The word boundary goes before an abbreviation's dot: "av. de la gare 5"
-              """\b(?:rue|avenue|av|quai|chemin|ch|route|rte|boulevard|bd|place|street|road)\b\.?\D*\d"""
+              // The word boundary goes before an abbreviation's dot: "av. de la gare 5". The number
+              // comes before any comma or colon, so "route: oral, 1 tablet" or "à la place de
+              // Primpéran, 1 cp" stay part of the prescription
+              """\b(?:rue|avenue|av|quai|chemin|ch|route|rte|boulevard|bd|place|street|road)\b""" +
+                  """\.?[^,:\d]*\d"""
           ),
           Regex("""(?:^|,\s*)\d{4}\s+(?!$UNIT\b)[a-z]{3,}"""),
           Regex("""\b756[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{2}\b|\b\d{10,}\b|\bgln\b|\bzsr\b"""),

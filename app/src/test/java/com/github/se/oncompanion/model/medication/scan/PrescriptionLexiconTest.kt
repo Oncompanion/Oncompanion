@@ -29,6 +29,9 @@ class PrescriptionLexiconTest {
         mapOf(
             "Lakeside Clinic (fictional) 29/09/2026" to LocalDate.of(2026, 9, 29),
             "Genève, le 14.10.2026" to LocalDate.of(2026, 10, 14),
+            // At the end of a sentence (review of #230)
+            "Genève, le 14.10.2026." to LocalDate.of(2026, 10, 14),
+            "Fait le 05/11/2026." to LocalDate.of(2026, 11, 5),
             "Date : 05/11/2026" to LocalDate.of(2026, 11, 5),
             "Sion, le 11. 11.2026" to LocalDate.of(2026, 11, 11),
             "le 3-11-2026" to LocalDate.of(2026, 11, 3),
@@ -63,6 +66,8 @@ class PrescriptionLexiconTest {
             "Ondansétron 8 mg",
             "1 cp toutes les 12 heures",
             "01.01.1850",
+            // A number that goes on after the year
+            "1.2.2026.5",
         )) {
       assertEquals("\"$text\"", emptyList<LocalDate>(), PrescriptionLexicon.datesIn(c(text)))
     }
@@ -211,6 +216,16 @@ class PrescriptionLexiconTest {
         "| tablet each morning",
     )
     assertAll(PrescriptionLexicon::hasDoseQuantity, false, "Ondansetron 8 mg", "3 jours", "Rx")
+    // Drugs ending in "-one" or "-une" before their form aren't a quantity (review of #230)
+    assertAll(
+        PrescriptionLexicon::hasDoseQuantity,
+        false,
+        "Prednisone tablets",
+        "Oxycodone capsules",
+        "Aucun comprimé",
+        "Dexaméthasone comprimés",
+    )
+    assertAll(PrescriptionLexicon::hasDoseQuantity, true, "Prednisone, one tablet", "une gélule")
   }
 
   @Test
@@ -231,6 +246,11 @@ class PrescriptionLexiconTest {
         "le soir",
         "toutes les 12 heures",
         "every 8 hours",
+        // Chemotherapy cycles (review of #230)
+        "1 injection toutes les 3 semaines",
+        "every 2 weeks",
+        "toutes les 48 heures",
+        "toutes les 2 jours",
         "1 injection s.c. par jour",
         "après chaque selle liquide",
         "as needed",
@@ -268,6 +288,9 @@ class PrescriptionLexiconTest {
         false,
         "Contrôle sanguin dans 10 jours.",
         "Control in 2 weeks",
+        // How often, not for how long
+        "1 injection toutes les 3 semaines",
+        "every 2 weeks",
         "1 cp toutes les 12 heures",
         "Ondansetron 8 mg",
     )
@@ -313,6 +336,9 @@ class PrescriptionLexiconTest {
         "Dr Paul Keller",
         "Ondansétron 8 mg :1 comprimé 2x/jour pendant 5 jours",
         "Service d'hémato-oncologie",
+        // "route" and "place" in a prescription line (review of #230)
+        "Route: oral, 1 tablet twice a day",
+        "À la place de Primpéran, 1 cp le matin",
     )
   }
 
