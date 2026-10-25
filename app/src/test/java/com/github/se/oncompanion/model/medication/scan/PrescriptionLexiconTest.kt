@@ -211,6 +211,16 @@ class PrescriptionLexiconTest {
         "| tablet each morning",
     )
     assertAll(PrescriptionLexicon::hasDoseQuantity, false, "Ondansetron 8 mg", "3 jours", "Rx")
+    // Drugs ending in "-one" or "-une" before their form aren't a quantity (review of #230)
+    assertAll(
+        PrescriptionLexicon::hasDoseQuantity,
+        false,
+        "Prednisone tablets",
+        "Oxycodone capsules",
+        "Aucun comprimé",
+        "Dexaméthasone comprimés",
+    )
+    assertAll(PrescriptionLexicon::hasDoseQuantity, true, "Prednisone, one tablet", "une gélule")
   }
 
   @Test

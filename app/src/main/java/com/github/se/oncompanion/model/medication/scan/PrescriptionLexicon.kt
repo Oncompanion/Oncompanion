@@ -131,8 +131,9 @@ internal object PrescriptionLexicon {
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
           """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?)"""
+  // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
-      Regex("""(?<![\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
+      Regex("""(?<![\p{L}\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
 
   private val FREQUENCIES =
       listOf(
