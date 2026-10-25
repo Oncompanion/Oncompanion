@@ -326,6 +326,7 @@
     <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
+
     <!-- Care circle invite code (#150) -->
     <string name="care_circle_invite_title">Invitation</string>
     <string name="care_circle_invite_back">Back</string>

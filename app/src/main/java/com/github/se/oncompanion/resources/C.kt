@@ -304,6 +304,7 @@ object C {
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"
     const val care_circle_invite_back_button = "care_circle_invite_back_button"
