@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,7 +22,10 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
+import com.github.se.oncompanion.model.medication.scan.FakeTextRecognizer
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
+import com.github.se.oncompanion.model.medication.scan.ScannedSheets
 import com.github.se.oncompanion.resources.C
 import java.io.File
 import java.io.IOException
@@ -51,6 +55,9 @@ class ScanScreenTest {
   private lateinit var viewModel: ScanViewModel
   private var backs = 0
   private var manualEntries = 0
+  private val reads = mutableListOf<ReadScan>()
+  // Reads sheet 01 of the test prescriptions, unless a test says otherwise
+  private val recognizer = FakeTextRecognizer(ScannedSheets.sheet(1))
 
   private val photosOnDisk: List<File>
     get() = File(cacheDir, ScanPhotoStore.DIRECTORY).listFiles()?.toList().orEmpty()
@@ -61,11 +68,12 @@ class ScanScreenTest {
 
   private fun showScreen() {
     cacheDir = temporaryFolder.newFolder("cache")
-    viewModel = ScanViewModel(ScanPhotoStore(cacheDir))
+    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer))
     compose.setContent {
       ScanScreen(
           onEnterManually = { manualEntries++ },
           onBack = { backs++ },
+          onRead = { reads += it },
           viewModel = viewModel,
           camera = camera,
       )
@@ -130,7 +138,13 @@ class ScanScreenTest {
     compose.activityRule.scenario.recreate()
     compose.runOnUiThread {
       compose.activity.setContent {
-        ScanScreen(onEnterManually = {}, onBack = {}, viewModel = viewModel, camera = camera)
+        ScanScreen(
+            onEnterManually = {},
+            onBack = {},
+            onRead = {},
+            viewModel = viewModel,
+            camera = camera,
+        )
       }
     }
     compose.waitForIdle()
@@ -223,7 +237,13 @@ class ScanScreenTest {
     compose.activityRule.scenario.recreate()
     compose.runOnUiThread {
       compose.activity.setContent {
-        ScanScreen(onEnterManually = {}, onBack = {}, viewModel = viewModel, camera = newCamera)
+        ScanScreen(
+            onEnterManually = {},
+            onBack = {},
+            onRead = {},
+            viewModel = viewModel,
+            camera = newCamera,
+        )
       }
     }
     compose.waitForIdle()
@@ -284,24 +304,64 @@ class ScanScreenTest {
   }
 
   @Test
-  fun usePhoto_deletesIt_andOffersManualEntry() {
+  fun usePhoto_readsThePrescription_andOpensTheFormWithItOnce() {
     grantCamera()
     showScreen()
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
     compose.waitForIdle()
 
     compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitUntil(5_000) { reads.isNotEmpty() }
     compose.waitForIdle()
 
-    assertTrue(photosOnDisk.isEmpty())
-    compose
-        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_reading_coming_soon))
-        .assertIsDisplayed()
-    compose
-        .onNodeWithText(compose.activity.getString(R.string.prescription_scan_enter_manually))
-        .performClick()
+    val read = reads.single()
+    assertEquals("Dr. Anna Martin Oncology", read.prescription.draft.prescribedBy)
+    // The photo is the form's now: kept until it is saved or closed
+    assertTrue(read.photo.exists())
+    assertNull(viewModel.uiState.value.read)
+  }
+
+  @Test
+  fun closingWhileReading_deletesThePhoto_andNeverOpensTheForm() {
+    recognizer.reading = CompletableDeferred()
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
     compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_reading).assertExists()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_close_button).performClick()
+    recognizer.reading!!.complete(Unit)
+    compose.waitForIdle()
+
+    assertEquals(1, backs)
+    assertTrue(photosOnDisk.isEmpty())
+    assertTrue(reads.isEmpty())
+  }
+
+  @Test
+  fun nothingRead_enterManually_deletesThePhoto() {
+    recognizer.result = FakeTextRecognizer.NO_TEXT
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitUntil(5_000) {
+      compose
+          .onAllNodesWithTag(C.Tag.prescription_scan_nothing_read)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_nothing_read_enter_manually_button).performClick()
+    compose.waitForIdle()
+
     assertEquals(1, manualEntries)
+    assertTrue(photosOnDisk.isEmpty())
+    assertTrue(reads.isEmpty())
   }
 
   @Test
@@ -343,10 +403,16 @@ class ScanScreenTest {
     compose.runOnUiThread { controller().isAppearanceLightStatusBars = true }
     var showScan by mutableStateOf(true)
     cacheDir = temporaryFolder.newFolder("cache")
-    viewModel = ScanViewModel(ScanPhotoStore(cacheDir))
+    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer))
     compose.setContent {
       if (showScan)
-          ScanScreen(onEnterManually = {}, onBack = {}, viewModel = viewModel, camera = camera)
+          ScanScreen(
+              onEnterManually = {},
+              onBack = {},
+              onRead = {},
+              viewModel = viewModel,
+              camera = camera,
+          )
     }
     compose.waitForIdle()
 

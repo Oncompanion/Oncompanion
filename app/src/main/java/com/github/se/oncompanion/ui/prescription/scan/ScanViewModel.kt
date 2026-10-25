@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.prescription.scan
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -45,8 +46,11 @@ enum class CameraStatus {
  * @property photo the photo just taken, shown so the user checks it before it's used; `null` while
  *   the camera is shown
  * @property captureFailed the last photo couldn't be taken (message to show once)
- * @property readingComingSoon the user chose to use the photo, but reading prescriptions doesn't
- *   exist yet (message to show once, with a way to enter the prescription manually)
+ * @property isReading the prescription on [photo] is being read
+ * @property nothingRead no prescription could be read on [photo]: the user retakes it or enters the
+ *   prescription manually
+ * @property read the prescription just read, for the screen to open the form with; the photo is
+ *   then its own, no longer this screen's
  */
 data class ScanUiState(
     val permission: CameraPermission = CameraPermission.UNKNOWN,
@@ -55,7 +59,9 @@ data class ScanUiState(
     val isCapturing: Boolean = false,
     val photo: File? = null,
     val captureFailed: Boolean = false,
-    val readingComingSoon: Boolean = false,
+    val isReading: Boolean = false,
+    val nothingRead: Boolean = false,
+    val read: ReadScan? = null,
 ) {
   /**
    * A photo can be taken: the camera is allowed and on, no photo is being taken, and the last one
@@ -75,9 +81,15 @@ data class ScanUiState(
  *
  * The photo of a prescription is a medical document: there is at most one, in [photoStore], shown
  * for the user to check, and it is deleted on Retake and when the screen is closed or destroyed.
- * Photos left by an earlier scan (e.g. the app was killed) are deleted when the screen opens.
+ * Photos left by an earlier scan (e.g. the app was killed) are deleted when the screen opens. Once
+ * a prescription is read on it, the photo goes with it to the form (see [ScanUiState.read]).
+ *
+ * @param draftFromScan reads the prescription on the photo
  */
-class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
+class ScanViewModel(
+    private val photoStore: ScanPhotoStore,
+    private val draftFromScan: DraftPrescriptionFromScan = DraftPrescriptionFromScan(),
+) : ViewModel() {
 
   private val _uiState = MutableStateFlow(ScanUiState())
   val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
@@ -154,23 +166,46 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
 
   /** The message about the last photo has been shown. */
   fun onMessageShown() {
-    _uiState.update { it.copy(captureFailed = false, readingComingSoon = false) }
+    _uiState.update { it.copy(captureFailed = false) }
   }
 
   /**
-   * The user wants to use the photo. Reading the prescription (#62) doesn't exist yet: until then,
-   * the photo is deleted, the camera is shown again and the user is told it's coming soon, with
-   * manual entry as the way forward.
+   * The user wants to use the photo: the prescription on it is read. Once read, [ScanUiState.read]
+   * holds it with the photo; if nothing could be read, [ScanUiState.nothingRead]. Does nothing
+   * without a photo, while reading, or once nothing was read on it.
    */
   fun usePhoto() {
-    if (_uiState.value.photo == null) return
-    deletePhoto()
-    _uiState.update { it.copy(readingComingSoon = true) }
+    val state = _uiState.value
+    val photo = state.photo ?: return
+    if (state.isReading || state.nothingRead) return
+    _uiState.update { it.copy(isReading = true) }
+    viewModelScope.launch {
+      val prescription = draftFromScan(photo)
+      if (closed) {
+        // Closed while reading: the photo isn't needed any more
+        photoStore.delete(photo)
+        _uiState.update { it.copy(isReading = false, photo = null) }
+      } else if (prescription == null) {
+        _uiState.update { it.copy(isReading = false, nothingRead = true) }
+      } else {
+        // The photo goes with the prescription: this screen no longer deletes it
+        _uiState.update {
+          it.copy(isReading = false, photo = null, read = ReadScan(prescription, photo))
+        }
+      }
+    }
+  }
+
+  /** The screen opened the form with the prescription just read. */
+  fun onReadOpened() {
+    _uiState.update { it.copy(read = null) }
   }
 
   /** The photo isn't good enough: it's deleted and the camera is shown again. */
   fun retake() {
+    if (_uiState.value.isReading) return
     deletePhoto()
+    _uiState.update { it.copy(nothingRead = false) }
   }
 
   /**
@@ -182,9 +217,11 @@ class ScanViewModel(private val photoStore: ScanPhotoStore) : ViewModel() {
     deletePhoto()
   }
 
-  // The screen is gone for good (e.g. Back, or Android cleared it): no photo must stay behind
+  // The screen is gone for good (e.g. Back, or Android cleared it): no photo must stay behind,
+  // including one read but not opened yet
   override fun onCleared() {
     deletePhoto()
+    _uiState.value.read?.let { photoStore.delete(it.photo) }
   }
 
   // There is at most one photo: the one being checked
