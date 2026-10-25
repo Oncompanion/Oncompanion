@@ -48,7 +48,7 @@ private val DIGIT_LOOKALIKES = mapOf('o' to '0', 'O' to '0', 'l' to '1', 'I' to 
 /** A bar, l or I standing alone before a dose form: a misread 1. */
 private val MISREAD_ONE =
     Regex(
-        """(?<=^|\s)[|lI](?=\s+(?:tablets?|comprim|cp\b|g[ée]lules?|capsules?|injections?|gouttes?|sachets?|drops?))""",
+        """(?<!\S)[|lI](?=\s+(?:tablet|comprim|cp\b|g[ée]lule|capsule|injection|goutte|sachet|drop))""",
         RegexOption.IGNORE_CASE,
     )
 
