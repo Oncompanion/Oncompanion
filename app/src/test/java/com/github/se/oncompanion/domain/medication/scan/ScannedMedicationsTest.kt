@@ -163,7 +163,15 @@ class ScannedMedicationsTest {
   @Test
   fun aDayInAFrequencyIsNotAnUnreadDuration() {
     for (dosing in
-        listOf("1 cp 2x/jour", "1 cp par jour", "1 tablet twice a day", "1 cp chaque jour")) {
+        listOf(
+            "1 cp 2x/jour",
+            "1 cp par jour",
+            "1 tablet twice a day",
+            "1 cp chaque jour",
+            // Chemotherapy cycles
+            "1 injection toutes les 3 semaines",
+            "1 injection every 2 weeks",
+        )) {
       val medication = medicationsOf(linesOf("Ondansetron 8 mg", dosing)).single()
       assertTrue(dosing, medication.frequency.sure)
       assertEquals(dosing, Reading<Int?>(null, true), medication.durationDays)

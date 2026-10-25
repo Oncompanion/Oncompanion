@@ -71,7 +71,8 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val linesSure = lines.all { it.line.confidence >= SURE }
   // A duration word left in the frequency ("twice a day S days") is a duration that couldn't be
   // read: neither the frequency nor "no duration" can be trusted
-  val unreadDuration = UNREAD_DURATION.containsMatchIn(matchable(frequency))
+  val unreadDuration =
+      UNREAD_DURATION.containsMatchIn(matchable(frequency).replace(EVERY_FEW_DAYS, ""))
   val days = duration?.days?.takeIf(Medication::isValidDuration)
   return ScannedMedication(
       name = limited(name, sure = lines.first().line.confidence >= SURE && !looksSplit(name)),
@@ -112,4 +113,8 @@ private val UNREAD_DURATION =
         """(?<!\bpar )(?<!\ba )(?<!\bper )(?<!\bevery )(?<!\bchaque )(?<!\beach )(?<!/)""" +
             """\b(?:jours?|days?|semaines?|weeks?|mois|months?)\b"""
     )
+
+/** A cycle, which says how often and not for how long: "toutes les 3 semaines", "every 2 days". */
+private val EVERY_FEW_DAYS =
+    Regex("""\b(?:toutes les|every)\s+\d+\s*(?:jours?|days?|semaines?|weeks?)\b""")
 private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·')
