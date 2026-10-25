@@ -106,8 +106,9 @@ internal object PrescriptionLexicon {
   // Longest names first, so "sept" isn't read as "sep" followed by "t"
   private val MONTH = MONTHS.keys.sortedByDescending { it.length }.joinToString("|")
 
+  // A full stop may end the sentence after it ("le 14.10.2026."), but not go on with a number
   private val NUMERIC_DATE =
-      Regex("""(?<![\d.])(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?![\d.])""")
+      Regex("""(?<![\d.])(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?!\d|\.\d)""")
   private val ISO_DATE = Regex("""(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)""")
   private val DAY_MONTH_YEAR =
       Regex("""(?<!\d)(\d{1,2})(?:er)?\.?\s+($MONTH)\.?,?\s+(\d{4})(?!\d)""")

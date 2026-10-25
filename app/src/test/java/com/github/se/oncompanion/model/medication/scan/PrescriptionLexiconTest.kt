@@ -29,6 +29,9 @@ class PrescriptionLexiconTest {
         mapOf(
             "Lakeside Clinic (fictional) 29/09/2026" to LocalDate.of(2026, 9, 29),
             "Genève, le 14.10.2026" to LocalDate.of(2026, 10, 14),
+            // At the end of a sentence (review of #230)
+            "Genève, le 14.10.2026." to LocalDate.of(2026, 10, 14),
+            "Fait le 05/11/2026." to LocalDate.of(2026, 11, 5),
             "Date : 05/11/2026" to LocalDate.of(2026, 11, 5),
             "Sion, le 11. 11.2026" to LocalDate.of(2026, 11, 11),
             "le 3-11-2026" to LocalDate.of(2026, 11, 3),
@@ -63,6 +66,8 @@ class PrescriptionLexiconTest {
             "Ondansétron 8 mg",
             "1 cp toutes les 12 heures",
             "01.01.1850",
+            // A number that goes on after the year
+            "1.2.2026.5",
         )) {
       assertEquals("\"$text\"", emptyList<LocalDate>(), PrescriptionLexicon.datesIn(c(text)))
     }
