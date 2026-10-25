@@ -194,8 +194,11 @@ internal object PrescriptionLexicon {
               """\b(?:tel|telephone|phone|fax|natel|mobile)\b|\+41|\b0\d{2}\s\d{3}\s\d{2}\s\d{2}\b"""
           ),
           Regex(
-              // The word boundary goes before an abbreviation's dot: "av. de la gare 5"
-              """\b(?:rue|avenue|av|quai|chemin|ch|route|rte|boulevard|bd|place|street|road)\b\.?\D*\d"""
+              // The word boundary goes before an abbreviation's dot: "av. de la gare 5". The number
+              // comes before any comma or colon, so "route: oral, 1 tablet" or "à la place de
+              // Primpéran, 1 cp" stay part of the prescription
+              """\b(?:rue|avenue|av|quai|chemin|ch|route|rte|boulevard|bd|place|street|road)\b""" +
+                  """\.?[^,:\d]*\d"""
           ),
           Regex("""(?:^|,\s*)\d{4}\s+(?!$UNIT\b)[a-z]{3,}"""),
           Regex("""\b756[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{2}\b|\b\d{10,}\b|\bgln\b|\bzsr\b"""),

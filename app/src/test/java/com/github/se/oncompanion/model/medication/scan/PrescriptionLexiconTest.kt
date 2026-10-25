@@ -336,6 +336,9 @@ class PrescriptionLexiconTest {
         "Dr Paul Keller",
         "Ondansétron 8 mg :1 comprimé 2x/jour pendant 5 jours",
         "Service d'hémato-oncologie",
+        // "route" and "place" in a prescription line (review of #230)
+        "Route: oral, 1 tablet twice a day",
+        "À la place de Primpéran, 1 cp le matin",
     )
   }
 }
