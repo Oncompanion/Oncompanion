@@ -184,8 +184,7 @@ internal object PrescriptionLexicon {
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
           // Also days and weeks: chemotherapy cycles ("tous les 21 jours", "toutes les 3 semaines")
           Regex(
-              """\b(?:tous les|toutes les|every)\s+\d+\s*""" +
-                  """(?:h|heures|hours|jours?|days?|semaines?|sem|weeks?)\b"""
+              """\b(?:tous les|toutes les|every)\s+\d+\s*(?:h|heure|hour|jour|day|semaine|sem|week)s?\b"""
           ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
           Regex("""\b(?:par jour|a day|per day|daily)\b"""),
