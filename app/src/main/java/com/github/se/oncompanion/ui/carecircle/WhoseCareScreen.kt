@@ -45,7 +45,7 @@ import com.github.se.oncompanion.resources.C
  * each one shares, to choose whose care to look at.
  *
  * @param onBack goes back, or `null` when the screen is the first one (no back arrow)
- * @param onPatientChosen called with the chosen patient's uid
+ * @param onPatientChosen called with the chosen patient
  * @param onJoinAnother opens the join screen, to follow one more patient
  * @param autoSelectSingle when the caregiver follows only one patient, choose them without showing
  *   the list (when opening the app), rather than when switching on purpose
@@ -54,7 +54,7 @@ import com.github.se.oncompanion.resources.C
 fun WhoseCareScreen(
     viewModel: WhoseCareViewModel,
     onBack: (() -> Unit)?,
-    onPatientChosen: (String) -> Unit,
+    onPatientChosen: (FollowedPatient) -> Unit,
     onJoinAnother: () -> Unit,
     autoSelectSingle: Boolean,
 ) {
@@ -65,7 +65,7 @@ fun WhoseCareScreen(
     val single = uiState.patients.singleOrNull()
     if (autoSelectSingle && !autoSelected && !uiState.isLoading && single != null) {
       autoSelected = true
-      onPatientChosen(single.uid)
+      onPatientChosen(single)
     }
   }
   WhoseCareContent(
@@ -83,7 +83,7 @@ fun WhoseCareScreen(
 fun WhoseCareContent(
     uiState: WhoseCareUiState,
     onBack: (() -> Unit)?,
-    onPatientClick: (String) -> Unit,
+    onPatientClick: (FollowedPatient) -> Unit,
     onJoinAnother: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -149,7 +149,7 @@ fun WhoseCareContent(
 @Composable
 private fun PatientList(
     patients: List<FollowedPatient>,
-    onPatientClick: (String) -> Unit,
+    onPatientClick: (FollowedPatient) -> Unit,
     modifier: Modifier,
 ) {
   // Room at the bottom for the button, so it never hides the last patient
@@ -177,7 +177,7 @@ private fun PatientList(
           supportingContent = { Text(accessSummary(patient.sharedSections)) },
           leadingContent = { Monogram(patient.firstName.take(1).uppercase()) },
           modifier =
-              Modifier.clickable { onPatientClick(patient.uid) }
+              Modifier.clickable { onPatientClick(patient) }
                   .testTag(C.Tag.whoseCarePatient(patient.uid)),
       )
     }

@@ -32,6 +32,7 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.CaregiverModeViewModel
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
@@ -80,6 +81,15 @@ fun AppNavHost(
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
+  // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
+  val caregiverMode: CaregiverModeViewModel = viewModel {
+    CaregiverModeViewModel(createSavedStateHandle())
+  }
+  val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  val signOut = {
+    caregiverMode.leave()
+    navigationActions.navigateAndClearBackStack(Route.AUTH)
+  }
 
   NavHost(navController = navController, startDestination = startRoute) {
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
@@ -87,6 +97,8 @@ fun AppNavHost(
         SignInScreen(
             credentialProvider = credentialProvider,
             onSignedIn = { next ->
+              // Whoever signs in starts in patient mode; a caregiver chooses again in "Whose care?"
+              caregiverMode.leave()
               navigationActions.navigateAndClearBackStack(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
@@ -127,7 +139,7 @@ fun AppNavHost(
             // Joined: choose whose care to follow (straight to them with a single patient)
             onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
-            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            onSignedOut = signOut,
         )
       }
     }
@@ -148,8 +160,11 @@ fun AppNavHost(
             // No back arrow when it is the first screen (after joining, or at start)
             onBack =
                 navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
-            // The Overview for now; the caregiver mode (#203) opens the chosen patient's one
-            onPatientChosen = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            // Their Overview, in caregiver mode
+            onPatientChosen = { patient ->
+              caregiverMode.choose(patient)
+              navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
+            },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
         )
@@ -157,7 +172,13 @@ fun AppNavHost(
     }
 
     navigation(startDestination = Screen.OVERVIEW, route = Route.OVERVIEW) {
-      composable(Screen.OVERVIEW) { OverviewScreen(navigationActions) }
+      composable(Screen.OVERVIEW) {
+        OverviewScreen(
+            navigationActions,
+            caregiverOf = chosenPatient?.firstName,
+            onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
+        )
+      }
     }
 
     // Bottom bar tabs, next to Overview
@@ -332,7 +353,7 @@ fun AppNavHost(
         ProfileScreen(
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
-            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            onSignedOut = signOut,
             viewModel = viewModel { ProfileViewModel() },
             credentialProvider = credentialProvider,
         )

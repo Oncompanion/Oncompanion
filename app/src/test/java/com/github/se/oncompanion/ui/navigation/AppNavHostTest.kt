@@ -70,6 +70,8 @@ import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import java.time.Duration
 import java.time.Instant
@@ -133,6 +135,7 @@ class AppNavHostTest {
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
       symptomRepository: SymptomRepository = FakeSymptomRepository(),
+      credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
     CareCircleRepositoryProvider.repository = careCircleRepository
@@ -147,8 +150,15 @@ class AppNavHostTest {
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      if (startRoute == null) AppNavHost(navController = navController)
-      else AppNavHost(navController = navController, startRoute = startRoute)
+      if (startRoute == null) {
+        AppNavHost(navController = navController, credentialProvider = credentialProvider)
+      } else {
+        AppNavHost(
+            navController = navController,
+            startRoute = startRoute,
+            credentialProvider = credentialProvider,
+        )
+      }
     }
   }
 
@@ -282,10 +292,13 @@ class AppNavHostTest {
     }
     composeTestRule.onNodeWithTag(C.Tag.join_circle_continue).performScrollTo().performClick()
 
-    // "Whose care?" chooses Marie by itself, the only patient, and opens the Overview
+    // "Whose care?" chooses Marie by itself, the only patient, and opens her Overview
     composeTestRule.waitUntil(timeoutMillis = 5_000) {
       composeTestRule.onAllNodesWithTag(C.Tag.overview_screen).fetchSemanticsNodes().isNotEmpty()
     }
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Marie"))
     composeTestRule.runOnIdle {
       assertEquals("patient", invites.joinedCircles("caregiver").single().patientUid)
     }
@@ -310,7 +323,7 @@ class AppNavHostTest {
   }
 
   @Test
-  fun whoseCare_withSeveralPatients_listsThem_andChoosingOneOpensTheOverview() {
+  fun whoseCare_withSeveralPatients_listsThem_andChoosingOneOpensTheirOverview() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
     setNavHost(
         Route.WHOSE_CARE,
@@ -328,7 +341,73 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.whose_care_back).assertDoesNotExist()
 
     composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Paul"))
+  }
+
+  @Test
+  fun caregiverMode_titleSwitchesPatient() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-paul"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
+
+    // "Paul's care ▾" opens the list again, to choose Anne instead
+    composeTestRule.onNodeWithTag(C.Tag.overview_whose_care).performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-anne"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
+    composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+  }
+
+  @Test
+  fun signingIn_leavesCaregiverMode() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val profiles = FakeUserProfileRepository()
+    profiles.seed(UserProfile("patient", Role.PATIENT, "Alex"))
+    UserProfileRepositoryProvider.repository = profiles
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.overview_whose_care)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    // Back on sign-in without signing out (e.g. the session expired), then a patient signs in
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateAndClearBackStack(Route.AUTH)
+    }
+    auth.onSignIn = { AuthUser(uid = "patient") }
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.overview_greeting).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_whose_care).assertDoesNotExist()
   }
 
   @Test
