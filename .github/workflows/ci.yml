@@ -142,7 +142,24 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
-          script: ./gradlew connectedCheck --parallel --build-cache
+          # The whole device's logcat is recorded, to see what happened when a test fails
+          script: |
+            adb logcat -v time > emulator-logcat.txt &
+            ./gradlew connectedCheck --parallel --build-cache
+
+      # Only when something failed: the logs to find out why
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connected-test-logs
+          path: |
+            emulator-logcat.txt
+            firebase-emulators.log
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
