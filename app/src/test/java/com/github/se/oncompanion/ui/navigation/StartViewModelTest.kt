@@ -344,23 +344,24 @@ class StartViewModelTest {
       }
 
   @Test
-  fun caregiverInACircle_startsOnOverview() =
+  fun caregiverInACircle_startsOnWhoseCare() =
       runTest(dispatcher) {
         val invites = FakeCareCircleInviteRepository()
         invites.setJoinedCircles(user.uid, listOf(JoinedCareCircle("patient", "Marie")))
         val viewModel = caregiverStart(invites)
         advanceUntilIdle()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
       }
 
   @Test
-  fun caregiverCirclesCantBeRead_startsOnOverview() =
+  fun caregiverCirclesCantBeRead_startsOnWhoseCare_whichCanRetry() =
       runTest(dispatcher) {
+        // Assumed in a circle: "Whose care?" then shows the error with Retry
         val invites = FakeCareCircleInviteRepository()
         invites.observeError = IllegalStateException("denied")
         val viewModel = caregiverStart(invites)
         advanceUntilIdle()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
       }
 
   @Test

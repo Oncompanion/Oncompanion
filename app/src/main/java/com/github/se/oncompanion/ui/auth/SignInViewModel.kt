@@ -38,6 +38,8 @@ enum class AfterSignIn {
   OVERVIEW,
   /** Returning caregiver who hasn't joined a care circle yet: the join screen. */
   JOIN_CIRCLE,
+  /** Returning caregiver in a care circle: "Whose care?", which opens their patient. */
+  WHOSE_CARE,
 }
 
 /**
@@ -85,9 +87,9 @@ class SignInViewModel(
         val next =
             when {
               profile == null -> AfterSignIn.ONBOARDING
-              profile.role == Role.CAREGIVER && !inviteRepository.hasJoinedCircle(user.uid) ->
-                  AfterSignIn.JOIN_CIRCLE
-              else -> AfterSignIn.OVERVIEW
+              profile.role != Role.CAREGIVER -> AfterSignIn.OVERVIEW
+              inviteRepository.hasJoinedCircle(user.uid) -> AfterSignIn.WHOSE_CARE
+              else -> AfterSignIn.JOIN_CIRCLE
             }
         _uiState.update { it.copy(isLoading = false, signedInUser = user, next = next) }
       } catch (e: CancellationException) {
