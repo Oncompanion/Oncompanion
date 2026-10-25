@@ -71,8 +71,7 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val linesSure = lines.all { it.line.confidence >= SURE }
   // A duration word left in the frequency ("twice a day S days") is a duration that couldn't be
   // read: neither the frequency nor "no duration" can be trusted
-  val unreadDuration =
-      UNREAD_DURATION.containsMatchIn(matchable(frequency).replace(EVERY_FEW_DAYS, ""))
+  val unreadDuration = hasUnreadDuration(matchable(frequency).replace(EVERY_FEW_DAYS, ""))
   val days = duration?.days?.takeIf(Medication::isValidDuration)
   return ScannedMedication(
       name = limited(name, sure = lines.first().line.confidence >= SURE && !looksSplit(name)),
@@ -107,14 +106,16 @@ private val NUMBERING = Regex("""^\s*[\dlIoO]{1,2}\s*[.)]\s+""")
 private val FRAGMENT = Regex("""\p{Ll}{1,3}""")
 private val SPACES = Regex("""\s+""")
 
-/** A day, week or month that isn't part of a frequency ("par jour", "a day", "2x/jour"). */
-private val UNREAD_DURATION =
-    Regex(
-        """(?<!\bpar )(?<!\ba )(?<!\bper )(?<!\bevery )(?<!\bchaque )(?<!\beach )(?<!/)""" +
-            """\b(?:jours?|days?|semaines?|weeks?|mois|months?)\b"""
-    )
+/**
+ * Whether [text] has a day, week or month that isn't part of a frequency ("par jour", "2x/jour").
+ */
+private fun hasUnreadDuration(text: String): Boolean =
+    DURATION_WORD.findAll(text).any { !PER.containsMatchIn(text.substring(0, it.range.first)) }
+
+private val DURATION_WORD = Regex("""\b(?:jour|day|semaine|week|mois|month)s?\b""")
+private val PER = Regex("""(?:\b(?:par|a|per|every|chaque|each) |/)$""")
 
 /** A cycle, which says how often and not for how long: "tous les 21 jours", "every 2 days". */
 private val EVERY_FEW_DAYS =
-    Regex("""\b(?:tous les|toutes les|every)\s+\d+\s*(?:jours?|days?|semaines?|sem|weeks?)\b""")
+    Regex("""\b(?:tous les|toutes les|every)\s+\d+\s*(?:jour|day|semaine|sem|week)s?\b""")
 private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·')
