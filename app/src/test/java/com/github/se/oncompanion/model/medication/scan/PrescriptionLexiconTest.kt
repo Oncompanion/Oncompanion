@@ -246,6 +246,11 @@ class PrescriptionLexiconTest {
         "le soir",
         "toutes les 12 heures",
         "every 8 hours",
+        // Chemotherapy cycles (review of #230)
+        "1 injection toutes les 3 semaines",
+        "every 2 weeks",
+        "toutes les 48 heures",
+        "toutes les 2 jours",
         "1 injection s.c. par jour",
         "après chaque selle liquide",
         "as needed",
@@ -283,6 +288,9 @@ class PrescriptionLexiconTest {
         false,
         "Contrôle sanguin dans 10 jours.",
         "Control in 2 weeks",
+        // How often, not for how long
+        "1 injection toutes les 3 semaines",
+        "every 2 weeks",
         "1 cp toutes les 12 heures",
         "Ondansetron 8 mg",
     )
