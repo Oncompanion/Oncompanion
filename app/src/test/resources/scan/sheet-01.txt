@@ -1,0 +1,14 @@
+# Fictional US-10 test prescription, sheet 01, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.88	768,788,1363,835	Dr. Anna Martin Oncology
+0.84	737,854,1287,892	Lakeside Clinic (fictional) 29/09/2026
+0.68	732,1033,826,1094	Rx
+0.88	723,1165,1076,1208	Ondansetron 8 mg
+0.90	734,1227,1171,1268	1 tablet twice a day 5 days
+0.91	718,1333,1138,1376	Dexamethasone 4 mg
+0.90	728,1398,1209,1435	1 tablet each morning 3 days
+0.88	656,3011,804,3047	Signature
+0.72	1940,0,2872,447	éée pour tester lap plication oncomppanion Non valable Aucune personne ni
+0.84	645,3314,2189,3349	SPECIMEN Fictional prescription made to test the oncompanion app Not valid No real person or clinic

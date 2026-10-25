@@ -1,0 +1,26 @@
+# Fictional US-10 test prescription, sheet 04, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.88	666,615,1224,669	Clinique du Lac (fictive)
+0.86	664,669,1122,713	Service d'hémato-oncologie
+0.85	662,710,892,746	Quai du Lac 8
+0.89	663,753,914,791	1006 Lausanne
+0.87	688,1018,902,1051	Médicament
+0.89	686,1113,1099,1155	Dexaméthasone 4 mg cp
+0.87	681,1206,1289,1254	Ondansétron 4 mg cp orodispersible
+0.84	679,1306,1117,1346	Filgrastim 30 MU seringue
+0.87	640,1453,1142,1498	Contrôle sanguin dans 10 jours.
+0.90	1557,1031,1733,1067	Posologie
+0.85	1554,1126,1765,1162	2 cp le matin
+0.87	1566,1223,1973,1258	1 cp toutes les 12 heures
+0.86	1563,1317,1926,1360	1 injection s.c. par jour
+0.85	2009,635,2372,667	Lausanne, 03.11.2026
+0.87	2147,713,2374,749	Dr Paul Keller
+0.84	2117,754,2374,794	Médecin adjoint
+0.89	2182,1037,2285,1066	Durée
+0.84	2182,1132,2288,1168	3 jours
+0.85	2182,1228,2291,1264	5 jours
+0.87	2182,1324,2292,1360	5 jours
+0.77	572,3279,2275,3311	SPECIMEN Ordonnance fictive creée pour tester I'application oncompanion Non valable AuCune personne ni
+0.70	573,3314,780,3350	clinique réelle
