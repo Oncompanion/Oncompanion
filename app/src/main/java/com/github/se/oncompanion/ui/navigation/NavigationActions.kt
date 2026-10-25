@@ -77,6 +77,11 @@ object Screen {
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"
   const val PRESCRIPTION_SCAN = "prescriptions_scan"
+  const val PRESCRIPTION_DETAIL_ID = "prescriptionId"
+  const val PRESCRIPTION_DETAIL = "prescriptions_detail/{$PRESCRIPTION_DETAIL_ID}"
+
+  /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
+  fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
 
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"

@@ -55,8 +55,10 @@ import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
@@ -913,6 +915,43 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
     assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionItem_opensItsDetail_andBackReturnsToTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    openPrescriptionsFromOverview(FakeMedicationRepository().apply { seed("owner", chemo) })
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
   }
 
   @Test
