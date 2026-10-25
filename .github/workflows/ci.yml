@@ -142,7 +142,10 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
-          script: ./gradlew connectedCheck --parallel --build-cache
+          # No "isn't responding" dialogs: on the slow emulator they cover the app under test
+          script: |
+            adb shell settings put global hide_error_dialogs 1
+            ./gradlew connectedCheck --parallel --build-cache
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
