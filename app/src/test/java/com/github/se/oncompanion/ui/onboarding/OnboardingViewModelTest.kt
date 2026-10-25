@@ -99,6 +99,12 @@ class OnboardingViewModelTest {
   }
 
   @Test
+  fun asksCancerType_onlyForAPatient() {
+    assertTrue(OnboardingUiState(role = Role.PATIENT).asksCancerType)
+    assertFalse(OnboardingUiState(role = Role.CAREGIVER).asksCancerType)
+  }
+
+  @Test
   fun defaultUiState_hasExpectedValues() {
     val s = OnboardingUiState()
     assertEquals(Role.PATIENT, s.role)
@@ -157,11 +163,22 @@ class OnboardingViewModelTest {
   }
 
   @Test
-  fun selectRole_caregiverIsIgnored() {
+  fun selectRole_caregiver_isChosen_andChangesNothingElse() {
     val vm = viewModel()
     val before = state(vm)
     vm.selectRole(Role.CAREGIVER)
-    assertEquals(before, state(vm))
+    assertEquals(before.copy(role = Role.CAREGIVER), state(vm))
+    assertFalse(state(vm).asksCancerType)
+  }
+
+  @Test
+  fun selectRole_backToPatient_keepsTheCancerTypeAlreadyTyped() {
+    val vm = viewModel()
+    vm.onCancerTypeChange("Leukemia")
+    vm.selectRole(Role.CAREGIVER)
+    vm.selectRole(Role.PATIENT)
+    assertEquals(Role.PATIENT, state(vm).role)
+    assertEquals("Leukemia", state(vm).cancerType)
   }
 
   // --- Fields ---
@@ -251,6 +268,31 @@ class OnboardingViewModelTest {
 
     assertEquals(
         listOf(UserProfile(uid = user.uid, role = Role.PATIENT, firstName = "Alexandra")),
+        profiles.created,
+    )
+    assertTrue(state(vm).isSaved)
+  }
+
+  @Test
+  fun saveProfile_caregiver_savesTheRole_withoutTheCancerType() = runTest {
+    val vm = viewModel()
+    // Typed as a patient before switching to caregiver: a caregiver's profile has no cancer type
+    vm.onCancerTypeChange("Leukemia")
+    vm.selectRole(Role.CAREGIVER)
+    vm.onFamilyNameChange("Doe")
+
+    vm.saveProfile()
+    advanceUntilIdle()
+
+    assertEquals(
+        listOf(
+            UserProfile(
+                uid = user.uid,
+                role = Role.CAREGIVER,
+                firstName = "Alexandra",
+                familyName = "Doe",
+            )
+        ),
         profiles.created,
     )
     assertTrue(state(vm).isSaved)

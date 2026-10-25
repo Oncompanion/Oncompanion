@@ -92,9 +92,6 @@ class RoleScreenTest {
             useUnmergedTree = true,
         )
         .assertExists()
-    composeTestRule
-        .onNodeWithText(string(R.string.onboarding_coming_soon), useUnmergedTree = true)
-        .assertExists()
 
     composeTestRule
         .onNodeWithTag(C.Tag.onboarding_continue_button)
@@ -134,23 +131,33 @@ class RoleScreenTest {
   }
 
   @Test
-  fun content_caregiverCard_isDisabled_neverSelected_andClickDoesNothing() {
+  fun content_clickingCaregiver_selectsCaregiver_andEnablesContinue() {
     setContent(null)
     val caregiver = composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver)
-    caregiver.assertIsNotEnabled()
+    caregiver.assertIsEnabled()
     caregiver.assertIsNotSelected()
 
     caregiver.performScrollTo().performClick()
-    composeTestRule.runOnIdle { assertTrue(selectedRoles.isEmpty()) }
-    caregiver.assertIsNotSelected()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsNotEnabled()
+    composeTestRule.runOnIdle { assertEquals(listOf(Role.CAREGIVER), selectedRoles) }
+    caregiver.assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsNotSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
   }
 
   @Test
-  fun content_caregiverIsNotSelected_evenWhenCaregiverIsTheSelectedRole() {
+  fun content_caregiverSelected_onlyTheCaregiverCardIsSelected() {
     setContent(Role.CAREGIVER)
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsSelected()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsNotSelected()
+  }
+
+  @Test
+  fun content_switchingFromCaregiverToPatient_selectsPatient() {
+    setContent(Role.CAREGIVER)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotSelected()
+    composeTestRule.runOnIdle { assertEquals(listOf(Role.PATIENT), selectedRoles) }
   }
 
   @Test
@@ -179,7 +186,7 @@ class RoleScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotSelected()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsEnabled()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
     composeTestRule.runOnIdle { assertEquals(Role.PATIENT, viewModel.uiState.value.role) }
   }
@@ -193,11 +200,12 @@ class RoleScreenTest {
   }
 
   @Test
-  fun screen_clickingCaregiver_doesNotChangeTheRole() {
+  fun screen_clickingCaregiver_storesCaregiverInTheViewModel() {
     val viewModel = setScreen()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
-    composeTestRule.runOnIdle { assertEquals(Role.PATIENT, viewModel.uiState.value.role) }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsNotSelected()
+    composeTestRule.runOnIdle { assertEquals(Role.CAREGIVER, viewModel.uiState.value.role) }
   }
 
   @Test
