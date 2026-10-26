@@ -363,6 +363,14 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <string name="prescription_form_edit_title">Edit prescription</string>
+    <string name="prescription_form_not_found_title">This prescription no longer exists</string>
+    <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
+    <string name="prescription_form_not_signed_in_title">You\'re signed out</string>
+    <string name="prescription_form_not_signed_in_hint">Sign in again to edit your prescription.</string>
+    <string name="prescription_form_load_error_title">Couldn\'t open this prescription</string>
+    <string name="prescription_form_load_error_hint">Something went wrong. Please try again.</string>
+    <string name="prescription_form_retry">Try again</string>
     <!-- Title of the prescriptions list; "prescriptions_title" is the Overview shortcut -->
     <string name="prescriptions_list_title">My prescriptions</string>
     <string name="prescriptions_back">Back</string>
