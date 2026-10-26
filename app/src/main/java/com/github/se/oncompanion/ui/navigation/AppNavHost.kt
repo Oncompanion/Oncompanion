@@ -34,6 +34,8 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
+import com.github.se.oncompanion.ui.carecircle.WhoseCareViewModel
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -92,6 +94,7 @@ fun AppNavHost(
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
                     AfterSignIn.OVERVIEW -> Route.OVERVIEW
                     AfterSignIn.JOIN_CIRCLE -> Route.JOIN_CIRCLE
+                    AfterSignIn.WHOSE_CARE -> Route.WHOSE_CARE
                   }
               )
             },
@@ -123,9 +126,34 @@ fun AppNavHost(
       composable(Screen.JOIN_CIRCLE) {
         JoinCareCircleScreen(
             viewModel = viewModel { JoinCareCircleViewModel() },
-            // Joined: the Overview for now, until caregivers get their own home
-            onDone = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            // Joined: choose whose care to follow (straight to them with a single patient)
+            onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+        )
+      }
+    }
+
+    navigation(startDestination = Screen.WHOSE_CARE, route = Route.WHOSE_CARE) {
+      composable(
+          Screen.WHOSE_CARE,
+          arguments =
+              listOf(
+                  navArgument(Screen.WHOSE_CARE_AUTO_SELECT) {
+                    type = NavType.BoolType
+                    defaultValue = true
+                  }
+              ),
+      ) { entry ->
+        WhoseCareScreen(
+            viewModel = viewModel { WhoseCareViewModel() },
+            // No back arrow when it is the first screen (after joining, or at start)
+            onBack =
+                navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
+            // The Overview for now; the caregiver mode (#203) opens the chosen patient's one
+            onPatientChosen = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
+            autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
             onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }

@@ -145,14 +145,14 @@ class SignInViewModelTest {
   }
 
   @Test
-  fun signIn_returningCaregiverInACircle_goesToOverview() = runTest {
+  fun signIn_returningCaregiverInACircle_goesToWhoseCare() = runTest {
     profiles.seed(returningProfile.copy(role = Role.CAREGIVER))
     invites.setJoinedCircles(user.uid, listOf(JoinedCareCircle("patient", "Marie")))
 
     viewModel.signIn(token())
     advanceUntilIdle()
 
-    assertEquals(AfterSignIn.OVERVIEW, viewModel.uiState.value.next)
+    assertEquals(AfterSignIn.WHOSE_CARE, viewModel.uiState.value.next)
   }
 
   @Test
