@@ -313,6 +313,19 @@
     <string name="join_circle_already_member_unnamed">You\'re already in their care circle</string>
     <string name="join_circle_joined_hint">You\'ll see what they choose to share with you.</string>
     <string name="join_circle_continue">Continue</string>
+
+    <!-- Whose care?: the patients a caregiver follows (#239) -->
+    <string name="whose_care_title">Whose care?</string>
+    <string name="whose_care_back">Back</string>
+    <string name="whose_care_intro">Choose the person whose care you want to follow. You only see what they chose to share.</string>
+    <!-- e.g. "Care circles (2)" -->
+    <string name="whose_care_count">Care circles (%1$d)</string>
+    <string name="whose_care_join_another">Join another care circle</string>
+    <string name="whose_care_error">Couldn\'t load your care circles.</string>
+    <string name="whose_care_retry">Retry</string>
+    <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
+    <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
+    <string name="whose_care_empty_join">Join a care circle</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>
@@ -369,6 +382,23 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <string name="prescription_detail_title">Prescription</string>
+    <string name="prescription_detail_back">Back</string>
+    <string name="prescription_detail_prescribed_by">Prescribed by</string>
+    <string name="prescription_detail_date">Date</string>
+    <string name="prescription_detail_medications">Medications</string>
+    <!-- Between the dosage, frequency and duration of a medication: "1 tablet · Twice a day · 5 days" -->
+    <string name="prescription_detail_separator">" · "</string>
+    <string name="prescription_detail_starts">Starts %1$s</string>
+    <string name="prescription_detail_error_title">Couldn\'t load this prescription</string>
+    <string name="prescription_detail_error_hint">Please try again.</string>
+    <string name="prescription_detail_retry">Retry</string>
+    <string name="prescription_detail_not_found_title">This prescription no longer exists</string>
+    <string name="prescription_detail_not_found_hint">It may have been deleted on another device.</string>
+    <plurals name="prescription_detail_duration_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

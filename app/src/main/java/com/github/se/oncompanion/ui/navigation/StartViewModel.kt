@@ -23,8 +23,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * Decides the first screen when the app starts (#30, US-2), while the splash screen is shown:
  * - nobody signed in → sign-in ([Route.AUTH])
- * - signed in with a profile → the Overview ([Route.OVERVIEW]), except a caregiver who hasn't
- *   joined a care circle yet → the join screen ([Route.JOIN_CIRCLE])
+ * - signed in with a profile → the Overview ([Route.OVERVIEW]); for a caregiver, "Whose care?"
+ *   ([Route.WHOSE_CARE]), or the join screen ([Route.JOIN_CIRCLE]) until they join a circle
  * - signed in without a profile (onboarding not finished) → onboarding ([Route.ONBOARDING])
  *
  * It works offline: Firebase remembers the session and Firestore reads the profile from its local
@@ -80,8 +80,9 @@ class StartViewModel(
     val profile = cachedProfile(uid) ?: profileRepository.getProfile(uid)
     return when {
       profile == null -> Route.ONBOARDING
-      profile.role == Role.CAREGIVER && !hasJoinedCircle(uid) -> Route.JOIN_CIRCLE
-      else -> Route.OVERVIEW
+      profile.role != Role.CAREGIVER -> Route.OVERVIEW
+      hasJoinedCircle(uid) -> Route.WHOSE_CARE
+      else -> Route.JOIN_CIRCLE
     }
   }
 
