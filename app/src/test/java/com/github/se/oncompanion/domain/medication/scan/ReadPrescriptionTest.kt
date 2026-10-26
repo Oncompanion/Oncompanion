@@ -271,9 +271,21 @@ class ReadPrescriptionTest {
   }
 
   @Test
-  fun atMostTwentyMedicationsAreKept() {
+  fun atMostTwentyMedicationsAreKept_andTheOthersAreCounted() {
     val text = linesOf(*Array(25) { "Medication${'A' + it} 5 mg" })
-    assertEquals(20, readPrescription(text, today)!!.draft.medications.size)
+
+    val read = readPrescription(text, today)!!
+
+    assertEquals(20, read.draft.medications.size)
+    // Dropped without a word, the patient wouldn't know (review of #231)
+    assertEquals(5, read.leftOut)
+  }
+
+  @Test
+  fun nothingIsLeftOutUpToTwentyMedications() {
+    val text = linesOf(*Array(20) { "Medication${'A' + it} 5 mg" })
+    assertEquals(0, readPrescription(text, today)!!.leftOut)
+    assertEquals(0, readPrescription(sheet(1), today)!!.leftOut)
   }
 
   @Test

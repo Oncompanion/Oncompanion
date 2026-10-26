@@ -33,8 +33,15 @@ enum class MedicationDetail {
  * A prescription read from a photo: the draft the form starts from, and the details the patient
  * must check because they may have been read wrong or not found. A detail not in [toCheck] was read
  * clearly; nothing is saved until the patient confirms the draft.
+ *
+ * @property leftOut how many more medications were read than a prescription can hold
+ *   ([Prescription.MAX_MEDICATIONS]): they aren't in [draft], so the patient must be told
  */
-data class ScannedPrescription(val draft: PrescriptionDraft, val toCheck: Set<ScannedField>)
+data class ScannedPrescription(
+    val draft: PrescriptionDraft,
+    val toCheck: Set<ScannedField>,
+    val leftOut: Int = 0,
+)
 
 /**
  * Reads the prescription in [text], what ML Kit read on its photo: the prescribing doctor, the date
@@ -47,7 +54,8 @@ data class ScannedPrescription(val draft: PrescriptionDraft, val toCheck: Set<Sc
  */
 fun readPrescription(text: RecognizedText, today: LocalDate): ScannedPrescription? {
   val rows = classify(text)
-  val medications = medicationsIn(rows).take(Prescription.MAX_MEDICATIONS)
+  val read = medicationsIn(rows)
+  val medications = read.take(Prescription.MAX_MEDICATIONS)
   if (medications.isEmpty()) return null
   val lines = rows.flatMap { it.lines }
   val doctor = prescriberIn(lines)
@@ -82,5 +90,5 @@ fun readPrescription(text: RecognizedText, today: LocalDate): ScannedPrescriptio
       details.filterValues { !it }.keys.forEach { add(ScannedField.OfMedication(position, it)) }
     }
   }
-  return ScannedPrescription(draft, toCheck)
+  return ScannedPrescription(draft, toCheck, leftOut = read.size - medications.size)
 }
