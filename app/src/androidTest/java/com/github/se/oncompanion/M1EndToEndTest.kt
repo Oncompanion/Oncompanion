@@ -360,8 +360,12 @@ class M1EndToEndTest {
     try {
       waitUntil(TIMEOUT_MS) { exists(matcher) }
     } catch (e: ComposeTimeoutException) {
-      check(activity === testScreen) {
-        "Android rebuilt the test screen (a configuration change): the app's content is gone"
+      // The timeout stays the cause, so the log shows both
+      if (activity !== testScreen) {
+        throw IllegalStateException(
+            "Android rebuilt the test screen (a configuration change): the app's content is gone",
+            e,
+        )
       }
       throw e
     }
