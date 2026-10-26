@@ -12,7 +12,8 @@ import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
-import kotlinx.coroutines.CancellationException
+import com.github.se.oncompanion.ui.common.DeletableUiState
+import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,11 +39,11 @@ data class PrescriptionDetailUiState(
     val prescription: Prescription? = null,
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
-    val isConfirmingDelete: Boolean = false,
-    val isDeleting: Boolean = false,
-    val hasDeleteError: Boolean = false,
-    val isDeleted: Boolean = false,
-) {
+    override val isConfirmingDelete: Boolean = false,
+    override val isDeleting: Boolean = false,
+    override val hasDeleteError: Boolean = false,
+    override val isDeleted: Boolean = false,
+) : DeletableUiState<PrescriptionDetailUiState> {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
     get() = !isLoading && !hasError && prescription == null
@@ -55,15 +56,21 @@ data class PrescriptionDetailUiState(
     get() = prescription != null && !isLoading && !hasError && !isDeleting && !isDeleted
 
   /** The prescription is shown and can be deleted. */
-  val canDelete: Boolean
+  override val canDelete: Boolean
     get() = canEdit
 
-  /**
-   * The dialog asking to confirm the deletion is shown: only while its Delete button can do
-   * something, so it never stays over a prescription that is gone or reloading.
-   */
-  val isDeleteDialogShown: Boolean
-    get() = isConfirmingDelete && (canDelete || isDeleting)
+  override fun withDelete(
+      isConfirmingDelete: Boolean,
+      isDeleting: Boolean,
+      hasDeleteError: Boolean,
+      isDeleted: Boolean,
+  ) =
+      copy(
+          isConfirmingDelete = isConfirmingDelete,
+          isDeleting = isDeleting,
+          hasDeleteError = hasDeleteError,
+          isDeleted = isDeleted,
+      )
 }
 
 /**
@@ -84,6 +91,9 @@ class PrescriptionDetailViewModel(
   val uiState: StateFlow<PrescriptionDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
+
+  private val deletion =
+      DeleteConfirmation(_uiState, viewModelScope, TAG, "the prescription $prescriptionId")
 
   init {
     load()
@@ -110,78 +120,37 @@ class PrescriptionDetailViewModel(
           .observePrescription(uid, prescriptionId)
           .catch { e ->
             Log.e(TAG, "Failed to load the prescription $prescriptionId", e)
-            _uiState.update {
-              it.copy(
-                  isLoading = false,
-                  hasError = true,
-                  isConfirmingDelete = false,
-                  hasDeleteError = false,
-              )
-            }
+            // Nothing to delete without the prescription: the confirmation is dropped
+            _uiState.update { it.copy(isLoading = false, hasError = true).afterRead(false) }
           }
           .collect { prescription ->
+            // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
             _uiState.update {
-              // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
-              val stillConfirming = it.isConfirmingDelete && prescription != null
-              it.copy(
-                  prescription = prescription,
-                  isLoading = false,
-                  hasError = false,
-                  isConfirmingDelete = stillConfirming,
-                  hasDeleteError = it.hasDeleteError && stillConfirming,
-              )
+              it.copy(prescription = prescription, isLoading = false, hasError = false)
+                  .afterRead(exists = prescription != null)
             }
           }
     }
   }
 
   /** Asks the user to confirm the deletion. Nothing is deleted before [confirmDelete]. */
-  fun requestDelete() {
-    _uiState.update {
-      if (it.canDelete) it.copy(isConfirmingDelete = true, hasDeleteError = false) else it
-    }
-  }
+  fun requestDelete() = deletion.request()
 
   /** Closes the confirmation and keeps the prescription. Ignored while it is being deleted. */
-  fun cancelDelete() {
-    _uiState.update {
-      if (it.isDeleting) it else it.copy(isConfirmingDelete = false, hasDeleteError = false)
-    }
-  }
+  fun cancelDelete() = deletion.cancel()
 
   /**
    * Deletes the prescription with its medications, through [ManageMedicationSchedule] like every
    * medication write. Returns once it is deleted on the device, also offline: the list no longer
    * shows it and the server deletes it when there is a connection.
    */
-  fun confirmDelete() {
-    val state = _uiState.value
-    if (!state.isConfirmingDelete || !state.canDelete) return
-    val uid = authRepository.signedInUid(TAG)
-    if (uid == null) {
-      _uiState.update { it.copy(hasDeleteError = true) }
-      return
-    }
-    // Stops observing first, or the deleted prescription would show as "no longer exists" before
-    // the screen closes
-    observation?.cancel()
-    _uiState.update { it.copy(isDeleting = true, hasDeleteError = false) }
-    viewModelScope.launch {
-      try {
-        manageMedicationSchedule.delete(uid, prescriptionId)
-        _uiState.update {
-          it.copy(isDeleting = false, isConfirmingDelete = false, isDeleted = true)
-        }
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to delete the prescription $prescriptionId", e)
-        // Keeps the prescription and the dialog shown, so the user can try again
-        _uiState.update { it.copy(isDeleting = false, hasDeleteError = true) }
-        observe(uid)
-      }
-    }
-  }
+  fun confirmDelete() =
+      deletion.confirm(
+          signedInUid = { authRepository.signedInUid(TAG) },
+          stopObserving = { observation?.cancel() },
+          delete = { uid -> manageMedicationSchedule.delete(uid, prescriptionId) },
+          onFailure = ::observe,
+      )
 
   private companion object {
     const val TAG = "PrescriptionDetailViewModel"
