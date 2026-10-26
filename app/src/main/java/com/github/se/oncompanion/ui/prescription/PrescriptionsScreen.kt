@@ -39,7 +39,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -301,17 +300,6 @@ private fun CenteredMessage(testTag: String, content: @Composable () -> Unit) {
   ) {
     content()
   }
-}
-
-@Composable
-private fun MessageTexts(title: String, hint: String) {
-  Text(text = title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-  Text(
-      text = hint,
-      style = MaterialTheme.typography.bodyMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      textAlign = TextAlign.Center,
-  )
 }
 
 /** Height kept free at the bottom for the floating buttons (56dp high, 24dp above the bottom). */

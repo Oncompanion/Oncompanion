@@ -142,8 +142,10 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
-          # The whole device's logcat is recorded, to see what happened when a test fails
+          # No "isn't responding" dialogs: on the slow emulator they take the focus from the app
+          # under test. The whole device's logcat is recorded, to see what happened when a test fails
           script: |
+            adb shell settings put global hide_error_dialogs 1
             adb logcat -v time > emulator-logcat.txt &
             ./gradlew connectedCheck --parallel --build-cache
 

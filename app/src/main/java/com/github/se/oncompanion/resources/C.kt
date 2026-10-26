@@ -319,6 +319,11 @@ object C {
     const val prescription_form_date_picker = "prescription_form_date_picker"
     const val prescription_form_date_picker_confirm = "prescription_form_date_picker_confirm"
     const val prescription_form_date_picker_cancel = "prescription_form_date_picker_cancel"
+    const val prescription_form_loading = "prescription_form_loading"
+    const val prescription_form_not_found = "prescription_form_not_found"
+    const val prescription_form_not_signed_in = "prescription_form_not_signed_in"
+    const val prescription_form_load_error = "prescription_form_load_error"
+    const val prescription_form_retry_button = "prescription_form_retry_button"
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
