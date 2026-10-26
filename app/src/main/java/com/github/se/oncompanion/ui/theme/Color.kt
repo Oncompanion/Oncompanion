@@ -65,3 +65,8 @@ val SurfaceContainerLowDark = Color(0xFF1D1B20)
 val SurfaceContainerDark = Color(0xFF211F26)
 val SurfaceContainerHighDark = Color(0xFF2B2930)
 val SurfaceContainerHighestDark = Color(0xFF36343B)
+
+// Not in Material 3: amber for what to check but doesn't block anything (e.g. a detail read from a
+// scan), unlike the red error. Contrast with the surface: 4.9:1 in light, 10.9:1 in dark.
+val WarningLight = Color(0xFFA15C00)
+val WarningDark = Color(0xFFFFB95C)

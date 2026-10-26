@@ -425,6 +425,32 @@
     <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
 
+    <!-- US-10: reviewing the prescription read from a scan, in the prescription form -->
+    <string name="prescription_review_title">Review prescription</string>
+    <string name="prescription_review_read">We read these details from your scan.</string>
+    <string name="prescription_review_partly_read">We could only read part of your prescription.</string>
+    <plurals name="prescription_review_to_check">
+        <item quantity="one">1 detail needs checking: it is marked in orange.</item>
+        <item quantity="other">%1$d details need checking: they are marked in orange.</item>
+    </plurals>
+    <string name="prescription_review_correct_anything">You can correct anything before saving.</string>
+    <string name="prescription_review_may_differ">Please check: it may not be what\'s on the paper</string>
+    <string name="prescription_review_date_hard_to_read">Please check: the date was hard to read</string>
+    <string name="prescription_review_not_found">Not found on the scan: add it if you want</string>
+    <string name="prescription_review_needs_checking">Needs checking</string>
+    <string name="prescription_review_check_name">Please check the name</string>
+    <string name="prescription_review_check_dosage">Please check the dosage</string>
+    <string name="prescription_review_check_frequency">Please check the frequency</string>
+    <string name="prescription_review_check_duration">Please check the duration</string>
+    <string name="prescription_review_name_not_found">Name not found</string>
+    <string name="prescription_review_dosage_not_found">Dosage not found</string>
+    <string name="prescription_review_frequency_not_found">Frequency not found</string>
+    <string name="prescription_review_duration_not_found">Duration not found</string>
+    <plurals name="prescription_review_check_details">
+        <item quantity="one">Please check 1 detail</item>
+        <item quantity="other">Please check %1$d details</item>
+    </plurals>
+
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>
     <string name="hospital_field_hint">Enter a hospital name or another location</string>
