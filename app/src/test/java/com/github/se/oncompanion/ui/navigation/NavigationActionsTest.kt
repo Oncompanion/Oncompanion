@@ -298,4 +298,11 @@ class NavigationActionsTest {
     assertEquals("symptomId", Screen.SYMPTOM_DETAIL_ID)
     assertEquals("symptoms_detail/abc", Screen.symptomDetail("abc"))
   }
+
+  /** IDs are encoded so punctuation cannot become route syntax. */
+  @Test
+  fun appointmentDetailEncodesItsIdentifier() {
+    assertEquals("appointment_detail/{appointmentId}", Screen.APPOINTMENT_DETAIL)
+    assertEquals("appointment_detail/visit%20%3F%23", Screen.appointmentDetail("visit ?#"))
+  }
 }

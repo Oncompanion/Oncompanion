@@ -20,6 +20,8 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
@@ -160,7 +162,9 @@ fun AppNavHost(
     }
 
     navigation(startDestination = Screen.OVERVIEW, route = Route.OVERVIEW) {
-      composable(Screen.OVERVIEW) { OverviewScreen(navigationActions) }
+      composable(Screen.OVERVIEW) {
+        OverviewScreen(navigationActions, onOpenAppointment = appointmentOpener(navigationActions))
+      }
     }
 
     // Bottom bar tabs, next to Overview
@@ -184,7 +188,16 @@ fun AppNavHost(
             navigationActions,
             planningViewModel,
             onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+            onOpenAppointment = appointmentOpener(navigationActions),
         )
+      }
+      composable(
+          Screen.APPOINTMENT_DETAIL,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
       }
       composable(
           Screen.APPOINTMENT_ADD,
@@ -375,4 +388,15 @@ private fun onboardingViewModel(
 ): OnboardingViewModel {
   val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
   return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
+}
+
+/** Shares the resumed-only guard for appointment navigation from either bottom tab. */
+@Composable
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+  return { id ->
+    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+      navigationActions.navigateTo(Screen.appointmentDetail(id))
+    }
+  }
 }

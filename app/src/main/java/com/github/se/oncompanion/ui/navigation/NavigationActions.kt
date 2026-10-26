@@ -52,6 +52,13 @@ object Screen {
 
   // Route.PLANNING
   const val PLANNING = "planning_home"
+  /** Argument identifying the appointment owned by the current patient. */
+  const val APPOINTMENT_ID = "appointmentId"
+  const val APPOINTMENT_DETAIL = "appointment_detail/{$APPOINTMENT_ID}"
+
+  /** Opens one appointment without changing the originating calendar selection. */
+  fun appointmentDetail(id: String) = "appointment_detail/${Uri.encode(id)}"
+
   const val APPOINTMENT_DATE = "appointmentDate"
   const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
   const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
