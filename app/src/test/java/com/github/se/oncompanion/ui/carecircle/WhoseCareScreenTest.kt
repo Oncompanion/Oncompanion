@@ -143,6 +143,7 @@ class WhoseCareScreenTest {
           onPatientChosen = { events += "chose $it" },
           onJoinAnother = {},
           autoSelectSingle = autoSelectSingle,
+          onSignedOut = { events += "signed out" },
       )
     }
   }
@@ -177,5 +178,16 @@ class WhoseCareScreenTest {
           .isNotEmpty()
     }
     composeTestRule.runOnIdle { assertEquals(emptyList<String>(), events) }
+  }
+
+  @Test
+  fun screen_nobodySignedIn_goesToSignIn() {
+    val auth = FakeAuthRepository()
+    val viewModel =
+        WhoseCareViewModel(auth, FakeCareCircleInviteRepository(), FakeCareCircleRepository())
+    setScreen(viewModel, autoSelectSingle = true)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
+    composeTestRule.runOnIdle { assertEquals(listOf("signed out"), events) }
+    node(C.Tag.whose_care_error).assertDoesNotExist()
   }
 }

@@ -374,6 +374,18 @@ class AppNavHostTest {
   }
 
   @Test
+  fun whoseCare_signedOut_opensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.WHOSE_CARE)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
   fun joinACareCircle_signedOut_joiningOpensSignIn() {
     // Nobody signed in, as when the session expired
     setNavHost(Route.JOIN_CIRCLE)

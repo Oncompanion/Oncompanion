@@ -152,6 +152,7 @@ fun AppNavHost(
             onPatientChosen = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }
     }
