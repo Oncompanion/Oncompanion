@@ -145,6 +145,11 @@
     <string name="symptom_delete_confirm">Delete</string>
     <string name="symptom_delete_cancel">Cancel</string>
     <string name="symptom_delete_error">Couldn\'t delete this entry. Try again.</string>
+    <string name="symptom_edit_title">Edit entry</string>
+    <string name="symptom_edit_save">Save changes</string>
+    <string name="symptom_edit_error_title">Couldn\'t load this entry</string>
+    <string name="symptom_detail_edit">Edit entry</string>
+    <string name="symptom_edit_error_hint">Please try again.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -163,7 +168,6 @@
     <string name="onboarding_role_patient_description">I\'m receiving cancer treatment and want to keep track of my care.</string>
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
-    <string name="onboarding_coming_soon">Coming soon</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>
@@ -192,6 +196,22 @@
     <string name="event_detail_not_found">This event doesn\'t exist anymore.</string>
     <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
+    <string name="event_detail_not_found_hint">It may have been cancelled by the organizer.</string>
+    <string name="event_detail_back_to_events">Back to events</string>
+    <string name="event_detail_visit_website">Visit event website</string>
+    <string name="event_detail_registered">I\'m registered</string>
+    <string name="event_detail_registration_note">This only saves it in Oncompanion. It doesn\'t register you with the organizer.</string>
+    <string name="event_detail_registration_closed">This event has already started, so it can\'t be confirmed anymore.</string>
+    <string name="event_detail_registration_confirmed">Registration confirmed</string>
+    <string name="event_detail_registration_confirmed_supporting">You told us you signed up for this event.</string>
+    <string name="event_detail_remove">Remove confirmation</string>
+    <string name="event_detail_remove_title">Remove your registration confirmation?</string>
+    <string name="event_detail_remove_message">This doesn\'t cancel your registration with the organizer.</string>
+    <string name="event_detail_remove_cancel">Cancel</string>
+    <string name="event_detail_remove_confirm">Remove</string>
+    <string name="event_detail_registration_error">Couldn\'t load or save your registration.</string>
+    <string name="event_detail_website_error">Couldn\'t open the event website.</string>
+    <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
@@ -273,6 +293,26 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+
+    <!-- Join a care circle with an invite code (#137) -->
+    <string name="join_circle_title">Join a care circle</string>
+    <string name="join_circle_subtitle">Enter the invite code that the person you support shared with you.</string>
+    <string name="join_circle_code">Invite code</string>
+    <string name="join_circle_code_hint">For example ABCDE-FGHJK</string>
+    <string name="join_circle_join">Join</string>
+    <string name="join_circle_no_code_hint">No code yet? Ask the person you support to add you to their care circle in Oncompanion. This screen opens each time you start the app until you join.</string>
+    <string name="join_circle_error_invalid">This code doesn\'t work. Check it, or ask for a new one.</string>
+    <string name="join_circle_error_offline">You need a connection to join a care circle. Please try again online.</string>
+    <string name="join_circle_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
+    <string name="join_circle_error_failed">Couldn\'t join the care circle. Please try again.</string>
+    <!-- e.g. "You joined Marie's care circle" -->
+    <string name="join_circle_joined">You joined %1$s\'s care circle</string>
+    <string name="join_circle_already_member">You\'re already in %1$s\'s care circle</string>
+    <!-- When the patient's first name is missing -->
+    <string name="join_circle_joined_unnamed">You joined their care circle</string>
+    <string name="join_circle_already_member_unnamed">You\'re already in their care circle</string>
+    <string name="join_circle_joined_hint">You\'ll see what they choose to share with you.</string>
+    <string name="join_circle_continue">Continue</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>
@@ -307,6 +347,14 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <string name="prescription_form_edit_title">Edit prescription</string>
+    <string name="prescription_form_not_found_title">This prescription no longer exists</string>
+    <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
+    <string name="prescription_form_not_signed_in_title">You\'re signed out</string>
+    <string name="prescription_form_not_signed_in_hint">Sign in again to edit your prescription.</string>
+    <string name="prescription_form_load_error_title">Couldn\'t open this prescription</string>
+    <string name="prescription_form_load_error_hint">Something went wrong. Please try again.</string>
+    <string name="prescription_form_retry">Try again</string>
     <!-- Title of the prescriptions list; "prescriptions_title" is the Overview shortcut -->
     <string name="prescriptions_list_title">My prescriptions</string>
     <string name="prescriptions_back">Back</string>

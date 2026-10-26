@@ -5,7 +5,7 @@ package com.github.se.oncompanion.model.user
 
 import java.time.Instant
 
-/** What the user chose during onboarding. Only [PATIENT] is available in the app for now. */
+/** What the user chose during onboarding: a patient, or a caregiver who supports one. */
 enum class Role {
   PATIENT,
   CAREGIVER,

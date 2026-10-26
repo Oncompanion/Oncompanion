@@ -19,14 +19,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role as SemanticsRole
@@ -37,8 +35,8 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 
 /**
- * First onboarding step (Figma "US-01 / Onboarding – Role"): patient or caregiver. The caregiver
- * side isn't available yet, so its card is shown disabled with "Coming soon".
+ * First onboarding step (Figma "US-01 / Onboarding – Role"): patient or caregiver. The role decides
+ * what the next steps ask (a caregiver has no cancer type) and can't change afterwards.
  *
  * @param onContinue called to go to the next step
  */
@@ -84,16 +82,14 @@ fun RoleContent(
             title = stringResource(R.string.onboarding_role_patient),
             description = stringResource(R.string.onboarding_role_patient_description),
             selected = selectedRole == Role.PATIENT,
-            enabled = true,
             onClick = { onRoleSelected(Role.PATIENT) },
             modifier = Modifier.testTag(C.Tag.onboarding_role_patient),
         )
         RoleCard(
             title = stringResource(R.string.onboarding_role_caregiver),
             description = stringResource(R.string.onboarding_role_caregiver_description),
-            selected = false,
-            enabled = false,
-            onClick = {},
+            selected = selectedRole == Role.CAREGIVER,
+            onClick = { onRoleSelected(Role.CAREGIVER) },
             modifier = Modifier.testTag(C.Tag.onboarding_role_caregiver),
         )
       }
@@ -112,13 +108,12 @@ fun RoleContent(
   }
 }
 
-/** A selectable card for one role; a disabled card shows a "Coming soon" chip. */
+/** A selectable card for one role. */
 @Composable
 private fun RoleCard(
     title: String,
     description: String,
     selected: Boolean,
-    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -134,7 +129,6 @@ private fun RoleCard(
               .fillMaxWidth()
               .selectable(
                   selected = selected,
-                  enabled = enabled,
                   role = SemanticsRole.RadioButton,
                   onClick = onClick,
               ),
@@ -145,7 +139,7 @@ private fun RoleCard(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
       Column(
-          modifier = Modifier.weight(1f).alpha(if (enabled) 1f else 0.38f),
+          modifier = Modifier.weight(1f),
           verticalArrangement = Arrangement.spacedBy(4.dp),
       ) {
         Text(
@@ -157,13 +151,6 @@ private fun RoleCard(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceVariant,
-        )
-      }
-      if (!enabled) {
-        SuggestionChip(
-            onClick = {},
-            enabled = false,
-            label = { Text(stringResource(R.string.onboarding_coming_soon)) },
         )
       }
     }

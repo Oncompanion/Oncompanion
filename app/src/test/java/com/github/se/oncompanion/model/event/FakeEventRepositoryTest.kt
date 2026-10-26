@@ -50,6 +50,14 @@ class FakeEventRepositoryTest {
   }
 
   @Test
+  fun sampleEvents_haveWebLinks_exceptOne() {
+    val events = FakeEventRepository.sampleEvents(LocalDate.of(2026, 10, 3))
+
+    assertEquals(listOf("support-group"), events.filter { it.websiteUrl == null }.map { it.id })
+    events.mapNotNull { it.websiteUrl }.forEach { assertEquals(it, webLinkOrNull(it)) }
+  }
+
+  @Test
   fun upcomingEvents_leaveOutPastEvents_andAreSortedByDate() = runBlocking {
     val past = event("past", now.minusDays(1))
     val later = event("later", now.plusDays(5))

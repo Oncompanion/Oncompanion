@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Debug builds only: lets tests reach the local Firebase emulators over HTTP. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="false"
-        android:networkSecurityConfig="@xml/network_security_config" />
+        android:networkSecurityConfig="@xml/network_security_config">
+        <!-- The empty screen Compose tests put their content on (from Compose's test manifest).
+             Rebuilt after a configuration change, as on the CI emulator while it finishes starting
+             up, it would come back blank: the test's content isn't set again. So it handles every
+             configuration change itself (Compose redraws with the new configuration) instead of
+             being rebuilt. A test can still rebuild it on purpose with scenario.recreate(). -->
+        <activity
+            android:name="androidx.activity.ComponentActivity"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|density|fontScale|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
+            tools:node="merge" />
+    </application>
 </manifest>

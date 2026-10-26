@@ -1,3 +1,5 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import kotlinx.coroutines.flow.first
@@ -65,6 +67,14 @@ class AppointmentRepositoryFirestoreConstructionTest {
             )
         for (uid in listOf("", " ", "alice/nested")) {
           assertTrue(
+              runCatching { repository.deleteAppointment(uid, "entry") }.exceptionOrNull()
+                  is IllegalArgumentException
+          )
+          assertTrue(
+              runCatching { repository.updateAppointment(uid, valid.copy(id = "entry")) }
+                  .exceptionOrNull() is IllegalArgumentException
+          )
+          assertTrue(
               runCatching { repository.observeAppointments(uid) }.exceptionOrNull()
                   is IllegalArgumentException
           )
@@ -79,10 +89,24 @@ class AppointmentRepositoryFirestoreConstructionTest {
         }
         for (id in listOf("", " ", "entry/nested")) {
           assertTrue(
+              runCatching { repository.deleteAppointment("alice", id) }.exceptionOrNull()
+                  is IllegalArgumentException
+          )
+          assertTrue(
+              runCatching { repository.updateAppointment("alice", valid.copy(id = id)) }
+                  .exceptionOrNull() is IllegalArgumentException
+          )
+          assertTrue(
               runCatching { repository.observeAppointment("alice", id) }.exceptionOrNull()
                   is IllegalArgumentException
           )
         }
+        assertTrue(
+            runCatching {
+              repository.updateAppointment("alice", valid.copy(id = "entry", title = ""))
+            }
+                .exceptionOrNull() is IllegalArgumentException
+        )
         assertTrue(
             runCatching { repository.addAppointment("alice", valid.copy(title = "")) }
                 .exceptionOrNull() is IllegalArgumentException

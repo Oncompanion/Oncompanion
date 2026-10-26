@@ -16,6 +16,7 @@ import java.time.LocalDate
 object Route {
   const val AUTH = "auth"
   const val ONBOARDING = "onboarding"
+  const val JOIN_CIRCLE = "join_circle"
   const val OVERVIEW = "overview"
   const val PLANNING = "planning"
   const val EVENTS = "events"
@@ -33,6 +34,9 @@ object Screen {
   // Route.ONBOARDING
   const val ONBOARDING_ROLE = "onboarding_role"
   const val ONBOARDING_INFORMATION = "onboarding_information"
+
+  // Route.JOIN_CIRCLE
+  const val JOIN_CIRCLE = "join_circle_home"
 
   // Route.OVERVIEW
   const val OVERVIEW = "overview_home"
@@ -71,6 +75,10 @@ object Screen {
   fun symptomDetail(symptomId: String) = "symptoms_detail/$symptomId"
 
   const val SYMPTOM_ADD = "symptoms_add"
+  const val SYMPTOM_EDIT = "symptoms_edit/{$SYMPTOM_DETAIL_ID}"
+
+  /** The [SYMPTOM_EDIT] screen of the symptom [symptomId]. */
+  fun symptomEdit(symptomId: String) = "symptoms_edit/$symptomId"
 
   // Route.PRESCRIPTIONS
   const val PRESCRIPTIONS = "prescriptions_home"

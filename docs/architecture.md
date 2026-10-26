@@ -1,4 +1,3 @@
-<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
@@ -33,7 +32,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
   - Repositories are injected through the existing screen/ViewModel boundary. Tests and previews can supply mixed entries; production supplies appointments through `AppointmentPlanningSource`. No new collection, layer or dependency is introduced by the mixed-entry contract.
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
 
-**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
+**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. The patient's confirmations that they registered for an event with its organizer (US-25) are in `EventRegistrationRepository`: one document per event, keyed by the event's id, so confirming twice never creates a duplicate. Oncompanion only records what the patient says; registering stays on the organizer's website, linked from the event's `websiteUrl`. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
 
 ## External hospital search (issue #142)
 
@@ -207,11 +206,26 @@ Unsupported Planning rows do not expose a clickable action. Edit and Delete are 
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 
+`AppointmentRepository.updateAppointment` updates editable fields on an existing document without
+changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
+is not recreated. Writes are queued locally, including offline, without waiting for server acknowledgement.
+A later server rejection is logged and may roll back local changes. Owner
+updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
+owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
+list/detail observations, with no second Planning write. Detail/edit/delete UI remains planned.
+
 ## Prescription scan
 
 The scan screen (`ui/prescription/scan/`) uses the camera through CameraX. The camera stays in the UI layer, behind a small `ScanCamera` interface so the screen can be tested with a fake: its preview has to be drawn inside the screen, so it can't sit behind a device service like `TextRecognizer`. Only its result, the photo file, leaves the screen.
 
 The photo of a prescription is a medical document, so it is never uploaded and never kept: `ScanPhotoStore` (`model/medication/scan/`) writes it to a `scans/` folder of the app's private cache, which is never backed up. There is at most one photo at a time. It is first shown on the same screen for the user to check (Retake deletes it and shows the camera again), and it is deleted when the scan screen is closed or destroyed, including when the screen is left while the photo is still being written. Photos left behind by an interrupted scan (e.g. the app was killed) are deleted the next time the scan screen opens. When text recognition exists, the photo is handed to `DraftMedicationFromScan`, which deletes it once read.
+
+The text on the photo is read by a `TextRecognizer` (`model/medication/scan/`), a device service behind an interface like the repositories, with its `TextRecognizerProvider` and a `FakeTextRecognizer` for tests. Its implementation, `MlKitTextRecognizer`, uses ML Kit's Latin text recognition (French and English) with the model bundled in the app, so it works offline from the first scan. The photo and its text never leave the phone; ML Kit only sends usage metrics to Google. It returns a `RecognizedText`: plain Kotlin lines, each with its text, its box on the upright photo and ML Kit's confidence, so the prescription parser can be tested without Android or ML Kit. ML Kit doesn't know what a prescription is: it only reads lines, in no guaranteed order, and turning them into a doctor, a date and medications is the parser's job. The photo is read at full size (up to 4096 px), because scaling a page down makes ML Kit misread small print. The recognizer never deletes the photo; whoever owns it does.
+
+Reading a prescription from those lines is plain Kotlin in `model/medication/scan/` (it uses no repository, so it isn't a domain use case), in steps that are tested on their own with what ML Kit read on phone photos of six fictional prescriptions (`src/test/resources/scan/`):
+1. `readingOrder` puts the lines back in reading order: ML Kit returns them in no guaranteed order and splits a table row into cells. Each line joins the row of its left neighbor at about the same height, which follows a slightly tilted photo.
+2. `cleanedOcr` undoes the mistakes ML Kit predictably makes (O for 0 inside a number, a bar for 1 before a dose form, spaces inside a date) without touching words; `comparable` gives the lowercase, accent-free form text is matched in.
+3. `PrescriptionLexicon` holds the French and English words and patterns: dates read day first (05/11/2026 is 5 November), birth-date clues, doctor titles, strengths, dose quantities, frequencies, durations, headings, labels and contact details. A new format means a new word there, not new logic.
 
 ## Care circle invitations
 
@@ -263,6 +277,7 @@ Firestore disk persistence is retained, including pending offline writes. Signin
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /users/{uid}/patients/{patientUid}    circles this caregiver joined
+/users/{uid}/eventRegistrations/{eventId}   events the user says they registered for (owner only)
 /invites/{inviteCode}                 pending care-circle members (invitations), deleted when redeemed
 /events/{id}                          Ligue events, read: signed in, write: nobody from the app
 /directory/{contacts|programs}/items/{id}   read: signed in, write: staff
