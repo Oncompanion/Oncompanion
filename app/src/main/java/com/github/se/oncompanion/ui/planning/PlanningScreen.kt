@@ -25,9 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -65,10 +63,8 @@ fun PlanningScreen(
     onOpenAppointment: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val lifecycle = LocalLifecycleOwner.current.lifecycle
   val openAppointment: (PlanningItem) -> Unit = { item ->
-    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
-        onOpenAppointment((item.source as PlanningSource.Appointment).appointmentId)
+    appointmentToOpen(item)?.let(onOpenAppointment)
   }
   LifecycleResumeEffect(viewModel) {
     viewModel.refreshToday()
@@ -87,7 +83,7 @@ fun PlanningScreen(
               viewModel::retry,
               onAddAppointment = onAddAppointment,
               onItemClick = openAppointment,
-              canOpenItem = { it.source is PlanningSource.Appointment },
+              canOpenItem = { appointmentToOpen(it) != null },
           ),
       modifier = modifier,
       bottomBar = {
@@ -418,3 +414,11 @@ private fun PlanningRow(
               ),
   )
 }
+
+/** Keeps row availability and click handling consistent for supported appointment sources. */
+internal fun appointmentToOpen(item: PlanningItem): String? =
+    when (val source = item.source) {
+      is PlanningSource.Appointment -> source.appointmentId
+      is PlanningSource.Event,
+      is PlanningSource.Medication -> null
+    }

@@ -97,7 +97,7 @@ class PlanningAppointmentsTest {
     }
     // The same cached document remains readable in details without reconnecting.
     compose.onNodeWithText("Offline consultation").performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
     File(context.cacheDir, "appointment-details-offline.png").outputStream().use {
       compose

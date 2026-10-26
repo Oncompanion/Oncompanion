@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
@@ -6,6 +7,8 @@ import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /**
  * Hand-written fake [AuthRepository]. [onSignIn] decides what signInWithGoogle does (return a user,
@@ -28,7 +31,13 @@ class FakeAuthRepository(
   override val currentUser: AuthUser?
     get() = user.value
 
-  override fun observeCurrentUser(): Flow<AuthUser?> = user
+  /** Failure raised when a new authentication observation starts. */
+  var observeError: Exception? = null
+
+  override fun observeCurrentUser(): Flow<AuthUser?> = flow {
+    observeError?.let { throw it }
+    emitAll(user)
+  }
 
   override suspend fun signInWithGoogle(idToken: String): AuthUser {
     signInTokens += idToken

@@ -197,6 +197,9 @@ Figma's entry-detail layout using the recorded type, title, start date/time and 
 and notes. No end time or reminder is inferred. `AppointmentDetailViewModel` reads the appointment
 repository directly, cancels old observations and clears private content on account changes.
 An unavailable cached snapshot does not confirm server-side deletion; read errors offer retry.
+Retry also restarts authentication observation after an auth failure. Both entry points share
+a resumed-only navigation guard in AppNavHost. Dates use English, matching Overview, while
+times respect the phone clock preference and display zone.
 Planning appointment rows and Overview's next-appointment card open the same detail destination.
 Overview preserves the source appointment ID rather than deriving it from display text. Back pops
 the destination to its origin, retaining Planning's selected day and saved agenda scroll position.

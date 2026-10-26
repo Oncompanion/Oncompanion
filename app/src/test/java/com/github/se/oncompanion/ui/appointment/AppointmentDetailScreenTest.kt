@@ -3,8 +3,10 @@
 package com.github.se.oncompanion.ui.appointment
 
 import android.content.Context
+import android.content.res.Configuration
 import android.provider.Settings
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -15,6 +17,7 @@ import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.*
+import java.util.Locale
 import kotlinx.coroutines.test.runTest
 import org.junit.*
 import org.junit.Assert.*
@@ -115,6 +118,31 @@ class AppointmentDetailScreenTest {
         )
       }
       compose.onNodeWithText("Fri 23 Oct 2026 · 01:00").assertIsDisplayed()
+    } finally {
+      Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, previous)
+    }
+  }
+
+  /** English dates remain consistent on a French phone using a 12-hour clock. */
+  @Test
+  fun twelveHourClockAndFrenchLocale() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val previous = Settings.System.getString(context.contentResolver, Settings.System.TIME_12_24)
+    try {
+      Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, "12")
+      compose.setContent {
+        val configuration =
+            Configuration(LocalConfiguration.current).apply { setLocale(Locale.FRENCH) }
+        CompositionLocalProvider(LocalConfiguration provides configuration) {
+          AppointmentDetailContent(
+              AppointmentDetailUiState.Loaded(appointment),
+              {},
+              {},
+              ZoneId.of("Europe/Zurich"),
+          )
+        }
+      }
+      compose.onNodeWithText("Fri 23 Oct 2026 · 1:00 AM").assertIsDisplayed()
     } finally {
       Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, previous)
     }

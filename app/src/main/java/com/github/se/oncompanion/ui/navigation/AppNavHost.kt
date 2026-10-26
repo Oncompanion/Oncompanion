@@ -34,6 +34,8 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
+import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -89,6 +91,7 @@ fun AppNavHost(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
                     AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                    AfterSignIn.JOIN_CIRCLE -> Route.JOIN_CIRCLE
                   }
               )
             },
@@ -106,14 +109,32 @@ fun AppNavHost(
       composable(Screen.ONBOARDING_INFORMATION) { entry ->
         InformationScreen(
             viewModel = onboardingViewModel(navController, entry),
-            // Onboarding is done: Back must not return to it
-            onSaved = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            // Onboarding is done: Back must not return to it. A caregiver then joins a circle
+            onSaved = { role ->
+              navigationActions.navigateAndClearBackStack(
+                  if (role == Role.CAREGIVER) Route.JOIN_CIRCLE else Route.OVERVIEW
+              )
+            },
+        )
+      }
+    }
+
+    navigation(startDestination = Screen.JOIN_CIRCLE, route = Route.JOIN_CIRCLE) {
+      composable(Screen.JOIN_CIRCLE) {
+        JoinCareCircleScreen(
+            viewModel = viewModel { JoinCareCircleViewModel() },
+            // Joined: the Overview for now, until caregivers get their own home
+            onDone = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }
     }
 
     navigation(startDestination = Screen.OVERVIEW, route = Route.OVERVIEW) {
-      composable(Screen.OVERVIEW) { OverviewScreen(navigationActions) }
+      composable(Screen.OVERVIEW) {
+        OverviewScreen(navigationActions, onOpenAppointment = appointmentOpener(navigationActions))
+      }
     }
 
     // Bottom bar tabs, next to Overview
@@ -137,7 +158,7 @@ fun AppNavHost(
             navigationActions,
             planningViewModel,
             onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
-            onOpenAppointment = { navigationActions.navigateTo(Screen.appointmentDetail(it)) },
+            onOpenAppointment = appointmentOpener(navigationActions),
         )
       }
       composable(
@@ -217,6 +238,18 @@ fun AppNavHost(
         // Saving returns to the journal, where the new entry is at the top
         AddSymptomScreen(
             viewModel = viewModel { AddSymptomViewModel() },
+            onBack = navigationActions::goBack,
+            onSaved = navigationActions::goBack,
+        )
+      }
+      composable(
+          Screen.SYMPTOM_EDIT,
+          arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
+        // Saving returns to the detail, which shows the change
+        AddSymptomScreen(
+            viewModel = viewModel { AddSymptomViewModel(symptomId = symptomId) },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
         )
@@ -312,4 +345,15 @@ private fun onboardingViewModel(
 ): OnboardingViewModel {
   val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
   return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
+}
+
+/** Shares the resumed-only guard for appointment navigation from either bottom tab. */
+@Composable
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+  return { id ->
+    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+      navigationActions.navigateTo(Screen.appointmentDetail(id))
+    }
+  }
 }

@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -24,6 +23,7 @@ import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** Connects the appointment observation to its read-only detail content. */
 @Composable
@@ -42,7 +42,7 @@ fun AppointmentDetailContent(
     zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
   Scaffold(
-      modifier = Modifier.testTag(C.Tag.appointment_detail),
+      modifier = Modifier.testTag(C.Tag.appointment_detail_screen),
       topBar = {
         TopAppBar(
             title = { Text(stringResource(R.string.appointment_detail)) },
@@ -83,7 +83,7 @@ private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
   Column(Modifier.padding(16.dp).testTag(C.Tag.appointment_detail_feedback)) {
     Text(stringResource(message))
     TextButton(onRetry, Modifier.testTag(C.Tag.appointment_detail_retry)) {
-      Text(stringResource(R.string.planning_retry))
+      Text(stringResource(R.string.appointment_detail_retry))
     }
   }
 }
@@ -107,8 +107,9 @@ private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
     )
     Text(appointment.title, style = MaterialTheme.typography.headlineMedium)
   }
-  // Appointments record a start instant only; display it using the phone's locale and clock format.
-  val locale = LocalConfiguration.current.locales[0]
+  // Appointments record a start instant only; display it using the English UI language and the
+  // phone's clock format.
+  val locale = Locale.ENGLISH
   val pattern =
       if (DateFormat.is24HourFormat(LocalContext.current)) "EEE d MMM yyyy · HH:mm"
       else "EEE d MMM yyyy · h:mm a"

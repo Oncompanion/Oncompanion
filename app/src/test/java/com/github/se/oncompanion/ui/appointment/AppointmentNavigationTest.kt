@@ -163,7 +163,7 @@ class AppointmentNavigationTest {
     show()
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
     compose.onNodeWithText("Future visit").performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Future visit").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appointment_back).performClick()
     compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
@@ -185,7 +185,7 @@ class AppointmentNavigationTest {
     )
     show(Route.OVERVIEW)
     compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Overview visit").assertIsDisplayed()
     compose.runOnIdle {
       assertEquals(
@@ -228,7 +228,7 @@ class AppointmentNavigationTest {
     show()
     compose.onNodeWithTag(C.Tag.planning_list).performScrollToNode(hasText("Agenda visit 20"))
     compose.onNodeWithText("Agenda visit 20").performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appointment_back).performClick()
     compose.onNodeWithText("Agenda visit 20").assertIsDisplayed()
     compose.onNodeWithText("Agenda visit 0").assertDoesNotExist()

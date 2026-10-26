@@ -365,4 +365,12 @@ class PlanningScreenTest {
     compose.onNodeWithTag(C.Tag.planningItem(item.key)).assertHasClickAction().performClick()
     assertEquals(item, opened)
   }
+
+  /** Even a future clickable event cannot be routed as an appointment. */
+  @Test
+  fun appointmentRoutingRejectsOtherSources() {
+    assertEquals("test", appointmentToOpen(item))
+    assertEquals(null, appointmentToOpen(item.copy(source = PlanningSource.Event("event"))))
+    assertEquals(null, appointmentToOpen(medication()))
+  }
 }

@@ -180,18 +180,15 @@ class OverviewViewModel(
   /** The first appointment that hasn't started yet. */
   private fun nextAppointmentOf(planned: List<PlanningItem>, now: LocalDateTime): NextAppointment? =
       planned
-          .filter { it.source is PlanningSource.Appointment }
-          .mapNotNull { item -> item.startIn()?.let { item to it } }
-          .filter { (_, start) -> start.isAfter(now) }
-          .minByOrNull { (_, start) -> start }
-          ?.let { (item, start) ->
-            NextAppointment(
-                (item.source as PlanningSource.Appointment).appointmentId,
-                item.title,
-                start,
-                item.subtitle,
-            )
+          .mapNotNull { item ->
+            (item.source as? PlanningSource.Appointment)?.let { source ->
+              item.startIn()?.let { start ->
+                NextAppointment(source.appointmentId, item.title, start, item.subtitle)
+              }
+            }
           }
+          .filter { it.dateTime.isAfter(now) }
+          .minByOrNull { it.dateTime }
 
   /**
    * Today's entries: those without a time first, as in Planning, then the timed ones by time. A

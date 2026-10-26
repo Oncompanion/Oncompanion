@@ -101,6 +101,31 @@ class AppointmentDetailViewModelTest {
         assertEquals(AppointmentDetailUiState.Unavailable, vm.uiState.value)
       }
 
+  /** Retry restores account observation after an authentication failure. */
+  @Test
+  fun authFailureRetryObservesLaterAccountChanges() =
+      runTest(dispatcher) {
+        auth.signInWithGoogle("first")
+        repository.seed("uid-first", appointment)
+        auth.observeError = IllegalStateException("auth failed")
+        val vm = AppointmentDetailViewModel("visit", repository, auth)
+        advanceUntilIdle()
+        assertEquals(AppointmentDetailUiState.Error, vm.uiState.value)
+        auth.observeError = null
+        vm.retry()
+        advanceUntilIdle()
+        assertEquals(AppointmentDetailUiState.Loaded(appointment), vm.uiState.value)
+        auth.signInWithGoogle("second")
+        advanceUntilIdle()
+        assertEquals(AppointmentDetailUiState.Unavailable, vm.uiState.value)
+        repository.seed("uid-second", appointment.copy(title = "Second"))
+        advanceUntilIdle()
+        assertEquals(
+            "Second",
+            (vm.uiState.value as AppointmentDetailUiState.Loaded).appointment.title,
+        )
+      }
+
   /** Synchronous repository validation failures also become a recoverable screen error. */
   @Test
   fun invalidIdentifierIsAnError() =

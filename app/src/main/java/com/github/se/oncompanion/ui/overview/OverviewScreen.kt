@@ -40,9 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
@@ -107,9 +105,11 @@ fun OverviewScreen(
     navigationActions: NavigationActions,
     modifier: Modifier = Modifier,
     viewModel: OverviewViewModel = viewModel { OverviewViewModel() },
+    onOpenAppointment: (String) -> Unit = {
+      navigationActions.navigateTo(Screen.appointmentDetail(it))
+    },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  val lifecycle = LocalLifecycleOwner.current.lifecycle
   // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
   // current
   LifecycleResumeEffect(viewModel) {
@@ -121,10 +121,7 @@ fun OverviewScreen(
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
       // Planning is a tab: switch to it like the bottom bar does
       onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
-      onOpenAppointment = { id ->
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
-            navigationActions.navigateTo(Screen.appointmentDetail(id))
-      },
+      onOpenAppointment = onOpenAppointment,
       onRetry = viewModel::loadDay,
       modifier = modifier,
       bottomBar = {

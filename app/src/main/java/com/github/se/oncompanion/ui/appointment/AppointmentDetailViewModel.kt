@@ -45,19 +45,31 @@ class AppointmentDetailViewModel(
   val uiState = state.asStateFlow()
   private var observation: Job? = null
 
+  private var authentication: Job? = null
+
   init {
-    viewModelScope.launch {
-      authRepository
-          .observeCurrentUser()
-          .catch { emit(null) }
+    observeAuthentication()
+  }
+
+  private fun observeAuthentication() {
+    authentication?.cancel()
+    authentication = viewModelScope.launch {
+      flow { emitAll(authRepository.observeCurrentUser()) }
           .map { it?.uid }
           .distinctUntilChanged()
+          .catch {
+            observation?.cancel()
+            state.value = AppointmentDetailUiState.Error
+          }
           .collect { observe(it) }
     }
   }
 
   /** Restarts a failed or unavailable observation without keeping duplicate listeners. */
-  fun retry() = observe(runCatching { authRepository.currentUser?.uid }.getOrNull())
+  fun retry() {
+    observe(runCatching { authRepository.currentUser?.uid }.getOrNull())
+    observeAuthentication()
+  }
 
   private fun observe(uid: String?) {
     observation?.cancel()
