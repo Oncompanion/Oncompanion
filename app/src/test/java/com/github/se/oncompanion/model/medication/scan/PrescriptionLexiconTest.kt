@@ -182,6 +182,7 @@ class PrescriptionLexiconTest {
         PrescriptionLexicon::hasStrength,
         true,
         "Ondansetron 8 mg",
+        "Ondansetron 8  mg",
         "Ondansetron 8mg",
         "Paracétamol 1 g si fièvre",
         "Filgrastim 30 MU seringue",

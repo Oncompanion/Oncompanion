@@ -185,7 +185,8 @@ internal object PrescriptionLexicon {
   private val FAMILY_DOCTOR = Regex("""^(?:medecin traitant|medecin de famille|family doctor)\b""")
 
   private const val UNIT = """(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol|%)"""
-  private val STRENGTH = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s?$UNIT(?![a-z])""")
+  // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them
+  private val STRENGTH = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s*$UNIT(?![a-z])""")
 
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +

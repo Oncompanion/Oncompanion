@@ -2,6 +2,9 @@
 
 package com.github.se.oncompanion.domain.medication.scan
 
+import com.github.se.oncompanion.model.medication.scan.ClassifiedLine
+import com.github.se.oncompanion.model.medication.scan.ClassifiedRow
+import com.github.se.oncompanion.model.medication.scan.LineKind
 import com.github.se.oncompanion.model.medication.scan.RecognizedLine
 import com.github.se.oncompanion.model.medication.scan.RecognizedText
 import com.github.se.oncompanion.model.medication.scan.ScannedSheets.linesOf
@@ -214,6 +217,34 @@ class ScannedMedicationsTest {
     val name = medicationsOf(linesOf("Medication" + "x".repeat(120) + " 5 mg")).single().name
     assertEquals(100, name.value.length)
     assertFalse(name.sure)
+  }
+
+  @Test
+  fun severalSpacesBeforeTheUnitAreStillAStrength() {
+    // ML Kit can keep two spaces: the classifier and the reader must agree it's a strength (review
+    // of #231)
+    val medication =
+        medicationsOf(linesOf("Ondansetron 8  mg", "1 comprimé 2x/jour pendant 5 jours")).single()
+    assertEquals(Reading("Ondansetron 8  mg", true), medication.name)
+    assertEquals("1 comprimé", medication.dosage.value)
+    assertEquals(Reading<Int?>(5, true), medication.durationDays)
+  }
+
+  @Test
+  fun aMedicationLineWhoseStrengthIsntFoundIsAWholeNameToCheck() {
+    // Should the classifier and the reader ever disagree, the scan goes on instead of crashing
+    fun line(text: String, kind: LineKind) =
+        ClassifiedLine(RecognizedLine(text, box = null, confidence = 1f), text, kind)
+    val rows =
+        listOf(
+            ClassifiedRow(listOf(line("Ondansetron huit mg", LineKind.MEDICATION))),
+            ClassifiedRow(listOf(line("1 comprimé le soir", LineKind.DOSING))),
+        )
+
+    val medication = medicationsIn(rows).single()
+
+    assertEquals(Reading("Ondansetron huit mg", false), medication.name)
+    assertEquals("1 comprimé", medication.dosage.value)
   }
 
   @Test

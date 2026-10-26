@@ -49,11 +49,13 @@ internal fun medicationsIn(rows: List<ClassifiedRow>): List<ScannedMedication> {
 /** The medication written on [lines]: its name and strength first, then how to take it. */
 private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val first = lines.first().text
-  // A medication line always has a strength: the name ends with it
-  val strength = checkNotNull(PrescriptionLexicon.strengthIn(matchable(first)))
-  val name = first.substring(0, strength.last + 1).replace(NUMBERING, "").trim(*EDGES)
+  // A medication line has a strength: the name ends with it. Should it not be found here, the
+  // whole line is the name, to check, rather than stopping the scan
+  val strength = PrescriptionLexicon.strengthIn(matchable(first))
+  val nameEnd = strength?.let { it.last + 1 } ?: first.length
+  val name = first.substring(0, nameEnd).replace(NUMBERING, "").trim(*EDGES)
   // After the strength, words before the first dosing word describe the form ("comprimés")
-  val after = first.substring(strength.last + 1)
+  val after = first.substring(nameEnd)
   val dosingAfter = PrescriptionLexicon.dosingStartIn(matchable(after))?.let(after::substring)
   val dosing = (listOfNotNull(dosingAfter) + lines.drop(1).map { it.text }).joinToString(" ")
 
@@ -74,7 +76,11 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val unreadDuration = hasUnreadDuration(matchable(frequency).replace(EVERY_FEW_DAYS, ""))
   val days = duration?.days?.takeIf(Medication::isValidDuration)
   return ScannedMedication(
-      name = limited(name, sure = lines.first().line.confidence >= SURE && !looksSplit(name)),
+      name =
+          limited(
+              name,
+              sure = strength != null && lines.first().line.confidence >= SURE && !looksSplit(name),
+          ),
       dosage = limited(quantity?.let(dosing::substring).orEmpty(), sure = linesSure),
       frequency = limited(frequency, sure = linesSure && !unreadDuration),
       durationDays =
