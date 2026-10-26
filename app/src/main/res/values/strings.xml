@@ -369,6 +369,23 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <string name="prescription_detail_title">Prescription</string>
+    <string name="prescription_detail_back">Back</string>
+    <string name="prescription_detail_prescribed_by">Prescribed by</string>
+    <string name="prescription_detail_date">Date</string>
+    <string name="prescription_detail_medications">Medications</string>
+    <!-- Between the dosage, frequency and duration of a medication: "1 tablet · Twice a day · 5 days" -->
+    <string name="prescription_detail_separator">" · "</string>
+    <string name="prescription_detail_starts">Starts %1$s</string>
+    <string name="prescription_detail_error_title">Couldn\'t load this prescription</string>
+    <string name="prescription_detail_error_hint">Please try again.</string>
+    <string name="prescription_detail_retry">Retry</string>
+    <string name="prescription_detail_not_found_title">This prescription no longer exists</string>
+    <string name="prescription_detail_not_found_hint">It may have been deleted on another device.</string>
+    <plurals name="prescription_detail_duration_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

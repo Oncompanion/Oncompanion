@@ -44,6 +44,8 @@ import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.prescription.PrescriptionDetailScreen
+import com.github.se.oncompanion.ui.prescription.PrescriptionDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
@@ -250,6 +252,19 @@ fun AppNavHost(
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
+            onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
+        )
+      }
+      composable(
+          Screen.PRESCRIPTION_DETAIL,
+          arguments =
+              listOf(navArgument(Screen.PRESCRIPTION_DETAIL_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID).orEmpty()
+        PrescriptionDetailScreen(
+            // Scoped to this back stack entry, so each opened prescription has its own ViewModel
+            viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
+            onBack = navigationActions::goBack,
         )
       }
       composable(Screen.PRESCRIPTION_SCAN) {

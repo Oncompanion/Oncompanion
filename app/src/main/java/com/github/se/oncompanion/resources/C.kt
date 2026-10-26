@@ -330,6 +330,21 @@ object C {
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
 
+    const val prescription_detail_screen = "prescription_detail_screen"
+    const val prescription_detail_back_button = "prescription_detail_back_button"
+    const val prescription_detail_loading = "prescription_detail_loading"
+    const val prescription_detail_error = "prescription_detail_error"
+    const val prescription_detail_retry_button = "prescription_detail_retry_button"
+    const val prescription_detail_not_found = "prescription_detail_not_found"
+    const val prescription_detail_content = "prescription_detail_content"
+    const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
+    const val prescription_detail_date = "prescription_detail_date"
+    const val prescription_detail_medications_header = "prescription_detail_medications_header"
+
+    /** One medication of the prescription detail. */
+    fun prescriptionDetailMedication(medicationId: String) =
+        "prescription_detail_medication_$medicationId"
+
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
     const val prescription_scan_close_button = "prescription_scan_close_button"
