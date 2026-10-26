@@ -379,7 +379,8 @@ class PrescriptionFormScreenTest {
 
     field(C.Tag.prescriptionFormMedicationRow(0)).assertExists()
     composeTestRule.onNodeWithText("Ondansetron 8 mg").assertExists()
-    composeTestRule.onNodeWithText("1 tablet · Twice a day · 5 days").assertExists()
+    // The start date is in the row too, short like the rest of it (Figma)
+    composeTestRule.onNodeWithText("1 tablet · Twice a day · from 30 Sep · 5 days").assertExists()
   }
 
   @Test
@@ -394,7 +395,7 @@ class PrescriptionFormScreenTest {
         )
     setContent(state)
 
-    composeTestRule.onNodeWithText("Twice a day · 1 day").assertExists()
+    composeTestRule.onNodeWithText("Twice a day · from 30 Sep · 1 day").assertExists()
   }
 
   @Test

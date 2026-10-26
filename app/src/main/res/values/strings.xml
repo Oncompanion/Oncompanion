@@ -354,6 +354,7 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+    <string name="prescription_form_from_date">from %1$s</string>
     <string name="prescription_form_edit_medication">Edit %1$s</string>
     <string name="prescription_form_remove_medication">Remove</string>
     <string name="prescription_form_add_medication">Add medication</string>

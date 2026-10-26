@@ -78,6 +78,9 @@ import java.util.Locale
 /** "29 Sep 2026". The app's UI is in English. */
 private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
+// The start date in a medication's row, short like the rest of the row: "29 Sep"
+private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+
 /**
  * The prescription form (US-24): the user types a prescription and its medications, then saves it.
  * Given a view model that corrects a saved prescription (US-12), it shows that prescription once
@@ -537,13 +540,15 @@ private fun ClosedMedication(
   )
 }
 
-/** "1 tablet · Twice a day · 5 days", without the fields left empty. */
+/** "1 tablet · Twice a day · from 29 Sep · 5 days", without the fields left empty. */
 @Composable
 private fun MedicationDraft.summary(): String {
   val duration = durationDays?.let {
     pluralStringResource(R.plurals.prescription_form_duration_days, it, it)
   }
-  return listOfNotNull(dosage.trim(), frequency.trim(), duration)
+  val start =
+      stringResource(R.string.prescription_form_from_date, startDate.format(shortDateFormatter))
+  return listOfNotNull(dosage.trim(), frequency.trim(), start, duration)
       .filter { it.isNotEmpty() }
       .joinToString(" · ")
 }
