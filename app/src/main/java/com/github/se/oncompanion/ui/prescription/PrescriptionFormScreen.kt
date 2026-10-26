@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.prescription
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +77,8 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
 
 /**
  * The prescription form (US-24): the user types a prescription and its medications, then saves it.
+ * Given a view model that corrects a saved prescription (US-12), it shows that prescription once
+ * read, or why it can't.
  *
  * @param onClose called when the user leaves the form without saving
  * @param onSaved called once the prescription is saved
@@ -106,6 +111,7 @@ fun PrescriptionFormScreen(
       onRemoveMedication = viewModel::removeMedication,
       onSave = viewModel::save,
       onErrorShown = viewModel::clearError,
+      onRetry = viewModel::load,
       modifier = modifier,
   )
 }
@@ -115,6 +121,7 @@ fun PrescriptionFormScreen(
  * be tested without a ViewModel.
  *
  * @param onErrorShown called once the error snackbar is gone
+ * @param onRetry reads the saved prescription again after it couldn't be loaded
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,6 +140,7 @@ fun PrescriptionFormContent(
     onRemoveMedication: (Int) -> Unit,
     onSave: () -> Unit,
     onErrorShown: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   // Shows each saving error once in a snackbar, then tells the view model it was shown
@@ -149,15 +157,22 @@ fun PrescriptionFormContent(
   // A short screen (a phone held sideways) keeps nothing fixed: with the keyboard open, a fixed
   // top bar and Save would leave no room for the field being typed
   val scrollsEverything = isCompactHeight()
+  // When correcting a saved prescription, its fields only show once it is read
+  val isReady = uiState.load == PrescriptionFormLoad.READY
 
   Scaffold(
       // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
       modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
-      topBar = { if (!scrollsEverything) FormTopBar(uiState, onClose) },
+      // Without fields there is no keyboard, so the top bar can stay fixed
+      topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose) },
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
-      bottomBar = { if (!scrollsEverything) FormSaveButton(uiState, onSave) },
+      bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
   ) { innerPadding ->
+    if (!isReady) {
+      LoadState(uiState.load, onRetry, Modifier.padding(innerPadding))
+      return@Scaffold
+    }
     Column(
         modifier =
             Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
@@ -235,7 +250,14 @@ private fun FormTopBar(
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
   TopAppBar(
-      title = { Text(stringResource(R.string.prescription_form_add_title)) },
+      title = {
+        Text(
+            stringResource(
+                if (uiState.isEditing) R.string.prescription_form_edit_title
+                else R.string.prescription_form_add_title
+            )
+        )
+      },
       navigationIcon = {
         // Not while saving or once saved: the form then leaves by itself, and a second way
         // out would go back twice
@@ -252,6 +274,64 @@ private fun FormTopBar(
       },
       windowInsets = windowInsets,
   )
+}
+
+/**
+ * What the form shows instead of its fields while the saved prescription to correct isn't there: a
+ * spinner while it is read, or why it can't be corrected.
+ */
+@Composable
+private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier: Modifier) {
+  Column(
+      modifier = modifier.fillMaxSize().padding(horizontal = 32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+  ) {
+    when (load) {
+      PrescriptionFormLoad.LOADING ->
+          CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_form_loading))
+      // No retry: the form keeps listening and fills in if the prescription arrives later
+      PrescriptionFormLoad.NOT_FOUND ->
+          LoadMessage(
+              C.Tag.prescription_form_not_found,
+              R.string.prescription_form_not_found_title,
+              R.string.prescription_form_not_found_hint,
+          )
+      PrescriptionFormLoad.NOT_SIGNED_IN ->
+          LoadMessage(
+              C.Tag.prescription_form_not_signed_in,
+              R.string.prescription_form_not_signed_in_title,
+              R.string.prescription_form_not_signed_in_hint,
+          )
+      PrescriptionFormLoad.FAILED -> {
+        LoadMessage(
+            C.Tag.prescription_form_load_error,
+            R.string.prescription_form_load_error_title,
+            R.string.prescription_form_load_error_hint,
+        )
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
+        ) {
+          Text(stringResource(R.string.prescription_form_retry))
+        }
+      }
+      // The fields are shown instead
+      PrescriptionFormLoad.READY -> Unit
+    }
+  }
+}
+
+/** The title and hint of a [LoadState] message, found by tests through [testTag]. */
+@Composable
+private fun LoadMessage(testTag: String, @StringRes title: Int, @StringRes hint: Int) {
+  Column(
+      modifier = Modifier.testTag(testTag),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    MessageTexts(title = stringResource(title), hint = stringResource(hint))
+  }
 }
 
 /** The fields of the medication being edited, under its title ("Medication 2"). */

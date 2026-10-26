@@ -151,6 +151,7 @@ class PrescriptionFormScreenTest {
             events += "errorShown"
             uiState = uiState.copy(error = null)
           },
+          onRetry = { events += "retry" },
       )
     }
   }
@@ -521,6 +522,89 @@ class PrescriptionFormScreenTest {
     waitForText(string(R.string.prescription_form_error_not_signed_in))
   }
 
+  // ---------- Edit mode ----------
+
+  /** The form fields and Save, none of which may show until the saved prescription is read. */
+  private fun assertNoForm() {
+    node(C.Tag.prescription_form_prescribed_by_field).assertDoesNotExist()
+    node(C.Tag.prescription_form_medication_name_field).assertDoesNotExist()
+    node(C.Tag.prescription_form_add_medication_button).assertDoesNotExist()
+    node(C.Tag.prescription_form_save_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun editingShowsTheEditTitleAndTheSavedPrescription() {
+    setContent(filled.copy(isEditing = true))
+
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_edit_title)).assertExists()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_add_title))
+        .assertDoesNotExist()
+    field(C.Tag.prescription_form_prescribed_by_field).assertTextContains("Dr. Martin")
+    node(C.Tag.prescription_form_save_button).assertIsEnabled()
+  }
+
+  @Test
+  fun loadingShowsASpinnerInsteadOfTheForm() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.LOADING))
+
+    node(C.Tag.prescription_form_loading).assertExists()
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_edit_title)).assertExists()
+    assertNoForm()
+  }
+
+  @Test
+  fun closeLeavesWhileLoading() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.LOADING))
+
+    node(C.Tag.prescription_form_close_button).assertIsEnabled().performClick()
+
+    assertEquals(listOf("close"), events)
+  }
+
+  @Test
+  fun notFoundSaysThePrescriptionNoLongerExists() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_FOUND))
+
+    node(C.Tag.prescription_form_not_found).assertExists()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_not_found_title))
+        .assertExists()
+    // Nothing to retry: the form fills in by itself if the prescription arrives later
+    node(C.Tag.prescription_form_retry_button).assertDoesNotExist()
+    node(C.Tag.prescription_form_loading).assertDoesNotExist()
+    assertNoForm()
+  }
+
+  @Test
+  fun signedOutWhileLoadingAsksToSignInAgain() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_SIGNED_IN))
+
+    node(C.Tag.prescription_form_not_signed_in).assertExists()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_not_signed_in_title))
+        .assertExists()
+    node(C.Tag.prescription_form_retry_button).assertDoesNotExist()
+    assertNoForm()
+  }
+
+  @Test
+  fun loadFailureOffersToTryAgain() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+
+    node(C.Tag.prescription_form_load_error).assertExists()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_load_error_title))
+        .assertExists()
+    // A Firestore error isn't a connection problem: offline, the cache answers
+    composeTestRule.onNodeWithText("connection", substring = true).assertDoesNotExist()
+    assertNoForm()
+
+    node(C.Tag.prescription_form_retry_button).performClick()
+
+    assertEquals(listOf("retry"), events)
+  }
+
   // ---------- Keyboard ----------
 
   @Test
@@ -537,6 +621,18 @@ class PrescriptionFormScreenTest {
     val saveTop = save.fetchSemanticsNode().boundsInRoot.top
     val duration = composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field)
     assertTrue(duration.fetchSemanticsNode().boundsInRoot.bottom <= saveTop)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscapeLoadingKeepsTheTitleAndCloseOnScreen() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.LOADING))
+
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_edit_title))
+        .assertIsFullyVisible()
+    node(C.Tag.prescription_form_close_button).assertIsFullyVisible()
+    node(C.Tag.prescription_form_loading).assertExists()
   }
 
   @Test
@@ -577,11 +673,20 @@ class PrescriptionFormScreenTest {
   private val clock = Clock.fixed(date.atTime(9, 30).atZone(zone).toInstant(), zone)
   private val medications = FakeMedicationRepository()
 
-  /** Shows PrescriptionFormScreen with its view model, for a signed-in user. */
-  private fun setScreen() {
+  /**
+   * Shows PrescriptionFormScreen with its view model, for a signed-in user, correcting the saved
+   * prescription [prescriptionId] if given.
+   */
+  private fun setScreen(prescriptionId: String? = null) {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = uid) })
     runBlocking { auth.signInWithGoogle("token") }
-    val viewModel = PrescriptionFormViewModel(auth, medications, clock = clock)
+    val viewModel =
+        PrescriptionFormViewModel(
+            auth,
+            medications,
+            clock = clock,
+            prescriptionId = prescriptionId,
+        )
     composeTestRule.setContent {
       PrescriptionFormScreen(
           viewModel = viewModel,
@@ -655,5 +760,54 @@ class PrescriptionFormScreenTest {
     assertEquals(listOf("close"), events)
     assertTrue(medications.prescriptionsOf(uid).isEmpty())
     assertFalse("saved" in events)
+  }
+
+  private val saved =
+      Prescription(
+          id = "rx-1",
+          prescribedBy = "Dr. Martin",
+          prescribedOn = date,
+          medications =
+              listOf(
+                  Medication(
+                      id = "med-1",
+                      prescriptionId = "rx-1",
+                      name = "Ondansetron 8 mg",
+                      startDate = date,
+                  )
+              ),
+      )
+
+  @Test
+  fun screen_editingStartsFromTheSavedPrescriptionAndSavesTheCorrection() {
+    medications.seed(uid, saved)
+    setScreen(prescriptionId = saved.id)
+
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_edit_title)).assertExists()
+    field(C.Tag.prescription_form_prescribed_by_field).assertTextContains("Dr. Martin")
+    field(C.Tag.prescription_form_prescribed_by_field).performTextClearance()
+    field(C.Tag.prescription_form_prescribed_by_field).performTextInput("Dr. Weber")
+    node(C.Tag.prescription_form_save_button).performClick()
+
+    composeTestRule.waitForIdle()
+    val corrected = medications.prescriptionsOf(uid).single()
+    assertEquals("Dr. Weber", corrected.prescribedBy)
+    // The saved medication stays the same medication
+    assertEquals("med-1", corrected.medications.single().id)
+    assertEquals(listOf("saved"), events)
+  }
+
+  @Test
+  fun screen_tryAgainReadsThePrescriptionAgainAfterAFailure() {
+    medications.seed(uid, saved)
+    medications.readError = IllegalStateException("Firestore failed")
+    setScreen(prescriptionId = saved.id)
+    node(C.Tag.prescription_form_load_error).assertExists()
+
+    medications.readError = null
+    node(C.Tag.prescription_form_retry_button).performClick()
+
+    node(C.Tag.prescription_form_load_error).assertDoesNotExist()
+    field(C.Tag.prescription_form_prescribed_by_field).assertTextContains("Dr. Martin")
   }
 }
