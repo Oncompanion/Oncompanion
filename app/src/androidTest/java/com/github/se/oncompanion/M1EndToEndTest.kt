@@ -3,15 +3,12 @@
 package com.github.se.oncompanion
 
 import android.content.Context
-import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
@@ -48,7 +45,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class M1EndToEndTest {
 
-  @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+  // Shows the app like MainActivity does, so it survives Android relaunching the screen
+  @get:Rule val compose = createAndroidComposeRule<TestHostActivity>()
 
   // A new account each run, so the test always starts with onboarding and empty data
   private val run = UUID.randomUUID().toString().take(8)
@@ -66,13 +64,11 @@ class M1EndToEndTest {
   // the collection is shared by every test run: its own id, deleted after the test
   private val ligueEvent = "m1-event-$run"
 
-  // The screen the app was put on, see [startApp]
-  private var testScreen: ComponentActivity? = null
-
   @Before fun setUp(): Unit = runBlocking { EmulatorTestData.signOut() }
 
   @After
   fun tearDown(): Unit = runBlocking {
+    TestHostActivity.content.value = {}
     EmulatorTestData.signOut()
     runCatching { EmulatorTestData.deleteRawDocument("events/$ligueEvent") }
   }
@@ -296,7 +292,8 @@ class M1EndToEndTest {
     )
   }
 
-  private fun tag(testTag: String) = compose.onNodeWithTag(testTag)
+  // Waits for it too: right after Android relaunches the screen, the app isn't drawn yet
+  private fun tag(testTag: String) = waitFor(hasTestTag(testTag))
 
   /** Types [text] at the end of the field, then closes the keyboard (see [closeKeyboard]). */
   private fun SemanticsNodeInteraction.typeText(text: String) = apply {
@@ -335,8 +332,8 @@ class M1EndToEndTest {
   private fun string(id: Int) = compose.activity.getString(id)
 
   /**
-   * Whether a node matches. While the app is covered (a system dialog on a slow emulator), there is
-   * no Compose hierarchy to search: that is "not there yet", so [waitFor] keeps waiting.
+   * Whether a node matches. While Android relaunches the screen, or the app is covered, there is no
+   * Compose hierarchy to search: that is "not there yet", so [waitFor] keeps waiting.
    */
   private fun exists(matcher: SemanticsMatcher) =
       try {
@@ -346,29 +343,18 @@ class M1EndToEndTest {
         false
       }
 
-  /** Puts the app on the test screen, which [waitFor] checks is never rebuilt. */
+  /** Shows the app on the test screen, which keeps showing it if Android relaunches it. */
   private fun startApp() {
-    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
-    testScreen = compose.activity
+    compose.runOnUiThread {
+      TestHostActivity.content.value = {
+        OncompanionTheme { AppNavHost(credentialProvider = signIn) }
+      }
+    }
   }
 
-  /**
-   * Waits for the node (data comes from the emulators asynchronously), then returns it. When it
-   * never comes because Android rebuilt the test screen, which comes back blank, the test says so.
-   */
+  /** Waits for the node (data comes from the emulators asynchronously), then returns it. */
   private fun waitFor(matcher: SemanticsMatcher) = compose.run {
-    try {
-      waitUntil(TIMEOUT_MS) { exists(matcher) }
-    } catch (e: ComposeTimeoutException) {
-      // The timeout stays the cause, so the log shows both
-      if (activity !== testScreen) {
-        throw IllegalStateException(
-            "Android rebuilt the test screen (a configuration change): the app's content is gone",
-            e,
-        )
-      }
-      throw e
-    }
+    waitUntil(TIMEOUT_MS) { exists(matcher) }
     onNode(matcher)
   }
 

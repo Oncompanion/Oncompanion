@@ -15,5 +15,9 @@
             android:name="androidx.activity.ComponentActivity"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|density|fontScale|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
             tools:node="merge" />
+        <!-- The screen end-to-end tests show the app on: it survives Android relaunching it -->
+        <activity
+            android:name="com.github.se.oncompanion.TestHostActivity"
+            android:exported="false" />
     </application>
 </manifest>
