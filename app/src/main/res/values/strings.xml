@@ -433,6 +433,10 @@
         <item quantity="one">1 detail needs checking: it is marked in orange.</item>
         <item quantity="other">%1$d details need checking: they are marked in orange.</item>
     </plurals>
+    <plurals name="prescription_review_left_out">
+        <item quantity="one">1 more medication was read but not added: a prescription holds %2$d at most.</item>
+        <item quantity="other">%1$d more medications were read but not added: a prescription holds %2$d at most.</item>
+    </plurals>
     <string name="prescription_review_correct_anything">You can correct anything before saving.</string>
     <string name="prescription_review_may_differ">Please check: it may not be what\'s on the paper</string>
     <string name="prescription_review_date_hard_to_read">Please check: the date was hard to read</string>

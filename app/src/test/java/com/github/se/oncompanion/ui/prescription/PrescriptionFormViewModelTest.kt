@@ -884,6 +884,26 @@ class PrescriptionFormViewModelTest {
 
     assertFalse(viewModel.state.isScanned)
     assertTrue(viewModel.state.toCheck.isEmpty())
+    assertEquals(0, viewModel.state.leftOut)
+  }
+
+  @Test
+  fun theMedicationsTheScanLeftOutAreKeptForTheNotice() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications = listOf(MedicationDraft(name = "Ondansetron 8 mg", startDate = today)),
+        )
+
+    val viewModel =
+        PrescriptionFormViewModel(
+            auth,
+            medications,
+            clock = clock,
+            scan = ScannedPrescription(draft, emptySet(), leftOut = 5),
+        )
+
+    assertEquals(5, viewModel.state.leftOut)
   }
 
   @Test

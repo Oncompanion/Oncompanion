@@ -25,6 +25,7 @@ import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.warning
 
@@ -69,8 +70,8 @@ internal fun PrescriptionFormUiState.checksOf(position: Int): Map<MedicationDeta
         .toMap()
 
 /**
- * At the top of the review: what was read, and how many details are still to check. "Only part"
- * when the scan didn't find some of them.
+ * At the top of the review: what was read, how many details are still to check, and how many
+ * medications were left out. "Only part" when the scan didn't find some details.
  */
 @Composable
 internal fun ReviewNotice(uiState: PrescriptionFormUiState) {
@@ -87,6 +88,15 @@ internal fun ReviewNotice(uiState: PrescriptionFormUiState) {
                     R.plurals.prescription_review_to_check,
                     toCheck.size,
                     toCheck.size,
+                )
+              } else null,
+              // Not in the draft at all, so nothing on screen would show they are missing
+              if (uiState.leftOut > 0) {
+                pluralStringResource(
+                    R.plurals.prescription_review_left_out,
+                    uiState.leftOut,
+                    uiState.leftOut,
+                    Prescription.MAX_MEDICATIONS,
                 )
               } else null,
               stringResource(R.string.prescription_review_correct_anything),

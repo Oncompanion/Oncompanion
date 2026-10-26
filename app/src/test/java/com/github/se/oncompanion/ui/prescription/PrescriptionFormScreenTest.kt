@@ -808,6 +808,28 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun theNoticeSaysHowManyMedicationsWereLeftOut() {
+    setContent(filled.copy(isScanned = true, leftOut = 5))
+
+    notice()
+        .assertTextContains(
+            "5 more medications were read but not added: a prescription holds 20 at most.",
+            substring = true,
+        )
+  }
+
+  @Test
+  fun theNoticeSaysWhenOneMedicationWasLeftOut() {
+    setContent(filled.copy(isScanned = true, leftOut = 1))
+
+    notice()
+        .assertTextContains(
+            "1 more medication was read but not added: a prescription holds 20 at most.",
+            substring = true,
+        )
+  }
+
+  @Test
   fun aFormNotFromAScanIsNotAReview() {
     setContent(filled)
 

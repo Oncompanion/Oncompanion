@@ -77,6 +77,7 @@ enum class PrescriptionFormLoad {
  *   [draft] isn't the saved prescription and must not be shown.
  * @property isScanned the draft was read from a scan: the patient reviews it before saving
  * @property toCheck the details read from the scan the patient should check, until they edit them
+ * @property leftOut how many medications the scan read beyond what a prescription can hold
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -90,6 +91,7 @@ data class PrescriptionFormUiState(
     val load: PrescriptionFormLoad = PrescriptionFormLoad.READY,
     val isScanned: Boolean = false,
     val toCheck: Set<ScannedField> = emptySet(),
+    val leftOut: Int = 0,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -153,6 +155,7 @@ class PrescriptionFormViewModel(
                 scan.draft.cutToLimits(),
                 isScanned = true,
                 toCheck = scan.toCheck,
+                leftOut = scan.leftOut,
             )
           } else if (initialDraft != null) PrescriptionFormUiState(initialDraft.cutToLimits())
           else
