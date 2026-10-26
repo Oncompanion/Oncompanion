@@ -14,7 +14,7 @@ import androidx.compose.runtime.mutableStateOf
  * emulator, while Google Play services updates) the app comes back on the same screen. A test that
  * calls `setContent` once on an empty activity would be left with a blank screen instead.
  */
-class TestHostActivity : ComponentActivity() {
+class AppHostActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

@@ -24,17 +24,17 @@ import org.junit.runner.RunWith
  * emulator, the content comes back, with its saved state, like in [MainActivity].
  */
 @RunWith(AndroidJUnit4::class)
-class TestHostActivityTest {
+class AppHostActivityTest {
 
-  @get:Rule val compose = createAndroidComposeRule<TestHostActivity>()
+  @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
 
   @After
   fun tearDown() {
-    TestHostActivity.content.value = {}
+    AppHostActivity.content.value = {}
   }
 
   private fun show(content: @Composable () -> Unit) {
-    compose.runOnUiThread { TestHostActivity.content.value = content }
+    compose.runOnUiThread { AppHostActivity.content.value = content }
     compose.waitForIdle()
   }
 

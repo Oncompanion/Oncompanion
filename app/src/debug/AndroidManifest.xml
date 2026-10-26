@@ -17,7 +17,7 @@
             tools:node="merge" />
         <!-- The screen end-to-end tests show the app on: it survives Android relaunching it -->
         <activity
-            android:name="com.github.se.oncompanion.TestHostActivity"
+            android:name="com.github.se.oncompanion.AppHostActivity"
             android:exported="false" />
     </application>
 </manifest>

@@ -46,7 +46,7 @@ import org.junit.runner.RunWith
 class M1EndToEndTest {
 
   // Shows the app like MainActivity does, so it survives Android relaunching the screen
-  @get:Rule val compose = createAndroidComposeRule<TestHostActivity>()
+  @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
 
   // A new account each run, so the test always starts with onboarding and empty data
   private val run = UUID.randomUUID().toString().take(8)
@@ -68,7 +68,7 @@ class M1EndToEndTest {
 
   @After
   fun tearDown(): Unit = runBlocking {
-    TestHostActivity.content.value = {}
+    AppHostActivity.content.value = {}
     EmulatorTestData.signOut()
     runCatching { EmulatorTestData.deleteRawDocument("events/$ligueEvent") }
   }
@@ -346,7 +346,7 @@ class M1EndToEndTest {
   /** Shows the app on the test screen, which keeps showing it if Android relaunches it. */
   private fun startApp() {
     compose.runOnUiThread {
-      TestHostActivity.content.value = {
+      AppHostActivity.content.value = {
         OncompanionTheme { AppNavHost(credentialProvider = signIn) }
       }
     }
