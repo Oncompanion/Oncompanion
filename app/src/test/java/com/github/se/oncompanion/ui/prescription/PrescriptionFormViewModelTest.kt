@@ -5,6 +5,9 @@ package com.github.se.oncompanion.ui.prescription
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
+import com.github.se.oncompanion.domain.medication.scan.ScannedField
+import com.github.se.oncompanion.domain.medication.scan.ScannedPrescription
 import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
@@ -833,6 +836,175 @@ class PrescriptionFormViewModelTest {
     viewModel.clearError()
 
     assertNull(viewModel.state.error)
+  }
+
+  // ---------- Reviewing a scan ----------
+
+  /** Two scanned medications, Ondansetron then Dexaméthasone, with [toCheck] marked. */
+  private fun reviewing(vararg toCheck: ScannedField): PrescriptionFormViewModel {
+    val draft =
+        PrescriptionDraft(
+            prescribedBy = "Dr. Martin",
+            prescribedOn = today,
+            medications =
+                listOf(
+                    MedicationDraft(name = "Ondansetron 8 mg", dosage = "1 cp", startDate = today),
+                    MedicationDraft(name = "Dexaméthasone 4 mg", startDate = today),
+                ),
+        )
+    return PrescriptionFormViewModel(
+        auth,
+        medications,
+        clock = clock,
+        scan = ScannedPrescription(draft, toCheck.toSet()),
+    )
+  }
+
+  private fun of(position: Int, detail: MedicationDetail) =
+      ScannedField.OfMedication(position, detail)
+
+  @Test
+  fun aScanStartsAReviewWithTheDetailsToCheck() {
+    val viewModel = reviewing(ScannedField.PrescribedOn, of(1, MedicationDetail.FREQUENCY))
+
+    assertTrue(viewModel.state.isScanned)
+    assertEquals(
+        setOf(ScannedField.PrescribedOn, of(1, MedicationDetail.FREQUENCY)),
+        viewModel.state.toCheck,
+    )
+    assertEquals("Dr. Martin", viewModel.state.draft.prescribedBy)
+    assertEquals(2, viewModel.medications.size)
+    // Details to check don't block saving: the patient may find them right
+    assertTrue(viewModel.state.canSave)
+  }
+
+  @Test
+  fun aFormNotFromAScanHasNothingToCheck() {
+    val viewModel = viewModel()
+
+    assertFalse(viewModel.state.isScanned)
+    assertTrue(viewModel.state.toCheck.isEmpty())
+  }
+
+  @Test
+  fun editingADetailToCheckMeansItIsChecked() {
+    val viewModel =
+        reviewing(
+            ScannedField.PrescribedBy,
+            ScannedField.PrescribedOn,
+            of(0, MedicationDetail.NAME),
+            of(0, MedicationDetail.DOSAGE),
+            of(0, MedicationDetail.FREQUENCY),
+            of(0, MedicationDetail.DURATION),
+        )
+
+    viewModel.onPrescribedByChange("Dr. Martine")
+    viewModel.onPrescribedOnChange(today.minusDays(1))
+    viewModel.onMedicationNameChange("Ondansétron 8 mg")
+    viewModel.onDosageChange("1 comprimé")
+    viewModel.onFrequencyChange("2x/jour")
+    viewModel.onDurationChange("5")
+
+    assertTrue(viewModel.state.toCheck.isEmpty())
+  }
+
+  @Test
+  fun editingOneDetailLeavesTheOthersToCheck() {
+    val viewModel =
+        reviewing(
+            ScannedField.PrescribedOn,
+            of(0, MedicationDetail.DOSAGE),
+            of(0, MedicationDetail.FREQUENCY),
+            of(1, MedicationDetail.DOSAGE),
+        )
+
+    // The first medication is open: its dosage is checked, not the second medication's
+    viewModel.onDosageChange("1 comprimé")
+
+    assertEquals(
+        setOf(
+            ScannedField.PrescribedOn,
+            of(0, MedicationDetail.FREQUENCY),
+            of(1, MedicationDetail.DOSAGE),
+        ),
+        viewModel.state.toCheck,
+    )
+  }
+
+  @Test
+  fun startDateIsNotADetailToCheck() {
+    val viewModel = reviewing(of(0, MedicationDetail.DURATION))
+
+    viewModel.onStartDateChange(today.plusDays(1))
+
+    assertEquals(setOf(of(0, MedicationDetail.DURATION)), viewModel.state.toCheck)
+  }
+
+  @Test
+  fun removingAMedicationDropsItsDetailsToCheckAndMovesTheNextOnesUp() {
+    val viewModel =
+        reviewing(
+            ScannedField.PrescribedBy,
+            of(0, MedicationDetail.NAME),
+            of(1, MedicationDetail.FREQUENCY),
+        )
+    viewModel.addMedication()
+
+    viewModel.removeMedication(0)
+
+    // Dexaméthasone is now first: its frequency is still to check, now at position 0
+    assertEquals("Dexaméthasone 4 mg", viewModel.medications[0].name)
+    assertEquals(
+        setOf(ScannedField.PrescribedBy, of(0, MedicationDetail.FREQUENCY)),
+        viewModel.state.toCheck,
+    )
+  }
+
+  @Test
+  fun removingALaterMedicationKeepsTheEarlierDetailsToCheck() {
+    val viewModel = reviewing(of(0, MedicationDetail.NAME), of(1, MedicationDetail.DOSAGE))
+
+    viewModel.removeMedication(1)
+
+    assertEquals(setOf(of(0, MedicationDetail.NAME)), viewModel.state.toCheck)
+  }
+
+  @Test
+  fun openingAnotherMedicationKeepsTheDetailsToCheck() {
+    val viewModel = reviewing(of(0, MedicationDetail.NAME), of(1, MedicationDetail.DOSAGE))
+
+    viewModel.openMedication(1)
+
+    assertEquals(
+        setOf(of(0, MedicationDetail.NAME), of(1, MedicationDetail.DOSAGE)),
+        viewModel.state.toCheck,
+    )
+  }
+
+  @Test
+  fun aReviewWithDetailsToCheckIsSavedOnlyOnSave() = runTest {
+    val viewModel = reviewing(ScannedField.PrescribedOn, of(1, MedicationDetail.DOSAGE))
+    advanceUntilIdle()
+    assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    val saved = fakeMedications.prescriptionsOf(uid).single()
+    assertEquals(
+        listOf("Ondansetron 8 mg", "Dexaméthasone 4 mg"),
+        saved.medications.map { it.name },
+    )
+  }
+
+  @Test
+  fun anAddedMedicationHasNothingToCheck() {
+    val viewModel = reviewing(of(1, MedicationDetail.NAME))
+
+    viewModel.addMedication()
+    viewModel.onMedicationNameChange("Paracétamol 1 g")
+
+    assertEquals(setOf(of(1, MedicationDetail.NAME)), viewModel.state.toCheck)
   }
 
   // ---------- Editing a saved prescription ----------

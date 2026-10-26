@@ -8,6 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
+import com.github.se.oncompanion.domain.medication.scan.ScannedField
+import com.github.se.oncompanion.domain.medication.scan.ScannedPrescription
 import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
@@ -72,6 +75,8 @@ enum class PrescriptionFormLoad {
  * @property isEditing the form corrects a saved prescription instead of adding a new one
  * @property load whether the form can be filled in. Until it is [PrescriptionFormLoad.READY],
  *   [draft] isn't the saved prescription and must not be shown.
+ * @property isScanned the draft was read from a scan: the patient reviews it before saving
+ * @property toCheck the details read from the scan the patient should check, until they edit them
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -83,6 +88,8 @@ data class PrescriptionFormUiState(
     val error: PrescriptionFormError? = null,
     val isEditing: Boolean = false,
     val load: PrescriptionFormLoad = PrescriptionFormLoad.READY,
+    val isScanned: Boolean = false,
+    val toCheck: Set<ScannedField> = emptySet(),
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -123,6 +130,8 @@ data class PrescriptionFormUiState(
  * @param initialDraft what the form starts with; `null` for an empty form. Replaced by the saved
  *   prescription when [prescriptionId] is given.
  * @param prescriptionId the saved prescription to correct; `null` to add a new one
+ * @param scan the prescription read from a scan, which the form starts from instead of
+ *   [initialDraft]: the patient reviews it, with the details to check marked
  */
 class PrescriptionFormViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -133,12 +142,19 @@ class PrescriptionFormViewModel(
     clock: Clock = Clock.systemDefaultZone(),
     initialDraft: PrescriptionDraft? = null,
     private val prescriptionId: String? = null,
+    scan: ScannedPrescription? = null,
 ) : ViewModel() {
 
   // A new form follows the date of the prescription; in a given draft every start date is chosen
   private val _uiState =
       MutableStateFlow(
-          if (initialDraft != null) PrescriptionFormUiState(initialDraft.cutToLimits())
+          if (scan != null) {
+            PrescriptionFormUiState(
+                scan.draft.cutToLimits(),
+                isScanned = true,
+                toCheck = scan.toCheck,
+            )
+          } else if (initialDraft != null) PrescriptionFormUiState(initialDraft.cutToLimits())
           else
               emptyDraft(LocalDate.now(clock)).let {
                 PrescriptionFormUiState(
@@ -232,7 +248,9 @@ class PrescriptionFormViewModel(
   /** Text longer than the prescription can store is cut. */
   fun onPrescribedByChange(value: String) {
     edit { state ->
-      state.withDraft { it.copy(prescribedBy = value.take(Prescription.MAX_PRESCRIBED_BY_LENGTH)) }
+      state
+          .withDraft { it.copy(prescribedBy = value.take(Prescription.MAX_PRESCRIBED_BY_LENGTH)) }
+          .checked(ScannedField.PrescribedBy)
     }
   }
 
@@ -242,16 +260,18 @@ class PrescriptionFormViewModel(
    */
   fun onPrescribedOnChange(date: LocalDate) {
     edit { state ->
-      state.withDraft { draft ->
-        draft.copy(
-            prescribedOn = date,
-            medications =
-                draft.medications.mapIndexed { position, medication ->
-                  if (state.startDateChosen[position]) medication
-                  else medication.copy(startDate = date)
-                },
-        )
-      }
+      state
+          .withDraft { draft ->
+            draft.copy(
+                prescribedOn = date,
+                medications =
+                    draft.medications.mapIndexed { position, medication ->
+                      if (state.startDateChosen[position]) medication
+                      else medication.copy(startDate = date)
+                    },
+            )
+          }
+          .checked(ScannedField.PrescribedOn)
     }
   }
 
@@ -261,17 +281,22 @@ class PrescriptionFormViewModel(
       state
           .withOpenMedication { it.copy(name = value.take(Medication.MAX_TEXT_LENGTH)) }
           .withOpenNameTouched()
+          .openChecked(MedicationDetail.NAME)
     }
   }
 
   /** Text longer than a medication can store is cut. */
   fun onDosageChange(value: String) {
-    editOpenMedication { it.copy(dosage = value.take(Medication.MAX_TEXT_LENGTH)) }
+    editOpenMedication(MedicationDetail.DOSAGE) {
+      it.copy(dosage = value.take(Medication.MAX_TEXT_LENGTH))
+    }
   }
 
   /** Text longer than a medication can store is cut. */
   fun onFrequencyChange(value: String) {
-    editOpenMedication { it.copy(frequency = value.take(Medication.MAX_TEXT_LENGTH)) }
+    editOpenMedication(MedicationDetail.FREQUENCY) {
+      it.copy(frequency = value.take(Medication.MAX_TEXT_LENGTH))
+    }
   }
 
   /**
@@ -297,7 +322,7 @@ class PrescriptionFormViewModel(
    */
   fun onDurationChange(value: String) {
     val days = value.filter(Char::isDigit).take(MAX_DURATION_DIGITS).toIntOrNull()
-    editOpenMedication { it.copy(durationDays = days) }
+    editOpenMedication(MedicationDetail.DURATION) { it.copy(durationDays = days) }
   }
 
   /**
@@ -347,6 +372,16 @@ class PrescriptionFormViewModel(
           openMedication = open.coerceAtMost(remaining.lastIndex),
           startDateChosen = state.startDateChosen.filterIndexed { index, _ -> index != position },
           nameTouched = state.nameTouched.filterIndexed { index, _ -> index != position },
+          // The removed medication's details have nothing left to check; the others move with it
+          toCheck =
+              state.toCheck.mapNotNullTo(mutableSetOf()) { field ->
+                when {
+                  field !is ScannedField.OfMedication -> field
+                  field.position == position -> null
+                  field.position > position -> field.copy(position = field.position - 1)
+                  else -> field
+                }
+              },
       )
     }
   }
@@ -415,9 +450,19 @@ class PrescriptionFormViewModel(
     }
   }
 
-  private fun editOpenMedication(transform: (MedicationDraft) -> MedicationDraft) {
-    edit { it.withOpenMedication(transform) }
+  private fun editOpenMedication(
+      detail: MedicationDetail,
+      transform: (MedicationDraft) -> MedicationDraft,
+  ) {
+    edit { it.withOpenMedication(transform).openChecked(detail) }
   }
+
+  /** The patient edited [field]: it is no longer to check. */
+  private fun PrescriptionFormUiState.checked(field: ScannedField) = copy(toCheck = toCheck - field)
+
+  /** The patient edited [detail] of the open medication: it is no longer to check. */
+  private fun PrescriptionFormUiState.openChecked(detail: MedicationDetail) =
+      checked(ScannedField.OfMedication(openMedication, detail))
 
   private fun PrescriptionFormUiState.withOpenNameTouched() =
       copy(
