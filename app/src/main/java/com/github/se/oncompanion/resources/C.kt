@@ -288,6 +288,18 @@ object C {
     const val join_circle_joined = "join_circle_joined"
     const val join_circle_continue = "join_circle_continue"
 
+    // Whose care?
+    const val whose_care_screen = "whose_care_screen"
+    const val whose_care_back = "whose_care_back"
+    const val whose_care_loading = "whose_care_loading"
+    const val whose_care_error = "whose_care_error"
+    const val whose_care_empty = "whose_care_empty"
+    const val whose_care_action = "whose_care_action"
+    const val whose_care_join_another = "whose_care_join_another"
+
+    /** The row of the followed patient [uid] in "Whose care?". */
+    fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
     const val prescription_form_close_button = "prescription_form_close_button"
@@ -329,6 +341,21 @@ object C {
 
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
+
+    const val prescription_detail_screen = "prescription_detail_screen"
+    const val prescription_detail_back_button = "prescription_detail_back_button"
+    const val prescription_detail_loading = "prescription_detail_loading"
+    const val prescription_detail_error = "prescription_detail_error"
+    const val prescription_detail_retry_button = "prescription_detail_retry_button"
+    const val prescription_detail_not_found = "prescription_detail_not_found"
+    const val prescription_detail_content = "prescription_detail_content"
+    const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
+    const val prescription_detail_date = "prescription_detail_date"
+    const val prescription_detail_medications_header = "prescription_detail_medications_header"
+
+    /** One medication of the prescription detail. */
+    fun prescriptionDetailMedication(medicationId: String) =
+        "prescription_detail_medication_$medicationId"
 
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"

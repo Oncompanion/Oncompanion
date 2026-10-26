@@ -17,6 +17,7 @@ object Route {
   const val AUTH = "auth"
   const val ONBOARDING = "onboarding"
   const val JOIN_CIRCLE = "join_circle"
+  const val WHOSE_CARE = "whose_care"
   const val OVERVIEW = "overview"
   const val PLANNING = "planning"
   const val EVENTS = "events"
@@ -37,6 +38,14 @@ object Screen {
 
   // Route.JOIN_CIRCLE
   const val JOIN_CIRCLE = "join_circle_home"
+
+  // Route.WHOSE_CARE
+  /** Whether "Whose care?" chooses the only patient by itself, argument of [WHOSE_CARE]. */
+  const val WHOSE_CARE_AUTO_SELECT = "autoSelect"
+  const val WHOSE_CARE = "whose_care_home?$WHOSE_CARE_AUTO_SELECT={$WHOSE_CARE_AUTO_SELECT}"
+
+  /** "Whose care?" opened to switch patient on purpose: the list shows even with one patient. */
+  const val WHOSE_CARE_SWITCH = "whose_care_home?$WHOSE_CARE_AUTO_SELECT=false"
 
   // Route.OVERVIEW
   const val OVERVIEW = "overview_home"
@@ -77,6 +86,11 @@ object Screen {
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"
   const val PRESCRIPTION_SCAN = "prescriptions_scan"
+  const val PRESCRIPTION_DETAIL_ID = "prescriptionId"
+  const val PRESCRIPTION_DETAIL = "prescriptions_detail/{$PRESCRIPTION_DETAIL_ID}"
+
+  /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
+  fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
 
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"
