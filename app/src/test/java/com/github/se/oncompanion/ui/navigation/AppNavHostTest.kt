@@ -1027,6 +1027,45 @@ class AppNavHostTest {
   }
 
   @Test
+  fun prescriptionDelete_cancelKeepsIt_confirmReturnsToTheListWithoutIt() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    // Cancel keeps the prescription and stays on its detail
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(listOf(chemo), repository.prescriptionsOf("owner")) }
+
+    // Confirm deletes it and returns to the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("owner"))
+    }
+  }
+
+  @Test
   fun prescriptionsEnterManually_opensTheForm_andCloseReturnsToTheList() {
     openPrescriptionsFromOverview(FakeMedicationRepository())
 

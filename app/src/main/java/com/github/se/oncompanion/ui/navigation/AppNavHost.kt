@@ -261,6 +261,8 @@ fun AppNavHost(
             viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
             onBack = navigationActions::goBack,
             onEdit = { id -> navigationActions.navigateTo(Screen.prescriptionEdit(id)) },
+            // Back to the list, which no longer shows it
+            onDeleted = navigationActions::goBack,
         )
       }
       composable(

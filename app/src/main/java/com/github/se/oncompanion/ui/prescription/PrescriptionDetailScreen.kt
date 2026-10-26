@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,9 +28,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -58,20 +62,30 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * offline.
  *
  * @param onEdit opens the prescription with the given ID in the form, to correct it (US-12)
+ * @param onDeleted called once the prescription is deleted, to leave the screen
  */
 @Composable
 fun PrescriptionDetailScreen(
     viewModel: PrescriptionDetailViewModel,
     onBack: () -> Unit,
     onEdit: (String) -> Unit,
+    onDeleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+  // Back to the list, which no longer shows the prescription, once it is deleted
+  val leave by rememberUpdatedState(onDeleted)
+  LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) leave() }
+
   PrescriptionDetailContent(
       uiState = uiState,
       onBack = onBack,
       onRetry = viewModel::load,
       onEdit = { uiState.prescription?.let { onEdit(it.id) } },
+      onDelete = viewModel::requestDelete,
+      onConfirmDelete = viewModel::confirmDelete,
+      onCancelDelete = viewModel::cancelDelete,
       modifier = modifier,
   )
 }
@@ -81,6 +95,9 @@ fun PrescriptionDetailScreen(
  *
  * @param onRetry reloads the prescription after an error
  * @param onEdit opens the shown prescription in the form
+ * @param onDelete asks to confirm the deletion
+ * @param onConfirmDelete deletes the prescription, from the confirmation dialog
+ * @param onCancelDelete closes the confirmation dialog and keeps the prescription
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +106,9 @@ fun PrescriptionDetailContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
+    onCancelDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
@@ -110,7 +130,7 @@ fun PrescriptionDetailContent(
         )
       },
       // At the bottom, away from the back arrow, as in the Figma mockup
-      bottomBar = { if (uiState.canEdit) DetailActions(onEdit) },
+      bottomBar = { if (uiState.canEdit) DetailActions(onEdit, onDelete) },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val prescription = uiState.prescription
@@ -143,11 +163,20 @@ fun PrescriptionDetailContent(
       }
     }
   }
+
+  if (uiState.isDeleteDialogShown) {
+    DeleteDialog(
+        isDeleting = uiState.isDeleting,
+        hasError = uiState.hasDeleteError,
+        onConfirm = onConfirmDelete,
+        onCancel = onCancelDelete,
+    )
+  }
 }
 
-/** What can be done with the shown prescription, as in the Figma mockup. */
+/** What can be done with the shown prescription: Edit, then Delete below it, as in the mockup. */
 @Composable
-private fun DetailActions(onEdit: () -> Unit) {
+private fun DetailActions(onEdit: () -> Unit, onDelete: () -> Unit) {
   Column(
       modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -160,7 +189,63 @@ private fun DetailActions(onEdit: () -> Unit) {
       Spacer(Modifier.size(ButtonDefaults.IconSpacing))
       Text(stringResource(R.string.prescription_detail_edit))
     }
+    TextButton(
+        onClick = onDelete,
+        modifier = Modifier.testTag(C.Tag.prescription_detail_delete_button),
+    ) {
+      Text(stringResource(R.string.prescription_detail_delete))
+    }
   }
+}
+
+/**
+ * Asks to confirm the deletion, which can't be undone (Figma: the symptom's "Delete entry –
+ * confirmation dialog"). Both buttons are disabled while deleting.
+ */
+@Composable
+private fun DeleteDialog(
+    isDeleting: Boolean,
+    hasError: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+  AlertDialog(
+      onDismissRequest = { if (!isDeleting) onCancel() },
+      modifier = Modifier.testTag(C.Tag.prescription_delete_dialog),
+      title = { Text(stringResource(R.string.prescription_delete_title)) },
+      text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text(stringResource(R.string.prescription_delete_message))
+          if (hasError) {
+            Text(
+                text = stringResource(R.string.prescription_delete_error),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(C.Tag.prescription_delete_error),
+            )
+          }
+        }
+      },
+      confirmButton = {
+        TextButton(
+            onClick = onConfirm,
+            enabled = !isDeleting,
+            colors =
+                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.testTag(C.Tag.prescription_delete_confirm),
+        ) {
+          Text(stringResource(R.string.prescription_delete_confirm))
+        }
+      },
+      dismissButton = {
+        TextButton(
+            onClick = onCancel,
+            enabled = !isDeleting,
+            modifier = Modifier.testTag(C.Tag.prescription_delete_cancel),
+        ) {
+          Text(stringResource(R.string.prescription_delete_cancel))
+        }
+      },
+  )
 }
 
 /** Every field of [prescription], as in the Figma mockup. */
