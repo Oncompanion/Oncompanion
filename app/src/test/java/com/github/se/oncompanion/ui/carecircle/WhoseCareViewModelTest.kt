@@ -193,11 +193,11 @@ class WhoseCareViewModelTest {
   }
 
   @Test
-  fun nobodySignedIn_showsAnError() = runTest {
+  fun nobodySignedIn_asksToSignIn_ratherThanRetry() = runTest {
     auth.signOut()
     val vm = viewModel()
     advanceUntilIdle()
-    assertTrue(vm.state.hasError)
-    assertFalse(vm.state.isLoading)
+    assertTrue(vm.state.isSignedOut)
+    assertFalse(vm.state.hasError)
   }
 }

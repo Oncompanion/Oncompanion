@@ -167,6 +167,7 @@ fun AppNavHost(
             },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
+            onSignedOut = signOut,
         )
       }
     }

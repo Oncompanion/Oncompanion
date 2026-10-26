@@ -46,12 +46,15 @@ data class FollowedPatient(
  *
  * @property patients the patients the caregiver follows, sorted by first name
  * @property isLoading true until the list arrives
- * @property hasError true if it couldn't be loaded
+ * @property hasError true if it couldn't be loaded; Retry can then work
+ * @property isSignedOut true when nobody is signed in anymore (e.g. the session expired): Retry
+ *   can't work, the caregiver has to sign in again
  */
 data class WhoseCareUiState(
     val patients: List<FollowedPatient> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
+    val isSignedOut: Boolean = false,
 )
 
 /**
@@ -82,7 +85,8 @@ class WhoseCareViewModel(
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     val uid = authRepository.currentUser?.uid
     if (uid == null) {
-      _uiState.update { it.copy(isLoading = false, hasError = true) }
+      // Still loading on screen until the caregiver is sent to sign in
+      _uiState.update { it.copy(isSignedOut = true) }
       return
     }
     observation = viewModelScope.launch {

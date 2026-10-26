@@ -49,6 +49,8 @@ import com.github.se.oncompanion.resources.C
  * @param onJoinAnother opens the join screen, to follow one more patient
  * @param autoSelectSingle when the caregiver follows only one patient, choose them without showing
  *   the list (when opening the app), rather than when switching on purpose
+ * @param onSignedOut called when nobody is signed in anymore (e.g. the session expired), to sign in
+ *   again: the list can't be read until then
  */
 @Composable
 fun WhoseCareScreen(
@@ -57,8 +59,11 @@ fun WhoseCareScreen(
     onPatientChosen: (FollowedPatient) -> Unit,
     onJoinAnother: () -> Unit,
     autoSelectSingle: Boolean,
+    onSignedOut: () -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  // Signed out: Retry can't work, so the caregiver goes to sign in, as from the join screen
+  LaunchedEffect(uiState.isSignedOut) { if (uiState.isSignedOut) onSignedOut() }
   // Only once: coming back to the screen must not choose again
   var autoSelected by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(uiState) {
