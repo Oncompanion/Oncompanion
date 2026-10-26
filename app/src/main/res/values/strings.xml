@@ -299,9 +299,20 @@
     <string name="join_circle_subtitle">Enter the invite code that the person you support shared with you.</string>
     <string name="join_circle_code">Invite code</string>
     <string name="join_circle_code_hint">For example ABCDE-FGHJK</string>
-    <!-- Join is disabled until joining is built -->
-    <string name="join_circle_join_coming_soon">Join · Coming soon</string>
-    <string name="join_circle_no_code">I don\'t have a code yet</string>
+    <string name="join_circle_join">Join</string>
+    <string name="join_circle_no_code_hint">No code yet? Ask the person you support to add you to their care circle in Oncompanion. This screen opens each time you start the app until you join.</string>
+    <string name="join_circle_error_invalid">This code doesn\'t work. Check it, or ask for a new one.</string>
+    <string name="join_circle_error_offline">You need a connection to join a care circle. Please try again online.</string>
+    <string name="join_circle_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
+    <string name="join_circle_error_failed">Couldn\'t join the care circle. Please try again.</string>
+    <!-- e.g. "You joined Marie's care circle" -->
+    <string name="join_circle_joined">You joined %1$s\'s care circle</string>
+    <string name="join_circle_already_member">You\'re already in %1$s\'s care circle</string>
+    <!-- When the patient's first name is missing -->
+    <string name="join_circle_joined_unnamed">You joined their care circle</string>
+    <string name="join_circle_already_member_unnamed">You\'re already in their care circle</string>
+    <string name="join_circle_joined_hint">You\'ll see what they choose to share with you.</string>
+    <string name="join_circle_continue">Continue</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>
@@ -336,6 +347,14 @@
     <string name="prescription_form_save">Save prescription</string>
     <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <string name="prescription_form_edit_title">Edit prescription</string>
+    <string name="prescription_form_not_found_title">This prescription no longer exists</string>
+    <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
+    <string name="prescription_form_not_signed_in_title">You\'re signed out</string>
+    <string name="prescription_form_not_signed_in_hint">Sign in again to edit your prescription.</string>
+    <string name="prescription_form_load_error_title">Couldn\'t open this prescription</string>
+    <string name="prescription_form_load_error_hint">Something went wrong. Please try again.</string>
+    <string name="prescription_form_retry">Try again</string>
     <!-- Title of the prescriptions list; "prescriptions_title" is the Overview shortcut -->
     <string name="prescriptions_list_title">My prescriptions</string>
     <string name="prescriptions_back">Back</string>

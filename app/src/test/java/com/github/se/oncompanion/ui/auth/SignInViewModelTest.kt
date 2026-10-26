@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.auth
 
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
@@ -40,6 +42,7 @@ class SignInViewModelTest {
 
   private lateinit var repository: FakeAuthRepository
   private lateinit var profiles: FakeUserProfileRepository
+  private lateinit var invites: FakeCareCircleInviteRepository
   private lateinit var viewModel: SignInViewModel
 
   /** Number of times the token lambda passed to signIn was called. */
@@ -50,7 +53,8 @@ class SignInViewModelTest {
     Dispatchers.setMain(dispatcher)
     repository = FakeAuthRepository(onSignIn = { user })
     profiles = FakeUserProfileRepository()
-    viewModel = SignInViewModel(repository, profiles)
+    invites = FakeCareCircleInviteRepository()
+    viewModel = SignInViewModel(repository, profiles, invites)
     tokenRequests = 0
   }
 
@@ -127,6 +131,40 @@ class SignInViewModelTest {
         ),
         viewModel.uiState.value,
     )
+  }
+
+  @Test
+  fun signIn_returningCaregiverWithoutACircle_goesToTheJoinScreen() = runTest {
+    profiles.seed(returningProfile.copy(role = Role.CAREGIVER))
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(AfterSignIn.JOIN_CIRCLE, viewModel.uiState.value.next)
+    assertEquals(user, viewModel.uiState.value.signedInUser)
+  }
+
+  @Test
+  fun signIn_returningCaregiverInACircle_goesToOverview() = runTest {
+    profiles.seed(returningProfile.copy(role = Role.CAREGIVER))
+    invites.setJoinedCircles(user.uid, listOf(JoinedCareCircle("patient", "Marie")))
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(AfterSignIn.OVERVIEW, viewModel.uiState.value.next)
+  }
+
+  @Test
+  fun signIn_caregiverCirclesCantBeRead_showsAnError_andGoesNowhere() = runTest {
+    profiles.seed(returningProfile.copy(role = Role.CAREGIVER))
+    invites.observeError = IllegalStateException("denied")
+
+    viewModel.signIn(token())
+    advanceUntilIdle()
+
+    assertEquals(SignInError.FAILED, viewModel.uiState.value.error)
+    assertNull(viewModel.uiState.value.next)
   }
 
   @Test
