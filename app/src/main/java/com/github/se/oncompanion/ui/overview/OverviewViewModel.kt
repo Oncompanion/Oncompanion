@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -52,11 +53,13 @@ enum class TodayItemStatus {
 /**
  * The user's next appointment, as shown on the Overview.
  *
+ * @property id the source appointment identity used to open its details
  * @property title what the appointment is (e.g. "Oncology check-up")
  * @property dateTime when it starts, in the phone's time zone
  * @property place where it takes place, if the user entered it
  */
 data class NextAppointment(
+    val id: String,
     val title: String,
     val dateTime: LocalDateTime,
     val place: String? = null,
@@ -177,11 +180,15 @@ class OverviewViewModel(
   /** The first appointment that hasn't started yet. */
   private fun nextAppointmentOf(planned: List<PlanningItem>, now: LocalDateTime): NextAppointment? =
       planned
-          .filter { it.source is PlanningSource.Appointment }
-          .mapNotNull { item -> item.startIn()?.let { item to it } }
-          .filter { (_, start) -> start.isAfter(now) }
-          .minByOrNull { (_, start) -> start }
-          ?.let { (item, start) -> NextAppointment(item.title, start, item.subtitle) }
+          .mapNotNull { item ->
+            (item.source as? PlanningSource.Appointment)?.let { source ->
+              item.startIn()?.let { start ->
+                NextAppointment(source.appointmentId, item.title, start, item.subtitle)
+              }
+            }
+          }
+          .filter { it.dateTime.isAfter(now) }
+          .minByOrNull { it.dateTime }
 
   /**
    * Today's entries: those without a time first, as in Planning, then the timed ones by time. A

@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -47,6 +48,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -103,6 +105,9 @@ fun OverviewScreen(
     navigationActions: NavigationActions,
     modifier: Modifier = Modifier,
     viewModel: OverviewViewModel = viewModel { OverviewViewModel() },
+    onOpenAppointment: (String) -> Unit = {
+      navigationActions.navigateTo(Screen.appointmentDetail(it))
+    },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
@@ -116,6 +121,7 @@ fun OverviewScreen(
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
       // Planning is a tab: switch to it like the bottom bar does
       onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
+      onOpenAppointment = onOpenAppointment,
       onRetry = viewModel::loadDay,
       modifier = modifier,
       bottomBar = {
@@ -130,7 +136,8 @@ fun OverviewScreen(
 /**
  * Stateless content of the Overview, so each state can be tested without a ViewModel.
  *
- * @param onOpenPlanning opens Planning, from the appointment card or "See planning"
+ * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
+ * @param onOpenAppointment opens the recorded appointment directly
  * @param onRetry reloads the day after an error
  * @param bottomBar the bottom navigation bar, empty by default
  */
@@ -140,6 +147,7 @@ fun OverviewContent(
     uiState: OverviewUiState,
     onShortcutClick: (OverviewShortcut) -> Unit,
     onOpenPlanning: () -> Unit,
+    onOpenAppointment: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
@@ -177,7 +185,12 @@ fun OverviewContent(
         uiState.isLoading -> LoadingDay()
         uiState.hasError -> DayError(onRetry)
         else -> {
-          NextAppointmentCard(uiState.nextAppointment, uiState.now.toLocalDate(), onOpenPlanning)
+          NextAppointmentCard(
+              uiState.nextAppointment,
+              uiState.now.toLocalDate(),
+              onOpenPlanning,
+              onOpenAppointment,
+          )
           TodaySection(uiState.todayEntries, onOpenPlanning)
         }
       }
