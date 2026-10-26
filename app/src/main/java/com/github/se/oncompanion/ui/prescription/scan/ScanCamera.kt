@@ -56,6 +56,15 @@ interface ScanCamera {
   @Composable fun Viewfinder(modifier: Modifier)
 }
 
+/**
+ * Makes the [ScanCamera] of each scan screen, so the scan names the interface and tests can give a
+ * fake camera instead of CameraX, also through the app's navigation.
+ */
+object ScanCameraProvider {
+  /** A new CameraX camera by default, one per screen. */
+  @Volatile var newCamera: () -> ScanCamera = ::CameraXScanCamera
+}
+
 /** [ScanCamera] with CameraX: a preview and a full-quality photo of the prescription. */
 class CameraXScanCamera : ScanCamera {
 
