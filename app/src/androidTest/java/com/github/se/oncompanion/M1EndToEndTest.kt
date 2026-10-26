@@ -4,6 +4,7 @@ package com.github.se.oncompanion
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyDescendant
@@ -65,6 +66,9 @@ class M1EndToEndTest {
   // the collection is shared by every test run: its own id, deleted after the test
   private val ligueEvent = "m1-event-$run"
 
+  // The screen the app was put on, see [startApp]
+  private var testScreen: ComponentActivity? = null
+
   @Before fun setUp(): Unit = runBlocking { EmulatorTestData.signOut() }
 
   @After
@@ -76,7 +80,7 @@ class M1EndToEndTest {
   @Test
   fun newPatient_usesEveryMainFeature() {
     addLigueEventTomorrow(title = "Gentle yoga")
-    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
+    startApp()
 
     signInAndOnboard(firstName = "Sam")
     addPrescription(doctor = "Dr Martin", medication = "Tamoxifen")
@@ -93,7 +97,7 @@ class M1EndToEndTest {
 
   @Test
   fun newPatient_invitesSomeoneToTheirCareCircle() {
-    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
+    startApp()
 
     signInAndOnboard(firstName = "Sam")
     inviteToCareCircle(firstName = "Julie")
@@ -342,9 +346,29 @@ class M1EndToEndTest {
         false
       }
 
-  /** Waits for the node (data comes from the emulators asynchronously), then returns it. */
+  /** Puts the app on the test screen, which [waitFor] checks is never rebuilt. */
+  private fun startApp() {
+    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
+    testScreen = compose.activity
+  }
+
+  /**
+   * Waits for the node (data comes from the emulators asynchronously), then returns it. When it
+   * never comes because Android rebuilt the test screen, which comes back blank, the test says so.
+   */
   private fun waitFor(matcher: SemanticsMatcher) = compose.run {
-    waitUntil(TIMEOUT_MS) { exists(matcher) }
+    try {
+      waitUntil(TIMEOUT_MS) { exists(matcher) }
+    } catch (e: ComposeTimeoutException) {
+      // The timeout stays the cause, so the log shows both
+      if (activity !== testScreen) {
+        throw IllegalStateException(
+            "Android rebuilt the test screen (a configuration change): the app's content is gone",
+            e,
+        )
+      }
+      throw e
+    }
     onNode(matcher)
   }
 
