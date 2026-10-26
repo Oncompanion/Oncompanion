@@ -322,6 +322,36 @@ class ScanScreenTest {
   }
 
   @Test
+  fun phoneRotated_afterTheFormOpened_doesNotOpenItAgain() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).performClick()
+    compose.waitUntil(5_000) { reads.isNotEmpty() }
+    compose.waitForIdle()
+
+    // Rotating recreates the activity, but the screen's ViewModel survives it: the prescription it
+    // handed over is gone from it, so the form isn't opened a second time (review of #237)
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread {
+      compose.activity.setContent {
+        ScanScreen(
+            onEnterManually = {},
+            onBack = {},
+            onRead = { reads += it },
+            viewModel = viewModel,
+            camera = camera,
+        )
+      }
+    }
+    compose.waitForIdle()
+
+    assertEquals(1, reads.size)
+    assertNull(viewModel.uiState.value.read)
+  }
+
+  @Test
   fun closingWhileReading_deletesThePhoto_andNeverOpensTheForm() {
     recognizer.reading = CompletableDeferred()
     grantCamera()
