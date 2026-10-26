@@ -432,6 +432,14 @@
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
     <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
+    <!-- Appointment detail -->
+    <string name="appointment_detail_retry">Retry</string>
+    <string name="appointment_detail">Entry details</string>
+    <string name="appointment_unavailable">This appointment is unavailable.</string>
+    <string name="appointment_detail_failed">Couldn\'t load your appointment. Please try again.</string>
+    <string name="appointment_date_time">Date &amp; time</string>
+    <string name="appointment_detail_location">Location</string>
+    <string name="appointment_detail_notes">Notes</string>
     <!-- Appointment form -->
     <string name="appointment_add">Add appointment</string>
     <string name="appointment_back">Back</string>

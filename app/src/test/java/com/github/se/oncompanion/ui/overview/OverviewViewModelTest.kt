@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -169,7 +170,7 @@ class OverviewViewModelTest {
     val vm = viewModel(planning = planning(appointment("check-up", now.plusMonths(4))))
 
     assertEquals(
-        NextAppointment("Appointment check-up", now.plusMonths(4)),
+        NextAppointment("check-up", "Appointment check-up", now.plusMonths(4)),
         vm.uiState.value.nextAppointment,
     )
     assertTrue(vm.uiState.value.todayEntries.isEmpty())
@@ -239,7 +240,7 @@ class OverviewViewModelTest {
         )
 
     assertEquals(
-        NextAppointment("Appointment soon", now.plusDays(1), "HUG"),
+        NextAppointment("soon", "Appointment soon", now.plusDays(1), "HUG"),
         vm.uiState.value.nextAppointment,
     )
   }
