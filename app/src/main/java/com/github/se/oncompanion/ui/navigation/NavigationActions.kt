@@ -83,6 +83,11 @@ object Screen {
   /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
   fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
 
+  const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_DETAIL_ID}"
+
+  /** The [PRESCRIPTION_EDIT] screen of the prescription [prescriptionId]. */
+  fun prescriptionEdit(prescriptionId: String) = "prescriptions_edit/$prescriptionId"
+
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"
   /** Name of the [CARE_CIRCLE_MEMBER] argument holding the member's uid. */

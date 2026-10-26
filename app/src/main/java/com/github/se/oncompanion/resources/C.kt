@@ -336,6 +336,7 @@ object C {
     const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
     const val prescription_detail_date = "prescription_detail_date"
     const val prescription_detail_medications_header = "prescription_detail_medications_header"
+    const val prescription_detail_edit_button = "prescription_detail_edit_button"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =

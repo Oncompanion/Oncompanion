@@ -371,6 +371,7 @@
     <string name="prescription_detail_retry">Retry</string>
     <string name="prescription_detail_not_found_title">This prescription no longer exists</string>
     <string name="prescription_detail_not_found_hint">It may have been deleted on another device.</string>
+    <string name="prescription_detail_edit">Edit prescription</string>
     <plurals name="prescription_detail_duration_days">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>

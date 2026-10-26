@@ -5,20 +5,26 @@ package com.github.se.oncompanion.ui.prescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -50,11 +56,14 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * The detail of one saved prescription (US-11, Figma: "US-11 / Prescription detail"), opened from
  * the prescriptions list: every saved field, so the patient can check a dosage at any time, also
  * offline.
+ *
+ * @param onEdit opens the prescription with the given ID in the form, to correct it (US-12)
  */
 @Composable
 fun PrescriptionDetailScreen(
     viewModel: PrescriptionDetailViewModel,
     onBack: () -> Unit,
+    onEdit: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -62,6 +71,7 @@ fun PrescriptionDetailScreen(
       uiState = uiState,
       onBack = onBack,
       onRetry = viewModel::load,
+      onEdit = { uiState.prescription?.let { onEdit(it.id) } },
       modifier = modifier,
   )
 }
@@ -70,6 +80,7 @@ fun PrescriptionDetailScreen(
  * Stateless content of the detail, so each state can be tested without a ViewModel.
  *
  * @param onRetry reloads the prescription after an error
+ * @param onEdit opens the shown prescription in the form
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +88,7 @@ fun PrescriptionDetailContent(
     uiState: PrescriptionDetailUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
@@ -97,6 +109,8 @@ fun PrescriptionDetailContent(
             },
         )
       },
+      // At the bottom, away from the back arrow, as in the Figma mockup
+      bottomBar = { if (uiState.canEdit) DetailActions(onEdit) },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val prescription = uiState.prescription
@@ -127,6 +141,24 @@ fun PrescriptionDetailContent(
             )
         else -> PrescriptionDetail(prescription)
       }
+    }
+  }
+}
+
+/** What can be done with the shown prescription, as in the Figma mockup. */
+@Composable
+private fun DetailActions(onEdit: () -> Unit) {
+  Column(
+      modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    OutlinedButton(
+        onClick = onEdit,
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_detail_edit_button),
+    ) {
+      Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+      Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+      Text(stringResource(R.string.prescription_detail_edit))
     }
   }
 }

@@ -35,6 +35,13 @@ data class PrescriptionDetailUiState(
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
     get() = !isLoading && !hasError && prescription == null
+
+  /**
+   * The prescription is shown and can be corrected: not after a read error, when what is on screen
+   * may be out of date.
+   */
+  val canEdit: Boolean
+    get() = prescription != null && !isLoading && !hasError
 }
 
 /**

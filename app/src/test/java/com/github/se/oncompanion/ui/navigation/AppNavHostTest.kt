@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -952,6 +953,77 @@ class AppNavHostTest {
     composeTestRule.runOnIdle {
       assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
     }
+  }
+
+  @Test
+  fun prescriptionEdit_savesTheCorrection_shownInTheDetailAndTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedBy = "Dr. Martin",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+
+    // The form corrects the saved prescription
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_screen).assertDoesNotExist()
+    composeTestRule
+        .onNode(
+            hasText("Edit prescription") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_form_screen)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_EDIT, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID),
+      )
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_prescribed_by_field)
+        .performTextReplacement("Dr. Dubois")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // Saving returns to the detail, which shows the correction
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_detail_prescribed_by)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals("Dr. Dubois", repository.prescriptionsOf("owner").single().prescribedBy)
+    }
+
+    // And so does the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois", substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem("chemo"))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
   }
 
   @Test

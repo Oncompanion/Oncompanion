@@ -71,9 +71,15 @@ class PrescriptionDetailScreenTest {
       state: PrescriptionDetailUiState,
       onBack: () -> Unit = {},
       onRetry: () -> Unit = {},
+      onEdit: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      PrescriptionDetailContent(uiState = state, onBack = onBack, onRetry = onRetry)
+      PrescriptionDetailContent(
+          uiState = state,
+          onBack = onBack,
+          onRetry = onRetry,
+          onEdit = onEdit,
+      )
     }
   }
 
@@ -252,25 +258,73 @@ class PrescriptionDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptionDetailMedication("m20")).assertIsDisplayed()
   }
 
+  // ----- Edit (US-12) -----
+
+  @Test
+  fun shown_editButtonOpensTheForm() {
+    var edits = 0
+    setContent(shown, onEdit = { edits++ })
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_detail_edit_button)
+        .assertIsDisplayed()
+        .performClick()
+
+    assertEquals(1, edits)
+    assertTextInside(
+        context.getString(R.string.prescription_detail_edit),
+        C.Tag.prescription_detail_edit_button,
+    )
+  }
+
+  @Test
+  fun editButton_onlyWhileThePrescriptionIsShown() {
+    listOf(
+            loading,
+            PrescriptionDetailUiState(isLoading = false, hasError = true),
+            PrescriptionDetailUiState(isLoading = false),
+            // A read error after it was shown: what is on screen may be out of date
+            shown.copy(hasError = true),
+        )
+        .forEach { state -> assertEquals("Edit for $state", false, state.canEdit) }
+    setContent(loading)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun editButton_staysOnScreenWithALongPrescription() {
+    val many = (1..20).map { ondansetron.copy(id = "m$it", name = "Medication $it") }
+    setContent(shown.copy(prescription = chemo.copy(medications = many)))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertIsDisplayed()
+  }
+
   // ----- With the ViewModel -----
 
   @Test
   fun screen_showsTheSignedInUsersPrescription_andPassesBack() {
     val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
     var backs = 0
+    val edited = mutableListOf<String>()
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
     composeTestRule.setContent {
       PrescriptionDetailScreen(
           viewModel = viewModel,
           onBack = { backs++ },
+          onEdit = { edited += it },
       )
     }
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
     assertTextInside("Dr. Martin", C.Tag.prescription_detail_prescribed_by)
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
 
-    composeTestRule.runOnIdle { assertEquals(1, backs) }
+    composeTestRule.runOnIdle {
+      assertEquals(1, backs)
+      assertEquals(listOf("chemo"), edited)
+    }
   }
 
   @Test
@@ -281,7 +335,9 @@ class PrescriptionDetailScreenTest {
           readError = IllegalStateException("no cache")
         }
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
-    composeTestRule.setContent { PrescriptionDetailScreen(viewModel = viewModel, onBack = {}) }
+    composeTestRule.setContent {
+      PrescriptionDetailScreen(viewModel = viewModel, onBack = {}, onEdit = {})
+    }
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_error).assertIsDisplayed()
 
     repository.readError = null
