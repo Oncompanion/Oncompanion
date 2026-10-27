@@ -416,12 +416,16 @@ fun AppNavHost(
           Screen.CARE_CIRCLE_MEMBER,
           arguments =
               listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
-      ) {
-        CareCircleMemberScreen(
-            navigationActions = navigationActions,
-            // The SavedStateHandle holds the route's member uid
-            viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
-        )
+      ) { entry ->
+        // The SavedStateHandle holds the route's member uid
+        val memberViewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) }
+        // Set by the edit form once it saved this member
+        val updated by
+            entry.savedStateHandle
+                .getStateFlow(Screen.CARE_CIRCLE_MEMBER_UPDATED, false)
+                .collectAsStateWithLifecycle()
+        LaunchedEffect(updated) { if (updated) memberViewModel.onMemberUpdated() }
+        CareCircleMemberScreen(navigationActions = navigationActions, viewModel = memberViewModel)
       }
       composable(Screen.CARE_CIRCLE_ADD) { entry ->
         CareCircleMemberFormScreen(
@@ -450,6 +454,27 @@ fun AppNavHost(
             },
             // The SavedStateHandle holds the route's invite code
             viewModel = viewModel { CareCircleInviteViewModel(createSavedStateHandle()) },
+        )
+      }
+      composable(
+          Screen.CARE_CIRCLE_EDIT_MEMBER,
+          arguments =
+              listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
+      ) { entry ->
+        val memberUid = entry.arguments?.getString(Screen.CARE_CIRCLE_MEMBER_ARG).orEmpty()
+        CareCircleMemberFormScreen(
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the member, who shows "Updated just now" for this visit
+            onSaved = {
+              // A save finishing during the exit animation must not pop the member as well
+              if (navController.currentBackStackEntry == entry) {
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set(Screen.CARE_CIRCLE_MEMBER_UPDATED, true)
+                navigationActions.goBack()
+              }
+            },
+            viewModel = viewModel { CareCircleMemberFormViewModel(memberUid = memberUid) },
         )
       }
     }

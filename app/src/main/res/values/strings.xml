@@ -268,9 +268,10 @@
     <string name="care_circle_member_remove">Remove from circle</string>
     <string name="care_circle_member_not_found">This person is no longer in your care circle.</string>
     <string name="care_circle_member_error">Couldn\'t load this member.</string>
-    <!-- Temporary messages until editing and removing members exist -->
-    <string name="care_circle_member_edit_not_implemented">Editing members isn\'t available yet. It will be added in a later version and let you change %1$s\'s details and what they can see.</string>
+    <!-- Temporary message until removing members exists -->
     <string name="care_circle_member_remove_not_implemented">Removing members isn\'t available yet. It will be added in a later version and let you take %1$s out of your circle.</string>
+    <!-- Relationship · after the patient saved changes, e.g. "Son · Updated just now" -->
+    <string name="care_circle_member_updated">%1$s · Updated just now</string>
 
     <!-- What each section shows a member -->
     <string name="permission_planning_description">Treatments &amp; appointments</string>
@@ -296,6 +297,12 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+    <!-- Edit a care circle member (#75) -->
+    <string name="care_circle_form_edit_title">Edit member</string>
+    <string name="care_circle_form_account_email">Account email. It can\'t be changed.</string>
+    <string name="care_circle_form_save_changes">Save changes</string>
+    <string name="care_circle_form_missing_first_name_edit">Add a first name to save the changes.</string>
+    <string name="care_circle_form_update_error">Couldn\'t save the changes. Try again.</string>
 
     <!-- Join a care circle with an invite code (#137) -->
     <string name="join_circle_title">Join a care circle</string>

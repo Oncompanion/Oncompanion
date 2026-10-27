@@ -5,9 +5,11 @@ package com.github.se.oncompanion.ui.carecircle
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
@@ -333,5 +335,184 @@ class CareCircleMemberFormViewModelTest {
 
         assertFalse(viewModel.uiState.value.isSaved)
         assertNull(viewModel.uiState.value.savedInviteCode)
+      }
+
+  // ---- editing a member ----
+
+  private val marc =
+      CareCircleMember(
+          uid = "marc",
+          firstName = "Marc",
+          familyName = "Dubois",
+          relationship = Relationship.SON,
+          permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+          email = "marc.dubois@email.com",
+      )
+  private val circle = FakeCareCircleRepository().apply { setMembers(ownerUid, listOf(marc)) }
+
+  private fun editViewModel(memberUid: String = marc.uid, authRepository: AuthRepository = auth) =
+      CareCircleMemberFormViewModel(invites, profiles, authRepository, circle, memberUid)
+
+  @Test
+  fun edit_isLoadingAtFirst_thenFilledInWithTheMember() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.uiState.value.isEditing)
+        assertFalse(viewModel.uiState.value.canEdit)
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertEquals("Marc", state.firstName)
+        assertEquals("Dubois", state.familyName)
+        assertEquals(Relationship.SON, state.relationship)
+        assertEquals("marc.dubois@email.com", state.email)
+        assertEquals(marc.permissions, state.permissions)
+        assertFalse(state.firstNameTouched)
+        assertTrue(state.canSave)
+      }
+
+  @Test
+  fun edit_memberWithoutLastNameOrEmail_isFilledInWithEmptyFields() =
+      runTest(dispatcher) {
+        circle.setMembers(ownerUid, listOf(marc.copy(familyName = null, email = null)))
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        assertEquals("", viewModel.uiState.value.familyName)
+        assertEquals("", viewModel.uiState.value.email)
+      }
+
+  @Test
+  fun edit_laterChangesToTheMember_keepThePatientsEdits() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+
+        circle.setMembers(
+            ownerUid,
+            listOf(marc.copy(firstName = "Marco", permissions = emptySet())),
+        )
+        advanceUntilIdle()
+
+        assertEquals("Marc", viewModel.uiState.value.firstName)
+        assertEquals(
+            setOf(CarePermission.PLANNING, CarePermission.EVENTS, CarePermission.SYMPTOMS),
+            viewModel.uiState.value.permissions,
+        )
+      }
+
+  @Test
+  fun edit_save_updatesTheMemberWithTrimmedDetails_withoutAnInvite() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        viewModel.onFirstNameChange(" Marco  ")
+        viewModel.onFamilyNameChange("   ")
+        viewModel.onRelationshipChange(Relationship.FRIEND)
+        viewModel.onPermissionChange(CarePermission.EVENTS, false)
+
+        saved(viewModel)
+
+        assertEquals(
+            "marc" to
+                CareCircleMemberDetails(
+                    firstName = "Marco",
+                    familyName = null,
+                    relationship = Relationship.FRIEND,
+                    permissions = setOf(CarePermission.PLANNING),
+                ),
+            circle.updated.single(),
+        )
+        assertTrue(invites.created.isEmpty())
+        val state = viewModel.uiState.value
+        assertTrue(state.isSaved)
+        assertNull(state.savedInviteCode)
+        // The saved (trimmed) member coming back doesn't change the form that is leaving
+        assertEquals(" Marco  ", state.firstName)
+      }
+
+  @Test
+  fun edit_theAccountEmail_isNeverInvalid() =
+      runTest(dispatcher) {
+        circle.setMembers(ownerUid, listOf(marc.copy(email = "not an email")))
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.invalidEmail)
+        assertTrue(viewModel.uiState.value.canSave)
+      }
+
+  @Test
+  fun edit_memberNotInTheCircle_isNotFound() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel(memberUid = "someone")
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+        assertTrue(state.notFound)
+        assertFalse(state.isLoading)
+        assertFalse(state.showsForm)
+        assertFalse(state.canSave)
+      }
+
+  @Test
+  fun edit_memberRemovedWhileEditing_isNotFound() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        circle.setMembers(ownerUid, emptyList())
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.notFound)
+      }
+
+  @Test
+  fun edit_unreadableMember_nobodySignedIn_orNoMember_isALoadError() =
+      runTest(dispatcher) {
+        val cases =
+            listOf(
+                { editViewModel(memberUid = " ") },
+                { editViewModel(authRepository = FakeAuthRepository()) },
+                {
+                  circle.observeError = IllegalStateException("denied")
+                  editViewModel()
+                },
+            )
+        cases.forEach { create ->
+          val viewModel = create()
+          advanceUntilIdle()
+          assertTrue(viewModel.uiState.value.loadFailed)
+          assertFalse(viewModel.uiState.value.isLoading)
+          assertFalse(viewModel.uiState.value.canEdit)
+        }
+        assertTrue(circle.updated.isEmpty())
+      }
+
+  @Test
+  fun edit_fieldsCantChangeWhileLoading() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        viewModel.onFirstNameChange("Bruno")
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals("Marc", viewModel.uiState.value.firstName)
+        assertTrue(circle.updated.isEmpty())
+      }
+
+  @Test
+  fun edit_saveError_keepsTheDraft() =
+      runTest(dispatcher) {
+        circle.updateError = IllegalStateException("boom")
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+
+        saved(viewModel)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.saveFailed)
+        assertFalse(state.isSaved)
+        assertTrue(CarePermission.SYMPTOMS in state.permissions)
+        assertTrue(state.canSave)
       }
 }
