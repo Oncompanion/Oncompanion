@@ -5,8 +5,6 @@ package com.github.se.oncompanion.ui.appointment
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,15 +19,25 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DetailActionTags
+import com.github.se.oncompanion.ui.common.DetailActions
+import com.github.se.oncompanion.ui.common.DetailWithActions
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Connects the appointment observation to its read-only detail content. */
+private val actionTags =
+    DetailActionTags(C.Tag.appointment_detail_edit_button, C.Tag.appointment_detail_delete_button)
+
+/** Connects the appointment observation to its detail content and available actions. */
 @Composable
-fun AppointmentDetailScreen(viewModel: AppointmentDetailViewModel, onBack: () -> Unit) {
+fun AppointmentDetailScreen(
+    viewModel: AppointmentDetailViewModel,
+    onBack: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  AppointmentDetailContent(state, onBack, viewModel::retry)
+  AppointmentDetailContent(state, onBack, viewModel::retry, onEdit = onEdit)
 }
 
 /** Figma entry details adapted to recorded fields, without inferred end times or reminders. */
@@ -40,6 +48,7 @@ fun AppointmentDetailContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    onEdit: (() -> Unit)? = null,
 ) {
   Scaffold(
       modifier = Modifier.testTag(C.Tag.appointment_detail_screen),
@@ -57,12 +66,7 @@ fun AppointmentDetailContent(
         )
       },
   ) { padding ->
-    Column(
-        Modifier.fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
-    ) {
+    Box(Modifier.fillMaxSize().padding(padding)) {
       when (state) {
         AppointmentDetailUiState.Loading ->
             CircularProgressIndicator(
@@ -72,7 +76,21 @@ fun AppointmentDetailContent(
             DetailFeedback(R.string.appointment_unavailable, onRetry)
         AppointmentDetailUiState.Error ->
             DetailFeedback(R.string.appointment_detail_failed, onRetry)
-        is AppointmentDetailUiState.Loaded -> AppointmentFields(state.appointment, zoneId)
+        is AppointmentDetailUiState.Loaded ->
+            DetailWithActions(
+                showActions = onEdit != null,
+                contentTestTag = C.Tag.appointment_detail_content,
+                actions = {
+                  DetailActions(
+                      editLabel = stringResource(R.string.appointment_detail_edit),
+                      deleteLabel = stringResource(R.string.appointment_detail_delete),
+                      onEdit = onEdit,
+                      tags = actionTags,
+                  )
+                },
+            ) {
+              AppointmentFields(state.appointment, zoneId)
+            }
       }
     }
   }

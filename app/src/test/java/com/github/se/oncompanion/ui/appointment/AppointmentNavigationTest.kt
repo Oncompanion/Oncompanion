@@ -233,4 +233,96 @@ class AppointmentNavigationTest {
     compose.onNodeWithText("Agenda visit 20").assertIsDisplayed()
     compose.onNodeWithText("Agenda visit 0").assertDoesNotExist()
   }
+
+  /** Editing returns to live details; Back keeps the originating day and Overview also updates. */
+  @Test
+  fun editSaveReturnsToDetailsAndPreservesPlanningDay() {
+    val day = LocalDate.now().plusWeeks(1)
+    repository.seed(
+        "uid-patient",
+        Appointment(
+            "edit-visit",
+            "Original visit",
+            day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.CONSULTATION,
+            "Room 3",
+            "Documents",
+        ),
+    )
+    show()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    compose.onNodeWithText("Original visit").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_title).assertTextContains("Original visit")
+    compose.onNodeWithTag(C.Tag.appointment_location).assertTextContains("Room 3")
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Updated visit")
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
+    compose.onNodeWithText("Updated visit").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
+    compose.onNodeWithText("Updated visit").assertIsDisplayed()
+    compose.runOnIdle { NavigationActions(nav).navigateToTab(Route.OVERVIEW) }
+    compose.onNodeWithTag(C.Tag.overview_next_appointment).assertTextContains("Updated visit")
+    assertEquals("edit-visit", repository.appointments("uid-patient").single().id)
+  }
+
+  /** Cancelling an invalid edit writes nothing and Back still returns directly to Overview. */
+  @Test
+  fun overviewEditCancelKeepsAppointment() {
+    val day = LocalDate.now().plusDays(1)
+    repository.seed(
+        "uid-patient",
+        Appointment(
+            "cancel-visit",
+            "Original visit",
+            day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.TREATMENT,
+        ),
+    )
+    show(Route.OVERVIEW)
+    compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
+    compose.runOnIdle { assertEquals(Screen.APPOINTMENT_EDIT, nav.currentDestination?.route) }
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithText("Original visit").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    assertTrue(repository.updateRequests.isEmpty())
+  }
+
+  /** A save completed beneath another destination is consumed only when the edit form resumes. */
+  @Test
+  fun backgroundEditCompletionWaitsForItsOwnDestination() {
+    val day = LocalDate.now()
+    repository.seed(
+        "uid-patient",
+        Appointment(
+            "background-visit",
+            "Background visit",
+            day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.OTHER,
+        ),
+    )
+    show()
+    compose.onNodeWithText("Background visit").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
+    val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+    repository.writeGate = gate
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
+    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Completed in background")
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+    compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.PROFILE) }
+    compose.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+    compose.runOnIdle { gate.complete(Unit) }
+    compose.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.PROFILE, nav.currentDestination?.route) }
+    compose.runOnIdle { NavigationActions(nav).goBack() }
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
+    compose.onNodeWithText("Completed in background").assertIsDisplayed()
+    assertEquals(1, repository.updateRequests.size)
+  }
 }

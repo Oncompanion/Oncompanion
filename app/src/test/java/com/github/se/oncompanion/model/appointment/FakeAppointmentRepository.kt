@@ -38,7 +38,7 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   /** When set, writing an appointment fails without changing storage. */
   var writeError: Exception? = null
 
-  /** Holds update/delete calls in flight until a test explicitly completes the gate. */
+  /** Holds a mutation in flight until a test explicitly completes the gate. */
   var writeGate: CompletableDeferred<Unit>? = null
 
   /** Update attempts, including failed attempts, for duplicate-submission assertions. */

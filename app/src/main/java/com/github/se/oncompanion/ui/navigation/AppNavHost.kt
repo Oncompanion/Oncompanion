@@ -200,7 +200,27 @@ fun AppNavHost(
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
         val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
-        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
+        AppointmentDetailScreen(
+            detail,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onEdit = dropUnlessResumed { navigationActions.navigateTo(Screen.appointmentEdit(id)) },
+        )
+      }
+      composable(
+          Screen.APPOINTMENT_EDIT,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val form: AppointmentFormViewModel = viewModel {
+          AppointmentFormViewModel(LocalDate.now(), appointmentId = id)
+        }
+        AppointmentFormScreen(
+            form,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onSaved = {
+              if (navController.currentBackStackEntry == entry) navigationActions.goBack()
+            },
+        )
       }
       composable(
           Screen.APPOINTMENT_ADD,

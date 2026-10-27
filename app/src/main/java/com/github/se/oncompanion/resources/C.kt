@@ -12,6 +12,9 @@ object C {
     const val appointment_detail_loading = "appointment_detail_loading"
     const val appointment_detail_feedback = "appointment_detail_feedback"
     const val appointment_detail_retry = "appointment_detail_retry"
+    const val appointment_detail_content = "appointment_detail_content"
+    const val appointment_detail_edit_button = "appointment_detail_edit_button"
+    const val appointment_detail_delete_button = "appointment_detail_delete_button"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -28,6 +31,10 @@ object C {
 
     /** Identifies the recorded appointment category choice. */
     fun appointmentType(type: String) = "appointment_type_$type"
+
+    const val appointment_form_feedback = "appointment_form_feedback"
+    const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_form_retry = "appointment_form_retry"
 
     // Hospital field
     const val hospital_field = "hospital_field"

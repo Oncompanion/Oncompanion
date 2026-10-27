@@ -447,6 +447,8 @@
     <string name="appointment_date_time">Date &amp; time</string>
     <string name="appointment_detail_location">Location</string>
     <string name="appointment_detail_notes">Notes</string>
+    <string name="appointment_detail_edit">Edit entry</string>
+    <string name="appointment_detail_delete">Delete</string>
     <!-- Appointment form -->
     <string name="appointment_add">Add appointment</string>
     <string name="appointment_back">Back</string>
@@ -475,4 +477,7 @@
     <string name="appointment_cancel">Cancel</string>
     <string name="appointment_signed_out">Sign in again to save your appointment.</string>
     <string name="appointment_save_failed">Couldn\'t save your appointment. Please try again.</string>
+    <string name="appointment_edit">Edit appointment</string>
+    <string name="appointment_save_changes">Save changes</string>
+    <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
 </resources>

@@ -15,7 +15,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
@@ -38,9 +41,14 @@ fun AppointmentFormScreen(
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(state.savedAt, state.completionHandled) {
-    if (!state.completionHandled)
-        state.savedAt?.let { if (viewModel.onCompletionHandled()) currentOnSaved(it) }
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  // A backgrounded form retains its completion until its own destination is resumed.
+  LaunchedEffect(viewModel, lifecycle) {
+    lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+      viewModel.uiState.collect { saved ->
+        saved.savedAt?.let { if (viewModel.onCompletionHandled()) currentOnSaved(it) }
+      }
+    }
   }
   AppointmentFormContent(
       state,
@@ -55,12 +63,11 @@ fun AppointmentFormScreen(
       viewModel::clearError,
       onBack,
       modifier,
+      onRetry = viewModel::load,
   )
 }
 
-/**
- * Stateless creation form with optional manual location entry until hospital search is released.
- */
+/** Stateless add/edit form with optional manual location until hospital search is released. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentFormContent(
@@ -76,9 +83,16 @@ fun AppointmentFormContent(
     onErrorShown: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
 ) {
   var dateOpen by remember { mutableStateOf(false) }
   var timeOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(state.editable) {
+    if (!state.editable) {
+      dateOpen = false
+      timeOpen = false
+    }
+  }
   val snackbar = remember { SnackbarHostState() }
   val message =
       state.error?.let {
@@ -96,7 +110,13 @@ fun AppointmentFormContent(
   val compact = isCompactHeight()
   val topBar: @Composable () -> Unit = {
     TopAppBar(
-        title = { Text(stringResource(R.string.appointment_add)) },
+        title = {
+          Text(
+              stringResource(
+                  if (state.isEditing) R.string.appointment_edit else R.string.appointment_add
+              )
+          )
+        },
         navigationIcon = {
           IconButton(onBack, Modifier.testTag(C.Tag.appointment_back)) {
             Icon(
@@ -113,6 +133,35 @@ fun AppointmentFormContent(
       snackbarHost = { SnackbarHost(snackbar) },
       topBar = { if (!compact) topBar() },
   ) { padding ->
+    if (state.load != AppointmentFormLoad.READY) {
+      Column(
+          Modifier.padding(padding)
+              .verticalScroll(rememberScrollState())
+              .padding(24.dp)
+              .testTag(C.Tag.appointment_form_feedback)
+      ) {
+        if (compact) topBar()
+        if (state.load == AppointmentFormLoad.LOADING)
+            CircularProgressIndicator(Modifier.testTag(C.Tag.appointment_form_loading))
+        else {
+          Text(
+              stringResource(
+                  when (state.load) {
+                    AppointmentFormLoad.NOT_SIGNED_IN -> R.string.appointment_edit_signed_out
+                    AppointmentFormLoad.FAILED -> R.string.appointment_detail_failed
+                    else -> R.string.appointment_unavailable
+                  }
+              )
+          )
+          onRetry?.let { retry ->
+            TextButton(retry, Modifier.testTag(C.Tag.appointment_form_retry)) {
+              Text(stringResource(R.string.appointment_detail_retry))
+            }
+          }
+        }
+      }
+      return@Scaffold
+    }
     Column(
         Modifier.fillMaxSize()
             .padding(padding)
@@ -248,7 +297,9 @@ fun AppointmentFormContent(
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.appointment_notes),
       )
       SaveButton(
-          stringResource(R.string.appointment_save),
+          stringResource(
+              if (state.isEditing) R.string.appointment_save_changes else R.string.appointment_save
+          ),
           state.canSave,
           state.isSaving,
           onSave,

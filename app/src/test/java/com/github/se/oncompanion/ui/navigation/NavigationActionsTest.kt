@@ -305,4 +305,11 @@ class NavigationActionsTest {
     assertEquals("appointment_detail/{appointmentId}", Screen.APPOINTMENT_DETAIL)
     assertEquals("appointment_detail/visit%20%3F%23", Screen.appointmentDetail("visit ?#"))
   }
+
+  /** Editing keeps identifiers separate from route punctuation. */
+  @Test
+  fun appointmentEditEncodesIdentifier() {
+    assertEquals("appointment_edit/{appointmentId}", Screen.APPOINTMENT_EDIT)
+    assertEquals("appointment_edit/visit%20%3F%23", Screen.appointmentEdit("visit ?#"))
+  }
 }
