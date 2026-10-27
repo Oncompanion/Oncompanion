@@ -77,13 +77,16 @@ object Screen {
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"
   const val PRESCRIPTION_SCAN = "prescriptions_scan"
-  const val PRESCRIPTION_DETAIL_ID = "prescriptionId"
-  const val PRESCRIPTION_DETAIL = "prescriptions_detail/{$PRESCRIPTION_DETAIL_ID}"
+
+  /** The argument of [PRESCRIPTION_DETAIL] and [PRESCRIPTION_EDIT]: the prescription's ID. */
+  const val PRESCRIPTION_ID = "prescriptionId"
+
+  const val PRESCRIPTION_DETAIL = "prescriptions_detail/{$PRESCRIPTION_ID}"
 
   /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
   fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
 
-  const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_DETAIL_ID}"
+  const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_ID}"
 
   /** The [PRESCRIPTION_EDIT] screen of the prescription [prescriptionId]. */
   fun prescriptionEdit(prescriptionId: String) = "prescriptions_edit/$prescriptionId"

@@ -944,7 +944,7 @@ class AppNavHostTest {
       assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
       assertEquals(
           "chemo",
-          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID),
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
       )
     }
 
@@ -993,7 +993,7 @@ class AppNavHostTest {
       assertEquals(Screen.PRESCRIPTION_EDIT, NavigationActions(navController).currentRoute())
       assertEquals(
           "chemo",
-          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID),
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
       )
     }
     composeTestRule
