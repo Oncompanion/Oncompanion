@@ -200,7 +200,14 @@ fun AppNavHost(
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
         val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
-        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
+        AppointmentDetailScreen(
+            detail,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onDeleted = {
+              // A completion may only pop the detail entry that initiated this deletion.
+              if (navController.currentBackStackEntry == entry) navigationActions.goBack()
+            },
+        )
       }
       composable(
           Screen.APPOINTMENT_ADD,

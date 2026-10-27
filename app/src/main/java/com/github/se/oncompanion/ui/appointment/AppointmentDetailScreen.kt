@@ -5,31 +5,62 @@ package com.github.se.oncompanion.ui.appointment
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DetailActionTags
+import com.github.se.oncompanion.ui.common.DetailActions
+import com.github.se.oncompanion.ui.common.DetailWithActions
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Connects the appointment observation to its read-only detail content. */
+/** Connects appointment observation and confirmed deletion to the detail content. */
 @Composable
-fun AppointmentDetailScreen(viewModel: AppointmentDetailViewModel, onBack: () -> Unit) {
+fun AppointmentDetailScreen(
+    viewModel: AppointmentDetailViewModel,
+    onBack: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDeleted: () -> Unit = onBack,
+) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  AppointmentDetailContent(state, onBack, viewModel::retry)
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  val leave by rememberUpdatedState(onDeleted)
+  // Recollect the completed state on resume instead of losing completion while backgrounded.
+  LaunchedEffect(viewModel, lifecycle) {
+    lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+      viewModel.uiState.collect {
+        if (it.delete.isDeleted && viewModel.canLeaveAfterDeletion()) leave()
+      }
+    }
+  }
+  AppointmentDetailContent(
+      state,
+      onBack,
+      viewModel::retry,
+      onEdit = onEdit,
+      onDelete = viewModel::requestDelete,
+      onConfirmDelete = viewModel::confirmDelete,
+      onCancelDelete = viewModel::cancelDelete,
+  )
 }
 
 /** Figma entry details adapted to recorded fields, without inferred end times or reminders. */
@@ -40,6 +71,10 @@ fun AppointmentDetailContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onConfirmDelete: () -> Unit = {},
+    onCancelDelete: () -> Unit = {},
 ) {
   Scaffold(
       modifier = Modifier.testTag(C.Tag.appointment_detail_screen),
@@ -57,24 +92,61 @@ fun AppointmentDetailContent(
         )
       },
   ) { padding ->
-    Column(
-        Modifier.fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
-    ) {
-      when (state) {
-        AppointmentDetailUiState.Loading ->
-            CircularProgressIndicator(
-                Modifier.padding(16.dp).testTag(C.Tag.appointment_detail_loading)
-            )
-        AppointmentDetailUiState.Unavailable ->
-            DetailFeedback(R.string.appointment_unavailable, onRetry)
-        AppointmentDetailUiState.Error ->
-            DetailFeedback(R.string.appointment_detail_failed, onRetry)
-        is AppointmentDetailUiState.Loaded -> AppointmentFields(state.appointment, zoneId)
-      }
+    when (state) {
+      is AppointmentDetailUiState.Loaded ->
+          DetailWithActions(
+              showActions = state.canDelete && (onEdit != null || onDelete != null),
+              contentTestTag = C.Tag.appointment_detail_content,
+              modifier = Modifier.padding(padding),
+              actions = {
+                DetailActions(
+                    editLabel = stringResource(R.string.appointment_detail_edit),
+                    deleteLabel = stringResource(R.string.appointment_detail_delete),
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    tags =
+                        DetailActionTags(
+                            C.Tag.appointment_detail_edit_button,
+                            C.Tag.appointment_detail_delete_button,
+                        ),
+                )
+              },
+          ) {
+            AppointmentFields(state.appointment, zoneId)
+          }
+      else ->
+          Column(Modifier.fillMaxSize().padding(padding)) {
+            when (state) {
+              AppointmentDetailUiState.Loading ->
+                  CircularProgressIndicator(
+                      Modifier.padding(16.dp).testTag(C.Tag.appointment_detail_loading)
+                  )
+              AppointmentDetailUiState.Unavailable ->
+                  DetailFeedback(R.string.appointment_unavailable, onRetry)
+              else -> DetailFeedback(R.string.appointment_detail_failed, onRetry)
+            }
+          }
     }
+  }
+  if (state.isDeleteDialogShown) {
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.appointment_delete_title),
+        message = stringResource(R.string.appointment_delete_message),
+        error = stringResource(R.string.appointment_delete_error),
+        confirmLabel = stringResource(R.string.appointment_delete_confirm),
+        cancelLabel = stringResource(R.string.appointment_delete_cancel),
+        isDeleting = state.delete.isDeleting,
+        hasError = state.delete.hasError,
+        onConfirm = onConfirmDelete,
+        onCancel = onCancelDelete,
+        tags =
+            DeleteDialogTags(
+                C.Tag.appointment_delete_dialog,
+                C.Tag.appointment_delete_confirm,
+                C.Tag.appointment_delete_cancel,
+                C.Tag.appointment_delete_error,
+            ),
+    )
   }
 }
 

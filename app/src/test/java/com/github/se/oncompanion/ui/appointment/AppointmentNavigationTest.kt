@@ -233,4 +233,71 @@ class AppointmentNavigationTest {
     compose.onNodeWithText("Agenda visit 20").assertIsDisplayed()
     compose.onNodeWithText("Agenda visit 0").assertDoesNotExist()
   }
+
+  /** Cancel preserves storage; confirmation returns to the same selected Planning day. */
+  @Test
+  fun deleteFromPlanningKeepsSelectionAndRemovesRow() {
+    val day = LocalDate.now().plusWeeks(1)
+    val appointment =
+        Appointment(
+            "delete-visit",
+            "Cancelled visit",
+            day.atTime(10, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.CONSULTATION,
+        )
+    repository.seed("uid-patient", appointment)
+    show()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    compose.onNodeWithText(appointment.title).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).performClick()
+    assertEquals(listOf(appointment), repository.appointments("uid-patient"))
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
+    compose.onNodeWithText(appointment.title).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(Screen.PLANNING, nav.currentDestination?.route) }
+  }
+
+  /** Overview immediately chooses the next remaining appointment after confirmed deletion. */
+  @Test
+  fun deleteFromOverviewRefreshesNextAppointment() {
+    val time = LocalDate.now().plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+    repository.seed(
+        "uid-patient",
+        Appointment("first", "First visit", time, AppointmentType.CONSULTATION),
+        Appointment("second", "Second visit", time.plusSeconds(3600), AppointmentType.OTHER),
+    )
+    show(Route.OVERVIEW)
+    compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    compose.onNodeWithText("First visit").assertDoesNotExist()
+    compose.onNodeWithText("Second visit").assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.OVERVIEW, nav.currentDestination?.route) }
+  }
+
+  /** A paused detail cannot pop another destination; returning delivers completion once. */
+  @Test
+  fun delayedDeletionDoesNotPopAnotherScreen() {
+    val time = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+    repository.seed(
+        "uid-patient",
+        Appointment("visit", "Delayed visit", time, AppointmentType.OTHER),
+    )
+    repository.writeGate = kotlinx.coroutines.CompletableDeferred()
+    show()
+    compose.onNodeWithText("Delayed visit").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.PROFILE) }
+    compose.runOnIdle { repository.writeGate!!.complete(Unit) }
+    compose.runOnIdle { assertEquals(Screen.PROFILE, nav.currentDestination?.route) }
+    compose.runOnIdle { NavigationActions(nav).goBack() }
+    compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    compose.onNodeWithText("Delayed visit").assertDoesNotExist()
+    compose.runOnIdle { assertEquals(Screen.PLANNING, nav.currentDestination?.route) }
+  }
 }
