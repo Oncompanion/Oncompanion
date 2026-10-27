@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.prescription
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -23,6 +24,7 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -30,6 +32,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionDetailScreenTest {
@@ -306,6 +309,21 @@ class PrescriptionDetailScreenTest {
     setContent(shown.copy(prescription = chemo.copy(medications = many)))
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun shortWindow_actionsComeAfterALongPrescription_soItKeepsTheWholeHeight() {
+    val many = (1..20).map { ondansetron.copy(id = "m$it", name = "Medication $it") }
+    setContent(shown.copy(prescription = chemo.copy(medications = many)))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertIsNotDisplayed()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.prescription_detail_delete_button))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).assertIsDisplayed()
   }
 
   // ----- Delete (US-12) -----

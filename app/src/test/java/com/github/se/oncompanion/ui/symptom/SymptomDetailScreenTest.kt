@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -30,6 +32,7 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
@@ -41,6 +44,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class SymptomDetailScreenTest {
@@ -244,6 +248,21 @@ class SymptomDetailScreenTest {
     edit.performClick()
 
     assertEquals(1, edits)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun shortWindow_actionsComeAfterLongNotes_soTheEntryKeepsTheWholeHeight() {
+    val longNotes = (1..40).joinToString("\n") { "Line $it" }
+    setContent(loaded.copy(entry = fatigue.copy(notes = longNotes)))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertIsNotDisplayed()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptom_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.symptom_detail_delete))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertIsDisplayed()
   }
 
   @Test

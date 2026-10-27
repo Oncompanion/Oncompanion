@@ -5,29 +5,20 @@ package com.github.se.oncompanion.ui.prescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,8 +42,17 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DetailActionTags
+import com.github.se.oncompanion.ui.common.DetailActions
+import com.github.se.oncompanion.ui.common.DetailWithActions
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val actionTags =
+    DetailActionTags(
+        edit = C.Tag.prescription_detail_edit_button,
+        delete = C.Tag.prescription_detail_delete_button,
+    )
 
 private val deleteDialogTags =
     DeleteDialogTags(
@@ -138,8 +138,6 @@ fun PrescriptionDetailContent(
             },
         )
       },
-      // At the bottom, away from the back arrow, as in the Figma mockup
-      bottomBar = { if (uiState.canEdit) DetailActions(onEdit, onDelete) },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val prescription = uiState.prescription
@@ -168,7 +166,23 @@ fun PrescriptionDetailContent(
                 title = stringResource(R.string.prescription_detail_not_found_title),
                 hint = stringResource(R.string.prescription_detail_not_found_hint),
             )
-        else -> PrescriptionDetail(prescription)
+        // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
+        else ->
+            DetailWithActions(
+                showActions = uiState.canEdit,
+                contentTestTag = C.Tag.prescription_detail_content,
+                actions = {
+                  DetailActions(
+                      editLabel = stringResource(R.string.prescription_detail_edit),
+                      deleteLabel = stringResource(R.string.prescription_detail_delete),
+                      onEdit = onEdit,
+                      onDelete = onDelete,
+                      tags = actionTags,
+                  )
+                },
+            ) {
+              PrescriptionDetail(prescription)
+            }
       }
     }
   }
@@ -189,40 +203,10 @@ fun PrescriptionDetailContent(
   }
 }
 
-/** What can be done with the shown prescription: Edit, then Delete below it, as in the mockup. */
-@Composable
-private fun DetailActions(onEdit: () -> Unit, onDelete: () -> Unit) {
-  Column(
-      modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    OutlinedButton(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_detail_edit_button),
-    ) {
-      Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
-      Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-      Text(stringResource(R.string.prescription_detail_edit))
-    }
-    TextButton(
-        onClick = onDelete,
-        modifier = Modifier.testTag(C.Tag.prescription_detail_delete_button),
-    ) {
-      Text(stringResource(R.string.prescription_detail_delete))
-    }
-  }
-}
-
 /** Every field of [prescription], as in the Figma mockup. */
 @Composable
 private fun PrescriptionDetail(prescription: Prescription) {
-  Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .verticalScroll(rememberScrollState())
-              .padding(vertical = 8.dp)
-              .testTag(C.Tag.prescription_detail_content)
-  ) {
+  Column(Modifier.padding(vertical = 8.dp)) {
     Text(
         text = prescription.medications.joinToString(", ") { it.name },
         style = MaterialTheme.typography.headlineSmall,
