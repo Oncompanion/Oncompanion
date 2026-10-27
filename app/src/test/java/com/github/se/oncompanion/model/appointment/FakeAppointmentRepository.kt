@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.appointment
 
 import java.time.Clock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,12 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
 
   /** When set, writing an appointment fails without changing storage. */
   var writeError: Exception? = null
+
+  /** Holds update/delete calls in flight until a test explicitly completes the gate. */
+  var writeGate: CompletableDeferred<Unit>? = null
+
+  /** Update attempts, including failed attempts, for duplicate-submission assertions. */
+  val updateRequests = mutableListOf<Pair<String, Appointment>>()
 
   /** Returns a snapshot of [uid]'s stored appointments, without imposing an order. */
   fun appointments(uid: String): List<Appointment> = store.value[uid].orEmpty().values.toList()
@@ -104,6 +111,8 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     requirePathSegment(uid)
     requirePathSegment(appointment.id)
     require(appointment.isValid()) { "Invalid appointment" }
+    updateRequests += uid to appointment
+    writeGate?.await()
     writeError?.let { throw it }
     // An absent record stays absent; this fake does not simulate deferred server rejection.
     store.update { current ->

@@ -40,10 +40,7 @@ fun AppointmentFormScreen(
   val currentOnSaved by rememberUpdatedState(onSaved)
   LaunchedEffect(state.savedAt, state.completionHandled) {
     if (!state.completionHandled)
-        state.savedAt?.let {
-          viewModel.onCompletionHandled()
-          currentOnSaved(it)
-        }
+        state.savedAt?.let { if (viewModel.onCompletionHandled()) currentOnSaved(it) }
   }
   AppointmentFormContent(
       state,
