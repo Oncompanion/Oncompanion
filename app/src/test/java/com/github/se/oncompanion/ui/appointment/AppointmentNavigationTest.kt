@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.ui.appointment
 
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
@@ -25,6 +27,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.util.Locale
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
@@ -324,5 +327,71 @@ class AppointmentNavigationTest {
     compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Completed in background").assertIsDisplayed()
     assertEquals(1, repository.updateRequests.size)
+  }
+
+  /** Rescheduling across weeks keeps Back on the original day and moves exactly one stored row. */
+  @Test
+  @OptIn(ExperimentalMaterial3Api::class)
+  fun rescheduledAppointmentKeepsOriginAndMovesToChosenDay() {
+    val originalDay = LocalDate.now().plusWeeks(1)
+    // Pick a different week in the displayed month so this works across month/year boundaries.
+    val movedDay =
+        if (originalDay.dayOfMonth <= 14) originalDay.plusWeeks(2) else originalDay.minusWeeks(2)
+    repository.seed(
+        "uid-patient",
+        Appointment(
+            "moved-visit",
+            "Rescheduled visit",
+            originalDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.CONSULTATION,
+        ),
+    )
+    show()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    val origin = compose.runOnIdle { nav.currentBackStackEntry }
+    compose.onNodeWithText("Rescheduled visit").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_date).performClick()
+    val pickedDayDescription =
+        requireNotNull(
+            DatePickerDefaults.dateFormatter()
+                .formatDate(
+                    movedDay.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
+                    Locale.getDefault(),
+                    forContentDescription = true,
+                )
+        )
+    compose
+        .onNode(
+            hasText(pickedDayDescription) and hasAnyAncestor(hasTestTag(C.Tag.appointment_picker))
+        )
+        .performClick()
+    compose.onNodeWithTag(C.Tag.appointment_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
+    compose.runOnIdle {
+      val saved = repository.appointments("uid-patient").single()
+      assertEquals("moved-visit", saved.id)
+      assertEquals(
+          movedDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+          saved.scheduledAt,
+      )
+      assertEquals(1, repository.updateRequests.size)
+    }
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose
+        .onNodeWithTag(C.Tag.planning_heading)
+        .assertTextContains(PlanningDates.format(originalDay))
+    compose.onNodeWithText("Rescheduled visit").assertDoesNotExist()
+    compose.runOnIdle {
+      assertSame(origin, nav.currentBackStackEntry)
+      assertNull(
+          nav.currentBackStackEntry?.savedStateHandle?.get<String>(Screen.APPOINTMENT_SAVED_DATE)
+      )
+    }
+    val direction = if (movedDay > originalDay) C.Tag.planning_next else C.Tag.planning_previous
+    repeat(2) { compose.onNodeWithTag(direction).performClick() }
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(movedDay))
+    compose.onNodeWithText("Rescheduled visit").assertIsDisplayed()
   }
 }

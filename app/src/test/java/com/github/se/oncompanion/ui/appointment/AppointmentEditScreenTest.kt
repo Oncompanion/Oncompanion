@@ -35,7 +35,7 @@ class AppointmentEditScreenTest {
       )
 
   @Composable
-  private fun content(state: AppointmentFormUiState, retry: () -> Unit = {}) {
+  private fun EditContent(state: AppointmentFormUiState, retry: () -> Unit = {}) {
     AppointmentFormContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, onRetry = retry)
   }
 
@@ -44,7 +44,7 @@ class AppointmentEditScreenTest {
   fun loadStatesAndRetry() {
     var load by mutableStateOf(AppointmentFormLoad.LOADING)
     var retries = 0
-    compose.setContent { content(draft().copy(load = load), { retries++ }) }
+    compose.setContent { EditContent(draft().copy(load = load), { retries++ }) }
     compose.onNodeWithText("Edit appointment").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appointment_form_loading).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appointment_title).assertDoesNotExist()
@@ -122,7 +122,7 @@ class AppointmentEditScreenTest {
   /** Portrait edit fields and Save stay above the keyboard. */
   @Test
   fun editingAbovePortraitKeyboard() {
-    compose.setContent { content(draft()) }
+    compose.setContent { EditContent(draft()) }
     compose.showKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().assertIsAboveKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsAboveKeyboard(700)
@@ -132,7 +132,7 @@ class AppointmentEditScreenTest {
   @Test
   @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
   fun editingAboveLandscapeKeyboard() {
-    compose.setContent { content(draft()) }
+    compose.setContent { EditContent(draft()) }
     compose.showKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().assertIsAboveKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsAboveKeyboard(280)
