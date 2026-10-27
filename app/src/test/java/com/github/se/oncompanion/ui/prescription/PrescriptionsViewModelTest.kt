@@ -8,18 +8,23 @@ import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -301,15 +306,33 @@ class PrescriptionsViewModelTest {
       }
 
   @Test
-  fun refreshToday_followsTheClock_andMovesLastMonthToEarlier() =
+  fun followToday_refreshesTheDateRightAway() =
       runTest(dispatcher) {
-        repository.seed(uid, prescription("october", "2026-10-06", "A"))
         val viewModel = viewModel()
         advanceUntilIdle()
+
+        // The date changed while the list was in the background
+        current = Clock.fixed(Instant.parse("2026-11-01T00:05:00Z"), ZoneOffset.UTC)
+        backgroundScope.launch { viewModel.followToday() }
+        runCurrent()
+
+        assertEquals(LocalDate.of(2026, 11, 1), viewModel.uiState.value.today)
+      }
+
+  @Test
+  fun followToday_movesLastMonthToEarlierAtMidnight() =
+      runTest(dispatcher) {
+        repository.seed(uid, prescription("october", "2026-10-06", "A"))
+        val clock =
+            VirtualClock(testScheduler, Instant.parse("2026-10-31T23:59:00Z"), ZoneOffset.UTC)
+        val viewModel = PrescriptionsViewModel(signedIn(), repository, clock)
+        advanceUntilIdle()
+        backgroundScope.launch { viewModel.followToday() }
+        runCurrent()
         assertEquals(listOf("october"), viewModel.thisMonthIds)
 
-        current = Clock.fixed(Instant.parse("2026-11-01T00:05:00Z"), ZoneOffset.UTC)
-        viewModel.refreshToday()
+        advanceTimeBy(1.minutes)
+        runCurrent()
 
         assertEquals(LocalDate.of(2026, 11, 1), viewModel.uiState.value.today)
         assertEquals(emptyList<String>(), viewModel.thisMonthIds)

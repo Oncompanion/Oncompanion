@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.Job
@@ -97,11 +98,11 @@ class PrescriptionsViewModel(
   }
 
   /**
-   * Updates the current date, so "This month" stays right while the ViewModel lives (the screen
-   * calls it each time it comes back).
+   * Keeps the current date right, so "This month" stays right while the list is open: updates it
+   * now, then at each midnight, until cancelled. The screen runs it while it is shown.
    */
-  fun refreshToday() {
-    _uiState.update { it.copy(today = LocalDate.now(clock)) }
+  suspend fun followToday() {
+    currentDay(clock).collect { today -> _uiState.update { it.copy(today = today) } }
   }
 
   private companion object {

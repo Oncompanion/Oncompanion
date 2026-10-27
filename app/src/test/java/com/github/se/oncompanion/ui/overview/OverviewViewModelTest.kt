@@ -14,6 +14,7 @@ import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
@@ -22,9 +23,14 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -381,5 +387,39 @@ class OverviewViewModelTest {
     assertEquals(2, planning.ranges.size)
     assertEquals(now.toLocalDate().plusDays(1), planning.ranges.last().startDateInclusive)
     assertEquals(now.plusDays(1).toLocalDate(), vm.uiState.value.now.toLocalDate())
+  }
+
+  // ----- Following the date -----
+
+  @Test
+  fun followToday_refreshesTheTimeRightAway() = runTest {
+    val clock = TestClock(now)
+    val vm = viewModel(clock = clock)
+
+    // Time passed while the Overview was in the background
+    clock.time = now.withHour(20)
+    backgroundScope.launch { vm.followToday() }
+    runCurrent()
+
+    assertEquals(now.withHour(20), vm.uiState.value.now)
+  }
+
+  @Test
+  fun followToday_reloadsTheNewDayAtMidnight() = runTest {
+    val lateEvening = now.withHour(23).withMinute(59)
+    val planning = FakePlanningRepository()
+    val clock = VirtualClock(testScheduler, lateEvening.toInstant(zone), zone)
+    val vm = viewModel(planning = planning, clock = clock)
+    backgroundScope.launch { vm.followToday() }
+    runCurrent()
+    assertEquals(1, planning.ranges.size)
+
+    advanceTimeBy(1.minutes)
+    runCurrent()
+
+    val tomorrow = now.toLocalDate().plusDays(1)
+    assertEquals(tomorrow, vm.uiState.value.now.toLocalDate())
+    assertEquals(2, planning.ranges.size)
+    assertEquals(tomorrow, planning.ranges.last().startDateInclusive)
   }
 }

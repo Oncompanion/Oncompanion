@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,6 +50,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** "29 Sep 2026", as in the prescription form. The app's UI is in English. */
 private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
@@ -73,10 +75,12 @@ fun PrescriptionsScreen(
     modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  // The ViewModel outlives navigation and backgrounding: keep "This month" right
+  // Keeps "This month" right while the list is on screen: refreshes when it comes back, then at
+  // each midnight
+  val scope = rememberCoroutineScope()
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = scope.launch { viewModel.followToday() }
+    onPauseOrDispose { following.cancel() }
   }
   PrescriptionsContent(
       uiState = uiState,

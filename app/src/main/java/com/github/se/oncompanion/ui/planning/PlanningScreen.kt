@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** Calendar and agenda events supplied by the screen or preview. */
 data class PlanningActions(
@@ -66,9 +68,12 @@ fun PlanningScreen(
   val openAppointment: (PlanningItem) -> Unit = { item ->
     appointmentToOpen(item)?.let(onOpenAppointment)
   }
+  // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
+  // at each midnight
+  val scope = rememberCoroutineScope()
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = scope.launch { viewModel.followToday() }
+    onPauseOrDispose { following.cancel() }
   }
   PlanningContent(
       state = state,
