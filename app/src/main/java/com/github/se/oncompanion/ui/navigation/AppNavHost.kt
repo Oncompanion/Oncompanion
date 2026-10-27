@@ -301,14 +301,29 @@ fun AppNavHost(
       }
       composable(
           Screen.PRESCRIPTION_DETAIL,
-          arguments =
-              listOf(navArgument(Screen.PRESCRIPTION_DETAIL_ID) { type = NavType.StringType }),
+          arguments = listOf(navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType }),
       ) { entry ->
-        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_DETAIL_ID).orEmpty()
+        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
         PrescriptionDetailScreen(
             // Scoped to this back stack entry, so each opened prescription has its own ViewModel
             viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
             onBack = navigationActions::goBack,
+            onEdit = { navigationActions.navigateTo(Screen.prescriptionEdit(prescriptionId)) },
+            // Back to the list, which no longer shows it
+            onDeleted = navigationActions::goBack,
+        )
+      }
+      composable(
+          Screen.PRESCRIPTION_EDIT,
+          arguments = listOf(navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
+        PrescriptionFormScreen(
+            viewModel = viewModel { PrescriptionFormViewModel(prescriptionId = prescriptionId) },
+            // A second tap while the form is already leaving is dropped, so Back happens once
+            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the detail, which shows the correction
+            onSaved = navigationActions::goBack,
         )
       }
       composable(Screen.PRESCRIPTION_SCAN) { entry ->

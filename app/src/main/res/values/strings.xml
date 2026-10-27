@@ -395,6 +395,13 @@
     <string name="prescription_detail_retry">Retry</string>
     <string name="prescription_detail_not_found_title">This prescription no longer exists</string>
     <string name="prescription_detail_not_found_hint">It may have been deleted on another device.</string>
+    <string name="prescription_detail_edit">Edit prescription</string>
+    <string name="prescription_detail_delete">Delete prescription</string>
+    <string name="prescription_delete_title">Delete this prescription?</string>
+    <string name="prescription_delete_message">It will be removed with all its medications. You can\'t undo this.</string>
+    <string name="prescription_delete_confirm">Delete</string>
+    <string name="prescription_delete_cancel">Cancel</string>
+    <string name="prescription_delete_error">Couldn\'t delete this prescription. Try again.</string>
     <plurals name="prescription_detail_duration_days">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>

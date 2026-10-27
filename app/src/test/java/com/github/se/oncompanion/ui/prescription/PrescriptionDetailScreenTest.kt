@@ -4,6 +4,9 @@ package com.github.se.oncompanion.ui.prescription
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -21,13 +24,16 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionDetailScreenTest {
@@ -71,9 +77,21 @@ class PrescriptionDetailScreenTest {
       state: PrescriptionDetailUiState,
       onBack: () -> Unit = {},
       onRetry: () -> Unit = {},
+      onEdit: () -> Unit = {},
+      onDelete: () -> Unit = {},
+      onConfirmDelete: () -> Unit = {},
+      onCancelDelete: () -> Unit = {},
   ) {
     composeTestRule.setContent {
-      PrescriptionDetailContent(uiState = state, onBack = onBack, onRetry = onRetry)
+      PrescriptionDetailContent(
+          uiState = state,
+          onBack = onBack,
+          onRetry = onRetry,
+          onEdit = onEdit,
+          onDelete = onDelete,
+          onConfirmDelete = onConfirmDelete,
+          onCancelDelete = onCancelDelete,
+      )
     }
   }
 
@@ -252,25 +270,166 @@ class PrescriptionDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptionDetailMedication("m20")).assertIsDisplayed()
   }
 
+  // ----- Edit (US-12) -----
+
+  @Test
+  fun shown_editButtonOpensTheForm() {
+    var edits = 0
+    setContent(shown, onEdit = { edits++ })
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_detail_edit_button)
+        .assertIsDisplayed()
+        .performClick()
+
+    assertEquals(1, edits)
+    assertTextInside(
+        context.getString(R.string.prescription_detail_edit),
+        C.Tag.prescription_detail_edit_button,
+    )
+  }
+
+  @Test
+  fun editButton_onlyWhileThePrescriptionIsShown() {
+    listOf(
+            loading,
+            PrescriptionDetailUiState(isLoading = false, hasError = true),
+            PrescriptionDetailUiState(isLoading = false),
+            // A read error after it was shown: what is on screen may be out of date
+            shown.copy(hasError = true),
+        )
+        .forEach { state -> assertEquals("Edit for $state", false, state.canEdit) }
+    setContent(loading)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun editButton_staysOnScreenWithALongPrescription() {
+    val many = (1..20).map { ondansetron.copy(id = "m$it", name = "Medication $it") }
+    setContent(shown.copy(prescription = chemo.copy(medications = many)))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun shortWindow_actionsComeAfterALongPrescription_soItKeepsTheWholeHeight() {
+    val many = (1..20).map { ondansetron.copy(id = "m$it", name = "Medication $it") }
+    setContent(shown.copy(prescription = chemo.copy(medications = many)))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertIsNotDisplayed()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.prescription_detail_delete_button))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).assertIsDisplayed()
+  }
+
+  // ----- Delete (US-12) -----
+
+  private val confirming = shown.copy(delete = DeleteState(isConfirming = true))
+
+  @Test
+  fun shown_deleteButtonUnderEdit_asksForConfirmation() {
+    var deletes = 0
+    setContent(shown, onDelete = { deletes++ })
+
+    assertTextInside(
+        context.getString(R.string.prescription_detail_delete),
+        C.Tag.prescription_detail_delete_button,
+    )
+    assert(
+        yOf(C.Tag.prescription_detail_edit_button) < yOf(C.Tag.prescription_detail_delete_button)
+    )
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+
+    assertEquals(1, deletes)
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_dialog).assertDoesNotExist()
+  }
+
+  @Test
+  fun deleteButton_onlyWhileThePrescriptionIsShown() {
+    setContent(loading)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun deleteDialog_saysItRemovesTheMedicationsForGood() {
+    setContent(confirming)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_dialog).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_delete_title))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_delete_message))
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun deleteDialog_confirmDeletes_andCancelKeeps() {
+    var confirms = 0
+    var cancels = 0
+    setContent(
+        confirming,
+        onConfirmDelete = { confirms++ },
+        onCancelDelete = { cancels++ },
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+
+    assertEquals(1 to 1, confirms to cancels)
+  }
+
+  @Test
+  fun whileDeleting_theDialogsButtonsAreDisabled() {
+    setContent(confirming.copy(delete = confirming.delete.copy(isDeleting = true)))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).assertIsNotEnabled()
+  }
+
+  @Test
+  fun deleteError_isShownInTheDialog() {
+    setContent(confirming.copy(delete = confirming.delete.copy(hasError = true)))
+
+    assertTextInside(
+        context.getString(R.string.prescription_delete_error),
+        C.Tag.prescription_delete_dialog,
+    )
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).assertIsEnabled()
+  }
+
   // ----- With the ViewModel -----
 
   @Test
-  fun screen_showsTheSignedInUsersPrescription_andPassesBack() {
+  fun screen_showsTheSignedInUsersPrescription_andPassesBackAndEdit() {
     val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
     var backs = 0
+    var edits = 0
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
     composeTestRule.setContent {
       PrescriptionDetailScreen(
           viewModel = viewModel,
           onBack = { backs++ },
+          onEdit = { edits++ },
+          onDeleted = {},
       )
     }
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
     assertTextInside("Dr. Martin", C.Tag.prescription_detail_prescribed_by)
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
 
-    composeTestRule.runOnIdle { assertEquals(1, backs) }
+    composeTestRule.runOnIdle {
+      assertEquals(1, backs)
+      assertEquals(1, edits)
+    }
   }
 
   @Test
@@ -281,13 +440,38 @@ class PrescriptionDetailScreenTest {
           readError = IllegalStateException("no cache")
         }
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
-    composeTestRule.setContent { PrescriptionDetailScreen(viewModel = viewModel, onBack = {}) }
+    composeTestRule.setContent {
+      PrescriptionDetailScreen(viewModel = viewModel, onBack = {}, onEdit = {}, onDeleted = {})
+    }
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_error).assertIsDisplayed()
 
     repository.readError = null
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_confirmedDeletion_deletesAndLeavesOnce() {
+    val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
+    val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
+    var leaves = 0
+    composeTestRule.setContent {
+      PrescriptionDetailScreen(
+          viewModel = viewModel,
+          onBack = {},
+          onEdit = {},
+          onDeleted = { leaves++ },
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+
+    composeTestRule.runOnIdle {
+      assertEquals(1, leaves)
+      assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
+    }
   }
 
   private fun yOf(tag: String) =

@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -30,7 +32,9 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
@@ -41,6 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class SymptomDetailScreenTest {
@@ -247,6 +252,21 @@ class SymptomDetailScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun shortWindow_actionsComeAfterLongNotes_soTheEntryKeepsTheWholeHeight() {
+    val longNotes = (1..40).joinToString("\n") { "Line $it" }
+    setContent(loaded.copy(entry = fatigue.copy(notes = longNotes)))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertIsNotDisplayed()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptom_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.symptom_detail_delete))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertIsDisplayed()
+  }
+
+  @Test
   fun noEditButton_whileLoading_afterAnError_whenNotFound_orWhileDeleting() {
     var state by mutableStateOf(SymptomDetailUiState())
     composeTestRule.setContent {
@@ -265,7 +285,10 @@ class SymptomDetailScreenTest {
             SymptomDetailUiState(),
             loaded.copy(hasError = true),
             loaded,
-            loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true),
+            loaded.copy(
+                entry = fatigue,
+                delete = DeleteState(isConfirming = true, isDeleting = true),
+            ),
         )) {
       state = hidden
       composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertDoesNotExist()
@@ -277,7 +300,7 @@ class SymptomDetailScreenTest {
     var confirms = 0
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, isConfirmingDelete = true),
+        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true)),
         onConfirmDelete = { confirms++ },
         onCancelDelete = { cancels++ },
     )
@@ -298,7 +321,7 @@ class SymptomDetailScreenTest {
 
   @Test
   fun confirmingWithoutAnEntry_showsNoDialog() {
-    setContent(loaded.copy(isConfirmingDelete = true))
+    setContent(loaded.copy(delete = DeleteState(isConfirming = true)))
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
@@ -308,7 +331,7 @@ class SymptomDetailScreenTest {
   fun backInTheDialog_cancelsTheDeletion() {
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, isConfirmingDelete = true),
+        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true)),
         onCancelDelete = { cancels++ },
     )
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
@@ -322,7 +345,7 @@ class SymptomDetailScreenTest {
   fun backWhileDeleting_doesNotCancel() {
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true),
+        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, isDeleting = true)),
         onCancelDelete = { cancels++ },
     )
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
@@ -334,7 +357,9 @@ class SymptomDetailScreenTest {
 
   @Test
   fun whileDeleting_theDialogButtonsAreDisabled() {
-    setContent(loaded.copy(entry = fatigue, isConfirmingDelete = true, isDeleting = true))
+    setContent(
+        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, isDeleting = true))
+    )
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).assertIsNotEnabled()
@@ -343,7 +368,9 @@ class SymptomDetailScreenTest {
 
   @Test
   fun deleteError_isShownInTheDialog() {
-    setContent(loaded.copy(entry = fatigue, isConfirmingDelete = true, hasDeleteError = true))
+    setContent(
+        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, hasError = true))
+    )
 
     composeTestRule
         .onNode(
