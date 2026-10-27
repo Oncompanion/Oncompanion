@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,11 +42,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val deleteDialogTags =
+    DeleteDialogTags(
+        dialog = C.Tag.symptom_delete_dialog,
+        confirm = C.Tag.symptom_delete_confirm,
+        cancel = C.Tag.symptom_delete_cancel,
+        error = C.Tag.symptom_delete_error,
+    )
 
 /** "Monday 5 October 2026, 14:30". The app's UI is in English. */
 private val detailDateFormatter =
@@ -144,11 +153,17 @@ fun SymptomDetailContent(
   }
 
   if (uiState.isDeleteDialogShown) {
-    DeleteDialog(
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.symptom_delete_title),
+        message = stringResource(R.string.symptom_delete_message),
+        error = stringResource(R.string.symptom_delete_error),
+        confirmLabel = stringResource(R.string.symptom_delete_confirm),
+        cancelLabel = stringResource(R.string.symptom_delete_cancel),
         isDeleting = uiState.isDeleting,
         hasError = uiState.hasDeleteError,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
+        tags = deleteDialogTags,
     )
   }
 }
@@ -173,53 +188,6 @@ private fun EntryActions(onEdit: () -> Unit, onDelete: () -> Unit) {
       Text(stringResource(R.string.symptom_detail_delete))
     }
   }
-}
-
-/** Asks to confirm the deletion, which can't be undone. Both buttons are disabled meanwhile. */
-@Composable
-private fun DeleteDialog(
-    isDeleting: Boolean,
-    hasError: Boolean,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-) {
-  AlertDialog(
-      onDismissRequest = { if (!isDeleting) onCancel() },
-      modifier = Modifier.testTag(C.Tag.symptom_delete_dialog),
-      title = { Text(stringResource(R.string.symptom_delete_title)) },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(stringResource(R.string.symptom_delete_message))
-          if (hasError) {
-            Text(
-                text = stringResource(R.string.symptom_delete_error),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(C.Tag.symptom_delete_error),
-            )
-          }
-        }
-      },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            enabled = !isDeleting,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.symptom_delete_confirm),
-        ) {
-          Text(stringResource(R.string.symptom_delete_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onCancel,
-            enabled = !isDeleting,
-            modifier = Modifier.testTag(C.Tag.symptom_delete_cancel),
-        ) {
-          Text(stringResource(R.string.symptom_delete_cancel))
-        }
-      },
-  )
 }
 
 @Composable

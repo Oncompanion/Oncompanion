@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,8 +49,18 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val deleteDialogTags =
+    DeleteDialogTags(
+        dialog = C.Tag.prescription_delete_dialog,
+        confirm = C.Tag.prescription_delete_confirm,
+        cancel = C.Tag.prescription_delete_cancel,
+        error = C.Tag.prescription_delete_error,
+    )
 
 /** "29 Sep 2026", as in the list and the form. The app's UI is in English. */
 private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
@@ -165,11 +174,17 @@ fun PrescriptionDetailContent(
   }
 
   if (uiState.isDeleteDialogShown) {
-    DeleteDialog(
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.prescription_delete_title),
+        message = stringResource(R.string.prescription_delete_message),
+        error = stringResource(R.string.prescription_delete_error),
+        confirmLabel = stringResource(R.string.prescription_delete_confirm),
+        cancelLabel = stringResource(R.string.prescription_delete_cancel),
         isDeleting = uiState.isDeleting,
         hasError = uiState.hasDeleteError,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
+        tags = deleteDialogTags,
     )
   }
 }
@@ -196,56 +211,6 @@ private fun DetailActions(onEdit: () -> Unit, onDelete: () -> Unit) {
       Text(stringResource(R.string.prescription_detail_delete))
     }
   }
-}
-
-/**
- * Asks to confirm the deletion, which can't be undone (Figma: the symptom's "Delete entry –
- * confirmation dialog"). Both buttons are disabled while deleting.
- */
-@Composable
-private fun DeleteDialog(
-    isDeleting: Boolean,
-    hasError: Boolean,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-) {
-  AlertDialog(
-      onDismissRequest = { if (!isDeleting) onCancel() },
-      modifier = Modifier.testTag(C.Tag.prescription_delete_dialog),
-      title = { Text(stringResource(R.string.prescription_delete_title)) },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(stringResource(R.string.prescription_delete_message))
-          if (hasError) {
-            Text(
-                text = stringResource(R.string.prescription_delete_error),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(C.Tag.prescription_delete_error),
-            )
-          }
-        }
-      },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            enabled = !isDeleting,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.prescription_delete_confirm),
-        ) {
-          Text(stringResource(R.string.prescription_delete_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onCancel,
-            enabled = !isDeleting,
-            modifier = Modifier.testTag(C.Tag.prescription_delete_cancel),
-        ) {
-          Text(stringResource(R.string.prescription_delete_cancel))
-        }
-      },
-  )
 }
 
 /** Every field of [prescription], as in the Figma mockup. */
