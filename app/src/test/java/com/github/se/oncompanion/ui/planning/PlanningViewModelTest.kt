@@ -27,7 +27,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.*
@@ -447,10 +446,11 @@ class PlanningViewModelTest {
 
         // The date changed while Planning was in the background
         now = Instant.parse("2026-10-04T10:00:00Z")
-        backgroundScope.launch { vm.followToday() }
+        val following = vm.followToday()
         runCurrent()
 
         assertEquals(LocalDate.of(2026, 10, 4), vm.uiState.value.today)
+        following.cancel()
       }
 
   @Test
@@ -468,7 +468,7 @@ class PlanningViewModelTest {
                 authRepository = FakeAuthRepository(),
             )
         drain()
-        backgroundScope.launch { vm.followToday() }
+        val following = vm.followToday()
         runCurrent()
         assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.today)
 
@@ -478,6 +478,7 @@ class PlanningViewModelTest {
         assertEquals(LocalDate.of(2026, 10, 3), vm.uiState.value.today)
         assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.selectedDate)
         assertEquals(1, repository.ranges.size)
+        following.cancel()
       }
 
   @Test

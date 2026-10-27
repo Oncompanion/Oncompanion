@@ -88,9 +88,10 @@ class SymptomJournalViewModel(
 
   /**
    * Keeps the current date right, so "Today" and "Yesterday" stay right while the journal is open:
-   * updates it now, then at each midnight, until cancelled. The screen runs it while it is shown.
+   * updates it now, then at each midnight, until the returned job is cancelled. The screen runs it
+   * while it is shown.
    */
-  suspend fun followToday() {
+  fun followToday(): Job = viewModelScope.launch {
     currentDay(clock).collect { today -> _uiState.update { it.copy(today = today) } }
   }
 

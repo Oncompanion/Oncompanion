@@ -31,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -54,7 +53,6 @@ import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 /** A section the patient can open from the Overview with a single tap. */
 enum class OverviewShortcut(
@@ -115,9 +113,8 @@ fun OverviewScreen(
   // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
   // current when the Overview comes back, and move to the new day at each midnight while it is on
   // screen
-  val scope = rememberCoroutineScope()
   LifecycleResumeEffect(viewModel) {
-    val following = scope.launch { viewModel.followToday() }
+    val following = viewModel.followToday()
     onPauseOrDispose { following.cancel() }
   }
   OverviewContent(

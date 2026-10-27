@@ -109,10 +109,10 @@ class PlanningViewModel(
 
   /**
    * Keeps the today marker right while Planning is open: updates it now, then at each midnight,
-   * until cancelled. Like [refreshToday], it keeps the selected day. The screen runs it while it is
-   * shown.
+   * until the returned job is cancelled. Like [refreshToday], it keeps the selected day. The screen
+   * runs it while it is shown.
    */
-  suspend fun followToday() {
+  fun followToday(): Job = viewModelScope.launch {
     currentDay(clock.withZone(zoneId)).collect { today ->
       mutableState.value = mutableState.value.copy(today = today)
     }

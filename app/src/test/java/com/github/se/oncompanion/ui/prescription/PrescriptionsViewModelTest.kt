@@ -18,7 +18,6 @@ import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -313,10 +312,11 @@ class PrescriptionsViewModelTest {
 
         // The date changed while the list was in the background
         current = Clock.fixed(Instant.parse("2026-11-01T00:05:00Z"), ZoneOffset.UTC)
-        backgroundScope.launch { viewModel.followToday() }
+        val following = viewModel.followToday()
         runCurrent()
 
         assertEquals(LocalDate.of(2026, 11, 1), viewModel.uiState.value.today)
+        following.cancel()
       }
 
   @Test
@@ -327,7 +327,7 @@ class PrescriptionsViewModelTest {
             VirtualClock(testScheduler, Instant.parse("2026-10-31T23:59:00Z"), ZoneOffset.UTC)
         val viewModel = PrescriptionsViewModel(signedIn(), repository, clock)
         advanceUntilIdle()
-        backgroundScope.launch { viewModel.followToday() }
+        val following = viewModel.followToday()
         runCurrent()
         assertEquals(listOf("october"), viewModel.thisMonthIds)
 
@@ -337,6 +337,7 @@ class PrescriptionsViewModelTest {
         assertEquals(LocalDate.of(2026, 11, 1), viewModel.uiState.value.today)
         assertEquals(emptyList<String>(), viewModel.thisMonthIds)
         assertEquals(listOf("october"), viewModel.earlierIds)
+        following.cancel()
       }
 
   @Test

@@ -171,10 +171,10 @@ class OverviewViewModel(
 
   /**
    * Keeps the day right while the Overview is open: refreshes the time now, then at each midnight
-   * (which also loads the new day's entries), until cancelled. The screen runs it while it is
-   * shown.
+   * (which also loads the new day's entries), until the returned job is cancelled. The screen runs
+   * it while it is shown.
    */
-  suspend fun followToday() {
+  fun followToday(): Job = viewModelScope.launch {
     currentDay(clock.withZone(zoneId)).collect { refreshNow() }
   }
 
