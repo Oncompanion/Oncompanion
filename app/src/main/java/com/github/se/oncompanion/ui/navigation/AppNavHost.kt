@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
@@ -19,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
@@ -54,6 +56,7 @@ import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionsViewModel
+import com.github.se.oncompanion.ui.prescription.scan.ScanHandoffViewModel
 import com.github.se.oncompanion.ui.prescription.scan.ScanScreen
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
@@ -308,7 +311,8 @@ fun AppNavHost(
             onBack = navigationActions::goBack,
         )
       }
-      composable(Screen.PRESCRIPTION_SCAN) {
+      composable(Screen.PRESCRIPTION_SCAN) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         ScanScreen(
             // The form replaces the scan screen, so closing or saving it returns to the list
             onEnterManually =
@@ -317,15 +321,32 @@ fun AppNavHost(
                   navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
                 },
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The form opens with what was read, in place of the scan screen as for manual entry
+            onRead = { scan ->
+              handoff.hand(scan)
+              navigationActions.goBack()
+              navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
+            },
         )
       }
-      composable(Screen.PRESCRIPTION_ADD) {
+      composable(Screen.PRESCRIPTION_ADD) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel() },
-            // A second tap while the form is already leaving is dropped, so Back happens once
-            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Starts from the scanned prescription if it was just read, empty otherwise
+            viewModel =
+                viewModel { PrescriptionFormViewModel(initialDraft = handoff.scanned?.draft) },
+            // A second tap while the form is already leaving is dropped, so Back happens once. The
+            // scan's photo is no longer needed once the form is done
+            onClose =
+                dropUnlessResumed {
+                  handoff.finish()
+                  navigationActions.goBack()
+                },
             // Saving returns to the screen the form was opened from
-            onSaved = navigationActions::goBack,
+            onSaved = {
+              handoff.finish()
+              navigationActions.goBack()
+            },
         )
       }
     }
@@ -374,6 +395,23 @@ fun AppNavHost(
         )
       }
     }
+  }
+}
+
+/**
+ * The [ScanHandoffViewModel] shared by the prescriptions screens: it belongs to the prescriptions
+ * graph, so it passes the scanned prescription from the scan screen to the form, and is cleared,
+ * deleting the photo, when the user leaves the prescriptions screens.
+ */
+@Composable
+private fun scanHandoffViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): ScanHandoffViewModel {
+  val prescriptionsGraph = remember(entry) { navController.getBackStackEntry(Route.PRESCRIPTIONS) }
+  val cacheDir = LocalContext.current.cacheDir
+  return viewModel(viewModelStoreOwner = prescriptionsGraph) {
+    ScanHandoffViewModel(ScanPhotoStore(cacheDir))
   }
 }
 

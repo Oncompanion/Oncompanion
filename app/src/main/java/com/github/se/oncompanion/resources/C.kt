@@ -379,5 +379,11 @@ object C {
     const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
     const val prescription_scan_retake_button = "prescription_scan_retake_button"
     const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
+    const val prescription_scan_reading = "prescription_scan_reading"
+    const val prescription_scan_nothing_read = "prescription_scan_nothing_read"
+    const val prescription_scan_nothing_read_enter_manually_button =
+        "prescription_scan_nothing_read_enter_manually_button"
+    const val prescription_scan_nothing_read_retake_button =
+        "prescription_scan_nothing_read_retake_button"
   }
 }

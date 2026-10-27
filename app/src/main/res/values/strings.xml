@@ -415,7 +415,12 @@
     <string name="prescription_scan_check_hint">Is all the text sharp and inside the photo?</string>
     <string name="prescription_scan_retake">Retake</string>
     <string name="prescription_scan_use_photo">Use this photo</string>
-    <string name="prescription_scan_reading_coming_soon">Reading the prescription is coming soon</string>
+    <string name="prescription_scan_reading_title">Reading the prescription</string>
+    <string name="prescription_scan_reading">Reading your prescription… This takes a few seconds.</string>
+    <string name="prescription_scan_nothing_read_title">Couldn\'t read the prescription</string>
+    <string name="prescription_scan_nothing_read">We couldn\'t find any text on this photo. It may be handwritten, blurry or too dark.</string>
+    <string name="prescription_scan_enter_it_manually">Enter it manually</string>
+    <string name="prescription_scan_retake_photo">Retake the photo</string>
     <string name="prescription_scan_photo_description">Photo of the prescription</string>
     <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>

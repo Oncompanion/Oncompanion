@@ -71,7 +71,7 @@ class ScanCameraTest {
   @Test
   fun realPhoto_isShown_deletedOnRetake_andDeletedOnClose() {
     var closed = false
-    compose.setContent { ScanScreen(onEnterManually = {}, onBack = { closed = true }) }
+    compose.setContent { ScanScreen(onEnterManually = {}, onBack = { closed = true }, onRead = {}) }
 
     // The real camera turns on (the shutter becomes usable), or the screen says it can't be used
     waitUntil { cameraReady() || cameraUnavailable() }

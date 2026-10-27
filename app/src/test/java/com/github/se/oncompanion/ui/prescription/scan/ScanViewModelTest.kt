@@ -6,14 +6,22 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
+import com.github.se.oncompanion.domain.medication.scan.readPrescription
+import com.github.se.oncompanion.model.medication.scan.FakeTextRecognizer
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
+import com.github.se.oncompanion.model.medication.scan.ScannedSheets
 import java.io.File
 import java.io.IOException
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -38,6 +46,11 @@ class ScanViewModelTest {
   private lateinit var cacheDir: File
   private lateinit var viewModel: ScanViewModel
 
+  // Reads sheet 01 of the test prescriptions, unless a test says otherwise
+  private val recognizer = FakeTextRecognizer(ScannedSheets.sheet(1))
+  private val zone = ZoneId.of("Europe/Zurich")
+  private val clock = Clock.fixed(LocalDate.of(2026, 11, 20).atStartOfDay(zone).toInstant(), zone)
+
   private val state
     get() = viewModel.uiState.value
 
@@ -49,7 +62,8 @@ class ScanViewModelTest {
   fun setUp() {
     Dispatchers.setMain(dispatcher)
     cacheDir = temporaryFolder.newFolder("cache")
-    viewModel = ScanViewModel(ScanPhotoStore(cacheDir))
+    viewModel =
+        ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer, clock))
   }
 
   @After
@@ -262,20 +276,179 @@ class ScanViewModelTest {
         assertEquals(photosOnDisk.single().absoluteFile, state.photo?.absoluteFile)
       }
 
+  // ---- reading the prescription ----
+
+  /** A photo taken and being checked, ready to be used. */
+  private suspend fun TestScope.photoTaken(): File {
+    cameraReady()
+    viewModel.capture(writePhoto)
+    advanceUntilIdle()
+    return photosOnDisk.single()
+  }
+
   @Test
-  fun usePhoto_deletesIt_andSaysReadingIsComingSoon() =
+  fun usePhoto_readsThePrescription_andHandsItOverWithThePhoto() =
       runTest(dispatcher) {
-        cameraReady()
-        viewModel.capture(writePhoto)
-        advanceUntilIdle()
+        val photo = photoTaken()
 
         viewModel.usePhoto()
+        assertTrue(state.isReading)
+        advanceUntilIdle()
 
-        // Nothing reads prescriptions yet (#62): the photo must not be kept for nothing
-        assertTrue(photosOnDisk.isEmpty())
+        assertFalse(state.isReading)
+        assertEquals(
+            readPrescription(ScannedSheets.sheet(1), LocalDate.of(2026, 11, 20)),
+            state.read?.prescription,
+        )
+        assertEquals(photo.absoluteFile, state.read?.photo?.absoluteFile)
+        // The photo goes with the prescription: this screen no longer shows or deletes it
         assertNull(state.photo)
-        assertTrue(state.readingComingSoon)
+        assertTrue(photo.exists())
+        assertEquals(listOf(photo.absoluteFile), recognizer.photos.map { it.absoluteFile })
+      }
+
+  @Test
+  fun whileReading_thePhotoCantBeRetakenOrUsedAgain() =
+      runTest(dispatcher) {
+        val photo = photoTaken()
+        recognizer.reading = CompletableDeferred()
+
+        viewModel.usePhoto()
+        advanceUntilIdle()
+        viewModel.usePhoto()
+        viewModel.retake()
+        advanceUntilIdle()
+
+        assertTrue(state.isReading)
+        assertTrue(photo.exists())
+        assertEquals(1, recognizer.photos.size)
+      }
+
+  @Test
+  fun theReadPrescriptionIsForgottenOnceOpened() =
+      runTest(dispatcher) {
+        val photo = photoTaken()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        viewModel.onReadOpened()
+
+        assertNull(state.read)
+        // Its photo is the form's now
+        assertTrue(photo.exists())
+      }
+
+  @Test
+  fun nothingRead_keepsThePhotoForRetakeOrManualEntry() =
+      runTest(dispatcher) {
+        recognizer.result = FakeTextRecognizer.NO_TEXT
+        val photo = photoTaken()
+
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        assertTrue(state.nothingRead)
+        assertFalse(state.isReading)
+        assertNull(state.read)
+        assertEquals(photo.absoluteFile, state.photo?.absoluteFile)
+        // Using it again would read the same nothing
+        viewModel.usePhoto()
+        advanceUntilIdle()
+        assertEquals(1, recognizer.photos.size)
+      }
+
+  @Test
+  fun aFailedReading_isNothingRead() =
+      runTest(dispatcher) {
+        recognizer.error = IOException("ML Kit couldn't read the photo")
+        photoTaken()
+
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        assertTrue(state.nothingRead)
+        assertNull(state.read)
+      }
+
+  @Test
+  fun retake_afterNothingRead_deletesThePhoto_andShowsTheCameraAgain() =
+      runTest(dispatcher) {
+        recognizer.result = FakeTextRecognizer.NO_TEXT
+        val photo = photoTaken()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        viewModel.retake()
+
+        assertFalse(photo.exists())
+        assertFalse(state.nothingRead)
         assertTrue(state.canCapture)
+      }
+
+  @Test
+  fun closedWhileReading_deletesThePhoto_andHandsNothingOver() =
+      runTest(dispatcher) {
+        val photo = photoTaken()
+        recognizer.reading = CompletableDeferred()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        viewModel.onClose()
+        recognizer.reading!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(photo.exists())
+        assertNull(state.read)
+        assertFalse(state.isReading)
+      }
+
+  @Test
+  fun noPhotoCanBeTaken_whileReadingOrOnceNothingWasRead() =
+      runTest(dispatcher) {
+        photoTaken()
+        recognizer.reading = CompletableDeferred()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+        assertFalse(state.canCapture)
+
+        recognizer.result = FakeTextRecognizer.NO_TEXT
+        recognizer.reading!!.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(state.nothingRead)
+        assertFalse(state.canCapture)
+      }
+
+  @Test
+  fun afterNothingRead_aRetakenPhotoIsReadAndHanded() =
+      runTest(dispatcher) {
+        recognizer.result = FakeTextRecognizer.NO_TEXT
+        val first = photoTaken()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+        viewModel.retake()
+
+        recognizer.result = ScannedSheets.sheet(3)
+        viewModel.capture(writePhoto)
+        advanceUntilIdle()
+        val second = photosOnDisk.single()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        assertFalse(first.exists())
+        assertEquals(second.absoluteFile, state.read?.photo?.absoluteFile)
+      }
+
+  @Test
+  fun closedAfterNothingRead_deletesThePhoto() =
+      runTest(dispatcher) {
+        recognizer.result = FakeTextRecognizer.NO_TEXT
+        val photo = photoTaken()
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        viewModel.onClose()
+
+        assertFalse(photo.exists())
       }
 
   @Test
@@ -284,21 +457,9 @@ class ScanViewModelTest {
 
     viewModel.usePhoto()
 
-    assertFalse(state.readingComingSoon)
+    assertFalse(state.isReading)
+    assertTrue(recognizer.photos.isEmpty())
   }
-
-  @Test
-  fun readingComingSoonMessageShown_isForgotten() =
-      runTest(dispatcher) {
-        cameraReady()
-        viewModel.capture(writePhoto)
-        advanceUntilIdle()
-        viewModel.usePhoto()
-
-        viewModel.onMessageShown()
-
-        assertFalse(state.readingComingSoon)
-      }
 
   @Test
   fun failedCaptureMessageShown_isForgotten() =
@@ -389,6 +550,79 @@ class ScanViewModelTest {
         advanceUntilIdle()
 
         assertTrue(photosOnDisk.isEmpty())
+      }
+
+  /** A scan view model cleared when [store] is, reading with the test's recognizer. */
+  private fun scopedTo(store: ViewModelStore): ScanViewModel =
+      ViewModelProvider(
+          store,
+          viewModelFactory {
+            initializer {
+              ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer, clock))
+            }
+          },
+      )[ScanViewModel::class.java]
+
+  @Test
+  fun screenDestroyedWhileReading_deletesThePhoto() =
+      runTest(dispatcher) {
+        val store = ViewModelStore()
+        val scoped =
+            scopedTo(store).apply {
+              onPermissionGranted()
+              onCameraReady()
+            }
+        scoped.capture(writePhoto)
+        advanceUntilIdle()
+        recognizer.reading = CompletableDeferred()
+        scoped.usePhoto()
+        advanceUntilIdle()
+
+        store.clear()
+        advanceUntilIdle()
+
+        assertTrue(photosOnDisk.isEmpty())
+      }
+
+  @Test
+  fun screenDestroyedBeforeTheReadPrescriptionWasOpened_deletesItsPhoto() =
+      runTest(dispatcher) {
+        val store = ViewModelStore()
+        val scoped =
+            scopedTo(store).apply {
+              onPermissionGranted()
+              onCameraReady()
+            }
+        scoped.capture(writePhoto)
+        advanceUntilIdle()
+        scoped.usePhoto()
+        advanceUntilIdle()
+        assertNotNull(scoped.uiState.value.read)
+
+        store.clear()
+
+        assertTrue(photosOnDisk.isEmpty())
+      }
+
+  @Test
+  fun screenDestroyedAfterTheFormOpened_leavesThePhotoToTheForm() =
+      runTest(dispatcher) {
+        val store = ViewModelStore()
+        val scoped =
+            scopedTo(store).apply {
+              onPermissionGranted()
+              onCameraReady()
+            }
+        scoped.capture(writePhoto)
+        advanceUntilIdle()
+        scoped.usePhoto()
+        advanceUntilIdle()
+        val photo = scoped.uiState.value.read!!.photo
+        scoped.onReadOpened()
+
+        store.clear()
+
+        assertTrue(photo.exists())
       }
 
   @Test

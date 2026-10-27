@@ -1013,7 +1013,7 @@
       "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1022,8 +1022,8 @@
         "type": 3
       },
       "seed": 1819980298,
-      "version": 2,
-      "versionNonce": 2123313617,
+      "version": 3,
+      "versionNonce": 1438782567,
       "isDeleted": false,
       "boundElements": [
         {
@@ -1031,7 +1031,7 @@
           "id": "b1_3_t"
         }
       ],
-      "updated": 1792851985407,
+      "updated": 1792918526884,
       "link": null,
       "locked": false,
       "index": "a029"
@@ -1055,11 +1055,11 @@
       "frameId": null,
       "roundness": null,
       "seed": 1296491778,
-      "version": 2,
-      "versionNonce": 123057951,
+      "version": 3,
+      "versionNonce": 1857595273,
       "isDeleted": false,
       "boundElements": [],
-      "updated": 1792851985407,
+      "updated": 1792918526884,
       "link": null,
       "locked": false,
       "index": "a030",
