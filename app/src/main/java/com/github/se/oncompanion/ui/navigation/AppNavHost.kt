@@ -260,7 +260,7 @@ fun AppNavHost(
             // Scoped to this back stack entry, so each opened prescription has its own ViewModel
             viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
             onBack = navigationActions::goBack,
-            onEdit = { id -> navigationActions.navigateTo(Screen.prescriptionEdit(id)) },
+            onEdit = { navigationActions.navigateTo(Screen.prescriptionEdit(prescriptionId)) },
             // Back to the list, which no longer shows it
             onDeleted = navigationActions::goBack,
         )

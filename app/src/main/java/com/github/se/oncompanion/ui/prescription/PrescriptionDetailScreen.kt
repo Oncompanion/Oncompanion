@@ -70,14 +70,14 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * the prescriptions list: every saved field, so the patient can check a dosage at any time, also
  * offline.
  *
- * @param onEdit opens the prescription with the given ID in the form, to correct it (US-12)
+ * @param onEdit opens the prescription in the form, to correct it (US-12)
  * @param onDeleted called once the prescription is deleted, to leave the screen
  */
 @Composable
 fun PrescriptionDetailScreen(
     viewModel: PrescriptionDetailViewModel,
     onBack: () -> Unit,
-    onEdit: (String) -> Unit,
+    onEdit: () -> Unit,
     onDeleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -91,7 +91,7 @@ fun PrescriptionDetailScreen(
       uiState = uiState,
       onBack = onBack,
       onRetry = viewModel::load,
-      onEdit = { uiState.prescription?.let { onEdit(it.id) } },
+      onEdit = onEdit,
       onDelete = viewModel::requestDelete,
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,

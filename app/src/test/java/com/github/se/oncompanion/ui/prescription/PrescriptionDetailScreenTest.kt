@@ -407,16 +407,16 @@ class PrescriptionDetailScreenTest {
   // ----- With the ViewModel -----
 
   @Test
-  fun screen_showsTheSignedInUsersPrescription_andPassesBack() {
+  fun screen_showsTheSignedInUsersPrescription_andPassesBackAndEdit() {
     val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
     var backs = 0
-    val edited = mutableListOf<String>()
+    var edits = 0
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
     composeTestRule.setContent {
       PrescriptionDetailScreen(
           viewModel = viewModel,
           onBack = { backs++ },
-          onEdit = { edited += it },
+          onEdit = { edits++ },
           onDeleted = {},
       )
     }
@@ -428,7 +428,7 @@ class PrescriptionDetailScreenTest {
 
     composeTestRule.runOnIdle {
       assertEquals(1, backs)
-      assertEquals(listOf("chemo"), edited)
+      assertEquals(1, edits)
     }
   }
 
