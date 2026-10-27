@@ -1,0 +1,22 @@
+# Fictional US-10 test prescription, sheet 02, as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.88	730,668,1570,713	Centre d'oncologie des Tilleuls (fictif)
+0.84	727,724,1480,759	Rue des Tilleuls 12 1200 Genève Tél. 022 000 00 00
+0.92	721,837,1016,873	Dre Claire Fontaine
+0.88	720,885,1318,920	Spécialiste FMH en oncologie médicale
+0.89	754,1032,1062,1063	Patient : Sam Rivera
+0.86	751,1075,1007,1105	Né le 12.03.1978
+0.75	696,1410,765,1449	Rp/
+0.83	771,1115,1172,1153	N° AVS :756.0000.0000.00
+0.86	725,1493,1226,1540	1. Tamoxifène 20 mg, comprimés
+0.83	753,1551,1084,1588	1-0-0, pendant 6 mois
+0.89	704,1644,1242,1689	2. Pantoprazole 40 mg, comprimés
+0.85	747,1701,1101,1738	1-0-0, pendant 30 jours
+0.87	696,1785,1293,1840	3. Métoclopram ide 10 mg, comprimés
+0.81	739,1843,1325,1888	1-1-1 si nausées, au maximum 5 jours
+0.80	2236,0,2757,187	inion Non valable Aucune personne ni
+0.86	2035,1281,2380,1310	Genève, le 14.10.2026
+0.83	611,3220,2292,3285	SPECIMEN Ordonnance fictive créee pour tester l'application oncompanion Non valable AUcune personne ni
+0.82	610,3265,810,3297	clinique réelle

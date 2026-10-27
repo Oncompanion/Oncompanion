@@ -7,6 +7,11 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment detail
+    const val appointment_detail_screen = "appointment_detail_screen"
+    const val appointment_detail_loading = "appointment_detail_loading"
+    const val appointment_detail_feedback = "appointment_detail_feedback"
+    const val appointment_detail_retry = "appointment_detail_retry"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -282,7 +287,23 @@ object C {
     const val join_circle_screen = "join_circle_screen"
     const val join_circle_code_field = "join_circle_code_field"
     const val join_circle_join_button = "join_circle_join_button"
-    const val join_circle_no_code = "join_circle_no_code"
+    const val join_circle_no_code_hint = "join_circle_no_code_hint"
+    const val join_circle_profile = "join_circle_profile"
+    const val join_circle_joining = "join_circle_joining"
+    const val join_circle_joined = "join_circle_joined"
+    const val join_circle_continue = "join_circle_continue"
+
+    // Whose care?
+    const val whose_care_screen = "whose_care_screen"
+    const val whose_care_back = "whose_care_back"
+    const val whose_care_loading = "whose_care_loading"
+    const val whose_care_error = "whose_care_error"
+    const val whose_care_empty = "whose_care_empty"
+    const val whose_care_action = "whose_care_action"
+    const val whose_care_join_another = "whose_care_join_another"
+
+    /** The row of the followed patient [uid] in "Whose care?". */
+    fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
@@ -364,5 +385,11 @@ object C {
     const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
     const val prescription_scan_retake_button = "prescription_scan_retake_button"
     const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
+    const val prescription_scan_reading = "prescription_scan_reading"
+    const val prescription_scan_nothing_read = "prescription_scan_nothing_read"
+    const val prescription_scan_nothing_read_enter_manually_button =
+        "prescription_scan_nothing_read_enter_manually_button"
+    const val prescription_scan_nothing_read_retake_button =
+        "prescription_scan_nothing_read_retake_button"
   }
 }

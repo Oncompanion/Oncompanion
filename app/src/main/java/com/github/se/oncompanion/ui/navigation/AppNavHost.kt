@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
@@ -19,7 +20,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
@@ -33,6 +37,9 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
+import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
+import com.github.se.oncompanion.ui.carecircle.WhoseCareViewModel
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -49,6 +56,7 @@ import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionsViewModel
+import com.github.se.oncompanion.ui.prescription.scan.ScanHandoffViewModel
 import com.github.se.oncompanion.ui.prescription.scan.ScanScreen
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
@@ -90,6 +98,8 @@ fun AppNavHost(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
                     AfterSignIn.OVERVIEW -> Route.OVERVIEW
+                    AfterSignIn.JOIN_CIRCLE -> Route.JOIN_CIRCLE
+                    AfterSignIn.WHOSE_CARE -> Route.WHOSE_CARE
                   }
               )
             },
@@ -120,14 +130,44 @@ fun AppNavHost(
     navigation(startDestination = Screen.JOIN_CIRCLE, route = Route.JOIN_CIRCLE) {
       composable(Screen.JOIN_CIRCLE) {
         JoinCareCircleScreen(
-            // No code yet: the Overview for now, until caregivers get their own home
-            onNoCode = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) }
+            viewModel = viewModel { JoinCareCircleViewModel() },
+            // Joined: choose whose care to follow (straight to them with a single patient)
+            onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
+            onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+        )
+      }
+    }
+
+    navigation(startDestination = Screen.WHOSE_CARE, route = Route.WHOSE_CARE) {
+      composable(
+          Screen.WHOSE_CARE,
+          arguments =
+              listOf(
+                  navArgument(Screen.WHOSE_CARE_AUTO_SELECT) {
+                    type = NavType.BoolType
+                    defaultValue = true
+                  }
+              ),
+      ) { entry ->
+        WhoseCareScreen(
+            viewModel = viewModel { WhoseCareViewModel() },
+            // No back arrow when it is the first screen (after joining, or at start)
+            onBack =
+                navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
+            // The Overview for now; the caregiver mode (#203) opens the chosen patient's one
+            onPatientChosen = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
+            autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }
     }
 
     navigation(startDestination = Screen.OVERVIEW, route = Route.OVERVIEW) {
-      composable(Screen.OVERVIEW) { OverviewScreen(navigationActions) }
+      composable(Screen.OVERVIEW) {
+        OverviewScreen(navigationActions, onOpenAppointment = appointmentOpener(navigationActions))
+      }
     }
 
     // Bottom bar tabs, next to Overview
@@ -151,7 +191,16 @@ fun AppNavHost(
             navigationActions,
             planningViewModel,
             onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+            onOpenAppointment = appointmentOpener(navigationActions),
         )
+      }
+      composable(
+          Screen.APPOINTMENT_DETAIL,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
       }
       composable(
           Screen.APPOINTMENT_ADD,
@@ -277,7 +326,8 @@ fun AppNavHost(
             onSaved = navigationActions::goBack,
         )
       }
-      composable(Screen.PRESCRIPTION_SCAN) {
+      composable(Screen.PRESCRIPTION_SCAN) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         ScanScreen(
             // The form replaces the scan screen, so closing or saving it returns to the list
             onEnterManually =
@@ -286,15 +336,32 @@ fun AppNavHost(
                   navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
                 },
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The form opens with what was read, in place of the scan screen as for manual entry
+            onRead = { scan ->
+              handoff.hand(scan)
+              navigationActions.goBack()
+              navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
+            },
         )
       }
-      composable(Screen.PRESCRIPTION_ADD) {
+      composable(Screen.PRESCRIPTION_ADD) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel() },
-            // A second tap while the form is already leaving is dropped, so Back happens once
-            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Starts from the scanned prescription if it was just read, empty otherwise
+            viewModel =
+                viewModel { PrescriptionFormViewModel(initialDraft = handoff.scanned?.draft) },
+            // A second tap while the form is already leaving is dropped, so Back happens once. The
+            // scan's photo is no longer needed once the form is done
+            onClose =
+                dropUnlessResumed {
+                  handoff.finish()
+                  navigationActions.goBack()
+                },
             // Saving returns to the screen the form was opened from
-            onSaved = navigationActions::goBack,
+            onSaved = {
+              handoff.finish()
+              navigationActions.goBack()
+            },
         )
       }
     }
@@ -347,6 +414,23 @@ fun AppNavHost(
 }
 
 /**
+ * The [ScanHandoffViewModel] shared by the prescriptions screens: it belongs to the prescriptions
+ * graph, so it passes the scanned prescription from the scan screen to the form, and is cleared,
+ * deleting the photo, when the user leaves the prescriptions screens.
+ */
+@Composable
+private fun scanHandoffViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): ScanHandoffViewModel {
+  val prescriptionsGraph = remember(entry) { navController.getBackStackEntry(Route.PRESCRIPTIONS) }
+  val cacheDir = LocalContext.current.cacheDir
+  return viewModel(viewModelStoreOwner = prescriptionsGraph) {
+    ScanHandoffViewModel(ScanPhotoStore(cacheDir))
+  }
+}
+
+/**
  * The [OnboardingViewModel] shared by the onboarding screens: it belongs to the onboarding graph,
  * so it keeps the user's answers while they move between the steps.
  */
@@ -357,4 +441,15 @@ private fun onboardingViewModel(
 ): OnboardingViewModel {
   val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
   return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
+}
+
+/** Shares the resumed-only guard for appointment navigation from either bottom tab. */
+@Composable
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+  return { id ->
+    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+      navigationActions.navigateTo(Screen.appointmentDetail(id))
+    }
+  }
 }

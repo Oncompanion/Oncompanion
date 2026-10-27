@@ -51,6 +51,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
+import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
@@ -254,15 +255,165 @@ class AppNavHostTest {
   }
 
   @Test
-  fun joinACareCircle_withoutACode_continuesToOverview() {
+  fun joinACareCircle_withAValidCode_joinsThenOpensTheirCare() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    // Joining adds the caregiver to Marie's circle, which "Whose care?" then reads
+    val circle = FakeCareCircleRepository()
+    val invites = FakeCareCircleInviteRepository(circle)
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "ABCDEFGHJK",
+                ownerUid = "patient",
+                ownerFirstName = "Marie",
+                details = CareCircleMemberDetails(firstName = "Sam"),
+            )
+        )
+    )
+    setNavHost(
+        Route.JOIN_CIRCLE,
+        careCircleRepository = circle,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.join_circle_joined).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_continue).performScrollTo().performClick()
+
+    // "Whose care?" chooses Marie by itself, the only patient, and opens the Overview
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.overview_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals("patient", invites.joinedCircles("caregiver").single().patientUid)
+    }
+  }
+
+  /** A signed-in caregiver following [patients] (uid to first name), for "Whose care?". */
+  private fun followingCaregiver(
+      vararg patients: Pair<String, String>
+  ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository()
+    val circles = FakeCareCircleRepository()
+    for ((uid, _) in patients) {
+      circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
+    }
+    invites.setJoinedCircles(
+        "caregiver",
+        patients.map { (uid, name) -> JoinedCareCircle(uid, name) },
+    )
+    return Triple(auth, invites, circles)
+  }
+
+  @Test
+  fun whoseCare_withSeveralPatients_listsThem_andChoosingOneOpensTheOverview() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-paul"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    // The first screen: no back arrow
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_back).assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun whoseCare_joinAnother_opensTheJoinScreen_andBackReturns() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whose_care_join_another)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_join_another).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun whoseCare_openedToSwitch_showsTheListAndABackArrow_evenWithOnePatient() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    setNavHost(
+        Route.OVERVIEW,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.runOnIdle { navController.navigate(Screen.WHOSE_CARE_SWITCH) }
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-anne"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun whoseCare_signedOut_opensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.WHOSE_CARE)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun joinACareCircle_signedOut_joiningOpensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun joinACareCircle_profileOpensTheProfile_andBackReturnsToJoin() {
     setNavHost(Route.JOIN_CIRCLE)
     composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).assertIsNotEnabled()
-    composeTestRule.onNodeWithTag(C.Tag.join_circle_no_code).performScrollTo().performClick()
-    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_profile).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
+      assertEquals(Screen.PROFILE, NavigationActions(navController).currentRoute())
+      NavigationActions(navController).goBack()
     }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
   }
 
   @Test

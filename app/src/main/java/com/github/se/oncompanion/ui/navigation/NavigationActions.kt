@@ -17,6 +17,7 @@ object Route {
   const val AUTH = "auth"
   const val ONBOARDING = "onboarding"
   const val JOIN_CIRCLE = "join_circle"
+  const val WHOSE_CARE = "whose_care"
   const val OVERVIEW = "overview"
   const val PLANNING = "planning"
   const val EVENTS = "events"
@@ -38,11 +39,26 @@ object Screen {
   // Route.JOIN_CIRCLE
   const val JOIN_CIRCLE = "join_circle_home"
 
+  // Route.WHOSE_CARE
+  /** Whether "Whose care?" chooses the only patient by itself, argument of [WHOSE_CARE]. */
+  const val WHOSE_CARE_AUTO_SELECT = "autoSelect"
+  const val WHOSE_CARE = "whose_care_home?$WHOSE_CARE_AUTO_SELECT={$WHOSE_CARE_AUTO_SELECT}"
+
+  /** "Whose care?" opened to switch patient on purpose: the list shows even with one patient. */
+  const val WHOSE_CARE_SWITCH = "whose_care_home?$WHOSE_CARE_AUTO_SELECT=false"
+
   // Route.OVERVIEW
   const val OVERVIEW = "overview_home"
 
   // Route.PLANNING
   const val PLANNING = "planning_home"
+  /** Argument identifying the appointment owned by the current patient. */
+  const val APPOINTMENT_ID = "appointmentId"
+  const val APPOINTMENT_DETAIL = "appointment_detail/{$APPOINTMENT_ID}"
+
+  /** Opens one appointment without changing the originating calendar selection. */
+  fun appointmentDetail(id: String) = "appointment_detail/${Uri.encode(id)}"
+
   const val APPOINTMENT_DATE = "appointmentDate"
   const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
   const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
