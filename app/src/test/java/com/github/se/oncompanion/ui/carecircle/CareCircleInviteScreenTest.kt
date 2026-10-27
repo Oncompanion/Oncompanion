@@ -203,6 +203,15 @@ class CareCircleInviteScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_valid).assertDoesNotExist()
   }
 
+  // ---- preview ----
+
+  @Test
+  fun preview_showsAPendingInvite() {
+    composeTestRule.setContent { CareCircleInviteScreenPreview() }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_name).assertTextEquals("Julie Martin")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("K7M2P-Q9XRT")
+  }
+
   // ---- screen wired to its ViewModel ----
 
   private lateinit var invites: FakeCareCircleInviteRepository
