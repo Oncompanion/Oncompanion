@@ -26,6 +26,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -328,7 +329,7 @@ class PrescriptionDetailScreenTest {
 
   // ----- Delete (US-12) -----
 
-  private val confirming = shown.copy(isConfirmingDelete = true)
+  private val confirming = shown.copy(delete = DeleteState(isConfirming = true))
 
   @Test
   fun shown_deleteButtonUnderEdit_asksForConfirmation() {
@@ -386,7 +387,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun whileDeleting_theDialogsButtonsAreDisabled() {
-    setContent(confirming.copy(isDeleting = true))
+    setContent(confirming.copy(delete = confirming.delete.copy(isDeleting = true)))
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).assertIsNotEnabled()
@@ -394,7 +395,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun deleteError_isShownInTheDialog() {
-    setContent(confirming.copy(hasDeleteError = true))
+    setContent(confirming.copy(delete = confirming.delete.copy(hasError = true)))
 
     assertTextInside(
         context.getString(R.string.prescription_delete_error),

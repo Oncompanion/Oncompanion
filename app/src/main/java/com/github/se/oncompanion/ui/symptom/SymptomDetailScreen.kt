@@ -71,7 +71,7 @@ fun SymptomDetailScreen(
 
   // Back to the journal, which no longer shows the symptom, once it is deleted
   val goBack by rememberUpdatedState(navigationActions::goBack)
-  LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) goBack() }
+  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) goBack() }
 
   SymptomDetailContent(
       uiState = uiState,
@@ -168,8 +168,8 @@ fun SymptomDetailContent(
         error = stringResource(R.string.symptom_delete_error),
         confirmLabel = stringResource(R.string.symptom_delete_confirm),
         cancelLabel = stringResource(R.string.symptom_delete_cancel),
-        isDeleting = uiState.isDeleting,
-        hasError = uiState.hasDeleteError,
+        isDeleting = uiState.delete.isDeleting,
+        hasError = uiState.delete.hasError,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags = deleteDialogTags,

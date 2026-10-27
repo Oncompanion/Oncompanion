@@ -10,48 +10,48 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The UI state of a detail screen whose item can be deleted after a confirmation (e.g. a symptom or
- * a prescription), so [DeleteConfirmation] can run the same deletion for every such screen.
+ * Where the deletion of a detail screen's item is at. Its four flags always change together, so
+ * every such screen holds them in this one field.
  *
- * @property canDelete the item is shown and can be deleted
- * @property isConfirmingDelete the user asked to delete the item and hasn't confirmed or cancelled
+ * @property isConfirming the user asked to delete the item and hasn't confirmed or cancelled
  * @property isDeleting the item is being deleted
- * @property hasDeleteError the last deletion failed; the item is kept
+ * @property hasError the last deletion failed; the item is kept
  * @property isDeleted the item is deleted: the screen is done
  */
-interface DeletableUiState<S : DeletableUiState<S>> {
-  val canDelete: Boolean
-  val isConfirmingDelete: Boolean
-  val isDeleting: Boolean
-  val hasDeleteError: Boolean
-  val isDeleted: Boolean
+data class DeleteState(
+    val isConfirming: Boolean = false,
+    val isDeleting: Boolean = false,
+    val hasError: Boolean = false,
+    val isDeleted: Boolean = false,
+) {
+  /**
+   * This deletion once the item has been read again, [exists] or not: an item deleted elsewhere
+   * can't be deleted here, so its confirmation and its error are dropped.
+   */
+  fun afterRead(exists: Boolean): DeleteState {
+    val stillConfirming = isConfirming && exists
+    return copy(isConfirming = stillConfirming, hasError = hasError && stillConfirming)
+  }
+}
 
-  /** A copy of this state with the given delete fields; the others stay the same. */
-  fun withDelete(
-      isConfirmingDelete: Boolean = this.isConfirmingDelete,
-      isDeleting: Boolean = this.isDeleting,
-      hasDeleteError: Boolean = this.hasDeleteError,
-      isDeleted: Boolean = this.isDeleted,
-  ): S
+/**
+ * The UI state of a detail screen whose item can be deleted after a confirmation (e.g. a symptom or
+ * a prescription): what [DeleteConfirmation] reads before each step.
+ *
+ * @property delete where the deletion is at
+ * @property canDelete the item is shown and can be deleted; the screen also shows its Delete button
+ *   from it, so both always agree
+ */
+interface HasDeleteState {
+  val delete: DeleteState
+  val canDelete: Boolean
 
   /**
    * The dialog asking to confirm the deletion is shown: only while its Delete button can do
    * something, so it never stays over an item that is gone or reloading.
    */
   val isDeleteDialogShown: Boolean
-    get() = isConfirmingDelete && (canDelete || isDeleting)
-
-  /**
-   * This state once the item has been read again, [exists] or not: an item deleted elsewhere can't
-   * be deleted here, so its confirmation and its error are dropped.
-   */
-  fun afterRead(exists: Boolean): S {
-    val stillConfirming = isConfirmingDelete && exists
-    return withDelete(
-        isConfirmingDelete = stillConfirming,
-        hasDeleteError = hasDeleteError && stillConfirming,
-    )
-  }
+    get() = delete.isConfirming && (canDelete || delete.isDeleting)
 }
 
 /**
@@ -61,25 +61,30 @@ interface DeletableUiState<S : DeletableUiState<S>> {
  * @param scope where the deletion runs, the ViewModel's: leaving the screen cancels it
  * @param tag the ViewModel's log tag
  * @param item what is deleted, for the log (e.g. "the symptom s1")
+ * @param withDelete a copy of the screen's state with the given deletion, e.g. `{ state, delete ->
+ *   state.copy(delete = delete) }`: each state class has its own `copy`, so it is passed in
  */
-class DeleteConfirmation<S : DeletableUiState<S>>(
+class DeleteConfirmation<S : HasDeleteState>(
     private val uiState: MutableStateFlow<S>,
     private val scope: CoroutineScope,
     private val tag: String,
     private val item: String,
+    private val withDelete: (S, DeleteState) -> S,
 ) {
 
   /** Asks the user to confirm the deletion. Nothing is deleted before [confirm]. */
   fun request() {
     uiState.update {
-      if (it.canDelete) it.withDelete(isConfirmingDelete = true, hasDeleteError = false) else it
+      if (it.canDelete) withDelete(it, it.delete.copy(isConfirming = true, hasError = false))
+      else it
     }
   }
 
   /** Closes the confirmation and keeps the item. Ignored while it is being deleted. */
   fun cancel() {
     uiState.update {
-      if (it.isDeleting) it else it.withDelete(isConfirmingDelete = false, hasDeleteError = false)
+      if (it.delete.isDeleting) it
+      else withDelete(it, it.delete.copy(isConfirming = false, hasError = false))
     }
   }
 
@@ -100,26 +105,26 @@ class DeleteConfirmation<S : DeletableUiState<S>>(
       onFailure: (uid: String) -> Unit,
   ) {
     val state = uiState.value
-    if (!state.isConfirmingDelete || !state.canDelete) return
+    if (!state.delete.isConfirming || !state.canDelete) return
     val uid = signedInUid()
     if (uid == null) {
-      uiState.update { it.withDelete(hasDeleteError = true) }
+      uiState.update { withDelete(it, it.delete.copy(hasError = true)) }
       return
     }
     stopObserving()
-    uiState.update { it.withDelete(isDeleting = true, hasDeleteError = false) }
+    uiState.update { withDelete(it, it.delete.copy(isDeleting = true, hasError = false)) }
     scope.launch {
       try {
         delete(uid)
         uiState.update {
-          it.withDelete(isDeleting = false, isConfirmingDelete = false, isDeleted = true)
+          withDelete(it, it.delete.copy(isDeleting = false, isConfirming = false, isDeleted = true))
         }
       } catch (e: CancellationException) {
         // Not a failure: the screen was left, the deletion stops with it
         throw e
       } catch (e: Exception) {
         Log.e(tag, "Failed to delete $item", e)
-        uiState.update { it.withDelete(isDeleting = false, hasDeleteError = true) }
+        uiState.update { withDelete(it, it.delete.copy(isDeleting = false, hasError = true)) }
         onFailure(uid)
       }
     }

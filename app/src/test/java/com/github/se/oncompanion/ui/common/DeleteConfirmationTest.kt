@@ -26,26 +26,10 @@ class DeleteConfirmationTest {
   /** The smallest detail screen state: an item that is shown or not. */
   private data class ItemState(
       val isShown: Boolean = true,
-      override val isConfirmingDelete: Boolean = false,
-      override val isDeleting: Boolean = false,
-      override val hasDeleteError: Boolean = false,
-      override val isDeleted: Boolean = false,
-  ) : DeletableUiState<ItemState> {
+      override val delete: DeleteState = DeleteState(),
+  ) : HasDeleteState {
     override val canDelete: Boolean
-      get() = isShown && !isDeleting && !isDeleted
-
-    override fun withDelete(
-        isConfirmingDelete: Boolean,
-        isDeleting: Boolean,
-        hasDeleteError: Boolean,
-        isDeleted: Boolean,
-    ) =
-        copy(
-            isConfirmingDelete = isConfirmingDelete,
-            isDeleting = isDeleting,
-            hasDeleteError = hasDeleteError,
-            isDeleted = isDeleted,
-        )
+      get() = isShown && !delete.isDeleting && !delete.isDeleted
   }
 
   private val uiState = MutableStateFlow(ItemState())
@@ -53,7 +37,9 @@ class DeleteConfirmationTest {
   private val events = mutableListOf<String>()
 
   private fun TestScope.deletion(scope: CoroutineScope = this) =
-      DeleteConfirmation(uiState, scope, TAG, "the item")
+      DeleteConfirmation(uiState, scope, TAG, "the item") { state, delete ->
+        state.copy(delete = delete)
+      }
 
   /** Confirms with [uid], recording what happens in [events]. */
   private fun DeleteConfirmation<ItemState>.confirmAs(
@@ -77,7 +63,7 @@ class DeleteConfirmationTest {
     deletion().request()
     advanceUntilIdle()
 
-    assertTrue(uiState.value.isConfirmingDelete)
+    assertTrue(uiState.value.delete.isConfirming)
     assertTrue(uiState.value.isDeleteDialogShown)
     assertEquals(emptyList<String>(), deleted)
   }
@@ -88,35 +74,35 @@ class DeleteConfirmationTest {
 
     deletion().request()
 
-    assertFalse(uiState.value.isConfirmingDelete)
+    assertFalse(uiState.value.delete.isConfirming)
   }
 
   @Test
   fun request_clearsAnEarlierError() = runTest {
-    uiState.value = ItemState(hasDeleteError = true)
+    uiState.value = ItemState(delete = DeleteState(hasError = true))
 
     deletion().request()
 
-    assertFalse(uiState.value.hasDeleteError)
+    assertFalse(uiState.value.delete.hasError)
   }
 
   @Test
   fun cancel_closesTheConfirmation_andItsError() = runTest {
-    uiState.value = ItemState(isConfirmingDelete = true, hasDeleteError = true)
+    uiState.value = ItemState(delete = DeleteState(isConfirming = true, hasError = true))
 
     deletion().cancel()
 
-    assertFalse(uiState.value.isConfirmingDelete)
-    assertFalse(uiState.value.hasDeleteError)
+    assertFalse(uiState.value.delete.isConfirming)
+    assertFalse(uiState.value.delete.hasError)
   }
 
   @Test
   fun cancel_isIgnoredWhileDeleting() = runTest {
-    uiState.value = ItemState(isConfirmingDelete = true, isDeleting = true)
+    uiState.value = ItemState(delete = DeleteState(isConfirming = true, isDeleting = true))
 
     deletion().cancel()
 
-    assertTrue(uiState.value.isConfirmingDelete)
+    assertTrue(uiState.value.delete.isConfirming)
   }
 
   // ----- Confirming -----
@@ -127,7 +113,7 @@ class DeleteConfirmationTest {
     advanceUntilIdle()
 
     assertEquals(emptyList<String>(), events)
-    assertFalse(uiState.value.isDeleted)
+    assertFalse(uiState.value.delete.isDeleted)
   }
 
   @Test
@@ -136,15 +122,15 @@ class DeleteConfirmationTest {
     deletion.request()
 
     deletion.confirmAs()
-    assertTrue(uiState.value.isDeleting)
+    assertTrue(uiState.value.delete.isDeleting)
     advanceUntilIdle()
 
     // Stops first, or the item would show as missing before the screen closes
     assertEquals(listOf("stop observing", "delete"), events)
     assertEquals(listOf("alice"), deleted)
-    assertTrue(uiState.value.isDeleted)
-    assertFalse(uiState.value.isDeleting)
-    assertFalse(uiState.value.isConfirmingDelete)
+    assertTrue(uiState.value.delete.isDeleted)
+    assertFalse(uiState.value.delete.isDeleting)
+    assertFalse(uiState.value.delete.isConfirming)
     assertFalse(uiState.value.isDeleteDialogShown)
   }
 
@@ -157,9 +143,9 @@ class DeleteConfirmationTest {
     advanceUntilIdle()
 
     assertEquals(emptyList<String>(), events)
-    assertTrue(uiState.value.hasDeleteError)
+    assertTrue(uiState.value.delete.hasError)
     assertTrue(uiState.value.isDeleteDialogShown)
-    assertFalse(uiState.value.isDeleted)
+    assertFalse(uiState.value.delete.isDeleted)
   }
 
   @Test
@@ -171,10 +157,10 @@ class DeleteConfirmationTest {
     advanceUntilIdle()
 
     assertEquals(listOf("stop observing", "delete", "resume observing for alice"), events)
-    assertTrue(uiState.value.hasDeleteError)
+    assertTrue(uiState.value.delete.hasError)
     assertTrue(uiState.value.isDeleteDialogShown)
-    assertFalse(uiState.value.isDeleting)
-    assertFalse(uiState.value.isDeleted)
+    assertFalse(uiState.value.delete.isDeleting)
+    assertFalse(uiState.value.delete.isDeleted)
   }
 
   @Test
@@ -190,12 +176,12 @@ class DeleteConfirmationTest {
     deletion.confirmAs()
     advanceUntilIdle()
     assertEquals(1, events.count { it == "delete" })
-    assertTrue(uiState.value.isConfirmingDelete)
+    assertTrue(uiState.value.delete.isConfirming)
 
     done.complete(Unit)
     advanceUntilIdle()
 
-    assertTrue(uiState.value.isDeleted)
+    assertTrue(uiState.value.delete.isDeleted)
   }
 
   @Test
@@ -210,7 +196,7 @@ class DeleteConfirmationTest {
     screen.cancel()
     advanceUntilIdle()
 
-    assertFalse(uiState.value.hasDeleteError)
+    assertFalse(uiState.value.delete.hasError)
     assertFalse(events.any { it.startsWith("resume observing") })
   }
 
@@ -218,30 +204,52 @@ class DeleteConfirmationTest {
 
   @Test
   fun deleteDialog_isShownOnlyWhileDeleteCanDoSomething() {
-    val confirming = ItemState(isConfirmingDelete = true)
+    val confirming = ItemState(delete = DeleteState(isConfirming = true))
 
     assertTrue(confirming.isDeleteDialogShown)
-    assertTrue(confirming.copy(isDeleting = true).isDeleteDialogShown)
+    assertTrue(
+        confirming.copy(delete = confirming.delete.copy(isDeleting = true)).isDeleteDialogShown
+    )
     assertFalse(ItemState().isDeleteDialogShown)
     assertFalse(confirming.copy(isShown = false).isDeleteDialogShown)
-    assertFalse(confirming.copy(isDeleted = true).isDeleteDialogShown)
+    assertFalse(
+        confirming.copy(delete = confirming.delete.copy(isDeleted = true)).isDeleteDialogShown
+    )
   }
 
   @Test
   fun afterRead_ofAMissingItem_closesTheConfirmationAndItsError() {
-    val state =
-        ItemState(isConfirmingDelete = true, hasDeleteError = true).afterRead(exists = false)
+    val delete = DeleteState(isConfirming = true, hasError = true).afterRead(exists = false)
 
-    assertFalse(state.isConfirmingDelete)
-    assertFalse(state.hasDeleteError)
+    assertEquals(DeleteState(), delete)
   }
 
   @Test
   fun afterRead_ofAnExistingItem_keepsTheConfirmationAndItsError() {
-    val state = ItemState(isConfirmingDelete = true, hasDeleteError = true).afterRead(exists = true)
+    val delete = DeleteState(isConfirming = true, hasError = true)
 
-    assertTrue(state.isConfirmingDelete)
-    assertTrue(state.hasDeleteError)
+    assertEquals(delete, delete.afterRead(exists = true))
+  }
+
+  @Test
+  fun afterRead_keepsWhetherItIsBeingDeletedOrDeleted() {
+    val deleting = DeleteState(isConfirming = true, isDeleting = true)
+    val deleted = DeleteState(isDeleted = true)
+
+    assertEquals(DeleteState(isDeleting = true), deleting.afterRead(exists = false))
+    assertEquals(deleted, deleted.afterRead(exists = false))
+  }
+
+  @Test
+  fun aDeletionStep_leavesTheRestOfTheScreenAsItWas() = runTest {
+    uiState.value = ItemState(isShown = true)
+
+    deletion().request()
+
+    assertEquals(
+        ItemState(isShown = true, delete = DeleteState(isConfirming = true)),
+        uiState.value,
+    )
   }
 
   private companion object {

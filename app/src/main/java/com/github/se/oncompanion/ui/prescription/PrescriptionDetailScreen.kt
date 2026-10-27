@@ -85,7 +85,7 @@ fun PrescriptionDetailScreen(
 
   // Back to the list, which no longer shows the prescription, once it is deleted
   val leave by rememberUpdatedState(onDeleted)
-  LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) leave() }
+  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) leave() }
 
   PrescriptionDetailContent(
       uiState = uiState,
@@ -194,8 +194,8 @@ fun PrescriptionDetailContent(
         error = stringResource(R.string.prescription_delete_error),
         confirmLabel = stringResource(R.string.prescription_delete_confirm),
         cancelLabel = stringResource(R.string.prescription_delete_cancel),
-        isDeleting = uiState.isDeleting,
-        hasError = uiState.hasDeleteError,
+        isDeleting = uiState.delete.isDeleting,
+        hasError = uiState.delete.hasError,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags = deleteDialogTags,

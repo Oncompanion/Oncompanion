@@ -11,8 +11,9 @@ import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
-import com.github.se.oncompanion.ui.common.DeletableUiState
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
+import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.HasDeleteState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,37 +28,17 @@ import kotlinx.coroutines.launch
  * @property entry the symptom, or `null` while loading, after an error, or if it doesn't exist
  * @property isLoading true until the symptom arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
- * @property isConfirmingDelete the user asked to delete the symptom and hasn't confirmed or
- *   cancelled
- * @property isDeleting the symptom is being deleted
- * @property hasDeleteError the last deletion failed; the symptom is kept
- * @property isDeleted the symptom is deleted: the screen is done
+ * @property delete where the deletion of the symptom is at
  */
 data class SymptomDetailUiState(
     val entry: SymptomEntry? = null,
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
-    override val isConfirmingDelete: Boolean = false,
-    override val isDeleting: Boolean = false,
-    override val hasDeleteError: Boolean = false,
-    override val isDeleted: Boolean = false,
-) : DeletableUiState<SymptomDetailUiState> {
+    override val delete: DeleteState = DeleteState(),
+) : HasDeleteState {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
-    get() = entry != null && !isLoading && !hasError && !isDeleting && !isDeleted
-
-  override fun withDelete(
-      isConfirmingDelete: Boolean,
-      isDeleting: Boolean,
-      hasDeleteError: Boolean,
-      isDeleted: Boolean,
-  ) =
-      copy(
-          isConfirmingDelete = isConfirmingDelete,
-          isDeleting = isDeleting,
-          hasDeleteError = hasDeleteError,
-          isDeleted = isDeleted,
-      )
+    get() = entry != null && !isLoading && !hasError && !delete.isDeleting && !delete.isDeleted
 
   /** The symptom doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
@@ -79,7 +60,14 @@ class SymptomDetailViewModel(
 
   private var observation: Job? = null
 
-  private val deletion = DeleteConfirmation(_uiState, viewModelScope, TAG, "the symptom $symptomId")
+  private val deletion =
+      DeleteConfirmation(
+          uiState = _uiState,
+          scope = viewModelScope,
+          tag = TAG,
+          item = "the symptom $symptomId",
+          withDelete = { state, delete -> state.copy(delete = delete) },
+      )
 
   init {
     load()
@@ -106,13 +94,19 @@ class SymptomDetailViewModel(
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom $symptomId", e)
             // Nothing to delete without the symptom: the confirmation is dropped
-            _uiState.update { it.copy(isLoading = false, hasError = true).afterRead(false) }
+            _uiState.update {
+              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
+            }
           }
           .collect { entry ->
             // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
             _uiState.update {
-              it.copy(entry = entry, isLoading = false, hasError = false)
-                  .afterRead(exists = entry != null)
+              it.copy(
+                  entry = entry,
+                  isLoading = false,
+                  hasError = false,
+                  delete = it.delete.afterRead(exists = entry != null),
+              )
             }
           }
     }

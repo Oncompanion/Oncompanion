@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -250,8 +251,8 @@ class PrescriptionDetailViewModelTest {
             PrescriptionDetailUiState(),
             shown.copy(prescription = null),
             shown.copy(hasError = true),
-            shown.copy(isDeleting = true),
-            shown.copy(isDeleted = true),
+            shown.copy(delete = DeleteState(isDeleting = true)),
+            shown.copy(delete = DeleteState(isDeleted = true)),
         )
         .forEach {
           assertFalse("Delete in $it", it.canDelete)
@@ -287,8 +288,8 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isDeleted)
-    assertFalse(vm.uiState.value.isDeleting)
+    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertFalse(vm.uiState.value.delete.isDeleting)
     // Not shown as "no longer exists" while the screen closes
     assertFalse(vm.uiState.value.isNotFound)
     assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
@@ -303,7 +304,7 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertFalse(vm.uiState.value.isDeleted)
+    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
 
@@ -314,7 +315,7 @@ class PrescriptionDetailViewModelTest {
 
     vm.requestDelete()
 
-    assertFalse(vm.uiState.value.isConfirmingDelete)
+    assertFalse(vm.uiState.value.delete.isConfirming)
   }
 
   @Test
@@ -325,17 +326,17 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasDeleteError)
+    assertTrue(vm.uiState.value.delete.hasError)
     assertTrue(vm.uiState.value.isDeleteDialogShown)
-    assertFalse(vm.uiState.value.isDeleted)
+    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(chemo, vm.uiState.value.prescription)
 
     repository.writeError = null
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isDeleted)
-    assertFalse(vm.uiState.value.hasDeleteError)
+    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertFalse(vm.uiState.value.delete.hasError)
   }
 
   @Test
@@ -348,7 +349,7 @@ class PrescriptionDetailViewModelTest {
     vm.cancelDelete()
     vm.requestDelete()
 
-    assertFalse(vm.uiState.value.hasDeleteError)
+    assertFalse(vm.uiState.value.delete.hasError)
   }
 
   @Test
@@ -360,8 +361,8 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasDeleteError)
-    assertFalse(vm.uiState.value.isDeleted)
+    assertTrue(vm.uiState.value.delete.hasError)
+    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
 
@@ -381,18 +382,18 @@ class PrescriptionDetailViewModelTest {
 
     vm.confirmDelete()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isDeleting)
+    assertTrue(vm.uiState.value.delete.isDeleting)
     assertTrue(vm.uiState.value.isDeleteDialogShown)
     vm.cancelDelete()
     vm.confirmDelete()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertTrue(vm.uiState.value.delete.isConfirming)
     assertEquals(1, deletes)
 
     deleted.complete(Unit)
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isDeleted)
+    assertTrue(vm.uiState.value.delete.isDeleted)
   }
 
   @Test
