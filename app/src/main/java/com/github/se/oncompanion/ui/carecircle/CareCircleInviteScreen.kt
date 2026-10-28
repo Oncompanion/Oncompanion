@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.carecircle
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -163,7 +164,11 @@ fun CareCircleInviteContent(
   }
 }
 
-/** A centered message, e.g. "Julie has joined your circle", with an optional icon and action. */
+/**
+ * A centered message, e.g. "Julie has joined your circle", with an optional icon and action. It
+ * scrolls when it doesn't fit (a phone held sideways, large text, a long name), so the action stays
+ * reachable.
+ */
 @Composable
 private fun CenteredMessage(
     title: String,
@@ -172,22 +177,29 @@ private fun CenteredMessage(
     icon: @Composable () -> Unit = {},
     action: @Composable () -> Unit = {},
 ) {
-  Column(
-      modifier = modifier.padding(32.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-  ) {
-    icon()
-    Text(text = title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-    body?.let {
-      Text(
-          text = it,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center,
-      )
+  BoxWithConstraints(modifier) {
+    // At least as tall as the screen, so a short message stays vertically centered
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+      icon()
+      Text(text = title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+      body?.let {
+        Text(
+            text = it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+      }
+      action()
     }
-    action()
   }
 }
 

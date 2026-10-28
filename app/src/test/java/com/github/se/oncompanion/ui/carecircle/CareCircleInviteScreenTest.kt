@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -25,6 +27,7 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
@@ -36,6 +39,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleInviteScreenTest {
@@ -136,6 +140,32 @@ class CareCircleInviteScreenTest {
         .assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.back) }
+  }
+
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  @Test
+  fun joined_staysReachable_sideways_withLargeText_andALongName() {
+    val member =
+        CareCircleMember(
+            uid = "caregiver",
+            firstName = "Marie-Christine",
+            familyName = "Fontaine-Delacroix de Montmorency",
+            permissions = CarePermission.entries.toSet(),
+        )
+    composeTestRule.setContent {
+      DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
+        CareCircleInviteContent(
+            uiState = CareCircleInviteUiState.Joined(member),
+            onBack = {},
+            onRetry = {},
+        )
+      }
+    }
+    // The message scrolls, so its button can still be reached
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button)
+        .performScrollTo()
+        .assertIsDisplayed()
   }
 
   // ---- pending invitation ----
