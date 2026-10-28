@@ -4,9 +4,11 @@ package com.github.se.oncompanion.ui.carecircle
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
+import android.os.PersistableBundle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -133,9 +135,7 @@ fun CareCircleInviteScreen(
       onShare = { invite -> start(shareIntent(resources, invite)) },
       onCopy = { invite ->
         scope.launch {
-          clipboard.setClipEntry(
-              ClipEntry(ClipData.newPlainText(invite.displayInviteCode, invite.displayInviteCode))
-          )
+          clipboard.setClipEntry(ClipEntry(inviteCodeClip(resources, invite)))
           // Android 13+ confirms the copy itself; showing both is discouraged
           if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             snackbarHostState.showSnackbar(resources.getString(R.string.care_circle_invite_copied))
@@ -150,6 +150,32 @@ fun CareCircleInviteScreen(
       snackbarHostState = snackbarHostState,
   )
 }
+
+/**
+ * The invite code for the clipboard, labelled "Invite code". The code gives access to the patient's
+ * care, so the clip is marked sensitive: Android 13+ then hides it in the clipboard preview.
+ */
+private fun inviteCodeClip(resources: Resources, invite: CareCircleInvite): ClipData =
+    ClipData.newPlainText(
+            resources.getString(R.string.care_circle_invite_code_label),
+            invite.displayInviteCode,
+        )
+        .apply {
+          description.extras =
+              PersistableBundle().apply {
+                // Below Android 13 the constant doesn't exist; its value is the same key
+                val key =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      ClipDescription.EXTRA_IS_SENSITIVE
+                    } else {
+                      IS_SENSITIVE_KEY
+                    }
+                putBoolean(key, true)
+              }
+        }
+
+/** [ClipDescription.EXTRA_IS_SENSITIVE]'s value, usable below Android 13. */
+private const val IS_SENSITIVE_KEY = "android.content.extra.IS_SENSITIVE"
 
 /** Opens the patient's email app with the invitation to [invite]'s email, ready to send. */
 private fun emailIntent(resources: Resources, invite: CareCircleInvite): Intent =

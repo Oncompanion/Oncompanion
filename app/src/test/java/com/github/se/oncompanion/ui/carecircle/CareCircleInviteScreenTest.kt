@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.carecircle
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -44,6 +46,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -463,23 +466,33 @@ class CareCircleInviteScreenTest {
   }
 
   @Test
-  fun screen_copy_putsTheInviteCodeInTheClipboard() {
+  fun screen_copy_putsTheInviteCodeInTheClipboard_labelledAndSensitive() {
     setScreen()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).performClick()
     composeTestRule.waitForIdle()
-    val clipboard = context.getSystemService(ClipboardManager::class.java)
-    assertEquals("K7M2P-Q9XRT", clipboard.primaryClip?.getItemAt(0)?.text.toString())
+    val clip = checkNotNull(copiedClip())
+    assertEquals("K7M2P-Q9XRT", clip.getItemAt(0).text.toString())
+    // Describes the clip instead of repeating the code, and hides it from the clipboard preview
+    assertEquals("Invite code", clip.description.label.toString())
+    assertTrue(clip.description.extras.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE))
     // Android 13+ confirms the copy itself
     composeTestRule.onNodeWithText(string(R.string.care_circle_invite_copied)).assertDoesNotExist()
   }
 
   @Config(sdk = [32])
   @Test
-  fun screen_copy_confirmsItBelowAndroid13() {
+  fun screen_copy_confirmsItBelowAndroid13_andStillMarksItSensitive() {
     setScreen()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_copy_button).performClick()
     composeTestRule.onNodeWithText(string(R.string.care_circle_invite_copied)).assertIsDisplayed()
+    // The constant only exists from Android 13; its key is the same string
+    val extras = checkNotNull(copiedClip()).description.extras
+    assertTrue(extras.getBoolean("android.content.extra.IS_SENSITIVE"))
   }
+
+  /** What the screen last put in the clipboard. */
+  private fun copiedClip(): ClipData? =
+      context.getSystemService(ClipboardManager::class.java).primaryClip
 
   @Test
   fun screen_confirmingCancel_deletesTheInvite_andGoesBack() {
