@@ -349,13 +349,16 @@ fun AppNavHost(
             viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
         )
       }
-      composable(Screen.CARE_CIRCLE_ADD) {
+      composable(Screen.CARE_CIRCLE_ADD) { entry ->
         CareCircleMemberFormScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
             // Saving shows the new invite code in place of the form: Back then returns to the list
             onSaved = { inviteCode ->
-              if (inviteCode == null) navigationActions.goBack()
-              else navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
+              // A save finishing after the patient left must not replace the screen they are on
+              if (navController.currentBackStackEntry == entry) {
+                if (inviteCode == null) navigationActions.goBack()
+                else navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
+              }
             },
             viewModel = viewModel { CareCircleMemberFormViewModel() },
         )
