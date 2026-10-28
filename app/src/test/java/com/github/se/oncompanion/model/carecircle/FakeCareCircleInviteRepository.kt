@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.carecircle
 
 import java.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +21,9 @@ import kotlinx.coroutines.flow.merge
  * invite (or null), and writes refuse invalid details or emails. New invites are stored with
  * `isSynced = true` (the server has them); call [setInvites] to test unsynced ones. Test hooks:
  * [setInvites] replaces every invite, [observeError], [createError], [updateError] and
- * [cancelError] make the matching calls fail, [failObservations] makes the running observations
- * fail, [created] records the invites created (including renewed ones), and [nextInviteCode] picks
- * the next invite code.
+ * [cancelError] make the matching calls fail, [createGate] holds [createInvite] back,
+ * [failObservations] makes the running observations fail, [created] records the invites created
+ * (including renewed ones), and [nextInviteCode] picks the next invite code.
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
  * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly.
@@ -52,6 +53,9 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
 
   /** When non-null, [createInvite] and [renewInvite] throw it. */
   var createError: Exception? = null
+
+  /** When non-null, [createInvite] waits for it before saving, like a slow write. */
+  var createGate: CompletableDeferred<Unit>? = null
 
   /** When non-null, [updateInvite] throws it. */
   var updateError: Exception? = null
@@ -103,6 +107,7 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
       details: CareCircleMemberDetails,
       email: String?,
   ): CareCircleInvite {
+    createGate?.await()
     createError?.let { throw it }
     requireValid(details, email)
     return store(

@@ -63,8 +63,10 @@ sealed interface CareCircleInviteUiState {
   data class Renewed(val inviteCode: String) : CareCircleInviteUiState
 
   /**
-   * The invitation is gone and nobody joined with it: it was cancelled, possibly from another
-   * device, or never existed. Retrying wouldn't help.
+   * The invitation is gone and nobody has joined with it, as far as this phone knows: it was
+   * cancelled (possibly from another device) or never existed, or the person has just joined. The
+   * invitation and the members come from separate listeners, so a used invitation can disappear
+   * before its new member arrives; the state then becomes [Joined]. The screen doesn't claim which.
    */
   data object NotFound : CareCircleInviteUiState
 

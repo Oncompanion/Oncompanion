@@ -9,6 +9,7 @@ import android.content.res.Resources
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -187,16 +188,16 @@ private fun invitationMessage(resources: Resources, invite: CareCircleInvite): S
 @Composable
 fun CareCircleInviteContent(
     uiState: CareCircleInviteUiState,
-    onBack: () -> Unit,
-    onSendEmail: (CareCircleInvite) -> Unit,
-    onShare: (CareCircleInvite) -> Unit,
-    onCopy: (CareCircleInvite) -> Unit,
-    onRenew: () -> Unit,
-    onCancel: () -> Unit,
-    onConfirmCancel: () -> Unit,
-    onDismissCancel: () -> Unit,
-    onRetry: () -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onSendEmail: (CareCircleInvite) -> Unit = {},
+    onShare: (CareCircleInvite) -> Unit = {},
+    onCopy: (CareCircleInvite) -> Unit = {},
+    onRenew: () -> Unit = {},
+    onCancel: () -> Unit = {},
+    onConfirmCancel: () -> Unit = {},
+    onDismissCancel: () -> Unit = {},
+    onRetry: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
   // No text field on this screen, so no imePadding()
@@ -230,8 +231,10 @@ fun CareCircleInviteContent(
             CircularProgressIndicator(Modifier.testTag(C.Tag.care_circle_invite_loading))
           }
       CareCircleInviteUiState.NotFound ->
+          // Neutral wording: a used invitation can vanish just before its new member arrives
           CenteredMessage(
               title = stringResource(R.string.care_circle_invite_not_found),
+              body = stringResource(R.string.care_circle_invite_not_found_body),
               modifier = contentModifier.testTag(C.Tag.care_circle_invite_not_found),
               action = { BackToCircleButton(onBack) },
           )
@@ -287,7 +290,11 @@ fun CareCircleInviteContent(
   }
 }
 
-/** A centered message, e.g. "Julie has joined your circle", with an optional icon and action. */
+/**
+ * A centered message, e.g. "Julie has joined your circle", with an optional icon and action. It
+ * scrolls when it doesn't fit (a phone held sideways, large text, a long name), so the action stays
+ * reachable.
+ */
 @Composable
 private fun CenteredMessage(
     title: String,
@@ -296,22 +303,29 @@ private fun CenteredMessage(
     icon: @Composable () -> Unit = {},
     action: @Composable () -> Unit = {},
 ) {
-  Column(
-      modifier = modifier.padding(32.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-  ) {
-    icon()
-    Text(text = title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-    body?.let {
-      Text(
-          text = it,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center,
-      )
+  BoxWithConstraints(modifier) {
+    // At least as tall as the screen, so a short message stays vertically centered
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+      icon()
+      Text(text = title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+      body?.let {
+        Text(
+            text = it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+      }
+      action()
     }
-    action()
   }
 }
 
@@ -361,7 +375,7 @@ private fun InviteDetails(
     )
 
     InviteCodeCard(invite, state.expired)
-    if (!invite.isSynced && !state.expired) OfflineWarning()
+    if (!invite.isSynced && !state.expired) SyncWarning()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
@@ -457,14 +471,17 @@ private fun InviteCodeCard(invite: CareCircleInvite, expired: Boolean) {
 private fun formatDay(instant: Instant): String =
     validityFormatter.format(instant.atZone(ZoneId.systemDefault()))
 
-/** The invite code only works on another phone once the server has it (architecture.md). */
+/**
+ * The invite code only works on another phone once the server has it (architecture.md). Waiting for
+ * the server also happens online, so this doesn't say the phone is offline.
+ */
 @Composable
-private fun OfflineWarning() {
+private fun SyncWarning() {
   Row(
       modifier =
           Modifier.fillMaxWidth()
               .padding(horizontal = 24.dp, vertical = 4.dp)
-              .testTag(C.Tag.care_circle_invite_offline_warning),
+              .testTag(C.Tag.care_circle_invite_sync_warning),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -474,7 +491,7 @@ private fun OfflineWarning() {
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Text(
-        text = stringResource(R.string.care_circle_invite_offline_warning),
+        text = stringResource(R.string.care_circle_invite_sync_warning),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

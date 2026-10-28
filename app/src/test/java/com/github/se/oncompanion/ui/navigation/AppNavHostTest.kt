@@ -78,6 +78,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -747,6 +748,58 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember("julie-uid")).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
+  }
+
+  @Test
+  fun careCircleForm_saveFinishingAfterLeaving_keepsTheList() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val gate = CompletableDeferred<Unit>()
+    val invites =
+        FakeCareCircleInviteRepository().apply {
+          nextInviteCode = { "K7M2PQ9XRT" }
+          createGate = gate
+        }
+    UserProfileRepositoryProvider.repository =
+        FakeUserProfileRepository().apply {
+          seed(UserProfile(uid = "owner", role = Role.PATIENT, firstName = "Anne"))
+        }
+    setNavHost(Route.CARE_CIRCLE, careCircleInviteRepository = invites, authRepository = auth)
+
+    // A save that takes a while: the invite isn't written yet
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_first_name).performTextInput("Julie")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_relationship).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleFormRelationshipOption(Relationship.DAUGHTER.name))
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_save_button)
+        .performScrollTo()
+        .performClick()
+
+    // The save finishes, and the patient taps Back before the next frame shows it
+    composeTestRule.mainClock.autoAdvance = false
+    gate.complete(Unit)
+    composeTestRule.waitForIdle()
+    // Back without a frame in between (a click would first draw the saved state)
+    composeTestRule.runOnUiThread { navController.popBackStack() }
+    // The leaving form still recomposes with the saved state while it animates out
+    repeat(3) { composeTestRule.mainClock.advanceTimeByFrame() }
+    composeTestRule.mainClock.autoAdvance = true
+    composeTestRule.waitForIdle()
+
+    // The list stays: the late save doesn't replace it with the invite code
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
+      assertEquals(
+          0,
+          navController.currentBackStack.value.count {
+            it.destination.route == Screen.CARE_CIRCLE_INVITE
+          },
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
   }
 
   @Test

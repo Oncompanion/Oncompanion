@@ -6,6 +6,8 @@ import android.app.Application
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -30,6 +32,7 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
@@ -129,11 +132,13 @@ class CareCircleInviteScreenTest {
   }
 
   @Test
-  fun notFound_saysItWasCancelled_andGoesBackToTheCircle() {
+  fun notFound_doesNotClaimItWasCancelled_andGoesBackToTheCircle() {
     val events = setContent(CareCircleInviteUiState.NotFound)
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_not_found).assertIsDisplayed()
+    composeTestRule.onNodeWithText("This invitation is no longer pending.").assertIsDisplayed()
+    // The person may have just joined, so the screen points to the circle instead of guessing
     composeTestRule
-        .onNodeWithText(string(R.string.care_circle_invite_not_found))
+        .onNodeWithText(string(R.string.care_circle_invite_not_found_body))
         .assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.back) }
@@ -166,6 +171,32 @@ class CareCircleInviteScreenTest {
     composeTestRule.runOnIdle { assertEquals(1, events.back) }
   }
 
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  @Test
+  fun joined_staysReachable_sideways_withLargeText_andALongName() {
+    val member =
+        CareCircleMember(
+            uid = "caregiver",
+            firstName = "Marie-Christine",
+            familyName = "Fontaine-Delacroix de Montmorency",
+            permissions = CarePermission.entries.toSet(),
+        )
+    composeTestRule.setContent {
+      DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
+        CareCircleInviteContent(
+            uiState = CareCircleInviteUiState.Joined(member),
+            onBack = {},
+            onRetry = {},
+        )
+      }
+    }
+    // The message scrolls, so its button can still be reached
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button)
+        .performScrollTo()
+        .assertIsDisplayed()
+  }
+
   // ---- pending invitation ----
 
   @Test
@@ -179,7 +210,7 @@ class CareCircleInviteScreenTest {
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_invite_valid)
         .assertTextEquals(string(R.string.care_circle_invite_valid_until, day(julie.expiresAt!!)))
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_offline_warning).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_sync_warning).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_renew_button).assertDoesNotExist()
   }
 
@@ -218,24 +249,28 @@ class CareCircleInviteScreenTest {
   }
 
   @Test
-  fun unsyncedInvite_warnsItOnlyWorksOnceOnline() {
+  fun unsyncedInvite_saysItIsWaitingToSync_withoutClaimingOffline() {
     setContent(
         CareCircleInviteUiState.Invite(
             julie.copy(createdAt = null, isSynced = false),
             expired = false,
         )
     )
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_offline_warning).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_sync_warning).assertIsDisplayed()
     composeTestRule
-        .onNodeWithText(string(R.string.care_circle_invite_offline_warning))
+        .onNodeWithText("Waiting to sync. This code will work once the invitation has synced.")
         .assertIsDisplayed()
+    // Waiting for the server also happens online
+    composeTestRule
+        .onNodeWithText("offline", substring = true, ignoreCase = true)
+        .assertDoesNotExist()
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_invite_valid)
         .assertTextEquals(string(R.string.care_circle_invite_valid_once_sent))
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_member_subtitle)
         .assertTextEquals("Sister · " + string(R.string.care_circle_invite_not_synced))
-    // The invite code can already be shared: it works once the phone reconnects
+    // The invite code can already be shared: it works once the invitation has synced
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertIsDisplayed()
   }
 

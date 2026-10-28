@@ -208,6 +208,43 @@ class CareCircleInviteViewModelTest {
     assertEquals(CareCircleInviteUiState.Joined(member), viewModel.uiState.value)
   }
 
+  // The invite and the members come from separate listeners: after a redeem, either can arrive
+  // first. Here they are applied one at a time, in each order.
+
+  @Test
+  fun inviteDeletedBeforeTheMemberArrives_isNotFound_thenJoined() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    runCurrent()
+
+    // The redeem deleted the invite, but the new member hasn't reached this phone yet
+    invites.setInvites(emptyList())
+    runCurrent()
+    assertEquals(CareCircleInviteUiState.NotFound, viewModel.uiState.value)
+
+    val member = CareCircleMember(uid = "caregiver", firstName = "Julie", inviteCode = inviteCode)
+    circle.setMembers(ownerUid, listOf(member))
+    runCurrent()
+    assertEquals(CareCircleInviteUiState.Joined(member), viewModel.uiState.value)
+  }
+
+  @Test
+  fun memberArrivesBeforeTheInviteIsDeleted_isJoined_andStaysJoined() = runTest {
+    invites.setInvites(listOf(julie()))
+    val viewModel = createViewModel()
+    runCurrent()
+
+    // The new member reaches this phone while the used invite is still in the local cache
+    val member = CareCircleMember(uid = "caregiver", firstName = "Julie", inviteCode = inviteCode)
+    circle.setMembers(ownerUid, listOf(member))
+    runCurrent()
+    assertEquals(CareCircleInviteUiState.Joined(member), viewModel.uiState.value)
+
+    invites.setInvites(emptyList())
+    runCurrent()
+    assertEquals(CareCircleInviteUiState.Joined(member), viewModel.uiState.value)
+  }
+
   @Test
   fun memberWithAnotherInviteCode_doesNotCountAsJoined() = runTest {
     circle.setMembers(

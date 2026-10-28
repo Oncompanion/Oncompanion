@@ -333,7 +333,8 @@
     <string name="care_circle_invite_code_label">Invite code</string>
     <string name="care_circle_invite_valid_until">Valid until %1$s</string>
     <string name="care_circle_invite_valid_once_sent">Valid for 7 days once sent</string>
-    <string name="care_circle_invite_offline_warning">You\'re offline. This invite code will work once your phone reconnects.</string>
+    <!-- Not synced also happens online: the server just hasn\'t confirmed the invitation yet -->
+    <string name="care_circle_invite_sync_warning">Waiting to sync. This code will work once the invitation has synced.</string>
     <string name="care_circle_invite_expired_on">The code stopped working on %1$s.</string>
     <string name="care_circle_invite_send_email">Send by email</string>
     <string name="care_circle_invite_share">Share</string>
@@ -349,10 +350,12 @@
     <string name="care_circle_invite_joined_title">%1$s has joined your circle</string>
     <string name="care_circle_invite_joined_body">%1$s can now see: %2$s. You can change this any time.</string>
     <string name="care_circle_invite_back_to_circle">Back to circle</string>
-    <string name="care_circle_invite_not_found">This invitation was cancelled.</string>
+    <string name="care_circle_invite_not_found">This invitation is no longer pending.</string>
     <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
     <string name="care_circle_invite_email_subject">Join my care circle on Oncompanion</string>
     <string name="care_circle_invite_message">Hi %1$s,\n\nI\'d like you to join my care circle on Oncompanion, so you can follow my care.\n\n1. Install Oncompanion and sign in with Google.\n2. Choose \"I\'m a caregiver\".\n3. Tap \"Join a care circle\" and enter this invite code: %2$s\n\nThe code works for 7 days.\n\n%3$s</string>
+    <!-- Neutral: the invitation may have been used just before the new member reaches this phone -->
+    <string name="care_circle_invite_not_found_body">It was cancelled, or the person has just joined. Your care circle shows who\'s in it.</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>

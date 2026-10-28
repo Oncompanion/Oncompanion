@@ -314,7 +314,7 @@ object C {
     const val care_circle_invite_not_found = "care_circle_invite_not_found"
     const val care_circle_invite_code = "care_circle_invite_code"
     const val care_circle_invite_valid = "care_circle_invite_valid"
-    const val care_circle_invite_offline_warning = "care_circle_invite_offline_warning"
+    const val care_circle_invite_sync_warning = "care_circle_invite_sync_warning"
     const val care_circle_invite_expired = "care_circle_invite_expired"
     const val care_circle_invite_email_button = "care_circle_invite_email_button"
     const val care_circle_invite_share_button = "care_circle_invite_share_button"
