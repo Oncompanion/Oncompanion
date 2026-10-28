@@ -66,9 +66,11 @@ fun PlanningScreen(
   val openAppointment: (PlanningItem) -> Unit = { item ->
     appointmentToOpen(item)?.let(onOpenAppointment)
   }
+  // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
+  // at each midnight
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = viewModel.followToday()
+    onPauseOrDispose { following.cancel() }
   }
   PlanningContent(
       state = state,

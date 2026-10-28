@@ -16,6 +16,7 @@ import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
+import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
@@ -166,6 +167,15 @@ class OverviewViewModel(
     val newDay = now.toLocalDate() != _uiState.value.now.toLocalDate()
     _uiState.update { it.copy(now = now).withItems(items, now) }
     if (newDay) loadDay()
+  }
+
+  /**
+   * Keeps the day right while the Overview is open: refreshes the time now, then at each midnight
+   * (which also loads the new day's entries), until the returned job is cancelled. The screen runs
+   * it while it is shown.
+   */
+  fun followToday(): Job = viewModelScope.launch {
+    currentDay(clock.withZone(zoneId)).collect { refreshNow() }
   }
 
   private fun now(): LocalDateTime = LocalDateTime.ofInstant(clock.instant(), zoneId)

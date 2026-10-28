@@ -73,10 +73,11 @@ fun PrescriptionsScreen(
     modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  // The ViewModel outlives navigation and backgrounding: keep "This month" right
+  // Keeps "This month" right while the list is on screen: refreshes when it comes back, then at
+  // each midnight
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = viewModel.followToday()
+    onPauseOrDispose { following.cancel() }
   }
   PrescriptionsContent(
       uiState = uiState,
