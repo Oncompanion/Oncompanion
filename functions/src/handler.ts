@@ -7,7 +7,7 @@ import { queryFromUrl } from "./validation.js";
 /** Builds an HTTP adapter; credentials never enter search logic or storage. */
 export function createHandler(
   service: HospitalSearchService,
-  authorize: (request: Request) => Promise<void>,
+  authorize: (request: Request) => Promise<string>,
 ) {
   let active = false;
   return async (request: Request, response: Response): Promise<void> => {
@@ -29,8 +29,8 @@ export function createHandler(
       if (active) throw new SearchError(429, "capacity_exhausted");
       active = true;
       try {
-        await authorize(request);
-        response.status(200).json(await service.search(query));
+        const quotaKey = await authorize(request);
+        response.status(200).json(await service.search(query, quotaKey));
       } finally {
         active = false;
       }

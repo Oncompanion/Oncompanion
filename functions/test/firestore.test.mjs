@@ -20,6 +20,7 @@ const control = firstDb.doc("hospitalSearchControl/nominatim");
 async function reset() {
   await firstDb.recursiveDelete(firstDb.collection("hospitalSearchCache"));
   await control.delete();
+  await firstDb.recursiveDelete(firstDb.collection("hospitalSearchQuota"));
 }
 async function ageCooldown() {
   // Advance persisted test state instead of sleeping or substituting a process-local limiter.
@@ -51,10 +52,12 @@ test("different queries across independent clients are serialized with a shared 
   };
   const first = new HospitalSearchService(firstStore, client);
   const second = new HospitalSearchService(secondStore, client);
-  const result = first.search("geneva");
+  const result = first.search("geneva", "a".repeat(64));
   await started;
   const attempts = await Promise.allSettled(
-    Array.from({ length: 8 }, (_, i) => second.search(`city ${i}`)),
+    Array.from({ length: 8 }, (_, i) =>
+      second.search(`city ${i}`, "a".repeat(64)),
+    ),
   );
   assert(
     attempts.every((r) => r.status === "rejected" && r.reason.status === 429),
@@ -67,7 +70,7 @@ test("different queries across independent clients are serialized with a shared 
   assert(released.releasedAt instanceof Timestamp);
   assert.equal(released.cooldownMs, 1000);
   await ageCooldown();
-  assert.deepEqual(await second.search("lausanne"), []);
+  assert.deepEqual(await second.search("lausanne", "a".repeat(64)), []);
   assert.equal(calls, 2);
 });
 test("atomic acquisition admits exactly one owner across independent Firestore clients", async () => {
@@ -100,12 +103,15 @@ test("concurrent identical queries never duplicate upstream work and share cache
   };
   const first = new HospitalSearchService(firstStore, client);
   const second = new HospitalSearchService(secondStore, client);
-  const result = first.search("geneva");
+  const result = first.search("geneva", "a".repeat(64));
   await started;
-  await assert.rejects(second.search("geneva"), (e) => e.status === 429);
+  await assert.rejects(
+    second.search("geneva", "a".repeat(64)),
+    (e) => e.status === 429,
+  );
   finish();
   await result;
-  assert.deepEqual(await second.search("geneva"), []);
+  assert.deepEqual(await second.search("geneva", "a".repeat(64)), []);
   assert.equal(calls, 1);
 });
 test("expired cache entries refresh while fresh entries are shared", async () => {
@@ -117,7 +123,10 @@ test("expired cache entries refresh while fresh entries are shared", async () =>
       return [];
     },
   };
-  await new HospitalSearchService(firstStore, client).search("geneva");
+  await new HospitalSearchService(firstStore, client).search(
+    "geneva",
+    "a".repeat(64),
+  );
   const cache = await firstDb.collection("hospitalSearchCache").get();
   assert.equal(cache.size, 1);
   assert.deepEqual(Object.keys(cache.docs[0].data()).sort(), [
@@ -125,11 +134,17 @@ test("expired cache entries refresh while fresh entries are shared", async () =>
     "results",
   ]);
   assert.match(cache.docs[0].id, /^[a-f0-9]{64}$/);
-  await new HospitalSearchService(secondStore, client).search("geneva");
+  await new HospitalSearchService(secondStore, client).search(
+    "geneva",
+    "a".repeat(64),
+  );
   assert.equal(calls, 1);
   await cache.docs[0].ref.update({ expiresAt: Timestamp.fromMillis(0) });
   await ageCooldown();
-  await new HospitalSearchService(secondStore, client).search("geneva");
+  await new HospitalSearchService(secondStore, client).search(
+    "geneva",
+    "a".repeat(64),
+  );
   assert.equal(calls, 2);
 });
 test("lock never expires, owner cannot be replaced, corrupt and future state fail closed", async () => {
@@ -162,7 +177,7 @@ test("malformed cache and limiter state cause controlled errors without upstream
         calls++;
         return [];
       },
-    }).search("geneva"),
+    }).search("geneva", "a".repeat(64)),
     (e) => e.status === 503,
   );
   assert.equal(calls, 0);
@@ -186,6 +201,7 @@ test("unchanged rules deny cache and control access to anonymous and authenticat
   for (const path of [
     "hospitalSearchCache/example",
     "hospitalSearchControl/nominatim",
+    "hospitalSearchQuota/example",
   ]) {
     const endpoint = `http://${host}/v1/projects/${projectId}/databases/(default)/documents/${path}`;
     for (const headers of [{}, { Authorization: `Bearer ${token}` }]) {
@@ -210,6 +226,7 @@ test("unknown acquisition commit outcome leaves the lock held without upstream w
   await reset();
   let calls = 0;
   const uncertainStore = {
+    consumeQuota: firstStore.consumeQuota.bind(firstStore),
     cached: firstStore.cached.bind(firstStore),
     save: firstStore.save.bind(firstStore),
     release: firstStore.release.bind(firstStore),
@@ -224,7 +241,7 @@ test("unknown acquisition commit outcome leaves the lock held without upstream w
         calls++;
         return [];
       },
-    }).search("geneva"),
+    }).search("geneva", "a".repeat(64)),
     (e) => e.status === 503,
   );
   assert.equal(calls, 0);
@@ -236,6 +253,7 @@ test("failed release stays safe both before and after an unknown commit acknowle
     await reset();
     let calls = 0;
     const uncertainStore = {
+      consumeQuota: firstStore.consumeQuota.bind(firstStore),
       cached: firstStore.cached.bind(firstStore),
       save: firstStore.save.bind(firstStore),
       acquire: firstStore.acquire.bind(firstStore),
@@ -250,7 +268,7 @@ test("failed release stays safe both before and after an unknown commit acknowle
           calls++;
           return [];
         },
-      }).search("geneva"),
+      }).search("geneva", "a".repeat(64)),
       (e) => e.status === 503,
     );
     assert.equal(calls, 1);
@@ -259,7 +277,7 @@ test("failed release stays safe both before and after an unknown commit acknowle
         search() {
           assert.fail();
         },
-      }).search("geneva"),
+      }).search("geneva", "a".repeat(64)),
       [],
     );
     assert.equal(await secondStore.acquire("replacement"), false);
@@ -267,4 +285,130 @@ test("failed release stays safe both before and after an unknown commit acknowle
     if (committed) assert(state.releasedAt instanceof Timestamp);
     else assert.equal(typeof state.owner, "string");
   }
+});
+
+test("rolling quota boundaries, expiry and independent users use Firestore server time", async () => {
+  await reset();
+  const key = "b".repeat(64);
+  const ref = firstDb.doc(`hospitalSearchQuota/${key}`);
+  for (let i = 0; i < 10; i++) await firstStore.consumeQuota(key);
+  await assert.rejects(
+    secondStore.consumeQuota(key),
+    (e) => e.code === "quota_exceeded",
+  );
+  let state = (await ref.get()).data();
+  assert.equal(state.misses.length, 10);
+  assert(state.expiresAt instanceof Timestamp);
+  assert.equal(
+    state.expiresAt.toMillis() - state.misses.at(-1).toMillis(),
+    86400_000,
+  );
+  await secondStore.consumeQuota("c".repeat(64));
+  const now = (await ref.get()).readTime.toMillis();
+  // Fifty misses outside the hourly window still exhaust the daily window.
+  await ref.set({
+    misses: Array(50).fill(Timestamp.fromMillis(now - 7200_000)),
+    expiresAt: Timestamp.fromMillis(now + 86400_000),
+  });
+  await assert.rejects(
+    firstStore.consumeQuota(key),
+    (e) => e.code === "quota_exceeded",
+  );
+  await ref.update({
+    misses: Array(49).fill(Timestamp.fromMillis(now - 7200_000)),
+  });
+  await firstStore.consumeQuota(key);
+  await assert.rejects(
+    secondStore.consumeQuota(key),
+    (e) => e.code === "quota_exceeded",
+  );
+  // Logical expiry works even if TTL deletion has not happened yet.
+  await ref.set({
+    misses: Array(50).fill(Timestamp.fromMillis(now - 86400_000)),
+    expiresAt: Timestamp.fromMillis(0),
+  });
+  await secondStore.consumeQuota(key);
+  assert.equal((await ref.get()).get("misses").length, 1);
+  // Exactly one hour old entries leave the hourly window, but remain in the day.
+  await ref.set({
+    misses: Array(10).fill(Timestamp.fromMillis(now - 3600_000)),
+    expiresAt: Timestamp.fromMillis(now + 86400_000),
+  });
+  await firstStore.consumeQuota(key);
+  assert.equal((await ref.get()).get("misses").length, 11);
+  await assert.rejects(firstStore.consumeQuota("raw-uid"), /Invalid quota key/);
+  await ref.set({ misses: ["corrupt"] });
+  await assert.rejects(firstStore.consumeQuota(key), /Invalid quota state/);
+});
+
+test("concurrent quota checks across clients cannot exceed hourly or daily limits", async (t) => {
+  for (const existing of [0, 49])
+    await t.test(`existing daily misses: ${existing}`, async () => {
+      await reset();
+      const key = "d".repeat(64);
+      const ref = firstDb.doc(`hospitalSearchQuota/${key}`);
+      const now = (await ref.get()).readTime.toMillis();
+      await ref.set({
+        misses: Array(existing).fill(Timestamp.fromMillis(now - 7200_000)),
+      });
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: 14 }, (_, i) =>
+          (i % 2 ? firstStore : secondStore).consumeQuota(key),
+        ),
+      );
+      assert.equal(
+        outcomes.filter((r) => r.status === "fulfilled").length,
+        existing ? 1 : 10,
+      );
+      for (const result of outcomes.filter((r) => r.status === "rejected"))
+        assert.equal(result.reason.code, "quota_exceeded");
+      assert.equal((await ref.get()).get("misses").length, existing ? 50 : 10);
+    });
+});
+
+test("release retries recover transient failures and ambiguous acknowledgements without another upstream request", async (t) => {
+  for (const committed of [false, true])
+    await t.test(`first release committed: ${committed}`, async () => {
+      await reset();
+      let attempts = 0;
+      let calls = 0;
+      const logs = [];
+      const store = {
+        cached: firstStore.cached.bind(firstStore),
+        save: firstStore.save.bind(firstStore),
+        consumeQuota: firstStore.consumeQuota.bind(firstStore),
+        acquire: firstStore.acquire.bind(firstStore),
+        async release(owner, cooldown) {
+          attempts++;
+          if (attempts === 1) {
+            if (committed) await firstStore.release(owner, cooldown);
+            throw new Error("private query/token must not be logged");
+          }
+          await firstStore.release(owner, cooldown);
+        },
+      };
+      const service = new HospitalSearchService(
+        store,
+        {
+          async search() {
+            calls++;
+            return [];
+          },
+        },
+        (...args) => logs.push(args),
+      );
+      await service.search("geneva", "a".repeat(64));
+      assert.equal(attempts, 2);
+      assert.equal(calls, 1);
+      assert.deepEqual(logs, [[]]);
+      assert.equal(await secondStore.acquire("too-soon"), false);
+      await ageCooldown();
+      await new HospitalSearchService(secondStore, {
+        async search() {
+          calls++;
+          return [];
+        },
+      }).search("bern", "a".repeat(64));
+      assert.equal(calls, 2);
+    });
 });

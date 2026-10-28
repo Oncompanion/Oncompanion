@@ -26,6 +26,7 @@ export interface Hospital {
 export interface SearchStore {
   cached(key: string): Promise<Hospital[] | undefined>;
   save(key: string, results: Hospital[]): Promise<void>;
+  consumeQuota(key: string): Promise<void>;
   acquire(owner: string): Promise<boolean>;
   release(owner: string, cooldownMs: number): Promise<void>;
 }

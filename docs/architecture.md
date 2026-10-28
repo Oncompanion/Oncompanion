@@ -84,6 +84,11 @@ Firebase Functions. The HTTP adapter validates the existing Android request cont
 Firebase Authentication and App Check, and calls a provider-independent `HospitalSearchService`.
 The service depends on a shared-store interface and an upstream-client interface; the Firestore
 adapter implements caching and global coordination, and `NominatimClient` owns the fixed upstream.
+Before global acquisition, a transaction
+enforces ten initial shared-cache misses per rolling hour and fifty per rolling day per user.
+`hospitalSearchQuota/{HMAC-SHA256}` retains bounded miss timestamps with one-day TTL using a
+server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
+deployable TTL policy; logical expiry remains enforced.
 The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
 The repository-to-proxy arrows remain planned until the authenticated transport is integrated.
 
@@ -95,7 +100,9 @@ in-memory repository cache and Firestore's offline SDK cache.
 
 A transaction admits only one upstream owner, with no automatic lock expiry. After completion,
 a server timestamp starts a minimum one-second cooldown, measured using Firestore read timestamps.
-A crashed owner blocks further misses until safe operator recovery. This deliberately trades
+Idempotent release retries recover transient storage failures without sending HTTP again.
+A crashed owner or persistent release failure blocks further misses until safe operator recovery.
+This deliberately trades
 availability for compliance under paused instances and overlapping revisions. See the
 [backend runbook](../functions/README.md) for the guarantee, recovery procedure, tests and setup.
 
@@ -103,6 +110,9 @@ The Android Search button remains disabled. Its response parser is compatible; i
 still needs Auth/App Check headers in a later PR before this endpoint can be wired into the app.
 The auth interface currently exposes identity but no Firebase ID-token accessor, and App Check is
 not integrated; add an injectable model/transport token boundary rather than Firebase calls in UI.
+The backend CI job runs type, format, unit and demo Firestore tests. `onCall` remains a team
+decision before Android integration: it improves token handling and URL privacy but requires a
+new Android SDK and transport contract. See the backend runbook for the comparison.
 No production deployment or automatic Functions deployment workflow is included.
 
 ## Reusable hospital field (issue #143)

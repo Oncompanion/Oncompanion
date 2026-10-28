@@ -8,15 +8,18 @@ export class HospitalSearchService {
   constructor(
     private readonly store: SearchStore,
     private readonly client: HospitalClient,
+    private readonly logFailure: () => void = () =>
+      console.error("hospital_search_storage_failure"),
   ) {}
   /** Returns shared results or makes one globally authorized upstream request. */
-  async search(query: string) {
+  async search(query: string, quotaKey: string) {
     const key = createHash("sha256")
       .update(`hospital-jsonv2-v1:${query}`)
       .digest("hex");
     try {
       const cached = await this.store.cached(key);
       if (cached !== undefined) return cached;
+      await this.store.consumeQuota(quotaKey);
       const owner = randomUUID();
       if (!(await this.store.acquire(owner))) {
         // A completed identical request can now be cached; otherwise reject without queuing.
@@ -34,16 +37,25 @@ export class HospitalSearchService {
       } catch (error) {
         // Back off all users after upstream failures; failures are never cached.
         cooldown =
-          error instanceof SearchError && error.status === 429
+          error instanceof SearchError && [429, 503].includes(error.status)
             ? Math.max(60, error.retryAfterSeconds ?? 60) * 1000
             : 10_000;
         throw error;
       } finally {
         // Release only after upstream completion/abort and cache persistence, even on failures.
-        await this.store.release(owner, cooldown);
+        for (let attempt = 0; ; attempt++) {
+          try {
+            await this.store.release(owner, cooldown);
+            break;
+          } catch (error) {
+            this.logFailure();
+            if (attempt === 2) throw error;
+          }
+        }
       }
     } catch (error) {
       if (error instanceof SearchError) throw error;
+      this.logFailure();
       throw new SearchError(503, "storage_unavailable");
     }
   }

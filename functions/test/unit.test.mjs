@@ -25,6 +25,7 @@ function fakeStore() {
   const values = new Map();
   return {
     values,
+    async consumeQuota() {},
     locked: false,
     releases: [],
     async cached(key) {
@@ -86,7 +87,7 @@ test("reject missing, repeated, malformed, oversized and forwarding parameters",
     "[clinic]",
     "😀",
   ])
-    assert.throws(() => queryFromUrl(url(q)), failure(400));
+    assert.throws(() => queryFromUrl(url(q)), failure(400), JSON.stringify(q));
   for (const u of [
     "/search",
     "/search?q=Genève",
@@ -96,7 +97,7 @@ test("reject missing, repeated, malformed, oversized and forwarding parameters",
     url("Geneva") + "&format=json",
     "/search?q=%ZZ",
   ])
-    assert.throws(() => queryFromUrl(u), failure(400));
+    assert.throws(() => queryFromUrl(u), failure(400), u);
   assert.throws(() => queryFromUrl("x".repeat(2049)), failure(413));
 });
 test("service caches successful results and empty arrays under hashed keys", async () => {
@@ -109,8 +110,8 @@ test("service caches successful results and empty arrays under hashed keys", asy
         return result;
       },
     });
-    assert.deepEqual(await service.search("genève"), result);
-    assert.deepEqual(await service.search("genève"), result);
+    assert.deepEqual(await service.search("genève", "a".repeat(64)), result);
+    assert.deepEqual(await service.search("genève", "a".repeat(64)), result);
     assert.equal(calls, 1);
     assert.match([...store.values.keys()][0], /^[a-f0-9]{64}$/);
     assert.deepEqual(store.releases, [1000]);
@@ -125,7 +126,7 @@ test("cache recheck inside acquired lock prevents duplicate upstream work", asyn
       search() {
         assert.fail();
       },
-    }).search("genève"),
+    }).search("genève", "a".repeat(64)),
     [],
   );
 });
@@ -137,13 +138,19 @@ test("busy requests recheck completed identical cache or reject without upstream
       assert.fail();
     },
   });
-  await assert.rejects(service.search("genève"), failure(429));
+  await assert.rejects(service.search("genève", "a".repeat(64)), failure(429));
   let reads = 0;
   store.cached = async () => (++reads === 1 ? undefined : []);
-  assert.deepEqual(await service.search("genève"), []);
+  assert.deepEqual(await service.search("genève", "a".repeat(64)), []);
 });
 test("cache and limiter failures fail closed; failed release never reports success", async () => {
-  for (const method of ["cached", "acquire", "save", "release"]) {
+  for (const method of [
+    "cached",
+    "consumeQuota",
+    "acquire",
+    "save",
+    "release",
+  ]) {
     const store = fakeStore();
     let calls = 0;
     store[method] = async () => {
@@ -155,7 +162,7 @@ test("cache and limiter failures fail closed; failed release never reports succe
           calls++;
           return [];
         },
-      }).search("genève"),
+      }).search("genève", "a".repeat(64)),
       failure(503, "storage_unavailable"),
     );
     assert.equal(calls, ["save", "release"].includes(method) ? 1 : 0);
@@ -169,7 +176,7 @@ test("upstream failures never cache, always release, and apply shared cooldown",
         async search() {
           throw new SearchError(status, "upstream_failure");
         },
-      }).search("genève"),
+      }).search("genève", "a".repeat(64)),
       failure(status),
     );
     assert.equal(store.values.size, 0);
@@ -182,7 +189,7 @@ test("HTTP returns parser-compatible JSON, enforces auth, methods and request bo
       return [hospital];
     },
   });
-  const handler = createHandler(service, async () => {});
+  const handler = createHandler(service, async () => "a".repeat(64));
   const ok = response();
   await handler(request(), ok);
   assert.equal(ok.statusCode, 200);
@@ -225,7 +232,7 @@ test("HTTP rejects overlapping work without an in-memory queue", async () => {
         return [];
       },
     },
-    async () => {},
+    async () => "a".repeat(64),
   );
   const first = handler(request(), response());
   await Promise.resolve();
@@ -267,9 +274,9 @@ test("Nominatim sends fixed URL, identity, bounded contract and projects Android
   );
 });
 test("upstream 429, 5xx, redirects, malformed results and network failures are sanitized", async () => {
-  for (const [fetcher, status] of [
+  for (const [fetcher, status, label] of [
     [async () => new Response("", { status: 429 }), 429],
-    [async () => new Response("", { status: 503 }), 502],
+    [async () => new Response("", { status: 503 }), 503],
     [async () => new Response("", { status: 302 }), 502],
     [
       async () => {
@@ -285,7 +292,11 @@ test("upstream 429, 5xx, redirects, malformed results and network failures are s
       [{ ...hospital, osm_id: 0 }],
       [{ ...hospital, display_name: "" }],
       Array(11).fill(hospital),
-    ].map((body) => [async () => Response.json(body), 502]),
+    ].map((body) => [
+      async () => Response.json(body),
+      502,
+      JSON.stringify(body),
+    ]),
     [async () => new Response("not JSON"), 502],
     [async () => new Response("x".repeat(262145)), 502],
     [async () => new Response(null), 502],
@@ -293,6 +304,7 @@ test("upstream 429, 5xx, redirects, malformed results and network failures are s
     await assert.rejects(
       new NominatimClient("a@example.org", fetcher).search("geneva"),
       failure(status),
+      `upstream ${label ?? String(fetcher)} expected ${status}`,
     );
   await assert.rejects(
     new NominatimClient("", () => assert.fail()).search("geneva"),
@@ -354,6 +366,7 @@ test("Firebase Auth and App Check must both verify and match an allowed app", as
     await assert.rejects(
       authorizeTokens(bearer, token, ids, verifyAuth, verifyApp),
       failure(status),
+      JSON.stringify({ bearer, token, ids, status }),
     );
 });
 
@@ -490,6 +503,7 @@ test("proxy rejects JavaScript-only coordinate syntax and empty Android fallback
         Response.json([invalid]),
       ).search("geneva"),
       failure(502),
+      JSON.stringify(invalid),
     );
   const result = await new NominatimClient("a@example.org", async () =>
     Response.json([
@@ -512,28 +526,221 @@ test("upstream Retry-After is enforced in shared cooldown and HTTP response", as
     apis: ["Date"],
     now: Date.parse("2026-10-20T00:00:00Z"),
   });
-  for (const [header, seconds] of [
-    ["900", 900],
-    ["Tue, 20 Oct 2026 00:30:00 GMT", 1800],
-    ["1", 60],
-    ["invalid", 60],
-    ["99999999999999999999999999", 60],
-    ["", 60],
+  for (const status of [429, 503])
+    for (const [header, seconds] of [
+      ["900", 900],
+      ["Tue, 20 Oct 2026 00:30:00 GMT", 1800],
+      ["1", 60],
+      ["invalid", 60],
+      ["99999999999999999999999999", 60],
+      ["", 60],
+    ]) {
+      const store = fakeStore();
+      const client = new NominatimClient(
+        "a@example.org",
+        async () =>
+          new Response("", { status, headers: { "Retry-After": header } }),
+      );
+      const handler = createHandler(
+        new HospitalSearchService(store, client),
+        async () => "a".repeat(64),
+      );
+      const res = response();
+      await handler(request(), res);
+      assert.equal(res.statusCode, status, `${status}: ${header}`);
+      assert.equal(
+        res.headers["Retry-After"],
+        String(seconds),
+        `${status}: ${header}`,
+      );
+      assert.deepEqual(store.releases, [seconds * 1000]);
+    }
+});
+
+test("real hospital names retain accents and legitimate punctuation", async (t) => {
+  for (const name of [
+    "Hôpital de l'Île",
+    "Hôpital du Valais (HVS)",
+    "Kantonsspital St. Gallen",
+    "Clinique de La Source",
+    "HUG / Cluse-Roseraie",
+    "St. Peter & Paul, Zürich",
+    "L’Hôpital – Genève".replace("–", "-"),
   ]) {
-    const store = fakeStore();
-    const client = new NominatimClient(
-      "a@example.org",
-      async () =>
-        new Response("", { status: 429, headers: { "Retry-After": header } }),
+    await t.test(name, () =>
+      assert.equal(queryFromUrl(url(name)), name.toLowerCase()),
     );
-    const handler = createHandler(
-      new HospitalSearchService(store, client),
-      async () => {},
-    );
-    const res = response();
-    await handler(request(), res);
-    assert.equal(res.statusCode, 429);
-    assert.equal(res.headers["Retry-After"], String(seconds));
-    assert.deepEqual(store.releases, [seconds * 1000]);
   }
+});
+
+test("quota applies only after a shared cache miss and before global acquisition", async () => {
+  const store = fakeStore();
+  let charged = 0;
+  store.consumeQuota = async (key) => {
+    assert.equal(key, "a".repeat(64));
+    charged++;
+    if (charged > 1) throw new SearchError(429, "quota_exceeded");
+  };
+  const service = new HospitalSearchService(store, {
+    async search() {
+      return [];
+    },
+  });
+  await service.search("geneva", "a".repeat(64));
+  await service.search("geneva", "a".repeat(64));
+  assert.equal(charged, 1);
+  store.acquire = () =>
+    assert.fail("rejected quota must not acquire global limiter");
+  await assert.rejects(
+    service.search("bern", "a".repeat(64)),
+    failure(429, "quota_exceeded"),
+  );
+  assert.equal(charged, 2);
+});
+
+test("authenticated handler forwards only permitted hospital parameters and headers upstream", async (t) => {
+  const { createServer, request: httpRequest } = await import("node:http");
+  const { requestOnce } = await import("../lib/https-transport.js");
+  let wire;
+  const server = createServer((req, res) => {
+    wire = { url: req.url, headers: req.headers, method: req.method };
+    res.end("[]");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  let calls = 0;
+  const client = new NominatimClient(
+    "maintainer@example.org",
+    async (upstream, options) => {
+      calls++;
+      assert.deepEqual(
+        [...upstream.searchParams],
+        [
+          ["q", "hôpital de l'île [hospital]"],
+          ["format", "jsonv2"],
+          ["limit", "10"],
+        ],
+      );
+      assert.deepEqual(options.headers, {
+        "User-Agent":
+          "Oncompanion/1.0 (+https://github.com/Oncompanion/Oncompanion; maintainer@example.org)",
+        Accept: "application/json",
+        "Accept-Language": "en",
+        "Accept-Encoding": "identity",
+      });
+      assert.deepEqual(Object.keys(options).sort(), ["headers", "signal"]);
+      return requestOnce(
+        new URL(
+          `http://127.0.0.1:${server.address().port}${upstream.pathname}${upstream.search}`,
+        ),
+        options,
+        httpRequest,
+      );
+    },
+  );
+  const req = request(url("Hôpital de l'Île"));
+  req.headers = {
+    authorization: "Bearer private-id-token",
+    "x-firebase-appcheck": "private-app-token",
+  };
+  req.patientProfile = { uid: "private-uid", diagnosis: "private-profile" };
+  const res = response();
+  await createHandler(
+    new HospitalSearchService(fakeStore(), client),
+    async () => "a".repeat(64),
+  )(req, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls, 1);
+  assert.equal(wire.method, "GET");
+  assert.equal(
+    wire.url,
+    `/search?${new URLSearchParams({ q: "hôpital de l'île [hospital]", format: "jsonv2", limit: "10" })}`,
+  );
+  assert.deepEqual(Object.keys(wire.headers).sort(), [
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "connection",
+    "host",
+    "user-agent",
+  ]);
+  assert.equal(wire.headers.connection, "close");
+  assert.equal(wire.headers.host, `127.0.0.1:${server.address().port}`);
+});
+
+test("HTTP 503 Retry-After has a sanitized minimum and preserves longer hints", async (t) => {
+  for (const [hint, expected] of [
+    [undefined, "60"],
+    [0, "60"],
+    [-1, "60"],
+    [900, "900"],
+  ]) {
+    await t.test(String(hint), async () => {
+      const res = response();
+      await createHandler(
+        {
+          async search() {
+            throw new SearchError(503, "service_unavailable", hint);
+          },
+        },
+        async () => "a".repeat(64),
+      )(request(), res);
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.headers["Retry-After"], expected);
+      assert.deepEqual(res.body, { error: { code: "service_unavailable" } });
+    });
+  }
+});
+
+test("TTL configuration covers only cache and quota expiry, never the global lock", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const config = JSON.parse(
+    await readFile(new URL("../../firebase.json", import.meta.url)),
+  );
+  assert.equal(config.firestore.indexes, "firestore.indexes.json");
+  const indexes = JSON.parse(
+    await readFile(new URL("../../firestore.indexes.json", import.meta.url)),
+  );
+  assert.deepEqual(
+    indexes.fieldOverrides,
+    ["hospitalSearchCache", "hospitalSearchQuota"].map((collectionGroup) => ({
+      collectionGroup,
+      fieldPath: "expiresAt",
+      ttl: true,
+      indexes: [],
+    })),
+  );
+});
+
+test("UID quota keys are stable, secret-dependent hashes with no raw identity", async () => {
+  const { quotaKeyForUid } = await import("../lib/authorization.js");
+  const key = quotaKeyForUid("private-uid", "secret".repeat(8));
+  assert.match(key, /^[a-f0-9]{64}$/);
+  assert.equal(key, quotaKeyForUid("private-uid", "secret".repeat(8)));
+  assert.notEqual(key, quotaKeyForUid("another-uid", "secret".repeat(8)));
+  assert.notEqual(key, quotaKeyForUid("private-uid", "rotated".repeat(8)));
+  assert.throws(() => quotaKeyForUid("private-uid", ""));
+  assert.throws(() => quotaKeyForUid("", "secret".repeat(8)));
+});
+
+test("invalid or unauthenticated requests never spend quota or acquire the global limiter", async (t) => {
+  for (const status of [400, 401, 403])
+    await t.test(String(status), async () => {
+      const store = fakeStore();
+      store.consumeQuota = () => assert.fail("Rejected request spent quota");
+      store.acquire = () => assert.fail("Rejected request acquired limiter");
+      const handler = createHandler(
+        new HospitalSearchService(store, {
+          search() {
+            assert.fail();
+          },
+        }),
+        async () => {
+          throw new SearchError(status, "rejected");
+        },
+      );
+      const res = response();
+      await handler(status === 400 ? request(url("[clinic]")) : request(), res);
+      assert.equal(res.statusCode, status);
+    });
 });

@@ -34,7 +34,8 @@
         ".git",
         "test",
         "*.log",
-        ".env.example"
+        ".env.example",
+        ".secret*"
       ]
     }
   ]

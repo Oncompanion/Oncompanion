@@ -30,7 +30,7 @@ export function queryFromUrl(originalUrl: string): string {
     text.length < 2 ||
     text.length > 200 ||
     !/[\p{L}\p{N}]/u.test(text) ||
-    !/^[\p{L}\p{M}\p{N} .,‘’'&()\-]+$/u.test(text)
+    !/^[\p{L}\p{M}\p{N} .,‘’'&()/\-]+$/u.test(text)
   )
     throw new SearchError(400, "invalid_query");
   return text.toLowerCase();

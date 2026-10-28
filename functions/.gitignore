@@ -1,5 +1,7 @@
+# Co-authored-by: ChatGPT <noreply@openai.com>
 node_modules/
 lib/
 .env*
 !.env.example
 coverage/
+.secret*

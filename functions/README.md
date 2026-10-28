@@ -4,8 +4,9 @@
 
 This is Oncompanion's explicit hospital search backend, implemented with second-generation
 Firebase Functions and TypeScript. It is **not deployed** by this change. Profile's Search button
-stays disabled. No Android files, Firebase rules, production resources or deployment workflows
-are changed. This endpoint is public at the network layer; Firebase Auth and App Check are
+stays disabled. No Android files, Firebase rules or production resources are changed. Backend
+tests run in CI; deployment stays manual. This endpoint is public at the network layer;
+Firebase Auth and App Check are
 mandatory in its handler.
 
 ## Development and tests
@@ -40,8 +41,9 @@ contention, cooldowns, permanent locks, ownership and default-deny rules for ano
 clients. Unit tests inject HTTP responses; transport regression tests use a loopback HTTP server to
 count wire attempts on 421, 408, redirects and socket failures. Timeout tests use virtual time.
 No tests call Nominatim.
-The TypeScript compiler provides strict static checks; Prettier provides formatting. There is no
-new CI workflow; run these commands manually until the team approves backend CI integration.
+The TypeScript compiler provides strict static checks; Prettier provides formatting. The existing
+CI workflow has an independent hospital-proxy job using Node 22, npm ci,
+TypeScript, Prettier and demo Firestore integration tests with coverage. Failures fail the job.
 
 To run Functions locally, build first and start the demo emulators:
 
@@ -94,9 +96,9 @@ queries, credentials, stack traces or internal exception details:
 | 401 / 403 | Invalid/missing Firebase Auth / App Check or unapproved app ID |
 | 405 | Unsupported method; `Allow: GET` |
 | 413 | Oversized URL or request body |
-| 429 | Shared capacity exhausted or upstream 429 |
+| 429 | User quota exceeded, shared capacity exhausted or upstream 429 |
 | 502 | Network, upstream non-success/5xx, redirect or malformed response |
-| 503 | Storage, limiter or configuration failure |
+| 503 | Storage, limiter, configuration failure or upstream 503 |
 | 504 | Five-second upstream timeout |
 
 Responses disable HTTP caching. 429/503 include a minimum `Retry-After: 60` hint; a valid longer
@@ -111,14 +113,41 @@ and `expiresAt`. Successful empty lists are cached too. Entries are fresh for se
 expiration is checked against Firestore server read time on every hit, with no stale serving.
 Expired records are overwritten on the next successful refresh. The hash is not an anonymity
 guarantee: dictionary guesses remain possible, so submit only public hospital/location text.
-There are no stored raw queries, user IDs, IP addresses or request history. No cache logs are emitted.
+There are no stored raw queries, raw user IDs or IP addresses. No cache logs are emitted.
+The separate quota store retains pseudonymous miss timestamps for at most one day of logical use.
 
 This cache is independent of the Android repository's 50-query memory cache and Firestore's
 Android offline cache. Admin SDK operations use the server, not an offline queue. Existing rules
-deny all mobile reads/writes to both backend collections; emulator tests confirm this without
-changing rules. Configure a Firestore TTL policy on **cache `expiresAt` only** before production
-if automatic storage reclamation is desired. Logical expiry does not depend on TTL; without TTL,
-expired documents remain stored and cost storage. Never apply TTL to the control document.
+deny all mobile reads/writes to all three backend collections; emulator tests confirm this without
+changing rules. `firestore.indexes.json` declares TTL on `hospitalSearchCache.expiresAt` and
+`hospitalSearchQuota.expiresAt`, with indexing disabled for those fields. Both are Firestore
+Timestamps. Logical expiry remains mandatory: TTL deletion is asynchronous and the emulator
+does not implement automatic TTL deletion. Never apply TTL to the control document.
+
+Before a separately approved rollout, deploy the checked-in policy with
+`firebase deploy --only firestore:indexes --project oncompanion-c4144`, then verify both TTL
+policies are ACTIVE in Firestore before enabling traffic. The existing rules-only deployment
+workflow does not deploy indexes/TTL. This PR does not execute that command.
+
+## Per-user miss quota
+
+After the first shared-cache lookup misses, and **before global limiter acquisition**, an atomic
+Firestore transaction permits ten misses in a rolling hour and fifty in a rolling 24 hours.
+`hospitalSearchQuota/{HMAC-SHA256(secret, "hospital-quota-v1:" + verifiedUid)}` stores at most
+fifty server-read timestamps and a Timestamp `expiresAt`, one day after the latest admitted miss.
+No query, token, profile or raw UID is stored. This is pseudonymization, not anonymity. All
+instances/revisions must use the same secret and database. Cache hits do not inspect or spend
+quota; quota rejections do not mutate the record or touch the global limiter. Initial cache misses
+consume quota even if contention or upstream failure later rejects them (there is no retry queue).
+Concurrent misses that later discover a filled cache were still misses at their initial lookup.
+Storage failures fail closed. Logical rolling-window pruning works before TTL deletion.
+
+Provision a random secret of at least 32 characters through Secret Manager as
+`HOSPITAL_QUOTA_SECRET` (for example with `firebase functions:secrets:set HOSPITAL_QUOTA_SECRET`
+during separately approved setup). Never commit it or put it in `.env.example`. For local
+Functions emulation use an ignored `.secret.local`. Keep it stable: rotating it resets effective
+quotas and old records expire separately. Do not rotate during live overlapping revisions;
+coordinate migration with traffic disabled. No per-user counters can bypass the global lock.
 
 ## Global rate-limit guarantee and recovery
 
@@ -144,8 +173,13 @@ There is **no automatic lock expiry**. If an owner pauses before its HTTP call, 
 cannot steal the lock and race it. A crash, unknown transaction commit outcome, function timeout
 or failed release may therefore leave misses blocked indefinitely. Cached results remain usable.
 A failed acquisition never sends HTTP; cache-read failures also stop before acquisition; cache
-write errors return 503 after releasing with a failure cooldown. A release error leaves the lock
-held or cooldown committed, never silently bypassed. Corrupt control state fails closed.
+write errors return 503 after releasing with a failure cooldown. Release is idempotent for the
+recorded releasing owner and is retried at most three times.
+A transient failure or lost acknowledgement can therefore recover without another upstream call.
+A persistent release error leaves the lock held or cooldown committed, never silently bypassed.
+Storage failures log only `hospital_search_storage_failure`, without exception contents, queries,
+UIDs or credentials. Alert on this marker and investigate held control state before rollout.
+Corrupt control state fails closed.
 
 Recovery is an operator action, not a timer: stop/disable traffic to **all** revisions/services
 that use this coordinator, terminate or otherwise prove all potential owners cannot resume,
@@ -202,8 +236,9 @@ Before a separately approved deployment:
    `europe-west1` deployment alongside the existing Standard Firestore `(default)` in `eur3`.
    Admin SDK access bypasses client rules; restrict IAM and do not grant mobile clients Admin access.
 4. Provide the contact/app IDs, review storage TTL, abuse monitoring and operator recovery ownership.
-   Firebase Auth and App Check deter abuse but are not per-user quotas; valid tokens can be replayed
-   until expiry. Consider additional edge/per-user controls if traffic warrants it. Auth verification
+   Provision the stable quota secret and deploy/verify both TTL policies as described above.
+   Firebase Auth and App Check deter abuse; valid tokens can still be replayed until expiry.
+   Quotas bound admitted misses per user, not token verification/cache-read spend. Auth verification
    does not perform revocation lookups; normal token expiry applies.
 5. Review request logging before rollout: application code never logs query text, but Cloud Run
    platform request logs may include GET URLs. Configure Cloud Logging exclusions/retention and
@@ -227,3 +262,38 @@ References: [Firebase scaling and runtime](https://firebase.google.com/docs/func
 [Functions billing/setup](https://firebase.google.com/docs/functions/get-started),
 [Cloud Run timeout behavior](https://docs.cloud.google.com/run/docs/configuring/request-timeout),
 [Fetch HTTP 421 retry algorithm](https://fetch.spec.whatwg.org/#http-network-or-cache-fetch).
+
+## API decision: retain onRequest pending Android contract approval
+
+[Callable functions](https://firebase.google.com/docs/functions/callable) automatically attach and
+validate available SDK tokens; `enforceAppCheck: true` rejects invalid App Check, but the handler
+must still require `request.auth` and restrict approved app IDs. Callable POST data avoids query
+strings in request URLs (body/APM logging still needs review). This is the preferred candidate
+for a coordinated Android integration if the team approves the Functions Android SDK dependency.
+
+For this PR retain `onRequest`: the current `HospitalRepositoryNominatim` and provider generate
+GET requests and parse a bare JSON array. Callable functions require a different transport,
+request/response envelope and error mapping, plus the new Android dependency. The provider can
+still expose `HospitalRepository` and preserve the existing explicit-search UI, manual entry,
+attribution and memory-cache behavior, but its present `configure(endpoint)` cannot simply be
+pointed at a callable endpoint. Neither API supplies offline network search; local cached results
+and manual entry must remain available. Auth/App Check enforcement remains explicit and mandatory
+in this HTTP handler. Do not enable Search until the team chooses the contract and implements
+its authenticated transport. No dependency or Android activation is added here.
+
+The GET endpoint may put public hospital names in infrastructure request logs. Application code
+cannot fix that with a logging exclusion alone: review platform collection, sinks and retention
+before rollout. A callable migration should update contract tests, diagrams and deployment notes
+in the same change. This is a deployment blocker for team review, not an implicit API migration.
+
+## Upstream configuration decision
+
+Keep the fixed public `https://nominatim.openstreetmap.org/search` endpoint for this PR. Tests
+already inject the transport, and emulation replaces the client entirely. An arbitrary environment
+URL would expand server-side request access (including private destinations); a future provider
+switch needs a reviewed HTTPS hostname/path allowlist, DNS/egress controls and response-contract
+review, never request-controlled URLs. Parameters are deployment configuration, not a live reload:
+Firebase environment parameter changes require a new revision. The backend can still change
+provider without an Android update. Team-approved controlled routing can follow with deployment.
+
+Request queuing remains deferred to a separate PR; this implementation rejects contention.

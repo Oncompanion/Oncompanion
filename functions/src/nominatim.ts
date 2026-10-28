@@ -36,10 +36,12 @@ export class NominatimClient implements HospitalClient {
           "Accept-Encoding": "identity",
         },
       });
-      if (response.status === 429)
+      if (response.status === 429 || response.status === 503)
         throw new SearchError(
-          429,
-          "upstream_rate_limited",
+          response.status,
+          response.status === 429
+            ? "upstream_rate_limited"
+            : "upstream_unavailable",
           retryAfter(response.headers.get("Retry-After")),
         );
       if (!response.ok) throw new SearchError(502, "upstream_unavailable");
