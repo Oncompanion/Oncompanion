@@ -260,6 +260,43 @@ class AppointmentNavigationTest {
     compose.runOnIdle { assertEquals(Screen.PLANNING, nav.currentDestination?.route) }
   }
 
+  /** Deleting one appointment preserves the other appointment on the selected Planning day. */
+  @Test
+  fun deleteFromPlanningKeepsOtherAppointmentOnSameDay() {
+    val day = LocalDate.now().plusWeeks(1)
+    val first =
+        Appointment(
+            "first-visit",
+            "First visit",
+            day.atTime(10, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.CONSULTATION,
+        )
+    val second =
+        Appointment(
+            "second-visit",
+            "Second visit",
+            day.atTime(11, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            AppointmentType.OTHER,
+        )
+    repository.seed("uid-patient", first, second)
+    show()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    compose.onNodeWithText(first.title).assertIsDisplayed()
+    compose.onNodeWithText(second.title).assertIsDisplayed()
+    compose.onNodeWithText(first.title).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
+    compose.onNodeWithText(first.title).assertDoesNotExist()
+    compose.onNodeWithText(second.title).assertIsDisplayed()
+    compose.runOnIdle {
+      assertEquals(Screen.PLANNING, nav.currentDestination?.route)
+      assertEquals(listOf(second), repository.appointments("uid-patient"))
+    }
+  }
+
   /** Overview immediately chooses the next remaining appointment after confirmed deletion. */
   @Test
   fun deleteFromOverviewRefreshesNextAppointment() {
