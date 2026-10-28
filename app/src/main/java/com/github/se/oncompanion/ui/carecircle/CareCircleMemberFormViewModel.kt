@@ -36,6 +36,8 @@ import kotlinx.coroutines.launch
  * @property isLoading in edit mode, waiting for the member's details to fill in the form
  * @property notFound in edit mode, the member isn't in the circle (anymore), e.g. removed elsewhere
  * @property loadFailed in edit mode, the member couldn't be read
+ * @property loadedDetails in edit mode, the member's details as filled in, to tell whether anything
+ *   changed
  * @property savedInviteCode the invite code of the invitation just created, once [isSaved]
  * @property saveFailed whether the last save failed; the draft is kept so the patient can retry
  */
@@ -50,6 +52,7 @@ data class CareCircleMemberFormUiState(
     val isLoading: Boolean = false,
     val notFound: Boolean = false,
     val loadFailed: Boolean = false,
+    val loadedDetails: CareCircleMemberDetails? = null,
     val isSaving: Boolean = false,
     val savedInviteCode: String? = null,
     val isSaved: Boolean = false,
@@ -78,9 +81,29 @@ data class CareCircleMemberFormUiState(
   val canEdit: Boolean
     get() = showsForm && !isSaving && !isSaved
 
-  /** Whether "Send invitation" (or "Save changes") is enabled. */
+  /**
+   * What saving stores: the names trimmed, a blank last name left out. Null without relationship.
+   */
+  val details: CareCircleMemberDetails?
+    get() = relationship?.let {
+      CareCircleMemberDetails(
+          firstName = firstName.trim(),
+          familyName = familyName.trim().ifEmpty { null },
+          relationship = it,
+          permissions = permissions,
+      )
+    }
+
+  /** In edit mode, whether the form still holds the member's details as loaded. */
+  val unchanged: Boolean
+    get() = loadedDetails != null && details == loadedDetails
+
+  /**
+   * Whether "Send invitation" (or "Save changes") is enabled: when editing, only once something
+   * changed, so tapping it can't rewrite the same details.
+   */
   val canSave: Boolean
-    get() = canEdit && !missingFirstName && !missingRelationship && !invalidEmail
+    get() = canEdit && !missingFirstName && !missingRelationship && !invalidEmail && !unchanged
 }
 
 /**
@@ -130,14 +153,17 @@ class CareCircleMemberFormViewModel(
               when {
                 member == null -> state.copy(isLoading = false, notFound = true)
                 state.isLoading ->
-                    state.copy(
-                        firstName = member.firstName,
-                        familyName = member.familyName.orEmpty(),
-                        relationship = member.relationship,
-                        email = member.email.orEmpty(),
-                        permissions = member.permissions,
-                        isLoading = false,
-                    )
+                    state
+                        .copy(
+                            firstName = member.firstName,
+                            familyName = member.familyName.orEmpty(),
+                            relationship = member.relationship,
+                            email = member.email.orEmpty(),
+                            permissions = member.permissions,
+                            isLoading = false,
+                        )
+                        // Trimmed like a save, so an untouched form counts as unchanged
+                        .let { it.copy(loadedDetails = it.details) }
                 else -> state
               }
         }
@@ -199,15 +225,8 @@ class CareCircleMemberFormViewModel(
   fun save() {
     val state = _uiState.value
     if (!state.canSave) return
-    val relationship = state.relationship ?: return
+    val details = state.details ?: return
     _uiState.value = state.copy(isSaving = true, saveFailed = false)
-    val details =
-        CareCircleMemberDetails(
-            firstName = state.firstName.trim(),
-            familyName = state.familyName.trim().ifEmpty { null },
-            relationship = relationship,
-            permissions = state.permissions,
-        )
     viewModelScope.launch {
       // The new invite code when adding, null when editing
       val saved: Result<String?> =

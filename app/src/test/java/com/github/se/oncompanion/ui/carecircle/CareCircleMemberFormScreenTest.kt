@@ -347,6 +347,13 @@ class CareCircleMemberFormScreenTest {
   }
 
   @Test
+  fun edit_unchanged_disablesSaveChanges_withoutAMissingText() {
+    content(editing.copy(loadedDetails = editing.details))
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.care_circle_form_missing).assertDoesNotExist()
+  }
+
+  @Test
   fun edit_memberWithoutEmail_hidesTheEmail() {
     content(editing.copy(email = ""))
     node(C.Tag.care_circle_form_first_name).assertIsDisplayed()

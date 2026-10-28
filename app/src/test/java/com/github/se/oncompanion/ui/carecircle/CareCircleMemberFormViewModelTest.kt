@@ -371,7 +371,46 @@ class CareCircleMemberFormViewModelTest {
         assertEquals("marc.dubois@email.com", state.email)
         assertEquals(marc.permissions, state.permissions)
         assertFalse(state.firstNameTouched)
-        assertTrue(state.canSave)
+        // Nothing changed yet
+        assertTrue(state.unchanged)
+        assertFalse(state.canSave)
+      }
+
+  @Test
+  fun edit_saveIsEnabledOnlyWhileSomethingDiffersFromTheMember() =
+      runTest(dispatcher) {
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        viewModel.save()
+        advanceUntilIdle()
+        assertTrue(circle.updated.isEmpty())
+
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+        assertTrue(viewModel.uiState.value.canSave)
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, false)
+        assertFalse(viewModel.uiState.value.canSave)
+
+        viewModel.onFirstNameChange("Marco")
+        assertTrue(viewModel.uiState.value.canSave)
+        // Back to the same name, spaces aside: saving would store the same details
+        viewModel.onFirstNameChange(" Marc ")
+        assertFalse(viewModel.uiState.value.canSave)
+
+        viewModel.onRelationshipChange(Relationship.FRIEND)
+        assertTrue(viewModel.uiState.value.canSave)
+        viewModel.onRelationshipChange(Relationship.SON)
+        viewModel.onFamilyNameChange("")
+        assertTrue(viewModel.uiState.value.canSave)
+      }
+
+  @Test
+  fun edit_memberWithBlankLastName_isUnchangedOnceFilledIn() =
+      runTest(dispatcher) {
+        circle.setMembers(ownerUid, listOf(marc.copy(familyName = " ")))
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.unchanged)
+        assertFalse(viewModel.uiState.value.canSave)
       }
 
   @Test
@@ -441,6 +480,7 @@ class CareCircleMemberFormViewModelTest {
         val viewModel = editViewModel()
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.invalidEmail)
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
         assertTrue(viewModel.uiState.value.canSave)
       }
 
