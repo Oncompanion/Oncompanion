@@ -151,7 +151,7 @@ class CareCircleInviteScreenTest {
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_invite_valid)
         .assertTextEquals(string(R.string.care_circle_invite_valid_until, day(julie.expiresAt!!)))
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_offline_warning).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_sync_warning).assertDoesNotExist()
   }
 
   @Test
@@ -168,24 +168,28 @@ class CareCircleInviteScreenTest {
   }
 
   @Test
-  fun unsyncedInvite_warnsItOnlyWorksOnceOnline() {
+  fun unsyncedInvite_saysItIsWaitingToSync_withoutClaimingOffline() {
     setContent(
         CareCircleInviteUiState.Invite(
             julie.copy(createdAt = null, isSynced = false),
             expired = false,
         )
     )
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_offline_warning).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_sync_warning).assertIsDisplayed()
     composeTestRule
-        .onNodeWithText(string(R.string.care_circle_invite_offline_warning))
+        .onNodeWithText("Waiting to sync. This code will work once the invitation has synced.")
         .assertIsDisplayed()
+    // Waiting for the server also happens online
+    composeTestRule
+        .onNodeWithText("offline", substring = true, ignoreCase = true)
+        .assertDoesNotExist()
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_invite_valid)
         .assertTextEquals(string(R.string.care_circle_invite_valid_once_sent))
     composeTestRule
         .onNodeWithTag(C.Tag.care_circle_member_subtitle)
         .assertTextEquals("Sister · " + string(R.string.care_circle_invite_not_synced))
-    // The invite code can already be shared: it works once the phone reconnects
+    // The invite code can already be shared: it works once the invitation has synced
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertIsDisplayed()
   }
 

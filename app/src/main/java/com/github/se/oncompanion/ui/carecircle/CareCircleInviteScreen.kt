@@ -229,7 +229,7 @@ private fun InviteDetails(state: CareCircleInviteUiState.Invite, modifier: Modif
     )
 
     InviteCodeCard(invite, state.expired)
-    if (!invite.isSynced && !state.expired) OfflineWarning()
+    if (!invite.isSynced && !state.expired) SyncWarning()
 
     // What the person will see once they join
     Subheader(stringResource(R.string.care_circle_member_can_see))
@@ -295,14 +295,17 @@ private fun InviteCodeCard(invite: CareCircleInvite, expired: Boolean) {
 private fun formatDay(instant: Instant): String =
     validityFormatter.format(instant.atZone(ZoneId.systemDefault()))
 
-/** The invite code only works on another phone once the server has it (architecture.md). */
+/**
+ * The invite code only works on another phone once the server has it (architecture.md). Waiting for
+ * the server also happens online, so this doesn't say the phone is offline.
+ */
 @Composable
-private fun OfflineWarning() {
+private fun SyncWarning() {
   Row(
       modifier =
           Modifier.fillMaxWidth()
               .padding(horizontal = 24.dp, vertical = 4.dp)
-              .testTag(C.Tag.care_circle_invite_offline_warning),
+              .testTag(C.Tag.care_circle_invite_sync_warning),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -312,7 +315,7 @@ private fun OfflineWarning() {
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Text(
-        text = stringResource(R.string.care_circle_invite_offline_warning),
+        text = stringResource(R.string.care_circle_invite_sync_warning),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
