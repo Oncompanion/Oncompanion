@@ -338,8 +338,10 @@
     <string name="care_circle_invite_joined_title">%1$s has joined your circle</string>
     <string name="care_circle_invite_joined_body">%1$s can now see: %2$s. You can change this any time.</string>
     <string name="care_circle_invite_back_to_circle">Back to circle</string>
-    <string name="care_circle_invite_not_found">This invitation was cancelled.</string>
+    <string name="care_circle_invite_not_found">This invitation is no longer pending.</string>
     <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
+    <!-- Neutral: the invitation may have been used just before the new member reaches this phone -->
+    <string name="care_circle_invite_not_found_body">It was cancelled, or the person has just joined. Your care circle shows who\'s in it.</string>
     <!-- Prescriptions -->
     <string name="prescription_form_add_title">Add prescription</string>
     <string name="prescription_form_close">Close</string>

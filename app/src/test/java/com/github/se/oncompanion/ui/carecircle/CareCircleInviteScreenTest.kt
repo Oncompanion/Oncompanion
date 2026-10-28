@@ -99,11 +99,13 @@ class CareCircleInviteScreenTest {
   }
 
   @Test
-  fun notFound_saysItWasCancelled_andGoesBackToTheCircle() {
+  fun notFound_doesNotClaimItWasCancelled_andGoesBackToTheCircle() {
     val events = setContent(CareCircleInviteUiState.NotFound)
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_not_found).assertIsDisplayed()
+    composeTestRule.onNodeWithText("This invitation is no longer pending.").assertIsDisplayed()
+    // The person may have just joined, so the screen points to the circle instead of guessing
     composeTestRule
-        .onNodeWithText(string(R.string.care_circle_invite_not_found))
+        .onNodeWithText(string(R.string.care_circle_invite_not_found_body))
         .assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button).performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.back) }

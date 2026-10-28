@@ -117,8 +117,10 @@ fun CareCircleInviteContent(
             CircularProgressIndicator(Modifier.testTag(C.Tag.care_circle_invite_loading))
           }
       CareCircleInviteUiState.NotFound ->
+          // Neutral wording: a used invitation can vanish just before its new member arrives
           CenteredMessage(
               title = stringResource(R.string.care_circle_invite_not_found),
+              body = stringResource(R.string.care_circle_invite_not_found_body),
               modifier = contentModifier.testTag(C.Tag.care_circle_invite_not_found),
               action = { BackToCircleButton(onBack) },
           )
