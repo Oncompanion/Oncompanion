@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.overview
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -99,6 +101,13 @@ private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.E
  * The home screen after signing in (US-23 "See my day at a glance"), following the Figma "US-23 ·
  * Overview dashboard (proposal)": a greeting, the next appointment, today's items and the shortcuts
  * to each section.
+ *
+ * A caregiver sees it in caregiver mode (US-20): "Anne's care ▾" opens "Whose care?" to switch
+ * patient, and the shortcuts are hidden, as the sections behind them would show the caregiver's own
+ * data until #240.
+ *
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ * @param onSwitchPatient opens "Whose care?", in caregiver mode
  */
 @Composable
 fun OverviewScreen(
@@ -108,6 +117,8 @@ fun OverviewScreen(
     onOpenAppointment: (String) -> Unit = {
       navigationActions.navigateTo(Screen.appointmentDetail(it))
     },
+    caregiverOf: String? = null,
+    onSwitchPatient: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
@@ -124,6 +135,8 @@ fun OverviewScreen(
       onOpenAppointment = onOpenAppointment,
       onRetry = viewModel::loadDay,
       modifier = modifier,
+      caregiverOf = caregiverOf,
+      onSwitchPatient = onSwitchPatient,
       bottomBar = {
         BottomNavigationBar(
             selectedTab = Tab.OVERVIEW,
@@ -139,6 +152,8 @@ fun OverviewScreen(
  * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
  * @param onOpenAppointment opens the recorded appointment directly
  * @param onRetry reloads the day after an error
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ * @param onSwitchPatient opens "Whose care?", in caregiver mode
  * @param bottomBar the bottom navigation bar, empty by default
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,13 +165,18 @@ fun OverviewContent(
     onOpenAppointment: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
+    onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.overview_screen),
       topBar = {
         MediumTopAppBar(
-            title = { Greeting(uiState.firstName, uiState.now) },
+            title = {
+              if (caregiverOf == null) Greeting(uiState.firstName, uiState.now)
+              else CareTitle(caregiverOf, uiState.now, onSwitchPatient)
+            },
             actions = {
               val profile = OverviewShortcut.PROFILE
               IconButton(
@@ -183,20 +203,45 @@ fun OverviewContent(
     ) {
       when {
         uiState.isLoading -> LoadingDay()
-        uiState.hasError -> DayError(onRetry)
+        uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
         else -> {
           NextAppointmentCard(
               uiState.nextAppointment,
               uiState.now.toLocalDate(),
               onOpenPlanning,
               onOpenAppointment,
+              canAdd = caregiverOf == null,
           )
           TodaySection(uiState.todayEntries, onOpenPlanning)
         }
       }
-      // The shortcuts stay available whatever happens to the day's data
-      Shortcuts(onShortcutClick)
+      // The shortcuts stay available whatever happens to the day's data. A caregiver has none yet:
+      // only the patient manages their circle, and #240 brings back the sections they share
+      if (caregiverOf == null) Shortcuts(onShortcutClick)
     }
+  }
+}
+
+/** "Anne's care ▾" and today's date, for a caregiver: tapping it opens "Whose care?". */
+@Composable
+private fun CareTitle(patientName: String, now: LocalDateTime, onClick: () -> Unit) {
+  Column(
+      Modifier.clickable(
+              onClickLabel = stringResource(R.string.overview_switch_patient),
+              onClick = onClick,
+          )
+          .testTag(C.Tag.overview_whose_care)
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(stringResource(R.string.overview_care_of, patientName))
+      // The click label already says what it does
+      Text(" ▾", modifier = Modifier.clearAndSetSemantics {})
+    }
+    Text(
+        text = now.format(todayFormatter),
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.testTag(C.Tag.overview_date),
+    )
   }
 }
 
@@ -233,9 +278,12 @@ private fun LoadingDay() {
   }
 }
 
-/** Shown when the appointment and today's items couldn't be loaded. */
+/**
+ * Shown when the appointment and today's items couldn't be loaded. A caregiver has no shortcuts to
+ * fall back on, so the hint doesn't mention them ([withShortcuts] false).
+ */
 @Composable
-private fun DayError(onRetry: () -> Unit) {
+private fun DayError(onRetry: () -> Unit, withShortcuts: Boolean) {
   Surface(
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.overview_error),
       shape = RoundedCornerShape(16.dp),
@@ -252,7 +300,11 @@ private fun DayError(onRetry: () -> Unit) {
           textAlign = TextAlign.Center,
       )
       Text(
-          text = stringResource(R.string.overview_error_hint),
+          text =
+              stringResource(
+                  if (withShortcuts) R.string.overview_error_hint
+                  else R.string.overview_error_hint_caregiver
+              ),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,

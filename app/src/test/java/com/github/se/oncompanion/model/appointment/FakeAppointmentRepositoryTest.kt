@@ -436,4 +436,24 @@ class FakeAppointmentRepositoryTest {
         repository.observeAppointment("alice", id).first(),
     )
   }
+
+  /** The shared gate records the owner before holding deletion, and release applies the write. */
+  @Test
+  fun deletionGateHoldsUntilReleased() = runTest {
+    val original = appointment(id = "saved")
+    repository.seed("alice", original)
+    val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+    repository.writeGate = gate
+    val write =
+        launch(StandardTestDispatcher(testScheduler)) {
+          repository.deleteAppointment("alice", original.id)
+        }
+    runCurrent()
+    assertEquals(listOf("alice" to original.id), repository.deleteRequests)
+    assertEquals(listOf(original), repository.appointments("alice"))
+    gate.complete(Unit)
+    runCurrent()
+    write.join()
+    assertTrue(repository.appointments("alice").isEmpty())
+  }
 }

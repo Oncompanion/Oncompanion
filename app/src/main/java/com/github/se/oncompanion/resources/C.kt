@@ -12,6 +12,13 @@ object C {
     const val appointment_detail_loading = "appointment_detail_loading"
     const val appointment_detail_feedback = "appointment_detail_feedback"
     const val appointment_detail_retry = "appointment_detail_retry"
+    const val appointment_detail_content = "appointment_detail_content"
+    const val appointment_detail_edit_button = "appointment_detail_edit_button"
+    const val appointment_detail_delete_button = "appointment_detail_delete_button"
+    const val appointment_delete_dialog = "appointment_delete_dialog"
+    const val appointment_delete_confirm = "appointment_delete_confirm"
+    const val appointment_delete_cancel = "appointment_delete_cancel"
+    const val appointment_delete_error = "appointment_delete_error"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -88,6 +95,7 @@ object C {
     const val overview_today_list = "overview_today_list"
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
+    const val overview_whose_care = "overview_whose_care"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
@@ -380,6 +388,12 @@ object C {
     const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
     const val prescription_detail_date = "prescription_detail_date"
     const val prescription_detail_medications_header = "prescription_detail_medications_header"
+    const val prescription_detail_edit_button = "prescription_detail_edit_button"
+    const val prescription_detail_delete_button = "prescription_detail_delete_button"
+    const val prescription_delete_dialog = "prescription_delete_dialog"
+    const val prescription_delete_confirm = "prescription_delete_confirm"
+    const val prescription_delete_cancel = "prescription_delete_cancel"
+    const val prescription_delete_error = "prescription_delete_error"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
@@ -402,5 +416,11 @@ object C {
     const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
     const val prescription_scan_retake_button = "prescription_scan_retake_button"
     const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
+    const val prescription_scan_reading = "prescription_scan_reading"
+    const val prescription_scan_nothing_read = "prescription_scan_nothing_read"
+    const val prescription_scan_nothing_read_enter_manually_button =
+        "prescription_scan_nothing_read_enter_manually_button"
+    const val prescription_scan_nothing_read_retake_button =
+        "prescription_scan_nothing_read_retake_button"
   }
 }

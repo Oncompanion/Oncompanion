@@ -50,7 +50,7 @@ class WhoseCareScreenTest {
       WhoseCareContent(
           uiState = uiState,
           onBack = if (withBack) ({ events += "back" }) else null,
-          onPatientClick = { events += "chose $it" },
+          onPatientClick = { events += "chose ${it.uid}" },
           onJoinAnother = { events += "join" },
           onRetry = { events += "retry" },
       )
@@ -140,7 +140,7 @@ class WhoseCareScreenTest {
       WhoseCareScreen(
           viewModel = viewModel,
           onBack = null,
-          onPatientChosen = { events += "chose $it" },
+          onPatientChosen = { events += "chose ${it.uid}" },
           onJoinAnother = {},
           autoSelectSingle = autoSelectSingle,
           onSignedOut = { events += "signed out" },
