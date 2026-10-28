@@ -990,40 +990,6 @@ class AppNavHostTest {
         .assertTextContains("Planning & symptoms", substring = true)
   }
 
-  @Test
-  fun careCircleMember_removingThem_asksFirst_thenTheListNoLongerHasThem() {
-    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
-    runBlocking { auth.signInWithGoogle("token") }
-    val careCircle = FakeCareCircleRepository()
-    careCircle.setMembers(
-        "owner",
-        listOf(
-            CareCircleMember(uid = "marc", firstName = "Marc", relationship = Relationship.SON),
-            CareCircleMember(uid = "sophie", firstName = "Sophie"),
-        ),
-    )
-    setNavHost(Route.CARE_CIRCLE, careCircleRepository = careCircle, authRepository = auth)
-
-    // Cancelling changes nothing
-    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("marc")).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).performClick()
-    composeTestRule.onNodeWithText("Remove Marc from your circle?").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dismiss).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_name).assertTextEquals("Marc")
-    composeTestRule.runOnIdle { assertTrue(careCircle.removed.isEmpty()) }
-
-    // Confirming removes Marc and returns to the list, without him (#75)
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_confirm).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("marc")).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("sophie")).assertIsDisplayed()
-    composeTestRule.runOnIdle {
-      assertEquals(listOf("marc"), careCircle.removed)
-      assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
-    }
-  }
-
   private fun assertOnTab(tab: Tab, screenTag: String) {
     composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(tab.testTag).assertIsSelected()

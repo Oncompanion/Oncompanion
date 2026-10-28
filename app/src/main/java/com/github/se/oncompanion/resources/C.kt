@@ -265,10 +265,6 @@ object C {
     const val care_circle_member_email = "care_circle_member_email"
     const val care_circle_member_edit_button = "care_circle_member_edit_button"
     const val care_circle_member_remove_button = "care_circle_member_remove_button"
-    const val care_circle_member_remove_dialog = "care_circle_member_remove_dialog"
-    const val care_circle_member_remove_confirm = "care_circle_member_remove_confirm"
-    const val care_circle_member_remove_dismiss = "care_circle_member_remove_dismiss"
-    const val care_circle_member_remove_error = "care_circle_member_remove_error"
 
     /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
     fun careCircleMemberPermission(permissionName: String) =

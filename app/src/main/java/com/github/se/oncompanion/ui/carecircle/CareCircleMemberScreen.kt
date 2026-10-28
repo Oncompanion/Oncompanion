@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.carecircle
 
+import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,12 +34,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -71,8 +72,9 @@ private val addedAtFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.EN
 /**
  * One member of the signed-in user's care circle (US-14), following the "US-14 / Member detail"
  * Figma mockup: who they are, how to reach them and what they can see. "Edit member" opens the
- * member form; "Remove from circle" asks for confirmation (Figma "US-14 / Remove member –
- * confirmation dialog"), then removes them and goes back to the circle.
+ * member form.
+ *
+ * Removing the member comes in a later commit: for now its button shows a toast.
  */
 @Composable
 fun CareCircleMemberScreen(
@@ -84,17 +86,22 @@ fun CareCircleMemberScreen(
     },
 ) {
   val uiState by viewModel.uiState.collectAsState()
-  // Back to the circle once removed, where the member is no longer listed
-  val removed = uiState == CareCircleMemberUiState.Removed
-  LaunchedEffect(removed) { if (removed) navigationActions.goBack() }
+  val context = LocalContext.current
+  val resources = LocalResources.current
 
   CareCircleMemberContent(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onEdit = { member -> navigationActions.navigateTo(Screen.careCircleEditMember(member.uid)) },
-      onRemove = { viewModel.askRemove() },
-      onConfirmRemove = viewModel::confirmRemove,
-      onDismissRemove = viewModel::dismissRemove,
+      onRemove = { member ->
+        // TODO: ask for confirmation, then remove the member (US-14) instead of this toast
+        val message =
+            resources.getString(
+                R.string.care_circle_member_remove_not_implemented,
+                member.firstName,
+            )
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+      },
       onRetry = viewModel::retry,
       modifier = modifier,
   )
@@ -108,8 +115,6 @@ fun CareCircleMemberContent(
     onBack: () -> Unit,
     onEdit: (CareCircleMember) -> Unit,
     onRemove: (CareCircleMember) -> Unit,
-    onConfirmRemove: () -> Unit,
-    onDismissRemove: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -134,9 +139,7 @@ fun CareCircleMemberContent(
   ) { innerPadding ->
     val contentModifier = Modifier.fillMaxSize().padding(innerPadding)
     when (uiState) {
-      // Removed: the screen is leaving
-      CareCircleMemberUiState.Loading,
-      CareCircleMemberUiState.Removed -> LoadingState(contentModifier)
+      CareCircleMemberUiState.Loading -> LoadingState(contentModifier)
       CareCircleMemberUiState.NotFound ->
           MessageState(
               message = stringResource(R.string.care_circle_member_not_found),
@@ -154,48 +157,16 @@ fun CareCircleMemberContent(
               Text(stringResource(R.string.care_circle_retry))
             }
           }
-      is CareCircleMemberUiState.Member -> {
-        MemberDetails(
-            state = uiState,
-            onEdit = { onEdit(uiState.member) },
-            onRemove = { onRemove(uiState.member) },
-            modifier = contentModifier,
-        )
-        if (uiState.confirmingRemoval) {
-          RemoveDialog(uiState.member.firstName, onConfirmRemove, onDismissRemove)
-        }
-      }
+      is CareCircleMemberUiState.Member ->
+          MemberDetails(
+              member = uiState.member,
+              updatedJustNow = uiState.updatedJustNow,
+              onEdit = { onEdit(uiState.member) },
+              onRemove = { onRemove(uiState.member) },
+              modifier = contentModifier,
+          )
     }
   }
-}
-
-/** "Remove Marc from your circle?", as in the mockup: Cancel changes nothing. */
-@Composable
-private fun RemoveDialog(firstName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-  AlertDialog(
-      onDismissRequest = onDismiss,
-      title = { Text(stringResource(R.string.care_circle_member_remove_title, firstName)) },
-      text = { Text(stringResource(R.string.care_circle_member_remove_body)) },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.care_circle_member_remove_confirm),
-        ) {
-          Text(stringResource(R.string.care_circle_member_remove_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.testTag(C.Tag.care_circle_member_remove_dismiss),
-        ) {
-          Text(stringResource(R.string.care_circle_member_remove_dismiss))
-        }
-      },
-      modifier = Modifier.testTag(C.Tag.care_circle_member_remove_dialog),
-  )
 }
 
 @Composable
@@ -224,16 +195,16 @@ private fun MessageState(
 
 /**
  * The details scroll, while the actions stay at the bottom like in the mockup. The subtitle says
- * "Updated just now" instead of when they joined once the patient saved changes in this visit.
+ * "Updated just now" instead of when they joined once the patient [updatedJustNow] saved changes.
  */
 @Composable
 private fun MemberDetails(
-    state: CareCircleMemberUiState.Member,
+    member: CareCircleMember,
+    updatedJustNow: Boolean,
     onEdit: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier,
 ) {
-  val member = state.member
   Column(modifier = modifier.padding(bottom = 24.dp)) {
     Column(
         modifier =
@@ -246,8 +217,7 @@ private fun MemberDetails(
       MemberHeader(
           details = member.details,
           subtitle =
-              if (state.updatedJustNow)
-                  stringResource(R.string.care_circle_member_updated, relationship)
+              if (updatedJustNow) stringResource(R.string.care_circle_member_updated, relationship)
               else
                   member.addedAt?.let { addedAt ->
                     stringResource(
@@ -278,19 +248,7 @@ private fun MemberDetails(
       }
     }
 
-    // The member is still in the circle: say so above the button to try again
-    if (state.removeFailed) {
-      Text(
-          text = stringResource(R.string.care_circle_member_remove_error),
-          color = MaterialTheme.colorScheme.error,
-          textAlign = TextAlign.Center,
-          modifier =
-              Modifier.fillMaxWidth()
-                  .padding(horizontal = 24.dp, vertical = 8.dp)
-                  .testTag(C.Tag.care_circle_member_remove_error),
-      )
-    }
-    MemberActions(enabled = !state.isRemoving, onEdit = onEdit, onRemove = onRemove)
+    MemberActions(onEdit = onEdit, onRemove = onRemove)
   }
 }
 
@@ -366,7 +324,7 @@ internal fun PermissionItem(permission: CarePermission, granted: Boolean) {
 }
 
 @Composable
-private fun MemberActions(enabled: Boolean, onEdit: () -> Unit, onRemove: () -> Unit) {
+private fun MemberActions(onEdit: () -> Unit, onRemove: () -> Unit) {
   Column(
       modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -374,7 +332,6 @@ private fun MemberActions(enabled: Boolean, onEdit: () -> Unit, onRemove: () -> 
   ) {
     OutlinedButton(
         onClick = onEdit,
-        enabled = enabled,
         modifier =
             Modifier.fillMaxWidth().height(56.dp).testTag(C.Tag.care_circle_member_edit_button),
     ) {
@@ -390,7 +347,6 @@ private fun MemberActions(enabled: Boolean, onEdit: () -> Unit, onRemove: () -> 
     }
     TextButton(
         onClick = onRemove,
-        enabled = enabled,
         modifier = Modifier.height(56.dp).testTag(C.Tag.care_circle_member_remove_button),
     ) {
       Text(stringResource(R.string.care_circle_member_remove))
@@ -429,8 +385,6 @@ fun CareCircleMemberScreenPreview() {
         onBack = {},
         onEdit = {},
         onRemove = {},
-        onConfirmRemove = {},
-        onDismissRemove = {},
         onRetry = {},
     )
   }
@@ -445,28 +399,6 @@ fun CareCircleMemberScreenNotFoundPreview() {
         onBack = {},
         onEdit = {},
         onRemove = {},
-        onConfirmRemove = {},
-        onDismissRemove = {},
-        onRetry = {},
-    )
-  }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CareCircleMemberScreenRemovePreview() {
-  OncompanionTheme {
-    CareCircleMemberContent(
-        uiState =
-            CareCircleMemberUiState.Member(
-                CareCircleMember(uid = "marc", firstName = "Marc", relationship = Relationship.SON),
-                confirmingRemoval = true,
-            ),
-        onBack = {},
-        onEdit = {},
-        onRemove = {},
-        onConfirmRemove = {},
-        onDismissRemove = {},
         onRetry = {},
     )
   }

@@ -6,28 +6,22 @@ import androidx.lifecycle.SavedStateHandle
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
-import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.google.firebase.firestore.FirebaseFirestoreException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -91,143 +85,6 @@ class CareCircleMemberViewModelTest {
         CareCircleMemberUiState.Member(updated, updatedJustNow = true),
         viewModel.uiState.value,
     )
-  }
-
-  // ---- removing ----
-
-  /** Marc, shown and loaded. */
-  private fun TestScope.shownMarc(): CareCircleMemberViewModel {
-    repository.setMembers(ownerUid, listOf(marc, sophie))
-    return createViewModel().also { advanceUntilIdle() }
-  }
-
-  private fun CareCircleMemberViewModel.memberState() =
-      uiState.value as CareCircleMemberUiState.Member
-
-  @Test
-  fun removeDialog_opensAndCloses_andCancellingRemovesNobody() = runTest {
-    val viewModel = shownMarc()
-    viewModel.askRemove()
-    assertTrue(viewModel.memberState().confirmingRemoval)
-
-    viewModel.dismissRemove()
-    advanceUntilIdle()
-    assertEquals(CareCircleMemberUiState.Member(marc), viewModel.uiState.value)
-    assertTrue(repository.removed.isEmpty())
-  }
-
-  @Test
-  fun confirmRemove_removesTheMember_thenIsRemoved() = runTest {
-    val viewModel = shownMarc()
-    viewModel.askRemove()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-
-    assertEquals(listOf("marc"), repository.removed)
-    assertEquals(listOf(sophie), repository.members(ownerUid))
-    // Not "no longer in your circle", although the listener saw Marc go
-    assertEquals(CareCircleMemberUiState.Removed, viewModel.uiState.value)
-  }
-
-  @Test
-  fun confirmRemove_withoutTheDialog_orTwice_removesOnce() = runTest {
-    val viewModel = shownMarc()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-    assertTrue(repository.removed.isEmpty())
-
-    viewModel.askRemove()
-    viewModel.confirmRemove()
-    assertTrue(viewModel.memberState().isRemoving)
-    assertFalse(viewModel.memberState().confirmingRemoval)
-    // A second tap, and reopening the dialog, do nothing while removing
-    viewModel.confirmRemove()
-    viewModel.askRemove()
-    assertFalse(viewModel.memberState().confirmingRemoval)
-    advanceUntilIdle()
-    assertEquals(listOf("marc"), repository.removed)
-  }
-
-  @Test
-  fun memberGoneWhileRemoving_isRemoved_notNotFound() = runTest {
-    repository.setMembers(ownerUid, listOf(marc, sophie))
-    // Deletes Marc on the device, then waits, like a removal the listener sees before it returns
-    val neverReturns = CompletableDeferred<Unit>()
-    val slowRemoval =
-        object : CareCircleRepository by repository {
-          override suspend fun removeMember(ownerUid: String, memberUid: String) {
-            repository.setMembers(ownerUid, listOf(sophie))
-            neverReturns.await()
-          }
-        }
-    val viewModel =
-        CareCircleMemberViewModel(
-            SavedStateHandle(mapOf(Screen.CARE_CIRCLE_MEMBER_ARG to marc.uid)),
-            slowRemoval,
-            auth,
-        )
-    advanceUntilIdle()
-    viewModel.askRemove()
-    viewModel.confirmRemove()
-    runCurrent()
-    assertEquals(CareCircleMemberUiState.Removed, viewModel.uiState.value)
-    neverReturns.cancel()
-  }
-
-  @Test
-  fun removeError_keepsTheMember_andCanBeTriedAgain() = runTest {
-    repository.removeError = IllegalStateException("boom")
-    val viewModel = shownMarc()
-    viewModel.askRemove()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-
-    val state = viewModel.memberState()
-    assertTrue(state.removeFailed)
-    assertFalse(state.isRemoving)
-    assertEquals(marc, state.member)
-
-    repository.removeError = null
-    viewModel.askRemove()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-    assertEquals(CareCircleMemberUiState.Removed, viewModel.uiState.value)
-  }
-
-  @Test
-  fun signedOutBeforeConfirming_isARemoveError() = runTest {
-    val viewModel = shownMarc()
-    viewModel.askRemove()
-    auth.signOut()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-    assertTrue(viewModel.memberState().removeFailed)
-    assertTrue(repository.removed.isEmpty())
-  }
-
-  @Test
-  fun changesWhileTheDialogIsOpen_keepItOpen() = runTest {
-    val viewModel = shownMarc()
-    viewModel.askRemove()
-    val renamed = marc.copy(firstName = "Marco")
-    repository.setMembers(ownerUid, listOf(renamed))
-    advanceUntilIdle()
-    assertEquals(
-        CareCircleMemberUiState.Member(renamed, confirmingRemoval = true),
-        viewModel.uiState.value,
-    )
-  }
-
-  @Test
-  fun removeActions_doNothingWithoutAMember() = runTest {
-    repository.setMembers(ownerUid, emptyList())
-    val viewModel = createViewModel()
-    advanceUntilIdle()
-    viewModel.askRemove()
-    viewModel.dismissRemove()
-    viewModel.confirmRemove()
-    advanceUntilIdle()
-    assertEquals(CareCircleMemberUiState.NotFound, viewModel.uiState.value)
   }
 
   @Test
