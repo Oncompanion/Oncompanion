@@ -44,6 +44,9 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   /** Update attempts, including failed attempts, for duplicate-submission assertions. */
   val updateRequests = mutableListOf<Pair<String, Appointment>>()
 
+  /** Owner and appointment ID of each validated deletion request. */
+  val deleteRequests = mutableListOf<Pair<String, String>>()
+
   /** Returns a snapshot of [uid]'s stored appointments, without imposing an order. */
   fun appointments(uid: String): List<Appointment> = store.value[uid].orEmpty().values.toList()
 
@@ -129,6 +132,8 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
   override suspend fun deleteAppointment(uid: String, id: String) {
     requirePathSegment(uid)
     requirePathSegment(id)
+    deleteRequests += uid to id
+    writeGate?.await()
     writeError?.let { throw it }
     store.update { current ->
       val appointments = current[uid]

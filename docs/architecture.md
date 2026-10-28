@@ -215,7 +215,7 @@ times respect the phone clock preference and display zone.
 Planning appointment rows and Overview's next-appointment card open the same detail destination.
 Overview preserves the source appointment ID rather than deriving it from display text. Back pops
 the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
-Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete remains a separate task.
+Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete asks for confirmation.
 
 ### Appointment edit recovery
 
@@ -223,6 +223,15 @@ The edit form offers Retry only for a failed load. An unavailable appointment ke
 message and Back without Retry. When authentication is lost, the resumed form opens sign-in
 and clears active and saved navigation stacks, matching Join and Whose care. A covered form
 waits until it resumes before redirecting.
+
+Appointment deletion (#207) reuses `DeleteState`, `DeleteConfirmation`, `DeleteConfirmationDialog`
+and the shared adaptive detail actions. Cancel changes nothing. Confirmation queues repository deletion
+for the displayed owner, stops the detail listener to avoid an unavailable-state flash, and returns to
+its originating screen. Immediate failure retains the detail/dialog with retry and resumes its listener.
+Account/session guards suppress stale success and failure. Completion is delivered on resume only while
+this detail is current; Planning keeps its selected day and both calendars update through observations.
+A successful enqueue, also offline, does not confirm server acceptance; deferred rejection feedback is
+outside this flow (#248).
 
 ## Appointment storage
 
@@ -234,7 +243,7 @@ is not recreated. Writes are queued locally, including offline, without waiting 
 A later server rejection is logged and may roll back local changes. Owner
 updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
 owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
-list/detail observations, with no second Planning write. Detail and editing are built; deletion UI remains planned.
+list/detail observations, with no second Planning write. Detail, editing and confirmed deletion are built.
 
 ## Prescription scan
 

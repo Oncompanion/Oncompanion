@@ -82,6 +82,9 @@
     <string name="overview_error_hint">Your shortcuts still work. Please try again.</string>
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
+    <string name="overview_care_of">%1$s\'s care</string>
+    <string name="overview_switch_patient">Choose whose care to follow</string>
+    <string name="overview_error_hint_caregiver">Please try again.</string>
 
     <!-- Symptoms -->
     <string name="symptom_type_fatigue">Fatigue</string>
@@ -449,6 +452,11 @@
     <string name="appointment_detail_notes">Notes</string>
     <string name="appointment_detail_edit">Edit entry</string>
     <string name="appointment_detail_delete">Delete</string>
+    <string name="appointment_delete_title">Delete this appointment?</string>
+    <string name="appointment_delete_message">It will be removed from Planning. You can\'t undo this.</string>
+    <string name="appointment_delete_confirm">Delete</string>
+    <string name="appointment_delete_cancel">Cancel</string>
+    <string name="appointment_delete_error">Couldn\'t delete this appointment. Try again.</string>
     <!-- Appointment form -->
     <string name="appointment_add">Add appointment</string>
     <string name="appointment_back">Back</string>

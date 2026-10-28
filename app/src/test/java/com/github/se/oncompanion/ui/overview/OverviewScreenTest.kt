@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
@@ -118,7 +120,9 @@ class OverviewScreenTest {
   }
 
   private fun setOverviewScreen(
-      planning: FakePlanningRepository = FakePlanningRepository()
+      planning: FakePlanningRepository = FakePlanningRepository(),
+      caregiverOf: String? = null,
+      onSwitchPatient: () -> Unit = {},
   ): RecordingNavigationActions {
     val viewModel =
         OverviewViewModel(
@@ -131,7 +135,12 @@ class OverviewScreenTest {
     lateinit var navigationActions: RecordingNavigationActions
     composeTestRule.setContent {
       navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
-      OverviewScreen(navigationActions = navigationActions, viewModel = viewModel)
+      OverviewScreen(
+          navigationActions = navigationActions,
+          viewModel = viewModel,
+          caregiverOf = caregiverOf,
+          onSwitchPatient = onSwitchPatient,
+      )
     }
     return navigationActions
   }
@@ -490,5 +499,70 @@ class OverviewScreenTest {
       )
     }
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+  }
+
+  // --- Caregiver mode (US-20) ---
+
+  @Test
+  fun caregiverMode_titleNamesThePatient_andOpensWhoseCare() {
+    var switches = 0
+    setOverviewScreen(caregiverOf = "Anne", onSwitchPatient = { switches++ })
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertDoesNotExist()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
+        .assertTextContains("Saturday 3 October")
+        .performClick()
+    composeTestRule.runOnIdle { assertEquals(1, switches) }
+  }
+
+  @Test
+  fun caregiverMode_hidesTheShortcutsAndTheAddHint_butKeepsTheProfile() {
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = loaded,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
+        .assertDoesNotExist()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).assertIsDisplayed()
+  }
+
+  @Test
+  fun patientMode_suggestsAddingAnAppointment() {
+    setContent(loaded)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
+        .assertExists()
+  }
+
+  @Test
+  fun caregiverMode_errorDoesntMentionTheShortcuts() {
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = loaded.copy(hasError = true),
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_error).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_error_hint_caregiver))
+        .assertExists()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_error_hint))
+        .assertDoesNotExist()
   }
 }

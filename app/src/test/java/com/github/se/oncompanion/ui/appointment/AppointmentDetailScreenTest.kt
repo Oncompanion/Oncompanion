@@ -11,17 +11,24 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.*
 import java.util.Locale
 import kotlinx.coroutines.test.runTest
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /** Checks every detail state and the live Screen boundary without Firebase. */
 @RunWith(AndroidJUnit4::class)
@@ -163,5 +170,109 @@ class AppointmentDetailScreenTest {
     compose.runOnIdle { current = appointment.copy(notes = null) }
     compose.onNodeWithText("Notes").assertDoesNotExist()
     compose.onNodeWithText("Room 3").performScrollTo().assertIsDisplayed()
+  }
+
+  /** Appointment actions use the shared confirmation and preserve error/submission states. */
+  @Test
+  fun sharedDeleteDialogStatesAndCallbacks() {
+    var deletion by mutableStateOf(DeleteState())
+    var requests = 0
+    var confirms = 0
+    var cancels = 0
+    compose.setContent {
+      AppointmentDetailContent(
+          AppointmentDetailUiState.Loaded(appointment, deletion),
+          {},
+          {},
+          onDelete = {
+            requests++
+            deletion = DeleteState(isConfirming = true)
+          },
+          onConfirmDelete = { confirms++ },
+          onCancelDelete = {
+            cancels++
+            deletion = DeleteState()
+          },
+      )
+    }
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_dialog).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    assertEquals(1, confirms)
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).performClick()
+    assertEquals(1, cancels)
+    compose.onNodeWithTag(C.Tag.appointment_delete_dialog).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.runOnIdle { deletion = deletion.copy(hasError = true) }
+    compose.onNodeWithTag(C.Tag.appointment_delete_error).assertIsDisplayed()
+    compose.runOnIdle { deletion = deletion.copy(isDeleting = true, hasError = false) }
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).assertIsNotEnabled()
+    assertEquals(2, requests)
+  }
+
+  /** Failed reads and unavailable records never expose a destructive action. */
+  @Test
+  fun noDeleteActionWithoutLoadedAppointment() {
+    var state by mutableStateOf<AppointmentDetailUiState>(AppointmentDetailUiState.Loading)
+    compose.setContent { AppointmentDetailContent(state, {}, {}, onDelete = {}) }
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertDoesNotExist()
+    compose.runOnIdle { state = AppointmentDetailUiState.Unavailable }
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertDoesNotExist()
+    compose.runOnIdle { state = AppointmentDetailUiState.Error }
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertDoesNotExist()
+  }
+
+  /** The shared compact layout keeps deletion reachable after long notes. */
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun deletionRemainsReachableInLandscape() {
+    compose.setContent {
+      AppointmentDetailContent(
+          AppointmentDetailUiState.Loaded(appointment.copy(notes = "Note ".repeat(100))),
+          {},
+          {},
+          onDelete = {},
+      )
+    }
+    compose
+        .onNodeWithTag(C.Tag.appointment_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.appointment_detail_delete_button))
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertIsDisplayed()
+  }
+
+  /** A deletion finishing while paused is delivered when the same screen resumes. */
+  @Test
+  fun screenDeliversDeletionOnResume() {
+    val repository = FakeAppointmentRepository()
+    val auth = FakeAuthRepository()
+    runTest { auth.signInWithGoogle("patient") }
+    repository.seed("uid-patient", appointment)
+    val owner =
+        object : LifecycleOwner {
+          override val lifecycle = LifecycleRegistry(this)
+        }
+    lateinit var vm: AppointmentDetailViewModel
+    var leaves = 0
+    compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+    compose.setContent {
+      CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+        vm = remember { AppointmentDetailViewModel("visit", repository, auth) }
+        AppointmentDetailScreen(vm, {}, onDeleted = { leaves++ })
+      }
+    }
+    compose.onNodeWithText("Follow-up").assertIsDisplayed()
+    compose.runOnIdle {
+      owner.lifecycle.currentState = Lifecycle.State.STARTED
+      vm.requestDelete()
+      vm.confirmDelete()
+    }
+    compose.waitForIdle()
+    assertEquals(0, leaves)
+    assertTrue(repository.appointments("uid-patient").isEmpty())
+    compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+    compose.waitForIdle()
+    assertEquals(1, leaves)
+    compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.DESTROYED }
   }
 }

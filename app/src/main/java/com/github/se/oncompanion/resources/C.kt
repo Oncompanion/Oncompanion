@@ -15,6 +15,10 @@ object C {
     const val appointment_detail_content = "appointment_detail_content"
     const val appointment_detail_edit_button = "appointment_detail_edit_button"
     const val appointment_detail_delete_button = "appointment_detail_delete_button"
+    const val appointment_delete_dialog = "appointment_delete_dialog"
+    const val appointment_delete_confirm = "appointment_delete_confirm"
+    const val appointment_delete_cancel = "appointment_delete_cancel"
+    const val appointment_delete_error = "appointment_delete_error"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -95,6 +99,7 @@ object C {
     const val overview_today_list = "overview_today_list"
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
+    const val overview_whose_care = "overview_whose_care"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
