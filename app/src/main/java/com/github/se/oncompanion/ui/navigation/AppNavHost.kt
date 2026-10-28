@@ -220,6 +220,7 @@ fun AppNavHost(
             onSaved = {
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
+            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
         )
       }
       composable(

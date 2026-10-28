@@ -56,12 +56,44 @@ class AppointmentEditScreenTest {
         )) {
       compose.runOnIdle { load = value }
       compose.onNodeWithTag(C.Tag.appointment_title).assertDoesNotExist()
-      compose.onNodeWithTag(C.Tag.appointment_form_retry).performClick()
+      if (value == AppointmentFormLoad.FAILED)
+          compose.onNodeWithTag(C.Tag.appointment_form_retry).performClick()
+      else compose.onNodeWithTag(C.Tag.appointment_form_retry).assertDoesNotExist()
+      compose.onNodeWithTag(C.Tag.appointment_back).assertIsDisplayed()
     }
-    assertEquals(3, retries)
+    assertEquals(1, retries)
+    compose.runOnIdle { load = AppointmentFormLoad.LOADING }
+    compose.onNodeWithTag(C.Tag.appointment_form_retry).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_form_loading).assertIsDisplayed()
     compose.runOnIdle { load = AppointmentFormLoad.READY }
     compose.onNodeWithTag(C.Tag.appointment_title).assertTextContains("Visit")
     compose.onNodeWithText("Save changes").performScrollTo().assertIsDisplayed()
+  }
+
+  /** An unavailable appointment explains the absence and lets the patient leave without retry. */
+  @Test
+  fun unavailableAppointmentKeepsBackAvailable() {
+    var backs = 0
+    compose.setContent {
+      AppointmentFormContent(
+          draft().copy(load = AppointmentFormLoad.UNAVAILABLE),
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          { backs++ },
+          onRetry = {},
+      )
+    }
+    compose.onNodeWithText("This appointment is unavailable.").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_form_retry).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    assertEquals(1, backs)
   }
 
   /** The real Screen updates the same record and delivers completion only once. */

@@ -38,15 +38,19 @@ fun AppointmentFormScreen(
     onBack: () -> Unit,
     onSaved: (Instant) -> Unit,
     modifier: Modifier = Modifier,
+    onSignedOut: () -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val currentOnSaved by rememberUpdatedState(onSaved)
+  val currentOnSignedOut by rememberUpdatedState(onSignedOut)
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   // A backgrounded form retains its completion until its own destination is resumed.
   LaunchedEffect(viewModel, lifecycle) {
     lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
       viewModel.uiState.collect { saved ->
-        saved.savedAt?.let { if (viewModel.onCompletionHandled()) currentOnSaved(it) }
+        // Authentication loss leaves private navigation only when this form is foregrounded.
+        if (saved.load == AppointmentFormLoad.NOT_SIGNED_IN) currentOnSignedOut()
+        else saved.savedAt?.let { if (viewModel.onCompletionHandled()) currentOnSaved(it) }
       }
     }
   }
@@ -153,11 +157,12 @@ fun AppointmentFormContent(
                   }
               )
           )
-          onRetry?.let { retry ->
-            TextButton(retry, Modifier.testTag(C.Tag.appointment_form_retry)) {
-              Text(stringResource(R.string.appointment_detail_retry))
-            }
-          }
+          if (state.load == AppointmentFormLoad.FAILED)
+              onRetry?.let { retry ->
+                TextButton(retry, Modifier.testTag(C.Tag.appointment_form_retry)) {
+                  Text(stringResource(R.string.appointment_detail_retry))
+                }
+              }
         }
       }
       return@Scaffold

@@ -217,6 +217,13 @@ Overview preserves the source appointment ID rather than deriving it from displa
 the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
 Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete remains a separate task.
 
+### Appointment edit recovery
+
+The edit form offers Retry only for a failed load. An unavailable appointment keeps its
+message and Back without Retry. When authentication is lost, the resumed form opens sign-in
+and clears active and saved navigation stacks, matching Join and Whose care. A covered form
+waits until it resumes before redirecting.
+
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
