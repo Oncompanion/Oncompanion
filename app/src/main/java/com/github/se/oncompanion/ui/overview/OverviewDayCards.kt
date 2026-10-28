@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -41,7 +42,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 
 /**
  * The next appointment (Figma: "Next appointment card"), or "No upcoming appointment". Tapping it
- * opens Planning.
+ * opens its detail; the empty card opens Planning.
  *
  * @param canAdd whether to suggest adding an appointment; a caregiver can't
  */
@@ -50,13 +51,16 @@ internal fun NextAppointmentCard(
     appointment: NextAppointment?,
     today: LocalDate,
     onOpenPlanning: () -> Unit,
+    onOpenAppointment: (String) -> Unit,
     canAdd: Boolean = true,
 ) {
   val colors = MaterialTheme.colorScheme
   val upcoming = appointment != null
   val content = if (upcoming) colors.onPrimaryContainer else colors.onSurfaceVariant
   Surface(
-      onClick = onOpenPlanning,
+      onClick = {
+        if (appointment == null) onOpenPlanning() else onOpenAppointment(appointment.id)
+      },
       modifier =
           Modifier.fillMaxWidth()
               .testTag(

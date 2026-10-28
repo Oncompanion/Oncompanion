@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -56,8 +57,10 @@ import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
@@ -1191,6 +1194,153 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
     assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionItem_opensItsDetail_andBackReturnsToTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    openPrescriptionsFromOverview(FakeMedicationRepository().apply { seed("owner", chemo) })
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun prescriptionEdit_savesTheCorrection_shownInTheDetailAndTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedBy = "Dr. Martin",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+
+    // The form corrects the saved prescription
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_screen).assertDoesNotExist()
+    composeTestRule
+        .onNode(
+            hasText("Edit prescription") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_form_screen)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_EDIT, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
+      )
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_prescribed_by_field)
+        .performTextReplacement("Dr. Dubois")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // Saving returns to the detail, which shows the correction
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_detail_prescribed_by)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals("Dr. Dubois", repository.prescriptionsOf("owner").single().prescribedBy)
+    }
+
+    // And so does the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois", substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem("chemo"))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+  }
+
+  @Test
+  fun prescriptionDelete_cancelKeepsIt_confirmReturnsToTheListWithoutIt() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    // Cancel keeps the prescription and stays on its detail
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(listOf(chemo), repository.prescriptionsOf("owner")) }
+
+    // Confirm deletes it and returns to the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("owner"))
+    }
   }
 
   @Test

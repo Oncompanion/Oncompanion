@@ -28,6 +28,25 @@ class TextCleanupTest {
   }
 
   @Test
+  fun aNumberReadAsLettersOnlyIsFixedBeforeAUnitOrInADosing() {
+    // Otherwise the medication's strength isn't seen and the medication is missed
+    assertCleaned("Métoclopramide 10 mg", "Métoclopramide lO mg")
+    assertCleaned("Métoclopramide 10mg", "Métoclopramide lOmg")
+    assertCleaned("Paracétamol 1 g", "Paracétamol l g")
+    assertCleaned("Filgrastim 30 MU", "Filgrastim 3O MU")
+    assertCleaned("1-0-1", "l-O-l")
+    assertCleaned("1-1-1-0 si nausées", "l-l-l-O si nausées")
+  }
+
+  @Test
+  fun lettersBeforeAUnitInsideAWordAreKept() {
+    for (text in listOf("Dolo mg", "Paracétamol mg", "Bol-lo-lo")) assertCleaned(
+        text,
+        text,
+    )
+  }
+
+  @Test
   fun wordsAreNeverTurnedIntoDigits() {
     for (text in
         listOf(
@@ -86,5 +105,15 @@ class TextCleanupTest {
     assertEquals("nee le 02.07.1965", comparable("Née le 02.07.1965"))
     assertEquals("geneve, le 14.10.2026", comparable("Genève, le\t14.10.2026"))
     assertEquals("gelule", comparable("gélule"))
+  }
+
+  @Test
+  fun matchableTextKeepsTheLengthAndPlaceOfEveryCharacter() {
+    for (text in listOf("Ondansétron  8 mg", " Lopéramide 2 mg,\t1 gélule", "MÉDECIN", "")) {
+      val matched = matchable(text)
+      assertEquals(text.length, matched.length)
+      assertEquals(comparable(text), comparable(matched))
+    }
+    assertEquals("ondansetron  8 mg", matchable("Ondansétron  8 mg"))
   }
 }

@@ -14,7 +14,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -99,6 +98,7 @@ class PrescriptionsScreenTest {
       onAdd: () -> Unit = {},
       onScan: () -> Unit = {},
       onRetry: () -> Unit = {},
+      onOpen: (String) -> Unit = {},
   ) {
     composeTestRule.setContent {
       PrescriptionsContent(
@@ -107,6 +107,7 @@ class PrescriptionsScreenTest {
           onAdd = onAdd,
           onScan = onScan,
           onRetry = onRetry,
+          onOpen = onOpen,
       )
     }
   }
@@ -143,6 +144,7 @@ class PrescriptionsScreenTest {
           onAdd = { adds++ },
           onScan = { scans++ },
           onRetry = {},
+          onOpen = {},
       )
     }
 
@@ -217,7 +219,14 @@ class PrescriptionsScreenTest {
   fun emptyAndErrorBlocks_stayAboveTheButtons() {
     var state by mutableStateOf(loaded)
     composeTestRule.setContent {
-      PrescriptionsContent(uiState = state, onBack = {}, onAdd = {}, onScan = {}, onRetry = {})
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+      )
     }
 
     listOf(loaded, loaded.copy(hasError = true)).forEach { next ->
@@ -421,10 +430,14 @@ class PrescriptionsScreenTest {
   }
 
   @Test
-  fun items_cannotBeOpenedYet() {
-    setContent(filled)
+  fun tappingAnItem_opensThatPrescription() {
+    val opened = mutableListOf<String>()
+    setContent(filled, onOpen = { opened += it })
 
-    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assert(!hasClickAction())
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("fever")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    assertEquals(listOf("fever", "chemo"), opened)
   }
 
   @Test
@@ -468,12 +481,14 @@ class PrescriptionsScreenTest {
     var backs = 0
     var adds = 0
     var scans = 0
+    val opened = mutableListOf<String>()
     composeTestRule.setContent {
       PrescriptionsScreen(
           viewModel = viewModel,
           onBack = { backs++ },
           onAdd = { adds++ },
           onScan = { scans++ },
+          onOpen = { opened += it },
       )
     }
 
@@ -492,11 +507,13 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("nausea")).performClick()
 
     composeTestRule.runOnIdle {
       assertEquals(1, adds)
       assertEquals(1, scans)
       assertEquals(1, backs)
+      assertEquals(listOf("nausea"), opened)
     }
   }
 
@@ -509,7 +526,7 @@ class PrescriptionsScreenTest {
         }
     val viewModel = PrescriptionsViewModel(signedIn("alice"), repository)
     composeTestRule.setContent {
-      PrescriptionsScreen(viewModel = viewModel, onBack = {}, onAdd = {}, onScan = {})
+      PrescriptionsScreen(viewModel = viewModel, onBack = {}, onAdd = {}, onScan = {}, onOpen = {})
     }
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_error).assertIsDisplayed()
 

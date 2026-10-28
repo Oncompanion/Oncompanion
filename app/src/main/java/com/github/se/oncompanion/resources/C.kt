@@ -7,6 +7,11 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment detail
+    const val appointment_detail_screen = "appointment_detail_screen"
+    const val appointment_detail_loading = "appointment_detail_loading"
+    const val appointment_detail_feedback = "appointment_detail_feedback"
+    const val appointment_detail_retry = "appointment_detail_retry"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -343,6 +348,27 @@ object C {
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
 
+    const val prescription_detail_screen = "prescription_detail_screen"
+    const val prescription_detail_back_button = "prescription_detail_back_button"
+    const val prescription_detail_loading = "prescription_detail_loading"
+    const val prescription_detail_error = "prescription_detail_error"
+    const val prescription_detail_retry_button = "prescription_detail_retry_button"
+    const val prescription_detail_not_found = "prescription_detail_not_found"
+    const val prescription_detail_content = "prescription_detail_content"
+    const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
+    const val prescription_detail_date = "prescription_detail_date"
+    const val prescription_detail_medications_header = "prescription_detail_medications_header"
+    const val prescription_detail_edit_button = "prescription_detail_edit_button"
+    const val prescription_detail_delete_button = "prescription_detail_delete_button"
+    const val prescription_delete_dialog = "prescription_delete_dialog"
+    const val prescription_delete_confirm = "prescription_delete_confirm"
+    const val prescription_delete_cancel = "prescription_delete_cancel"
+    const val prescription_delete_error = "prescription_delete_error"
+
+    /** One medication of the prescription detail. */
+    fun prescriptionDetailMedication(medicationId: String) =
+        "prescription_detail_medication_$medicationId"
+
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
     const val prescription_scan_close_button = "prescription_scan_close_button"
@@ -360,5 +386,11 @@ object C {
     const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
     const val prescription_scan_retake_button = "prescription_scan_retake_button"
     const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
+    const val prescription_scan_reading = "prescription_scan_reading"
+    const val prescription_scan_nothing_read = "prescription_scan_nothing_read"
+    const val prescription_scan_nothing_read_enter_manually_button =
+        "prescription_scan_nothing_read_enter_manually_button"
+    const val prescription_scan_nothing_read_retake_button =
+        "prescription_scan_nothing_read_retake_button"
   }
 }

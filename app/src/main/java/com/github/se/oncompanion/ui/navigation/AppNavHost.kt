@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.createSavedStateHandle
@@ -20,7 +21,10 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
+import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
@@ -49,10 +53,13 @@ import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.overview.OverviewViewModel
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.prescription.PrescriptionDetailScreen
+import com.github.se.oncompanion.ui.prescription.PrescriptionDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionsScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionsViewModel
+import com.github.se.oncompanion.ui.prescription.scan.ScanHandoffViewModel
 import com.github.se.oncompanion.ui.prescription.scan.ScanScreen
 import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
@@ -184,6 +191,7 @@ fun AppNavHost(
         OverviewScreen(
             navigationActions,
             viewModel = viewModel { OverviewViewModel(planningRepository = planning()) },
+            onOpenAppointment = appointmentOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
         )
@@ -214,7 +222,16 @@ fun AppNavHost(
             onAddAppointment =
                 if (chosenPatient != null) null
                 else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
+            onOpenAppointment = appointmentOpener(navigationActions),
         )
+      }
+      composable(
+          Screen.APPOINTMENT_DETAIL,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        AppointmentDetailScreen(detail, onBack = dropUnlessResumed { navigationActions.goBack() })
       }
       composable(
           Screen.APPOINTMENT_ADD,
@@ -311,9 +328,38 @@ fun AppNavHost(
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
+            onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
         )
       }
-      composable(Screen.PRESCRIPTION_SCAN) {
+      composable(
+          Screen.PRESCRIPTION_DETAIL,
+          arguments = listOf(navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
+        PrescriptionDetailScreen(
+            // Scoped to this back stack entry, so each opened prescription has its own ViewModel
+            viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
+            onBack = navigationActions::goBack,
+            onEdit = { navigationActions.navigateTo(Screen.prescriptionEdit(prescriptionId)) },
+            // Back to the list, which no longer shows it
+            onDeleted = navigationActions::goBack,
+        )
+      }
+      composable(
+          Screen.PRESCRIPTION_EDIT,
+          arguments = listOf(navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
+        PrescriptionFormScreen(
+            viewModel = viewModel { PrescriptionFormViewModel(prescriptionId = prescriptionId) },
+            // A second tap while the form is already leaving is dropped, so Back happens once
+            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the detail, which shows the correction
+            onSaved = navigationActions::goBack,
+        )
+      }
+      composable(Screen.PRESCRIPTION_SCAN) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         ScanScreen(
             // The form replaces the scan screen, so closing or saving it returns to the list
             onEnterManually =
@@ -322,15 +368,32 @@ fun AppNavHost(
                   navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
                 },
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The form opens with what was read, in place of the scan screen as for manual entry
+            onRead = { scan ->
+              handoff.hand(scan)
+              navigationActions.goBack()
+              navigationActions.navigateTo(Screen.PRESCRIPTION_ADD)
+            },
         )
       }
-      composable(Screen.PRESCRIPTION_ADD) {
+      composable(Screen.PRESCRIPTION_ADD) { entry ->
+        val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel() },
-            // A second tap while the form is already leaving is dropped, so Back happens once
-            onClose = dropUnlessResumed { navigationActions.goBack() },
+            // Starts from the scanned prescription if it was just read, empty otherwise
+            viewModel =
+                viewModel { PrescriptionFormViewModel(initialDraft = handoff.scanned?.draft) },
+            // A second tap while the form is already leaving is dropped, so Back happens once. The
+            // scan's photo is no longer needed once the form is done
+            onClose =
+                dropUnlessResumed {
+                  handoff.finish()
+                  navigationActions.goBack()
+                },
             // Saving returns to the screen the form was opened from
-            onSaved = navigationActions::goBack,
+            onSaved = {
+              handoff.finish()
+              navigationActions.goBack()
+            },
         )
       }
     }
@@ -383,6 +446,23 @@ fun AppNavHost(
 }
 
 /**
+ * The [ScanHandoffViewModel] shared by the prescriptions screens: it belongs to the prescriptions
+ * graph, so it passes the scanned prescription from the scan screen to the form, and is cleared,
+ * deleting the photo, when the user leaves the prescriptions screens.
+ */
+@Composable
+private fun scanHandoffViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): ScanHandoffViewModel {
+  val prescriptionsGraph = remember(entry) { navController.getBackStackEntry(Route.PRESCRIPTIONS) }
+  val cacheDir = LocalContext.current.cacheDir
+  return viewModel(viewModelStoreOwner = prescriptionsGraph) {
+    ScanHandoffViewModel(ScanPhotoStore(cacheDir))
+  }
+}
+
+/**
  * The [OnboardingViewModel] shared by the onboarding screens: it belongs to the onboarding graph,
  * so it keeps the user's answers while they move between the steps.
  */
@@ -393,4 +473,15 @@ private fun onboardingViewModel(
 ): OnboardingViewModel {
   val onboardingGraph = remember(entry) { navController.getBackStackEntry(Route.ONBOARDING) }
   return viewModel(viewModelStoreOwner = onboardingGraph) { OnboardingViewModel() }
+}
+
+/** Shares the resumed-only guard for appointment navigation from either bottom tab. */
+@Composable
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+  return { id ->
+    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+      navigationActions.navigateTo(Screen.appointmentDetail(id))
+    }
+  }
 }

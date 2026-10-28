@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -102,8 +103,8 @@ class SymptomDetailViewModelTest {
     assertFalse(SymptomDetailUiState().canDelete)
     assertFalse(shown.copy(entry = null).canDelete)
     assertFalse(shown.copy(hasError = true).canDelete)
-    assertFalse(shown.copy(isDeleting = true).canDelete)
-    assertFalse(shown.copy(isDeleted = true).canDelete)
+    assertFalse(shown.copy(delete = DeleteState(isDeleting = true)).canDelete)
+    assertFalse(shown.copy(delete = DeleteState(isDeleted = true)).canDelete)
   }
 
   @Test
@@ -155,7 +156,7 @@ class SymptomDetailViewModelTest {
   fun requestDelete_asksForConfirmation_andDeletesNothing() {
     val vm = confirmingDelete()
 
-    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertTrue(vm.uiState.value.delete.isConfirming)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -165,7 +166,7 @@ class SymptomDetailViewModelTest {
 
     vm.cancelDelete()
 
-    assertFalse(vm.uiState.value.isConfirmingDelete)
+    assertFalse(vm.uiState.value.delete.isConfirming)
     assertEquals(fatigue, vm.uiState.value.entry)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
@@ -178,9 +179,9 @@ class SymptomDetailViewModelTest {
 
     val state = vm.uiState.value
     assertTrue(repository.symptoms("alice").isEmpty())
-    assertTrue(state.isDeleted)
-    assertFalse(state.isConfirmingDelete)
-    assertFalse(state.isDeleting)
+    assertTrue(state.delete.isDeleted)
+    assertFalse(state.delete.isConfirming)
+    assertFalse(state.delete.isDeleting)
     // Still shows the entry until the screen closes, not "no longer exists"
     assertEquals(fatigue, state.entry)
     assertFalse(state.isNotFound)
@@ -194,7 +195,7 @@ class SymptomDetailViewModelTest {
 
     vm.confirmDelete()
 
-    assertFalse(vm.uiState.value.isDeleted)
+    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -202,12 +203,12 @@ class SymptomDetailViewModelTest {
   fun requestDelete_isIgnoredWithoutAnEntry() {
     val notFound = viewModel("missing")
     notFound.requestDelete()
-    assertFalse(notFound.uiState.value.isConfirmingDelete)
+    assertFalse(notFound.uiState.value.delete.isConfirming)
 
     repository.observeError = IllegalStateException("no cache")
     val error = viewModel()
     error.requestDelete()
-    assertFalse(error.uiState.value.isConfirmingDelete)
+    assertFalse(error.uiState.value.delete.isConfirming)
   }
 
   @Test
@@ -218,12 +219,12 @@ class SymptomDetailViewModelTest {
     vm.confirmDelete()
 
     var state = vm.uiState.value
-    assertTrue(state.hasDeleteError)
-    assertTrue(state.isConfirmingDelete)
+    assertTrue(state.delete.hasError)
+    assertTrue(state.delete.isConfirming)
     // No loading state in between: the dialog stays open with the error
     assertFalse(state.isLoading)
     assertTrue(state.isDeleteDialogShown)
-    assertFalse(state.isDeleted)
+    assertFalse(state.delete.isDeleted)
     assertEquals(fatigue, state.entry)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
 
@@ -231,8 +232,8 @@ class SymptomDetailViewModelTest {
     vm.confirmDelete()
 
     state = vm.uiState.value
-    assertTrue(state.isDeleted)
-    assertFalse(state.hasDeleteError)
+    assertTrue(state.delete.isDeleted)
+    assertFalse(state.delete.hasError)
     assertTrue(repository.symptoms("alice").isEmpty())
   }
 
@@ -245,8 +246,8 @@ class SymptomDetailViewModelTest {
     vm.cancelDelete()
     vm.requestDelete()
 
-    assertTrue(vm.uiState.value.isConfirmingDelete)
-    assertFalse(vm.uiState.value.hasDeleteError)
+    assertTrue(vm.uiState.value.delete.isConfirming)
+    assertFalse(vm.uiState.value.delete.hasError)
   }
 
   @Test
@@ -257,8 +258,8 @@ class SymptomDetailViewModelTest {
 
     vm.confirmDelete()
 
-    assertTrue(vm.uiState.value.hasDeleteError)
-    assertFalse(vm.uiState.value.isDeleted)
+    assertTrue(vm.uiState.value.delete.hasError)
+    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -277,28 +278,36 @@ class SymptomDetailViewModelTest {
     val vm = confirmingDelete(symptoms = slow)
 
     vm.confirmDelete()
-    assertTrue(vm.uiState.value.isDeleting)
+    assertTrue(vm.uiState.value.delete.isDeleting)
     assertFalse(vm.uiState.value.canDelete)
     vm.cancelDelete()
     vm.confirmDelete()
-    assertTrue(vm.uiState.value.isConfirmingDelete)
+    assertTrue(vm.uiState.value.delete.isConfirming)
     assertEquals(1, deletes)
 
     deleted.complete(Unit)
     shadowOf(Looper.getMainLooper()).idle()
 
-    assertTrue(vm.uiState.value.isDeleted)
-    assertFalse(vm.uiState.value.isDeleting)
+    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertFalse(vm.uiState.value.delete.isDeleting)
   }
 
   @Test
   fun deleteDialog_isShownOnlyWhileDeleteCanDoSomething() {
     val confirming =
-        SymptomDetailUiState(entry = fatigue, isLoading = false, isConfirmingDelete = true)
+        SymptomDetailUiState(
+            entry = fatigue,
+            isLoading = false,
+            delete = DeleteState(isConfirming = true),
+        )
 
     assertTrue(confirming.isDeleteDialogShown)
-    assertTrue(confirming.copy(isDeleting = true).isDeleteDialogShown)
-    assertFalse(confirming.copy(isConfirmingDelete = false).isDeleteDialogShown)
+    assertTrue(
+        confirming.copy(delete = confirming.delete.copy(isDeleting = true)).isDeleteDialogShown
+    )
+    assertFalse(
+        confirming.copy(delete = confirming.delete.copy(isConfirming = false)).isDeleteDialogShown
+    )
     assertFalse(confirming.copy(entry = null).isDeleteDialogShown)
     assertFalse(confirming.copy(isLoading = true).isDeleteDialogShown)
     assertFalse(confirming.copy(hasError = true).isDeleteDialogShown)
@@ -313,7 +322,7 @@ class SymptomDetailViewModelTest {
 
     var state = vm.uiState.value
     assertTrue(state.isNotFound)
-    assertFalse(state.isConfirmingDelete)
+    assertFalse(state.delete.isConfirming)
     assertFalse(state.isDeleteDialogShown)
 
     // Coming back (e.g. the deletion was rolled back) doesn't reopen the dialog
@@ -333,8 +342,8 @@ class SymptomDetailViewModelTest {
 
     val state = vm.uiState.value
     assertTrue(state.hasError)
-    assertFalse(state.isConfirmingDelete)
-    assertFalse(state.hasDeleteError)
+    assertFalse(state.delete.isConfirming)
+    assertFalse(state.delete.hasError)
     assertFalse(state.isDeleteDialogShown)
   }
 }

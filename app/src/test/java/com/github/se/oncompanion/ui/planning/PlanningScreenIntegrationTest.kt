@@ -57,7 +57,9 @@ class PlanningScreenIntegrationTest {
             selectedRoute = route
           }
         }
-    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.setContent {
+      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}) }
+    }
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
     compose.onNodeWithText("Tap + to add a doctor appointment.").assertDoesNotExist()
@@ -88,7 +90,9 @@ class PlanningScreenIntegrationTest {
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
-    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.setContent {
+      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}) }
+    }
     compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
     compose.runOnIdle { repository.fail = false }
     compose.onNodeWithTag(C.Tag.planning_retry).performClick()
@@ -123,7 +127,9 @@ class PlanningScreenIntegrationTest {
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
-    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.setContent {
+      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}) }
+    }
     compose.onNodeWithText("Frequency: Twice a day").assertIsDisplayed()
     compose.onNodeWithText("Workshop").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
@@ -152,7 +158,9 @@ class PlanningScreenIntegrationTest {
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
-    compose.setContent { OncompanionTheme { PlanningScreen(navigation, vm) } }
+    compose.setContent {
+      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}) }
+    }
     compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
     compose.runOnIdle { appointments.observeError = null }
     compose.onNodeWithTag(C.Tag.planning_retry).performClick()

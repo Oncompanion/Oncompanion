@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.prescription
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +61,7 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  *
  * @param onAdd opens the prescription form
  * @param onScan starts scanning a prescription
+ * @param onOpen opens the detail of the prescription with the given ID
  */
 @Composable
 fun PrescriptionsScreen(
@@ -67,6 +69,7 @@ fun PrescriptionsScreen(
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onScan: () -> Unit,
+    onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,6 +84,7 @@ fun PrescriptionsScreen(
       onAdd = onAdd,
       onScan = onScan,
       onRetry = viewModel::load,
+      onOpen = onOpen,
       modifier = modifier,
   )
 }
@@ -91,6 +95,7 @@ fun PrescriptionsScreen(
  * @param onAdd opens the prescription form
  * @param onScan starts scanning a prescription
  * @param onRetry reloads the prescriptions after an error
+ * @param onOpen opens the detail of the prescription with the given ID
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +105,7 @@ fun PrescriptionsContent(
     onAdd: () -> Unit,
     onScan: () -> Unit,
     onRetry: () -> Unit,
+    onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Scaffold(
@@ -132,7 +138,7 @@ fun PrescriptionsContent(
             )
         uiState.hasError -> ErrorState(onRetry)
         uiState.prescriptions.isEmpty() -> EmptyState()
-        else -> PrescriptionList(uiState.thisMonth, uiState.earlier)
+        else -> PrescriptionList(uiState.thisMonth, uiState.earlier, onOpen)
       }
     }
   }
@@ -190,7 +196,11 @@ private fun AddButton(
 
 /** The two groups, each under its subheader; a group with nothing in it shows no subheader. */
 @Composable
-private fun PrescriptionList(thisMonth: List<Prescription>, earlier: List<Prescription>) {
+private fun PrescriptionList(
+    thisMonth: List<Prescription>,
+    earlier: List<Prescription>,
+    onOpen: (String) -> Unit,
+) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.prescriptions_list),
       // Room for the buttons, so they never hide the last prescription
@@ -203,7 +213,7 @@ private fun PrescriptionList(thisMonth: List<Prescription>, earlier: List<Prescr
             C.Tag.prescriptions_this_month_header,
         )
       }
-      items(thisMonth, key = { it.id }) { PrescriptionItem(it) }
+      items(thisMonth, key = { it.id }) { PrescriptionItem(it, onOpen) }
     }
     if (earlier.isNotEmpty()) {
       item(key = C.Tag.prescriptions_earlier_header) {
@@ -212,7 +222,7 @@ private fun PrescriptionList(thisMonth: List<Prescription>, earlier: List<Prescr
             C.Tag.prescriptions_earlier_header,
         )
       }
-      items(earlier, key = { it.id }) { PrescriptionItem(it) }
+      items(earlier, key = { it.id }) { PrescriptionItem(it, onOpen) }
     }
   }
 }
@@ -236,7 +246,7 @@ private fun Subheader(text: String, testTag: String) {
  * Sep 2026"), or the date alone when the prescriber wasn't entered.
  */
 @Composable
-private fun PrescriptionItem(prescription: Prescription) {
+private fun PrescriptionItem(prescription: Prescription, onOpen: (String) -> Unit) {
   val date = prescription.prescribedOn.format(dateFormatter)
   val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
   ListItem(
@@ -253,7 +263,9 @@ private fun PrescriptionItem(prescription: Prescription) {
             else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
         )
       },
-      modifier = Modifier.testTag(C.Tag.prescriptionsItem(prescription.id)),
+      modifier =
+          Modifier.clickable { onOpen(prescription.id) }
+              .testTag(C.Tag.prescriptionsItem(prescription.id)),
   )
 }
 

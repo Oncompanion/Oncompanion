@@ -52,6 +52,13 @@ object Screen {
 
   // Route.PLANNING
   const val PLANNING = "planning_home"
+  /** Argument identifying the appointment owned by the current patient. */
+  const val APPOINTMENT_ID = "appointmentId"
+  const val APPOINTMENT_DETAIL = "appointment_detail/{$APPOINTMENT_ID}"
+
+  /** Opens one appointment without changing the originating calendar selection. */
+  fun appointmentDetail(id: String) = "appointment_detail/${Uri.encode(id)}"
+
   const val APPOINTMENT_DATE = "appointmentDate"
   const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
   const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
@@ -86,6 +93,19 @@ object Screen {
   const val PRESCRIPTIONS = "prescriptions_home"
   const val PRESCRIPTION_ADD = "prescriptions_add"
   const val PRESCRIPTION_SCAN = "prescriptions_scan"
+
+  /** The argument of [PRESCRIPTION_DETAIL] and [PRESCRIPTION_EDIT]: the prescription's ID. */
+  const val PRESCRIPTION_ID = "prescriptionId"
+
+  const val PRESCRIPTION_DETAIL = "prescriptions_detail/{$PRESCRIPTION_ID}"
+
+  /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
+  fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
+
+  const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_ID}"
+
+  /** The [PRESCRIPTION_EDIT] screen of the prescription [prescriptionId]. */
+  fun prescriptionEdit(prescriptionId: String) = "prescriptions_edit/$prescriptionId"
 
   // Route.CARE_CIRCLE
   const val CARE_CIRCLE = "care_circle_home"
