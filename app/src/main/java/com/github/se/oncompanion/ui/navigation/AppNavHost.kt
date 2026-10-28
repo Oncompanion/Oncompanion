@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
@@ -45,6 +46,7 @@ import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.overview.OverviewViewModel
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
@@ -86,6 +88,11 @@ fun AppNavHost(
     CaregiverModeViewModel(createSavedStateHandle())
   }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  // A caregiver sees only the Ligue's events until #240, never their own appointments
+  val planning = {
+    if (chosenPatient == null) PlanningRepositoryProvider.repository
+    else PlanningRepositoryProvider.publicEvents
+  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -176,6 +183,7 @@ fun AppNavHost(
       composable(Screen.OVERVIEW) {
         OverviewScreen(
             navigationActions,
+            viewModel = viewModel { OverviewViewModel(planningRepository = planning()) },
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
         )
@@ -186,7 +194,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) { entry ->
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(savedStateHandle = createSavedStateHandle())
+          PlanningViewModel(repository = planning(), savedStateHandle = createSavedStateHandle())
         }
         // Return to this calendar instance and reveal the saved day, including another week.
         val savedDate by

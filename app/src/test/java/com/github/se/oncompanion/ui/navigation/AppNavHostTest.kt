@@ -103,6 +103,7 @@ class AppNavHostTest {
 
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
+  private val appPublicEvents = PlanningRepositoryProvider.publicEvents
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
@@ -115,6 +116,7 @@ class AppNavHostTest {
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
+    PlanningRepositoryProvider.publicEvents = appPublicEvents
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
@@ -129,6 +131,7 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
+      publicEvents: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
@@ -138,6 +141,7 @@ class AppNavHostTest {
       credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
+    PlanningRepositoryProvider.publicEvents = publicEvents
     CareCircleRepositoryProvider.repository = careCircleRepository
     CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
@@ -381,6 +385,45 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_neverShowsTheCaregiversOwnAppointments() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    // The caregiver's own account has an appointment: it must not look like Anne's
+    val own = FakePlanningRepository()
+    own.items.value =
+        listOf(
+            PlanningItem(
+                PlanningSource.Appointment("own"),
+                PlanningTiming.Timed(Instant.now().plus(1, ChronoUnit.HOURS)),
+                "Own dentist",
+            )
+        )
+    val events = FakePlanningRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        planningRepository = own,
+        publicEvents = events,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.overview_whose_care)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+
+    composeTestRule.onNodeWithText("Own dentist").assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      // The Overview and Planning only read the Ligue's events
+      assertTrue(own.ranges.isEmpty())
+      assertTrue(events.ranges.isNotEmpty())
+    }
   }
 
   @Test
