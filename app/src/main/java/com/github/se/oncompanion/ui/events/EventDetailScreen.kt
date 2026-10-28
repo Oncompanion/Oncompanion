@@ -67,6 +67,8 @@ private val endTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLI
  * The detail of one of the Ligue's events (Figma: "US-03 / Event details"), opened from the Events
  * list. The patient can open the organizer's website and confirm here that they registered there
  * (Figma: "US-25 / Event detail").
+ *
+ * @param readOnly a caregiver only reads the event: registering is the patient's (US-20)
  */
 @Composable
 fun EventDetailScreen(
@@ -74,6 +76,7 @@ fun EventDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EventDetailViewModel = viewModel(key = eventId) { EventDetailViewModel(eventId) },
+    readOnly: Boolean = false,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   // The event may have started while the patient was away: recompute what can be confirmed
@@ -90,11 +93,14 @@ fun EventDetailScreen(
       onCancelRemoval = viewModel::cancelRemoval,
       onRemoveRegistration = viewModel::removeRegistration,
       modifier = modifier,
+      readOnly = readOnly,
   )
 }
 
 /**
  * Stateless content of the event detail screen, so each state can be tested without a ViewModel.
+ *
+ * @param readOnly hides confirming and removing the registration, for a caregiver
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +113,7 @@ fun EventDetailContent(
     onCancelRemoval: () -> Unit,
     onRemoveRegistration: () -> Unit,
     modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
 ) {
   val snackbarHostState = remember { SnackbarHostState() }
   Scaffold(
@@ -146,6 +153,7 @@ fun EventDetailContent(
       else -> {
         EventDetails(event, uiState.registration, contentModifier) {
           RegistrationActions(
+              readOnly = readOnly,
               link = webLinkOrNull(event.websiteUrl),
               registration = uiState.registration,
               snackbarHostState = snackbarHostState,
@@ -261,6 +269,7 @@ private fun ConfirmedBanner() {
  */
 @Composable
 private fun RegistrationActions(
+    readOnly: Boolean,
     link: String?,
     registration: RegistrationStatus,
     snackbarHostState: SnackbarHostState,
@@ -302,6 +311,8 @@ private fun RegistrationActions(
         Button(onClick = openWebsite, modifier = websiteModifier) { websiteText() }
       }
     }
+    // The website stays open to a caregiver; confirming the registration is the patient's
+    if (readOnly) return@Column
     when (registration) {
       RegistrationStatus.LOADING -> {
         // Nothing to offer until the registration status is known

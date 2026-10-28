@@ -30,11 +30,11 @@ import kotlinx.coroutines.withTimeoutOrNull
  * It works offline: Firebase remembers the session and Firestore reads the profile from its local
  * cache. The profile saved on the phone is checked first, since it answers at once, while the
  * normal read can wait for a slow server. If the profile or a caregiver's circles can't be read in
- * time, the user goes to the Overview: onboarding would try to create a profile that may already
- * exist.
+ * time, a known caregiver goes to "Whose care?", which reads their circles itself, and anyone else
+ * to the Overview: onboarding would try to create a profile that may already exist.
  *
  * @param profileTimeoutMillis how long to wait for the profile and, for a caregiver, their circles
- *   (both together) before choosing the Overview
+ *   (both together) before choosing without them
  */
 class StartViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -45,6 +45,9 @@ class StartViewModel(
 ) : ViewModel() {
 
   private val _startRoute = MutableStateFlow<String?>(null)
+
+  // The role, once the profile is read: a caregiver never falls back to the patient Overview
+  private var knownRole: Role? = null
 
   /** The [Route] to start on, or `null` while it is being decided. */
   val startRoute: StateFlow<String?> = _startRoute.asStateFlow()
@@ -71,13 +74,14 @@ class StartViewModel(
     } catch (e: Exception) {
       Log.w(TAG, "Couldn't read the profile at startup", e)
       null
-    } ?: Route.OVERVIEW
+    } ?: if (knownRole == Role.CAREGIVER) Route.WHOSE_CARE else Route.OVERVIEW
   }
 
   /** Where [uid] starts, from their profile and, for a caregiver, their circles. */
   private suspend fun routeFor(uid: String): String {
     // Only ask the server when the phone doesn't know whether the profile exists
     val profile = cachedProfile(uid) ?: profileRepository.getProfile(uid)
+    knownRole = profile?.role
     return when {
       profile == null -> Route.ONBOARDING
       profile.role != Role.CAREGIVER -> Route.OVERVIEW

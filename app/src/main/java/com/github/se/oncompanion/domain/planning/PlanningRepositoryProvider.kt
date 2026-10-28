@@ -32,4 +32,15 @@ object PlanningRepositoryProvider {
         )
         .observeItems(range)
   }
+
+  /**
+   * What a caregiver sees in Planning and the Overview until #240 reads the chosen patient's data:
+   * only the Ligue's events, the same for everyone. Never the signed-in caregiver's own
+   * appointments, which would look like the patient's.
+   */
+  @Volatile
+  var publicEvents: PlanningRepository = PlanningRepository { range ->
+    OptionalPlanningSource(EventPlanningSource(EventRepositoryProvider.repository))
+        .observeItems(range)
+  }
 }

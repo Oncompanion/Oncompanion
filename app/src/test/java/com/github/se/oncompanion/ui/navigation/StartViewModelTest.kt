@@ -365,7 +365,7 @@ class StartViewModelTest {
       }
 
   @Test
-  fun caregiverCirclesNeverAnswer_startsOnOverviewAfterTheTimeout() =
+  fun caregiverCirclesNeverAnswer_startsOnWhoseCareAfterTheTimeout() =
       runTest(dispatcher) {
         val viewModel =
             StartViewModel(
@@ -378,7 +378,8 @@ class StartViewModelTest {
         runCurrent()
         assertNull(viewModel.startRoute.value)
         advanceUntilIdle()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        // Never the patient Overview: the role is known, only the circles are missing
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
       }
 
   @Test
@@ -415,7 +416,7 @@ class StartViewModelTest {
         assertNull(viewModel.startRoute.value)
         advanceTimeBy(2L)
         runCurrent()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
       }
 
   /** Invites whose joined circles never arrive, like a cache and a server that don't answer. */

@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
@@ -36,6 +37,7 @@ import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleViewModel
+import com.github.se.oncompanion.ui.carecircle.CaregiverModeViewModel
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
@@ -48,6 +50,7 @@ import com.github.se.oncompanion.ui.onboarding.InformationScreen
 import com.github.se.oncompanion.ui.onboarding.OnboardingViewModel
 import com.github.se.oncompanion.ui.onboarding.RoleScreen
 import com.github.se.oncompanion.ui.overview.OverviewScreen
+import com.github.se.oncompanion.ui.overview.OverviewViewModel
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionDetailScreen
@@ -87,6 +90,20 @@ fun AppNavHost(
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
+  // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
+  val caregiverMode: CaregiverModeViewModel = viewModel {
+    CaregiverModeViewModel(createSavedStateHandle())
+  }
+  val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  // A caregiver sees only the Ligue's events until #240, never their own appointments
+  val planning = {
+    if (chosenPatient == null) PlanningRepositoryProvider.repository
+    else PlanningRepositoryProvider.publicEvents
+  }
+  val signOut = {
+    caregiverMode.leave()
+    navigationActions.navigateAndClearBackStack(Route.AUTH)
+  }
 
   NavHost(navController = navController, startDestination = startRoute) {
     navigation(startDestination = Screen.SIGN_IN, route = Route.AUTH) {
@@ -94,6 +111,8 @@ fun AppNavHost(
         SignInScreen(
             credentialProvider = credentialProvider,
             onSignedIn = { next ->
+              // Whoever signs in starts in patient mode; a caregiver chooses again in "Whose care?"
+              caregiverMode.leave()
               navigationActions.navigateAndClearBackStack(
                   when (next) {
                     AfterSignIn.ONBOARDING -> Route.ONBOARDING
@@ -134,7 +153,7 @@ fun AppNavHost(
             // Joined: choose whose care to follow (straight to them with a single patient)
             onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
-            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            onSignedOut = signOut,
         )
       }
     }
@@ -155,18 +174,27 @@ fun AppNavHost(
             // No back arrow when it is the first screen (after joining, or at start)
             onBack =
                 navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
-            // The Overview for now; the caregiver mode (#203) opens the chosen patient's one
-            onPatientChosen = { navigationActions.navigateAndClearBackStack(Route.OVERVIEW) },
+            // Their Overview, in caregiver mode
+            onPatientChosen = { patient ->
+              caregiverMode.choose(patient)
+              navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
+            },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
-            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            onSignedOut = signOut,
         )
       }
     }
 
     navigation(startDestination = Screen.OVERVIEW, route = Route.OVERVIEW) {
       composable(Screen.OVERVIEW) {
-        OverviewScreen(navigationActions, onOpenAppointment = appointmentOpener(navigationActions))
+        OverviewScreen(
+            navigationActions,
+            viewModel = viewModel { OverviewViewModel(planningRepository = planning()) },
+            onOpenAppointment = appointmentOpener(navigationActions),
+            caregiverOf = chosenPatient?.firstName,
+            onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
+        )
       }
     }
 
@@ -174,7 +202,7 @@ fun AppNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) { entry ->
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(savedStateHandle = createSavedStateHandle())
+          PlanningViewModel(repository = planning(), savedStateHandle = createSavedStateHandle())
         }
         // Return to this calendar instance and reveal the saved day, including another week.
         val savedDate by
@@ -190,7 +218,10 @@ fun AppNavHost(
         PlanningScreen(
             navigationActions,
             planningViewModel,
-            onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
+            // Only the patient adds appointments
+            onAddAppointment =
+                if (chosenPatient != null) null
+                else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
             onOpenAppointment = appointmentOpener(navigationActions),
         )
       }
@@ -249,6 +280,7 @@ fun AppNavHost(
             eventId = eventId,
             onBack = navigationActions::goBack,
             viewModel = viewModel { EventDetailViewModel(eventId) },
+            readOnly = chosenPatient != null,
         )
       }
     }
@@ -397,7 +429,7 @@ fun AppNavHost(
         ProfileScreen(
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
-            onSignedOut = { navigationActions.navigateAndClearBackStack(Route.AUTH) },
+            onSignedOut = signOut,
             viewModel = viewModel { ProfileViewModel() },
             credentialProvider = credentialProvider,
         )
