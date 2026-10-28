@@ -671,6 +671,22 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun aDateTheScanDidNotFindSaysTodayIsUsed() {
+    setContent(
+        twoMedications.copy(
+            isScanned = true,
+            toCheck = setOf(ScannedField.PrescribedOn),
+            dateFound = false,
+        )
+    )
+
+    // Today's date stands in for the missing one: only part of the prescription was read
+    notice().assertTextContains(string(R.string.prescription_review_partly_read), substring = true)
+    fieldCheck("prescribed_on")
+        .assertTextContains(string(R.string.prescription_review_date_not_found))
+  }
+
+  @Test
   fun everyDetailOfTheOpenMedicationCanBeToCheck() {
     setContent(
         filled.copy(

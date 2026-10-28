@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.medication.scan.classify
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -78,14 +79,14 @@ class PrescriptionDetailsTest {
   }
 
   @Test
-  fun noDateGivesTodayToCheck() {
-    assertEquals(Reading(today, sure = false), dateIn(emptyList(), today))
+  fun noDateIsNotFound() {
+    assertNull(dateIn(emptyList(), today))
   }
 
   @Test
   fun theBirthDateIsNeverThePrescriptionsDate() {
     val lines = listOf(line("Née le 02.07.1965", LineKind.PATIENT))
-    assertEquals(Reading(today, sure = false), dateIn(lines, today))
+    assertNull(dateIn(lines, today))
   }
 
   @Test
@@ -93,19 +94,21 @@ class PrescriptionDetailsTest {
     val two = listOf(line("le 05.11.2026", LineKind.DATE), line("le 06.11.2026", LineKind.DATE))
     assertEquals(Reading(LocalDate.of(2026, 11, 5), sure = false), dateIn(two, today))
     val same = listOf(line("le 05.11.2026", LineKind.DATE), line("5 novembre 2026", LineKind.DATE))
-    assertTrue(dateIn(same, today).sure)
+    assertTrue(dateIn(same, today)!!.sure)
   }
 
   @Test
   fun aDateInTheFutureOrOverAYearOldIsToCheck() {
-    assertFalse(dateIn(listOf(line("le 21.11.2026", LineKind.DATE)), today).sure)
-    assertFalse(dateIn(listOf(line("le 19.11.2025", LineKind.DATE)), today).sure)
-    assertTrue(dateIn(listOf(line("le 20.11.2025", LineKind.DATE)), today).sure)
-    assertTrue(dateIn(listOf(line("le 20.11.2026", LineKind.DATE)), today).sure)
+    assertFalse(dateIn(listOf(line("le 21.11.2026", LineKind.DATE)), today)!!.sure)
+    assertFalse(dateIn(listOf(line("le 19.11.2025", LineKind.DATE)), today)!!.sure)
+    assertTrue(dateIn(listOf(line("le 20.11.2025", LineKind.DATE)), today)!!.sure)
+    assertTrue(dateIn(listOf(line("le 20.11.2026", LineKind.DATE)), today)!!.sure)
   }
 
   @Test
   fun aDateOnAnUnsureLineIsToCheck() {
-    assertFalse(dateIn(listOf(line("le 05.11.2026", LineKind.DATE, confidence = 0.5f)), today).sure)
+    assertFalse(
+        dateIn(listOf(line("le 05.11.2026", LineKind.DATE, confidence = 0.5f)), today)!!.sure
+    )
   }
 }

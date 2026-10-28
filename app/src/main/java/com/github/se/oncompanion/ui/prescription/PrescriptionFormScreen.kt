@@ -577,7 +577,15 @@ private fun DateField(
       },
       modifier = Modifier.testTag(testTag),
       supportingText =
-          check?.let { { CheckReason(it, R.string.prescription_review_date_hard_to_read) } },
+          check?.let {
+            {
+              CheckReason(
+                  it,
+                  whenRead = R.string.prescription_review_date_hard_to_read,
+                  whenNotFound = R.string.prescription_review_date_not_found,
+              )
+            }
+          },
       colors = if (check != null) checkColors() else OutlinedTextFieldDefaults.colors(),
   )
 

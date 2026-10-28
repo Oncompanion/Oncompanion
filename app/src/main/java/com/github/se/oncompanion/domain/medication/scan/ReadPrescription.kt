@@ -36,11 +36,13 @@ enum class MedicationDetail {
  *
  * @property leftOut how many more medications were read than a prescription can hold
  *   ([Prescription.MAX_MEDICATIONS]): they aren't in [draft], so the patient must be told
+ * @property dateFound whether a date was read; if not, the draft's date is today's, to check
  */
 data class ScannedPrescription(
     val draft: PrescriptionDraft,
     val toCheck: Set<ScannedField>,
     val leftOut: Int = 0,
+    val dateFound: Boolean = true,
 )
 
 /**
@@ -59,7 +61,8 @@ fun readPrescription(text: RecognizedText, today: LocalDate): ScannedPrescriptio
   if (medications.isEmpty()) return null
   val lines = rows.flatMap { it.lines }
   val doctor = prescriberIn(lines)
-  val date = dateIn(lines, today)
+  val readDate = dateIn(lines, today)
+  val date = readDate ?: Reading(today, sure = false)
 
   val draft =
       PrescriptionDraft(
@@ -90,5 +93,10 @@ fun readPrescription(text: RecognizedText, today: LocalDate): ScannedPrescriptio
       details.filterValues { !it }.keys.forEach { add(ScannedField.OfMedication(position, it)) }
     }
   }
-  return ScannedPrescription(draft, toCheck, leftOut = read.size - medications.size)
+  return ScannedPrescription(
+      draft,
+      toCheck,
+      leftOut = read.size - medications.size,
+      dateFound = readDate != null,
+  )
 }

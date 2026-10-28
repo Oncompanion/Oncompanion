@@ -441,6 +441,7 @@
     <string name="prescription_review_correct_anything">You can correct anything before saving.</string>
     <string name="prescription_review_may_differ">Please check: it may not be what\'s on the paper</string>
     <string name="prescription_review_date_hard_to_read">Please check: the date was hard to read</string>
+    <string name="prescription_review_date_not_found">Not found on the scan: today\'s date is used</string>
     <string name="prescription_review_not_found">Not found on the scan: add it if you want</string>
     <string name="prescription_review_needs_checking">Needs checking</string>
     <string name="prescription_review_check_name">Please check the name</string>

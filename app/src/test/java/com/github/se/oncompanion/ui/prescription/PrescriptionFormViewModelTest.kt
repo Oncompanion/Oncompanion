@@ -885,6 +885,7 @@ class PrescriptionFormViewModelTest {
     assertFalse(viewModel.state.isScanned)
     assertTrue(viewModel.state.toCheck.isEmpty())
     assertEquals(0, viewModel.state.leftOut)
+    assertTrue(viewModel.state.dateFound)
   }
 
   @Test
@@ -904,6 +905,25 @@ class PrescriptionFormViewModelTest {
         )
 
     assertEquals(5, viewModel.state.leftOut)
+  }
+
+  @Test
+  fun aScanWithoutDateIsKeptForTheReview() {
+    val draft =
+        PrescriptionDraft(
+            prescribedOn = today,
+            medications = listOf(MedicationDraft(name = "Ondansetron 8 mg", startDate = today)),
+        )
+
+    val viewModel =
+        PrescriptionFormViewModel(
+            auth,
+            medications,
+            clock = clock,
+            scan = ScannedPrescription(draft, setOf(ScannedField.PrescribedOn), dateFound = false),
+        )
+
+    assertFalse(viewModel.state.dateFound)
   }
 
   @Test

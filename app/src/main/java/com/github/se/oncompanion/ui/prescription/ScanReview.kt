@@ -22,7 +22,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.medication.MedicationDraft
-import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.model.medication.Prescription
@@ -35,12 +34,12 @@ import com.github.se.oncompanion.ui.theme.warning
 /** A field to check, and why: [notFound] when the scan has nothing for it, else it was unsure. */
 internal data class FieldCheck(val notFound: Boolean, val testTag: String)
 
-/** Whether [field] of [draft] is empty, so the scan didn't find it rather than read it unsurely. */
-internal fun isNotFound(field: ScannedField, draft: PrescriptionDraft): Boolean =
+/** Whether the scan didn't find [field], rather than read it unsurely. */
+internal fun PrescriptionFormUiState.isNotFound(field: ScannedField): Boolean =
     when (field) {
       ScannedField.PrescribedBy -> draft.prescribedBy.isBlank()
-      // A prescription always has a date: the scan read one unsurely, or used today
-      ScannedField.PrescribedOn -> false
+      // A prescription always has a date: without one, the scan used today's
+      ScannedField.PrescribedOn -> !dateFound
       is ScannedField.OfMedication ->
           draft.medications.getOrNull(field.position)?.isEmpty(field.detail) ?: false
     }
@@ -56,7 +55,7 @@ private fun MedicationDraft.isEmpty(detail: MedicationDetail) =
 /** How [field] is to check in [uiState], `null` if it isn't. */
 internal fun PrescriptionFormUiState.checkOf(field: ScannedField, tagName: String): FieldCheck? =
     if (field in toCheck) {
-      FieldCheck(isNotFound(field, draft), C.Tag.prescriptionReviewFieldCheck(tagName))
+      FieldCheck(isNotFound(field), C.Tag.prescriptionReviewFieldCheck(tagName))
     } else null
 
 /** The details to check of the medication at [position] in [this]'s draft, and how. */
@@ -76,7 +75,7 @@ internal fun PrescriptionFormUiState.checksOf(position: Int): Map<MedicationDeta
 @Composable
 internal fun ReviewNotice(uiState: PrescriptionFormUiState) {
   val toCheck = uiState.toCheck
-  val partly = toCheck.any { isNotFound(it, uiState.draft) }
+  val partly = toCheck.any { uiState.isNotFound(it) }
   val text =
       listOfNotNull(
               stringResource(
@@ -134,15 +133,17 @@ internal fun checkColors(): TextFieldColors {
 
 /**
  * Why the field is to check, below it. [whenRead] says it for a field that has a value: read
- * unsurely, converted or cut, the scan doesn't tell which.
+ * unsurely, converted or cut, the scan doesn't tell which. [whenNotFound] for one the scan didn't
+ * find.
  */
 @Composable
 internal fun CheckReason(
     check: FieldCheck,
     @StringRes whenRead: Int = R.string.prescription_review_may_differ,
+    @StringRes whenNotFound: Int = R.string.prescription_review_not_found,
 ) {
   Text(
-      stringResource(if (check.notFound) R.string.prescription_review_not_found else whenRead),
+      stringResource(if (check.notFound) whenNotFound else whenRead),
       modifier = Modifier.testTag(check.testTag),
   )
 }
