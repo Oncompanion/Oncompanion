@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -53,6 +54,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
@@ -209,7 +211,18 @@ private fun MemberDetails(
                 .verticalScroll(rememberScrollState())
                 .testTag(C.Tag.care_circle_member_details)
     ) {
-      MemberHeader(member)
+      val relationship = stringResource(member.relationship.label)
+      MemberHeader(
+          details = member.details,
+          subtitle =
+              member.addedAt?.let { addedAt ->
+                stringResource(
+                    R.string.care_circle_member_since,
+                    relationship,
+                    addedAtFormatter.format(addedAt.atZone(ZoneId.systemDefault())),
+                )
+              } ?: relationship,
+      )
 
       // Contact: the member's account email, hidden if their account has none
       member.email
@@ -235,9 +248,16 @@ private fun MemberDetails(
   }
 }
 
-/** Avatar, full name, and "relationship · Member since <month>". */
+/**
+ * Avatar, full name and [subtitle] (e.g. "Son · Member since Aug 2026"), shared by the member and
+ * invitation screens.
+ */
 @Composable
-private fun MemberHeader(member: CareCircleMember) {
+internal fun MemberHeader(
+    details: CareCircleMemberDetails,
+    subtitle: String,
+    subtitleColor: Color = MaterialTheme.colorScheme.primary,
+) {
   Column(
       modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -251,36 +271,29 @@ private fun MemberHeader(member: CareCircleMember) {
         contentAlignment = Alignment.Center,
     ) {
       Text(
-          text = member.initial,
+          text = details.initial,
           style = MaterialTheme.typography.headlineLarge,
           color = MaterialTheme.colorScheme.onPrimaryContainer,
       )
     }
     Text(
-        text = member.fullName,
+        text = details.fullName,
         style = MaterialTheme.typography.headlineMedium,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(horizontal = 16.dp).testTag(C.Tag.care_circle_member_name),
     )
-    val relationship = stringResource(member.relationship.label)
     Text(
-        text =
-            member.addedAt?.let { addedAt ->
-              stringResource(
-                  R.string.care_circle_member_since,
-                  relationship,
-                  addedAtFormatter.format(addedAt.atZone(ZoneId.systemDefault())),
-              )
-            } ?: relationship,
+        text = subtitle,
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.primary,
+        color = subtitleColor,
         modifier = Modifier.testTag(C.Tag.care_circle_member_subtitle),
     )
   }
 }
 
+/** A section title, e.g. "Can see". */
 @Composable
-private fun Subheader(text: String) {
+internal fun Subheader(text: String) {
   Text(
       text = text,
       style = MaterialTheme.typography.titleSmall,
@@ -294,7 +307,7 @@ private fun Subheader(text: String) {
  * readers announce it even though the switch itself can't be toggled.
  */
 @Composable
-private fun PermissionItem(permission: CarePermission, granted: Boolean) {
+internal fun PermissionItem(permission: CarePermission, granted: Boolean) {
   ListItem(
       headlineContent = { Text(stringResource(permission.label)) },
       supportingContent = { Text(stringResource(permission.description)) },

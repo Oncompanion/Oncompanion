@@ -6,7 +6,6 @@ import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -111,6 +110,7 @@ class CareCircleScreenTest {
     var addClicks = 0
     var retryClicks = 0
     val memberClicks = mutableListOf<CareCircleMember>()
+    val inviteClicks = mutableListOf<CareCircleInvite>()
   }
 
   private fun setContent(uiState: CareCircleUiState): Events {
@@ -120,6 +120,7 @@ class CareCircleScreenTest {
           uiState = uiState,
           onBack = { events.backClicks++ },
           onMemberClick = { events.memberClicks += it },
+          onInviteClick = { events.inviteClicks += it },
           onAddMember = { events.addClicks++ },
           onRetry = { events.retryClicks++ },
       )
@@ -357,14 +358,17 @@ class CareCircleScreenTest {
   }
 
   @Test
-  fun onlyMembersAreClickable_notInvites() {
+  fun clickingAnInvite_opensIt_notAMember() {
     val events = setContent(circle(joined = listOf(sophie), pending = listOf(julie)))
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).assertHasClickAction()
     composeTestRule
         .onNodeWithTag(C.Tag.careCircleInvite(julie.inviteCode))
-        .assertHasNoClickAction()
+        .assertHasClickAction()
         .performClick()
-    composeTestRule.runOnIdle { assertEquals(emptyList<CareCircleMember>(), events.memberClicks) }
+    composeTestRule.runOnIdle {
+      assertEquals(listOf(julie), events.inviteClicks)
+      assertEquals(emptyList<CareCircleMember>(), events.memberClicks)
+    }
   }
 
   // ---- access summary and labels ----
@@ -458,6 +462,15 @@ class CareCircleScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember(sophie.uid)).performClick()
     composeTestRule.runOnIdle {
       assertEquals(listOf("care_circle_member/sophie"), navigationActions.navigatedTo)
+    }
+  }
+
+  @Test
+  fun screen_clickingAnInvite_opensItsInviteCode() {
+    val navigationActions = setScreen(listOf(sophie), invites = listOf(julie))
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite(julie.inviteCode)).performClick()
+    composeTestRule.runOnIdle {
+      assertEquals(listOf("care_circle_invite/JJJJJ23456"), navigationActions.navigatedTo)
     }
   }
 

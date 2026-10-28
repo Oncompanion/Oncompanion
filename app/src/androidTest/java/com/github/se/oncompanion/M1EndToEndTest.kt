@@ -244,7 +244,11 @@ class M1EndToEndTest {
     waitFor(hasTestTag(C.Tag.careCircleFormRelationshipOption("DAUGHTER"))).performClick()
     tag(C.Tag.care_circle_form_save_button).reveal().performClick()
 
-    // Saving returns to the circle, where the invitation is pending
+    // Saving shows the invite code to share, in place of the form
+    waitFor(hasTestTag(C.Tag.care_circle_invite_code))
+    tag(C.Tag.care_circle_invite_back_button).performClick()
+
+    // Back returns to the circle, where the invitation is pending
     waitFor(
         hasTestTag(C.Tag.care_circle_member_list) and
             hasAnyDescendant(hasTestTag(C.Tag.care_circle_pending_section)) and

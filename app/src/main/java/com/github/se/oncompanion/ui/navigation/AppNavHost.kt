@@ -31,6 +31,8 @@ import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.carecircle.CareCircleInviteScreen
+import com.github.se.oncompanion.ui.carecircle.CareCircleInviteViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberFormScreen
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberFormViewModel
 import com.github.se.oncompanion.ui.carecircle.CareCircleMemberScreen
@@ -422,12 +424,29 @@ fun AppNavHost(
             viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
         )
       }
-      composable(Screen.CARE_CIRCLE_ADD) {
+      composable(Screen.CARE_CIRCLE_ADD) { entry ->
         CareCircleMemberFormScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
-            // Saving returns to the list, where the person is shown as waiting to join
-            onSaved = { navigationActions.goBack() },
+            // Saving shows the new invite code in place of the form: Back then returns to the list
+            onSaved = { inviteCode ->
+              // A save finishing after the patient left must not replace the screen they are on
+              if (navController.currentBackStackEntry == entry) {
+                if (inviteCode == null) navigationActions.goBack()
+                else navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
+              }
+            },
             viewModel = viewModel { CareCircleMemberFormViewModel() },
+        )
+      }
+      composable(
+          Screen.CARE_CIRCLE_INVITE,
+          arguments =
+              listOf(navArgument(Screen.CARE_CIRCLE_INVITE_ARG) { type = NavType.StringType }),
+      ) {
+        CareCircleInviteScreen(
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The SavedStateHandle holds the route's invite code
+            viewModel = viewModel { CareCircleInviteViewModel(createSavedStateHandle()) },
         )
       }
     }
