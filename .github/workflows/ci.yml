@@ -1,4 +1,5 @@
 # Co-authored-by: Claude Code <noreply@anthropic.com>
+# Co-authored-by: ChatGPT <noreply@openai.com>
 
 name: CI - Test Runner
 
@@ -15,6 +16,35 @@ on:
       - reopened
 
 jobs:
+  hospital-proxy:
+    name: Hospital proxy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - name: Install proxy dependencies
+        run: npm --prefix functions ci
+      - name: Check proxy formatting and types
+        run: |
+          npm --prefix functions run format:check
+          npm --prefix functions run lint
+      - name: Build proxy
+        run: npm --prefix functions run build
+      - name: Test proxy with Firestore emulator and coverage
+        run: >-
+          npx --yes firebase-tools@15.30.2 emulators:exec
+          --config firebase.proxy-test.json --only firestore
+          --project demo-oncompanion-proxy
+          'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
+
   ci:
     name: CI
     # Execute the CI on the course's runners
