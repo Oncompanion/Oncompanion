@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.common
@@ -124,6 +125,36 @@ class DetailActionsTest {
 
     composeTestRule.onNodeWithTag(TAGS.edit).assertIsDisplayed()
     composeTestRule.onNodeWithTag(TAGS.delete).assertIsFullyVisible()
+  }
+
+  /** An edit-only feature exposes no inactive Delete action. */
+  @Test
+  fun editOnlyShowsAndDispatchesEdit() {
+    composeTestRule.setContent {
+      DetailActions("Edit item", "Delete item", onEdit = { edits++ }, tags = TAGS)
+    }
+    composeTestRule.onNodeWithTag(TAGS.delete).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(TAGS.edit).performClick()
+    assertEquals(1, edits)
+  }
+
+  /** A delete-only feature exposes no inactive Edit action. */
+  @Test
+  fun deleteOnlyShowsAndDispatchesDelete() {
+    composeTestRule.setContent {
+      DetailActions("Edit item", "Delete item", onDelete = { deletes++ }, tags = TAGS)
+    }
+    composeTestRule.onNodeWithTag(TAGS.edit).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(TAGS.delete).performClick()
+    assertEquals(1, deletes)
+  }
+
+  /** No callbacks means no action buttons or placeholder actions. */
+  @Test
+  fun noCallbacksShowNoActions() {
+    composeTestRule.setContent { DetailActions("Edit item", "Delete item", tags = TAGS) }
+    composeTestRule.onNodeWithTag(TAGS.edit).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(TAGS.delete).assertDoesNotExist()
   }
 
   private companion object {

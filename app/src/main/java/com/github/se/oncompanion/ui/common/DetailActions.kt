@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.common
@@ -58,25 +59,34 @@ fun DetailWithActions(
   }
 }
 
-/** Edit, then Delete below it, as in the Figma mockups of the symptom and prescription details. */
+/** Available item actions, Edit before Delete, shared across detail screens. */
 @Composable
 fun DetailActions(
     editLabel: String,
     deleteLabel: String,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     tags: DetailActionTags,
 ) {
+  if (onEdit == null && onDelete == null) return
   Column(
       modifier = Modifier.fillMaxWidth().padding(16.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag(tags.edit)) {
-      Icon(Icons.Default.Edit, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
-      Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-      Text(editLabel)
-    }
-    TextButton(onClick = onDelete, modifier = Modifier.testTag(tags.delete)) { Text(deleteLabel) }
+    if (onEdit != null)
+        OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag(tags.edit)) {
+          Icon(
+              Icons.Default.Edit,
+              contentDescription = null,
+              Modifier.size(ButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+          Text(editLabel)
+        }
+    if (onDelete != null)
+        TextButton(onClick = onDelete, modifier = Modifier.testTag(tags.delete)) {
+          Text(deleteLabel)
+        }
   }
 }

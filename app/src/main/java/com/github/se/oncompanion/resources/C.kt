@@ -12,6 +12,13 @@ object C {
     const val appointment_detail_loading = "appointment_detail_loading"
     const val appointment_detail_feedback = "appointment_detail_feedback"
     const val appointment_detail_retry = "appointment_detail_retry"
+    const val appointment_detail_content = "appointment_detail_content"
+    const val appointment_detail_edit_button = "appointment_detail_edit_button"
+    const val appointment_detail_delete_button = "appointment_detail_delete_button"
+    const val appointment_delete_dialog = "appointment_delete_dialog"
+    const val appointment_delete_confirm = "appointment_delete_confirm"
+    const val appointment_delete_cancel = "appointment_delete_cancel"
+    const val appointment_delete_error = "appointment_delete_error"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
