@@ -35,6 +35,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -408,6 +409,34 @@ class CareCircleInviteScreenTest {
       assert(text.startsWith("Hi Julie")) { text }
       assert(text.endsWith("Anne")) { text }
     }
+  }
+
+  /** The text of the email opened for [invite]. */
+  private fun sharedMessage(invite: CareCircleInvite): String {
+    setScreen(invite)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_email_button).performClick()
+    return composeTestRule.runOnIdle {
+      checkNotNull(nextStartedActivity()?.getStringExtra(Intent.EXTRA_TEXT))
+    }
+  }
+
+  @Test
+  fun screen_sharedMessage_saysUntilWhenTheCodeWorks() {
+    // Shared 5 days after it reached the server: only 2 days are left, not 7
+    val invite = julie.copy(createdAt = Instant.now().minus(Duration.ofDays(5)))
+    val text = sharedMessage(invite)
+    assert(
+        string(R.string.care_circle_invite_message_valid_until, day(invite.expiresAt!!)) in text
+    ) {
+      text
+    }
+    assert("7 days" !in text) { text }
+  }
+
+  @Test
+  fun screen_sharedMessage_beforeSync_saysItsSevenDaysStartOnceSent() {
+    val text = sharedMessage(julie.copy(createdAt = null, isSynced = false))
+    assert(string(R.string.care_circle_invite_message_valid_once_sent) in text) { text }
   }
 
   @Test

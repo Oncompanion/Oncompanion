@@ -174,13 +174,21 @@ private fun shareIntent(resources: Resources, invite: CareCircleInvite): Intent 
         null,
     )
 
-/** The invitation text: the invite code and how to use it, signed with the patient's name. */
+/**
+ * The invitation text: the invite code, how to use it and until when it works, signed with the
+ * patient's name. A code shared days after it was created works for less than 7 days, so the date
+ * comes from [CareCircleInvite.expiresAt]; until the server has the invite, its 7 days haven't
+ * started.
+ */
 private fun invitationMessage(resources: Resources, invite: CareCircleInvite): String =
     resources.getString(
         R.string.care_circle_invite_message,
         invite.details.firstName,
         invite.displayInviteCode,
         invite.ownerFirstName,
+        invite.expiresAt?.let {
+          resources.getString(R.string.care_circle_invite_message_valid_until, formatDay(it))
+        } ?: resources.getString(R.string.care_circle_invite_message_valid_once_sent),
     )
 
 /** Stateless content of the invite code screen, so each state can be tested on its own. */
