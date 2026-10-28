@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -231,19 +232,40 @@ class ScanContentTest {
     assertEquals(0, retakes)
   }
 
+  // ---- reading the prescription ----
+
   @Test
-  fun readingComingSoon_isSaid_withManualEntryAsTheWayForward() {
-    show(granted().copy(readingComingSoon = true))
+  fun whileReading_theUserIsToldItTakesAFewSeconds_andCanOnlyClose() {
+    show(granted().copy(photo = photoFile(), isReading = true))
+
+    compose.onNodeWithText(string(R.string.prescription_scan_reading_title)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_reading).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.prescription_scan_reading)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_close_button).performClick()
+    assertEquals(1, backs)
+  }
+
+  @Test
+  fun nothingRead_offersManualEntryFirst_thenARetake() {
+    show(granted().copy(photo = photoFile(), nothingRead = true))
 
     compose
-        .onNodeWithText(string(R.string.prescription_scan_reading_coming_soon))
+        .onNodeWithText(string(R.string.prescription_scan_nothing_read_title))
         .assertIsDisplayed()
-    // The snackbar's action
-    compose.onNodeWithText(string(R.string.prescription_scan_enter_manually)).performClick()
-    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_nothing_read).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_scan_use_photo_button).assertDoesNotExist()
+
+    compose
+        .onNodeWithTag(C.Tag.prescription_scan_nothing_read_enter_manually_button)
+        .assertTextEquals(string(R.string.prescription_scan_enter_it_manually))
+        .performClick()
+    compose.onNodeWithTag(C.Tag.prescription_scan_nothing_read_retake_button).performClick()
 
     assertEquals(1, manualEntries)
-    assertEquals(1, messagesShown)
+    assertEquals(1, retakes)
   }
 
   @Test

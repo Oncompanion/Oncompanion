@@ -57,8 +57,8 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 /**
  * Displays the members of the signed-in user's care circle (US-13), following the "US-13 / Circle
  * members" as well as the people invited who haven't joined yet. Tapping a member opens their
- * details (US-14), and "Add member" opens the form adding someone (#79). @TODO: Invitations don't
- * open anything yet: the invite code screen comes in a later PR.
+ * details (US-14), tapping an invitation opens its invite code (#150), and "Add member" opens the
+ * form adding someone (#79).
  */
 @Composable
 fun CareCircleScreen(
@@ -79,6 +79,9 @@ fun CareCircleScreen(
       onMemberClick = { member ->
         navigationActions.navigateTo(Screen.careCircleMember(member.uid))
       },
+      onInviteClick = { invite ->
+        navigationActions.navigateTo(Screen.careCircleInvite(invite.inviteCode))
+      },
       onAddMember = { navigationActions.navigateTo(Screen.CARE_CIRCLE_ADD) },
       onRetry = viewModel::retry,
       modifier = modifier,
@@ -92,6 +95,7 @@ fun CareCircleContent(
     uiState: CareCircleUiState,
     onBack: () -> Unit,
     onMemberClick: (CareCircleMember) -> Unit,
+    onInviteClick: (CareCircleInvite) -> Unit,
     onAddMember: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -132,7 +136,7 @@ fun CareCircleContent(
       CareCircleUiState.Empty -> EmptyState(onAddMember, contentModifier)
       CareCircleUiState.Error -> ErrorState(onRetry, contentModifier)
       is CareCircleUiState.CareCircleMembers ->
-          CareCircleMemberList(uiState, onMemberClick, contentModifier)
+          CareCircleMemberList(uiState, onMemberClick, onInviteClick, contentModifier)
     }
   }
 }
@@ -152,6 +156,7 @@ private fun LoadingState(modifier: Modifier) {
 private fun CareCircleMemberList(
     careCircle: CareCircleUiState.CareCircleMembers,
     onMemberClick: (CareCircleMember) -> Unit,
+    onInviteClick: (CareCircleInvite) -> Unit,
     modifier: Modifier,
 ) {
   LazyColumn(
@@ -180,7 +185,9 @@ private fun CareCircleMemberList(
             tag = C.Tag.care_circle_pending_section,
         )
       }
-      items(careCircle.pending, key = { it.key }) { entry -> PendingItem(entry) }
+      items(careCircle.pending, key = { it.key }) { entry ->
+        PendingItem(entry, onClick = { onInviteClick(entry.invite) })
+      }
     }
   }
 }
@@ -228,10 +235,10 @@ private fun MemberItem(member: CareCircleMember, onClick: () -> Unit) {
 /**
  * One invitation, laid out like a member with a "Pending" label. Its supporting text says whether
  * the invite code can be used: pending (with what the person will see), expired, or not on the
- * server yet. Not clickable yet: the invite code screen comes in a later PR (#150).
+ * server yet. Tapping it opens its invite code.
  */
 @Composable
-private fun PendingItem(entry: CareCircleEntry.Pending) {
+private fun PendingItem(entry: CareCircleEntry.Pending, onClick: () -> Unit) {
   val invite = entry.invite
   ListItem(
       headlineContent = { Text(entry.details.fullName) },
@@ -255,7 +262,8 @@ private fun PendingItem(entry: CareCircleEntry.Pending) {
       },
       leadingContent = { Monogram(entry.details.initial) },
       trailingContent = { PendingLabel() },
-      modifier = Modifier.testTag(C.Tag.careCircleInvite(invite.inviteCode)),
+      modifier =
+          Modifier.clickable(onClick = onClick).testTag(C.Tag.careCircleInvite(invite.inviteCode)),
   )
 }
 
@@ -275,8 +283,9 @@ private fun PendingLabel() {
   }
 }
 
+/** A round avatar with a person's [initial], shared with "Whose care?". */
 @Composable
-private fun Monogram(initial: String) {
+internal fun Monogram(initial: String) {
   Box(
       modifier =
           Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
@@ -444,6 +453,7 @@ fun CareCircleScreenPreview() {
             ),
         onBack = {},
         onMemberClick = {},
+        onInviteClick = {},
         onAddMember = {},
         onRetry = {},
     )
@@ -458,6 +468,7 @@ fun CareCircleScreenEmptyPreview() {
         uiState = CareCircleUiState.Empty,
         onBack = {},
         onMemberClick = {},
+        onInviteClick = {},
         onAddMember = {},
         onRetry = {},
     )

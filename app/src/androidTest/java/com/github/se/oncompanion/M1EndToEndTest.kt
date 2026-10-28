@@ -3,19 +3,18 @@
 package com.github.se.oncompanion
 
 import android.content.Context
-import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
@@ -46,7 +45,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class M1EndToEndTest {
 
-  @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+  // Shows the app like MainActivity does, so it survives Android relaunching the screen
+  @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
 
   // A new account each run, so the test always starts with onboarding and empty data
   private val run = UUID.randomUUID().toString().take(8)
@@ -68,6 +68,7 @@ class M1EndToEndTest {
 
   @After
   fun tearDown(): Unit = runBlocking {
+    AppHostActivity.content.value = {}
     EmulatorTestData.signOut()
     runCatching { EmulatorTestData.deleteRawDocument("events/$ligueEvent") }
   }
@@ -75,7 +76,7 @@ class M1EndToEndTest {
   @Test
   fun newPatient_usesEveryMainFeature() {
     addLigueEventTomorrow(title = "Gentle yoga")
-    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
+    startApp()
 
     signInAndOnboard(firstName = "Sam")
     addPrescription(doctor = "Dr Martin", medication = "Tamoxifen")
@@ -92,7 +93,7 @@ class M1EndToEndTest {
 
   @Test
   fun newPatient_invitesSomeoneToTheirCareCircle() {
-    compose.setContent { OncompanionTheme { AppNavHost(credentialProvider = signIn) } }
+    startApp()
 
     signInAndOnboard(firstName = "Sam")
     inviteToCareCircle(firstName = "Julie")
@@ -107,7 +108,7 @@ class M1EndToEndTest {
     // A new account goes to onboarding
     waitFor(hasTestTag(C.Tag.onboarding_role_patient)).performClick()
     tag(C.Tag.onboarding_continue_button).performClick()
-    waitFor(hasTestTag(C.Tag.onboarding_first_name_field)).performTextReplacement(firstName)
+    waitFor(hasTestTag(C.Tag.onboarding_first_name_field)).replaceText(firstName)
     tag(C.Tag.onboarding_save_button).reveal().performClick()
 
     waitFor(hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true))
@@ -118,10 +119,10 @@ class M1EndToEndTest {
     tag(C.Tag.overview_shortcut_prescriptions).reveal().performClick()
     waitFor(hasTestTag(C.Tag.prescriptions_enter_manually_button)).performClick()
 
-    waitFor(hasTestTag(C.Tag.prescription_form_prescribed_by_field)).performTextInput(doctor)
-    tag(C.Tag.prescription_form_medication_name_field).reveal().performTextInput(medication)
-    tag(C.Tag.prescription_form_dosage_field).reveal().performTextInput("20 mg")
-    tag(C.Tag.prescription_form_frequency_field).reveal().performTextInput("Once a day")
+    waitFor(hasTestTag(C.Tag.prescription_form_prescribed_by_field)).typeText(doctor)
+    tag(C.Tag.prescription_form_medication_name_field).reveal().typeText(medication)
+    tag(C.Tag.prescription_form_dosage_field).reveal().typeText("20 mg")
+    tag(C.Tag.prescription_form_frequency_field).reveal().typeText("Once a day")
     // Save stays at the bottom of the screen, outside the scrolling fields
     tag(C.Tag.prescription_form_save_button).performClick()
 
@@ -142,10 +143,10 @@ class M1EndToEndTest {
     waitFor(hasTestTag(tomorrow)).performClick()
 
     tag(C.Tag.planning_add).performClick()
-    waitFor(hasTestTag(C.Tag.appointment_title)).performTextInput(title)
+    waitFor(hasTestTag(C.Tag.appointment_title)).typeText(title)
     tag(C.Tag.appointment_time).performClick()
     tag(C.Tag.appointment_confirm).performClick()
-    tag(C.Tag.appointment_location).reveal().performTextInput("HUG, oncology")
+    tag(C.Tag.appointment_location).reveal().typeText("HUG, oncology")
     tag(C.Tag.appointment_save).reveal().performClick()
 
     // Saving returns to the calendar, on the appointment's day
@@ -220,7 +221,7 @@ class M1EndToEndTest {
     waitFor(hasTestTag(C.Tag.profile_name) and hasText(firstName, substring = true))
 
     tag(C.Tag.profile_edit).performClick()
-    waitFor(hasTestTag(C.Tag.hospital_field)).reveal().performTextInput(hospital)
+    waitFor(hasTestTag(C.Tag.hospital_field)).reveal().typeText(hospital)
     tag(C.Tag.edit_profile_save).reveal().performClick()
 
     waitFor(
@@ -238,12 +239,16 @@ class M1EndToEndTest {
     // A new patient's circle is empty: its add button is in the page
     waitFor(hasTestTag(C.Tag.care_circle_empty_add_button)).performClick()
 
-    waitFor(hasTestTag(C.Tag.care_circle_form_first_name)).performTextInput(firstName)
+    waitFor(hasTestTag(C.Tag.care_circle_form_first_name)).typeText(firstName)
     tag(C.Tag.care_circle_form_relationship).reveal().performClick()
     waitFor(hasTestTag(C.Tag.careCircleFormRelationshipOption("DAUGHTER"))).performClick()
     tag(C.Tag.care_circle_form_save_button).reveal().performClick()
 
-    // Saving returns to the circle, where the invitation is pending
+    // Saving shows the invite code to share, in place of the form
+    waitFor(hasTestTag(C.Tag.care_circle_invite_code))
+    tag(C.Tag.care_circle_invite_back_button).performClick()
+
+    // Back returns to the circle, where the invitation is pending
     waitFor(
         hasTestTag(C.Tag.care_circle_member_list) and
             hasAnyDescendant(hasTestTag(C.Tag.care_circle_pending_section)) and
@@ -291,7 +296,30 @@ class M1EndToEndTest {
     )
   }
 
-  private fun tag(testTag: String) = compose.onNodeWithTag(testTag)
+  // Waits for it too: right after Android relaunches the screen, the app isn't drawn yet
+  private fun tag(testTag: String) = waitFor(hasTestTag(testTag))
+
+  /** Types [text] at the end of the field, then closes the keyboard (see [closeKeyboard]). */
+  private fun SemanticsNodeInteraction.typeText(text: String) = apply {
+    performTextInput(text)
+    closeKeyboard()
+  }
+
+  /** Replaces the field's text with [text], then closes the keyboard (see [closeKeyboard]). */
+  private fun SemanticsNodeInteraction.replaceText(text: String) = apply {
+    performTextReplacement(text)
+    closeKeyboard()
+  }
+
+  /**
+   * Closes the keyboard and waits until it's gone. On the slow CI emulator, a keyboard still
+   * closing covers the next button and the tap lands on the keyboard (seen in the emulator's
+   * logcat).
+   */
+  private fun closeKeyboard() {
+    Espresso.closeSoftKeyboard()
+    compose.waitForIdle()
+  }
 
   /**
    * Scrolls to the node when it's in a scrolling area, which depends on the screen's height. Only
@@ -307,8 +335,26 @@ class M1EndToEndTest {
 
   private fun string(id: Int) = compose.activity.getString(id)
 
+  /**
+   * Whether a node matches. While Android relaunches the screen, or the app is covered, there is no
+   * Compose hierarchy to search: that is "not there yet", so [waitFor] keeps waiting.
+   */
   private fun exists(matcher: SemanticsMatcher) =
-      compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+      try {
+        compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+      } catch (e: IllegalStateException) {
+        if (e.message?.startsWith("No compose hierarchies found") != true) throw e
+        false
+      }
+
+  /** Shows the app on the test screen, which keeps showing it if Android relaunches it. */
+  private fun startApp() {
+    compose.runOnUiThread {
+      AppHostActivity.content.value = {
+        OncompanionTheme { AppNavHost(credentialProvider = signIn) }
+      }
+    }
+  }
 
   /** Waits for the node (data comes from the emulators asynchronously), then returns it. */
   private fun waitFor(matcher: SemanticsMatcher) = compose.run {

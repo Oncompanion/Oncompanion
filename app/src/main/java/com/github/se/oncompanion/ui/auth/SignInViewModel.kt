@@ -8,6 +8,9 @@ import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.auth.isNetworkError
+import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
+import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import kotlinx.coroutines.CancellationException
@@ -33,6 +36,10 @@ enum class AfterSignIn {
   ONBOARDING,
   /** Returning user (profile exists): straight to the Overview. */
   OVERVIEW,
+  /** Returning caregiver who hasn't joined a care circle yet: the join screen. */
+  JOIN_CIRCLE,
+  /** Returning caregiver in a care circle: "Whose care?", which opens their patient. */
+  WHOSE_CARE,
 }
 
 /**
@@ -52,6 +59,8 @@ data class SignInUiState(
 class SignInViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    private val inviteRepository: CareCircleInviteRepository =
+        CareCircleInviteRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(SignInUiState())
@@ -64,9 +73,9 @@ class SignInViewModel(
    * (e.g. across a rotation, until the dialog returns). Does nothing while a sign-in is already in
    * progress. If the user closes Google's dialog, no error is shown.
    *
-   * Once signed in, checks whether the user already has a profile to decide where to go next
-   * ([SignInUiState.next]). If that check fails, the error is shown like a sign-in error, rather
-   * than guessing and sending a returning user to onboarding.
+   * Once signed in, checks whether the user already has a profile (and, for a caregiver, a care
+   * circle) to decide where to go next ([SignInUiState.next]). If that check fails, the error is
+   * shown like a sign-in error, rather than guessing and sending a returning user to onboarding.
    */
   fun signIn(getGoogleIdToken: suspend () -> String) {
     if (_uiState.value.isLoading) return
@@ -74,8 +83,14 @@ class SignInViewModel(
     viewModelScope.launch {
       try {
         val user = authRepository.signInWithGoogle(getGoogleIdToken())
-        val hasProfile = profileRepository.getProfile(user.uid) != null
-        val next = if (hasProfile) AfterSignIn.OVERVIEW else AfterSignIn.ONBOARDING
+        val profile = profileRepository.getProfile(user.uid)
+        val next =
+            when {
+              profile == null -> AfterSignIn.ONBOARDING
+              profile.role != Role.CAREGIVER -> AfterSignIn.OVERVIEW
+              inviteRepository.hasJoinedCircle(user.uid) -> AfterSignIn.WHOSE_CARE
+              else -> AfterSignIn.JOIN_CIRCLE
+            }
         _uiState.update { it.copy(isLoading = false, signedInUser = user, next = next) }
       } catch (e: CancellationException) {
         throw e

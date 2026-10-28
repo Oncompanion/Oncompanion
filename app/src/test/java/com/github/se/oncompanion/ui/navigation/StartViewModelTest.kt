@@ -4,6 +4,9 @@ package com.github.se.oncompanion.ui.navigation
 
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
@@ -319,4 +322,107 @@ class StartViewModelTest {
 
         assertEquals(listOf(user.uid), profiles.requestedUids)
       }
+
+  // --- Caregivers ---
+
+  private val caregiver = profile.copy(role = Role.CAREGIVER)
+
+  private fun caregiverStart(invites: FakeCareCircleInviteRepository, timeout: Long = 5_000L) =
+      StartViewModel(
+          signedIn(),
+          RecordingProfileRepository { caregiver },
+          profileTimeoutMillis = timeout,
+          inviteRepository = invites,
+      )
+
+  @Test
+  fun caregiverWithoutACircle_startsOnTheJoinScreen() =
+      runTest(dispatcher) {
+        val viewModel = caregiverStart(FakeCareCircleInviteRepository())
+        advanceUntilIdle()
+        assertEquals(Route.JOIN_CIRCLE, viewModel.startRoute.value)
+      }
+
+  @Test
+  fun caregiverInACircle_startsOnWhoseCare() =
+      runTest(dispatcher) {
+        val invites = FakeCareCircleInviteRepository()
+        invites.setJoinedCircles(user.uid, listOf(JoinedCareCircle("patient", "Marie")))
+        val viewModel = caregiverStart(invites)
+        advanceUntilIdle()
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
+      }
+
+  @Test
+  fun caregiverCirclesCantBeRead_startsOnWhoseCare_whichCanRetry() =
+      runTest(dispatcher) {
+        // Assumed in a circle: "Whose care?" then shows the error with Retry
+        val invites = FakeCareCircleInviteRepository()
+        invites.observeError = IllegalStateException("denied")
+        val viewModel = caregiverStart(invites)
+        advanceUntilIdle()
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
+      }
+
+  @Test
+  fun caregiverCirclesNeverAnswer_startsOnWhoseCareAfterTheTimeout() =
+      runTest(dispatcher) {
+        val viewModel =
+            StartViewModel(
+                signedIn(),
+                RecordingProfileRepository { caregiver },
+                profileTimeoutMillis = 1_000L,
+                inviteRepository = NeverAnsweringInvites(),
+            )
+        advanceTimeBy(999L)
+        runCurrent()
+        assertNull(viewModel.startRoute.value)
+        advanceUntilIdle()
+        // Never the patient Overview: the role is known, only the circles are missing
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
+      }
+
+  @Test
+  fun patient_neverReadsCircles() =
+      runTest(dispatcher) {
+        val invites = FakeCareCircleInviteRepository()
+        invites.observeError = IllegalStateException("must not be read")
+        val viewModel =
+            StartViewModel(
+                signedIn(),
+                RecordingProfileRepository { profile },
+                inviteRepository = invites,
+            )
+        advanceUntilIdle()
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+      }
+
+  @Test
+  fun caregiver_profileAndCirclesShareOneTimeout() =
+      runTest(dispatcher) {
+        // The profile takes most of the time, then the circles never answer
+        val viewModel =
+            StartViewModel(
+                signedIn(),
+                RecordingProfileRepository {
+                  delay(800L)
+                  caregiver
+                },
+                profileTimeoutMillis = 1_000L,
+                inviteRepository = NeverAnsweringInvites(),
+            )
+        advanceTimeBy(999L)
+        runCurrent()
+        assertNull(viewModel.startRoute.value)
+        advanceTimeBy(2L)
+        runCurrent()
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
+      }
+
+  /** Invites whose joined circles never arrive, like a cache and a server that don't answer. */
+  private class NeverAnsweringInvites(
+      private val delegate: FakeCareCircleInviteRepository = FakeCareCircleInviteRepository()
+  ) : CareCircleInviteRepository by delegate {
+    override suspend fun hasJoinedCircle(caregiverUid: String): Boolean = awaitCancellation()
+  }
 }

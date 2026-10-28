@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore
 import com.github.se.oncompanion.model.appointment.AppointmentType
@@ -51,7 +52,7 @@ class PlanningAppointmentsTest {
     EmulatorTestData.signOut()
   }
 
-  /** Displays a saved appointment without a Planning override or a network connection. */
+  /** Reads and confirms deletion offline through production wiring, then synchronizes removal. */
   @Test
   fun cachedAppointmentAppearsThroughDefaultPlanningWiringOffline() {
     val db = FirebaseEmulator.firestore
@@ -68,6 +69,7 @@ class PlanningAppointmentsTest {
                 scheduledAt =
                     LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
                 location = "HUG",
+                notes = "Bring appointment documents",
             ),
         )
         db.waitForPendingWrites().await()
@@ -93,6 +95,45 @@ class PlanningAppointmentsTest {
           .captureToImage()
           .asAndroidBitmap()
           .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
+    // The same cached document remains readable in details without reconnecting.
+    compose.onNodeWithText("Offline consultation").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
+    compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
+    File(context.cacheDir, "appointment-details-offline.png").outputStream().use {
+      compose
+          .onRoot()
+          .captureToImage()
+          .asAndroidBitmap()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
+    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+    compose.onNodeWithText("Offline consultation").assertIsDisplayed()
+    compose.onNodeWithText("Offline consultation").performClick()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_dialog).assertIsDisplayed()
+    // Keep an unmodified native screenshot of the destructive-action confirmation for review.
+    File(context.cacheDir, "appointment-delete-confirmation.png").outputStream().use {
+      InstrumentationRegistry.getInstrumentation()
+          .uiAutomation
+          .takeScreenshot()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).performClick()
+    compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
+    compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    compose.onNodeWithText("Offline consultation").assertDoesNotExist()
+    runBlocking {
+      withTimeout(10_000) {
+        val uid = requireNotNull(FirebaseEmulator.auth.currentUser).uid
+        val documents = db.collection("users").document(uid).collection("appointments")
+        assertEquals(0, documents.get(Source.CACHE).await().size())
+        db.enableNetwork().await()
+        db.waitForPendingWrites().await()
+        assertEquals(0, documents.get(Source.SERVER).await().size())
+      }
     }
   }
 

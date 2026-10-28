@@ -19,12 +19,14 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -49,13 +51,16 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
+import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
@@ -68,12 +73,15 @@ import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.overview.OverviewShortcut
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -99,6 +107,7 @@ class AppNavHostTest {
 
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
+  private val appPublicEvents = PlanningRepositoryProvider.publicEvents
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
@@ -111,6 +120,7 @@ class AppNavHostTest {
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
+    PlanningRepositoryProvider.publicEvents = appPublicEvents
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
@@ -125,14 +135,17 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
+      publicEvents: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
       authRepository: AuthRepository = FakeAuthRepository(),
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
       symptomRepository: SymptomRepository = FakeSymptomRepository(),
+      credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
+    PlanningRepositoryProvider.publicEvents = publicEvents
     CareCircleRepositoryProvider.repository = careCircleRepository
     CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
@@ -145,8 +158,15 @@ class AppNavHostTest {
           TestNavHostController(LocalContext.current).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
           }
-      if (startRoute == null) AppNavHost(navController = navController)
-      else AppNavHost(navController = navController, startRoute = startRoute)
+      if (startRoute == null) {
+        AppNavHost(navController = navController, credentialProvider = credentialProvider)
+      } else {
+        AppNavHost(
+            navController = navController,
+            startRoute = startRoute,
+            credentialProvider = credentialProvider,
+        )
+      }
     }
   }
 
@@ -198,11 +218,330 @@ class AppNavHostTest {
   }
 
   @Test
-  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverIsDisabled() {
+  fun onboardingRoleScreen_patientIsSelectedByDefault_andCaregiverCanBeChosen() {
     setNavHost(Route.ONBOARDING)
     composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).assertIsSelected()
-    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsEnabled()
     composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).assertIsEnabled()
+  }
+
+  @Test
+  fun onboardingAsCaregiver_informationScreenHasNoCancerType() {
+    setNavHost(Route.ONBOARDING)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertDoesNotExist()
+
+    // Going back keeps the choice, and picking patient brings the cancer type back
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).assertIsSelected()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertExists()
+  }
+
+  @Test
+  fun caregiverOnboarding_endsOnJoinACareCircle_whichBackCantLeave() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val profiles = FakeUserProfileRepository()
+    UserProfileRepositoryProvider.repository = profiles
+    setNavHost(Route.ONBOARDING, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextInput("Sam")
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.join_circle_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Role.CAREGIVER, profiles.profiles["caregiver"]?.role)
+      assertEquals(Screen.JOIN_CIRCLE, NavigationActions(navController).currentRoute())
+      // Onboarding is done: Back doesn't return to it
+      NavigationActions(navController).goBack()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_information_screen).assertDoesNotExist()
+  }
+
+  @Test
+  fun joinACareCircle_withAValidCode_joinsThenOpensTheirCare() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    // Joining adds the caregiver to Marie's circle, which "Whose care?" then reads
+    val circle = FakeCareCircleRepository()
+    val invites = FakeCareCircleInviteRepository(circle)
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "ABCDEFGHJK",
+                ownerUid = "patient",
+                ownerFirstName = "Marie",
+                details = CareCircleMemberDetails(firstName = "Sam"),
+            )
+        )
+    )
+    setNavHost(
+        Route.JOIN_CIRCLE,
+        careCircleRepository = circle,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.join_circle_joined).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_continue).performScrollTo().performClick()
+
+    // "Whose care?" chooses Marie by itself, the only patient, and opens her Overview
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.overview_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Marie"))
+    composeTestRule.runOnIdle {
+      assertEquals("patient", invites.joinedCircles("caregiver").single().patientUid)
+    }
+  }
+
+  /** A signed-in caregiver following [patients] (uid to first name), for "Whose care?". */
+  private fun followingCaregiver(
+      vararg patients: Pair<String, String>
+  ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository()
+    val circles = FakeCareCircleRepository()
+    for ((uid, _) in patients) {
+      circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
+    }
+    invites.setJoinedCircles(
+        "caregiver",
+        patients.map { (uid, name) -> JoinedCareCircle(uid, name) },
+    )
+    return Triple(auth, invites, circles)
+  }
+
+  @Test
+  fun whoseCare_withSeveralPatients_listsThem_andChoosingOneOpensTheirOverview() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-paul"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    // The first screen: no back arrow
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_back).assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Paul"))
+  }
+
+  @Test
+  fun caregiverMode_titleSwitchesPatient_andPlanningCantAdd() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-paul"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
+
+    // "Paul's care ▾" opens the list again, to choose Anne instead
+    composeTestRule.onNodeWithTag(C.Tag.overview_whose_care).performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-anne"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
+    composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+
+    // Only the patient adds appointments
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_neverShowsTheCaregiversOwnAppointments() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    // The caregiver's own account has an appointment: it must not look like Anne's
+    val own = FakePlanningRepository()
+    own.items.value =
+        listOf(
+            PlanningItem(
+                PlanningSource.Appointment("own"),
+                PlanningTiming.Timed(Instant.now().plus(1, ChronoUnit.HOURS)),
+                "Own dentist",
+            )
+        )
+    val events = FakePlanningRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        planningRepository = own,
+        publicEvents = events,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.overview_whose_care)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+
+    composeTestRule.onNodeWithText("Own dentist").assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      // The Overview and Planning only read the Ligue's events
+      assertTrue(own.ranges.isEmpty())
+      assertTrue(events.ranges.isNotEmpty())
+    }
+  }
+
+  @Test
+  fun signingIn_leavesCaregiverMode() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val profiles = FakeUserProfileRepository()
+    profiles.seed(UserProfile("patient", Role.PATIENT, "Alex"))
+    UserProfileRepositoryProvider.repository = profiles
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.overview_whose_care)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    // Back on sign-in without signing out (e.g. the session expired), then a patient signs in
+    composeTestRule.runOnIdle {
+      NavigationActions(navController).navigateAndClearBackStack(Route.AUTH)
+    }
+    auth.onSignIn = { AuthUser(uid = "patient") }
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.overview_greeting).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_whose_care).assertDoesNotExist()
+  }
+
+  @Test
+  fun whoseCare_joinAnother_opensTheJoinScreen_andBackReturns() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whose_care_join_another)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_join_another).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+
+    composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun whoseCare_openedToSwitch_showsTheListAndABackArrow_evenWithOnePatient() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    setNavHost(
+        Route.OVERVIEW,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.runOnIdle { navController.navigate(Screen.WHOSE_CARE_SWITCH) }
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.whoseCarePatient("p-anne"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_back).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun whoseCare_signedOut_opensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.WHOSE_CARE)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun joinACareCircle_signedOut_joiningOpensSignIn() {
+    // Nobody signed in, as when the session expired
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_code_field).performTextInput("abcde-fghjk")
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).performScrollTo().performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.sign_in_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SIGN_IN, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun joinACareCircle_profileOpensTheProfile_andBackReturnsToJoin() {
+    setNavHost(Route.JOIN_CIRCLE)
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_join_button).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_profile).performClick()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PROFILE, NavigationActions(navController).currentRoute())
+      NavigationActions(navController).goBack()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.join_circle_screen).assertIsDisplayed()
   }
 
   @Test
@@ -440,7 +779,7 @@ class AppNavHostTest {
   }
 
   @Test
-  fun careCircle_addingAMemberFromOverview_showsThemAsPendingInTheList() {
+  fun careCircle_addingAMemberFromOverview_showsTheInviteCode_thenThemAsPending() {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository().apply { nextInviteCode = { "K7M2PQ9XRT" } }
@@ -473,7 +812,15 @@ class AppNavHostTest {
         .performScrollTo()
         .performClick()
 
-    // Back on the list, Julie waits to join with the access she was given
+    // The form is replaced by Julie's invite code, to send or share
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("K7M2P-Q9XRT")
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_INVITE, NavigationActions(navController).currentRoute())
+    }
+
+    // Back skips the filled form: on the list, Julie waits to join with the access she was given
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertIsDisplayed()
@@ -485,6 +832,102 @@ class AppNavHostTest {
     composeTestRule.runOnIdle {
       assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
     }
+  }
+
+  @Test
+  fun careCircleInvite_opensFromTheList_andShowsWhenThePersonJoins() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val careCircle = FakeCareCircleRepository()
+    val invites = FakeCareCircleInviteRepository(careCircle)
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "JJJJJ23456",
+                ownerUid = "owner",
+                ownerFirstName = "Anne",
+                details = CareCircleMemberDetails(firstName = "Julie"),
+            )
+        )
+    )
+    setNavHost(
+        Route.CARE_CIRCLE,
+        careCircleRepository = careCircle,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+
+    // The route's argument must reach the invite code screen's ViewModel
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("JJJJJ-23456")
+    composeTestRule.runOnIdle {
+      assertEquals(
+          "JJJJJ23456",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.CARE_CIRCLE_INVITE_ARG),
+      )
+    }
+
+    // Julie uses the invite code on her phone: the screen says she joined (#150)
+    runBlocking { invites.redeem("jjjjj-23456", "julie-uid", "julie@example.com") }
+    composeTestRule.onNodeWithText("Julie has joined your circle").assertIsDisplayed()
+
+    // Back on the list, she is a regular member and no longer waiting to join
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_to_circle_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("julie-uid")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
+  }
+
+  @Test
+  fun careCircleForm_saveFinishingAfterLeaving_keepsTheList() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val gate = CompletableDeferred<Unit>()
+    val invites =
+        FakeCareCircleInviteRepository().apply {
+          nextInviteCode = { "K7M2PQ9XRT" }
+          createGate = gate
+        }
+    UserProfileRepositoryProvider.repository =
+        FakeUserProfileRepository().apply {
+          seed(UserProfile(uid = "owner", role = Role.PATIENT, firstName = "Anne"))
+        }
+    setNavHost(Route.CARE_CIRCLE, careCircleInviteRepository = invites, authRepository = auth)
+
+    // A save that takes a while: the invite isn't written yet
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_first_name).performTextInput("Julie")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_relationship).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleFormRelationshipOption(Relationship.DAUGHTER.name))
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_save_button)
+        .performScrollTo()
+        .performClick()
+
+    // The save finishes, and the patient taps Back before the next frame shows it
+    composeTestRule.mainClock.autoAdvance = false
+    gate.complete(Unit)
+    composeTestRule.waitForIdle()
+    // Back without a frame in between (a click would first draw the saved state)
+    composeTestRule.runOnUiThread { navController.popBackStack() }
+    // The leaving form still recomposes with the saved state while it animates out
+    repeat(3) { composeTestRule.mainClock.advanceTimeByFrame() }
+    composeTestRule.mainClock.autoAdvance = true
+    composeTestRule.waitForIdle()
+
+    // The list stays: the late save doesn't replace it with the invite code
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE, NavigationActions(navController).currentRoute())
+      assertEquals(
+          0,
+          navController.currentBackStack.value.count {
+            it.destination.route == Screen.CARE_CIRCLE_INVITE
+          },
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_screen).assertIsDisplayed()
   }
 
   @Test
@@ -747,6 +1190,92 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
+  /**
+   * Opens the edit screen of Alice's only symptom (`s1`, fatigue) from the journal and its detail,
+   * as the user does. Returns the repository holding it.
+   */
+  private fun openTheEditScreenFromTheJournal(): FakeSymptomRepository {
+    val symptoms =
+        FakeSymptomRepository().apply {
+          seed(
+              "alice",
+              SymptomEntry(
+                  id = "s1",
+                  types = listOf(SymptomType.FATIGUE),
+                  occurredAt = Instant.now().minus(Duration.ofHours(1)),
+              ),
+          )
+        }
+    val alice =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    setNavHost(Route.OVERVIEW, authRepository = alice, symptomRepository = symptoms)
+    openTheJournalFromOverview()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("s1")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_EDIT, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "s1",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.SYMPTOM_DETAIL_ID),
+      )
+    }
+    return symptoms
+  }
+
+  @Test
+  fun editedSymptom_returnsToTheDetail_andBothItAndTheJournalShowTheChange() {
+    val symptoms = openTheEditScreenFromTheJournal()
+    val fatigueAndPain =
+        listOf(R.string.symptom_type_fatigue, R.string.symptom_type_pain).joinToString(", ") {
+          context.getString(it)
+        }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.PAIN.name))
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_save).performClick()
+
+    // Back on the detail of the same symptom, which shows the change
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithText(fatigueAndPain).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          listOf(SymptomType.FATIGUE, SymptomType.PAIN),
+          symptoms.symptoms("alice").single().types,
+      )
+    }
+
+    // And so does the journal behind it
+    composeTestRule.onNodeWithTag(C.Tag.symptom_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText(fatigueAndPain, substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.symptomJournalItem("s1"))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+  }
+
+  @Test
+  fun closingTheEditScreen_returnsToTheDetail_withoutSaving() {
+    val symptoms = openTheEditScreenFromTheJournal()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_close).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.SYMPTOM_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(listOf(SymptomType.FATIGUE), symptoms.symptoms("alice").single().types)
+    }
+  }
+
   /** Opens the prescriptions list from its Overview shortcut, as the user does. */
   private fun openPrescriptionsFromOverview(medicationRepository: MedicationRepository) {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
@@ -770,6 +1299,153 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
     assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionItem_opensItsDetail_andBackReturnsToTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    openPrescriptionsFromOverview(FakeMedicationRepository().apply { seed("owner", chemo) })
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
+      )
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
+  fun prescriptionEdit_savesTheCorrection_shownInTheDetailAndTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedBy = "Dr. Martin",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+
+    // The form corrects the saved prescription
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_screen).assertDoesNotExist()
+    composeTestRule
+        .onNode(
+            hasText("Edit prescription") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_form_screen)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_EDIT, NavigationActions(navController).currentRoute())
+      assertEquals(
+          "chemo",
+          navController.currentBackStackEntry?.arguments?.getString(Screen.PRESCRIPTION_ID),
+      )
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_prescribed_by_field)
+        .performTextReplacement("Dr. Dubois")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // Saving returns to the detail, which shows the correction
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois") and
+                hasAnyAncestor(hasTestTag(C.Tag.prescription_detail_prescribed_by)),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTION_DETAIL, NavigationActions(navController).currentRoute())
+      assertEquals("Dr. Dubois", repository.prescriptionsOf("owner").single().prescribedBy)
+    }
+
+    // And so does the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    composeTestRule
+        .onNode(
+            hasText("Dr. Dubois", substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem("chemo"))),
+            useUnmergedTree = true,
+        )
+        .assertExists()
+  }
+
+  @Test
+  fun prescriptionDelete_cancelKeepsIt_confirmReturnsToTheListWithoutIt() {
+    val date = LocalDate.of(2026, 9, 29)
+    val chemo =
+        Prescription(
+            id = "chemo",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "chemo",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+        )
+    val repository = FakeMedicationRepository().apply { seed("owner", chemo) }
+    openPrescriptionsFromOverview(repository)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+
+    // Cancel keeps the prescription and stays on its detail
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(listOf(chemo), repository.prescriptionsOf("owner")) }
+
+    // Confirm deletes it and returns to the list
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("owner"))
+    }
   }
 
   @Test

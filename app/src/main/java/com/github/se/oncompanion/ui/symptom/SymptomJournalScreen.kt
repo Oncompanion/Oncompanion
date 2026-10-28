@@ -55,10 +55,11 @@ fun SymptomJournalScreen(
     viewModel: SymptomJournalViewModel = viewModel { SymptomJournalViewModel() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  // The ViewModel outlives navigation and backgrounding: keep "Today" and "Yesterday" right
+  // Keeps "Today" and "Yesterday" right while the journal is on screen: refreshes when it comes
+  // back, then at each midnight
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = viewModel.followToday()
+    onPauseOrDispose { following.cancel() }
   }
   SymptomJournalContent(
       uiState = uiState,

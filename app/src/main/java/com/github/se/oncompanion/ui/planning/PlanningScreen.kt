@@ -50,6 +50,7 @@ data class PlanningActions(
     val onRetry: () -> Unit,
     val onAddAppointment: ((LocalDate) -> Unit)? = null,
     val onItemClick: ((PlanningItem) -> Unit)? = null,
+    val canOpenItem: (PlanningItem) -> Boolean = { true },
 )
 
 /** The Planning tab, collecting calendar state and reusing the app's bottom navigation. */
@@ -59,11 +60,17 @@ fun PlanningScreen(
     viewModel: PlanningViewModel,
     modifier: Modifier = Modifier,
     onAddAppointment: ((LocalDate) -> Unit)? = null,
+    onOpenAppointment: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val openAppointment: (PlanningItem) -> Unit = { item ->
+    appointmentToOpen(item)?.let(onOpenAppointment)
+  }
+  // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
+  // at each midnight
   LifecycleResumeEffect(viewModel) {
-    viewModel.refreshToday()
-    onPauseOrDispose {}
+    val following = viewModel.followToday()
+    onPauseOrDispose { following.cancel() }
   }
   PlanningContent(
       state = state,
@@ -77,6 +84,8 @@ fun PlanningScreen(
               viewModel::goToToday,
               viewModel::retry,
               onAddAppointment = onAddAppointment,
+              onItemClick = openAppointment,
+              canOpenItem = { appointmentToOpen(it) != null },
           ),
       modifier = modifier,
       bottomBar = {
@@ -164,6 +173,7 @@ fun PlanningContent(
             actions.onRetry,
             actions.onItemClick,
             Modifier.weight(1f),
+            canOpenItem = actions.canOpenItem,
         )
       }
       actions.onAddAppointment?.let { onAdd ->
@@ -277,6 +287,7 @@ internal fun PlanningAgenda(
     onItemClick: ((PlanningItem) -> Unit)?,
     modifier: Modifier = Modifier,
     canAdd: Boolean = false,
+    canOpenItem: (PlanningItem) -> Boolean = { true },
 ) {
   // Save scrolling with the tab, but start at the top when a different day is selected.
   val listState =
@@ -331,7 +342,7 @@ internal fun PlanningAgenda(
             AgendaHeading(R.string.planning_no_set_time, C.Tag.planning_no_set_time)
           }
           items(state.untimedItems, key = { it.key }) { item ->
-            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick.takeIf { canOpenItem(item) })
           }
         }
         if (state.scheduledItems.isNotEmpty()) {
@@ -339,7 +350,7 @@ internal fun PlanningAgenda(
             AgendaHeading(R.string.planning_scheduled, C.Tag.planning_scheduled)
           }
           items(state.scheduledItems, key = { it.key }) { item ->
-            PlanningRow(item, zoneId, locale, timePattern, onItemClick)
+            PlanningRow(item, zoneId, locale, timePattern, onItemClick.takeIf { canOpenItem(item) })
           }
         }
       }
@@ -405,3 +416,11 @@ private fun PlanningRow(
               ),
   )
 }
+
+/** Keeps row availability and click handling consistent for supported appointment sources. */
+internal fun appointmentToOpen(item: PlanningItem): String? =
+    when (val source = item.source) {
+      is PlanningSource.Appointment -> source.appointmentId
+      is PlanningSource.Event,
+      is PlanningSource.Medication -> null
+    }

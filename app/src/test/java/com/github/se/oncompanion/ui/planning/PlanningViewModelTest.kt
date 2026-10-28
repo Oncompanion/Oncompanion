@@ -15,12 +15,14 @@ import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -418,6 +420,65 @@ class PlanningViewModelTest {
         vm.goToToday()
         assertEquals(LocalDate.of(2026, 10, 3), vm.uiState.value.selectedDate)
         assertEquals(1, repository.ranges.size)
+      }
+
+  @Test
+  fun followTodayRefreshesTheTodayMarkerRightAway() =
+      runTest(dispatcher) {
+        var now = Instant.parse("2026-10-02T10:00:00Z")
+        val movingClock =
+            object : Clock() {
+              override fun getZone(): ZoneId = zone
+
+              override fun withZone(zone: ZoneId): Clock = Clock.fixed(now, zone)
+
+              override fun instant(): Instant = now
+            }
+        val vm =
+            PlanningViewModel(
+                FakePlanningRepository(),
+                movingClock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
+        drain()
+
+        // The date changed while Planning was in the background
+        now = Instant.parse("2026-10-04T10:00:00Z")
+        val following = vm.followToday()
+        runCurrent()
+
+        assertEquals(LocalDate.of(2026, 10, 4), vm.uiState.value.today)
+        following.cancel()
+      }
+
+  @Test
+  fun followTodayMovesTheTodayMarkerAtMidnightAndKeepsTheSelection() =
+      runTest(dispatcher) {
+        // 23:59 in Zurich on Friday 2 October 2026
+        val clock = VirtualClock(testScheduler, Instant.parse("2026-10-02T21:59:00Z"), zone)
+        val repository = FakePlanningRepository()
+        val vm =
+            PlanningViewModel(
+                repository,
+                clock,
+                zone,
+                SavedStateHandle(),
+                authRepository = FakeAuthRepository(),
+            )
+        drain()
+        val following = vm.followToday()
+        runCurrent()
+        assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.today)
+
+        advanceTimeBy(1.minutes)
+        runCurrent()
+
+        assertEquals(LocalDate.of(2026, 10, 3), vm.uiState.value.today)
+        assertEquals(LocalDate.of(2026, 10, 2), vm.uiState.value.selectedDate)
+        assertEquals(1, repository.ranges.size)
+        following.cancel()
       }
 
   @Test

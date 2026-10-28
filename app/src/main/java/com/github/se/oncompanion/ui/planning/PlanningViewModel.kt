@@ -13,6 +13,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.ui.common.currentDay
 import java.text.Collator
 import java.time.Clock
 import java.time.DayOfWeek
@@ -104,6 +105,17 @@ class PlanningViewModel(
   /** Updates the today marker without changing the selected day or restarting observation. */
   fun refreshToday() {
     mutableState.value = mutableState.value.copy(today = LocalDate.now(clock.withZone(zoneId)))
+  }
+
+  /**
+   * Keeps the today marker right while Planning is open: updates it now, then at each midnight,
+   * until the returned job is cancelled. Like [refreshToday], it keeps the selected day. The screen
+   * runs it while it is shown.
+   */
+  fun followToday(): Job = viewModelScope.launch {
+    currentDay(clock.withZone(zoneId)).collect { today ->
+      mutableState.value = mutableState.value.copy(today = today)
+    }
   }
 
   /** Selects the current day, including after the screen has crossed midnight. */

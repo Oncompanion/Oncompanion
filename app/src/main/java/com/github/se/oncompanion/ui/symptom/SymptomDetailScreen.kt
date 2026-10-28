@@ -7,20 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,18 +31,35 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DetailActionTags
+import com.github.se.oncompanion.ui.common.DetailActions
+import com.github.se.oncompanion.ui.common.DetailWithActions
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val actionTags =
+    DetailActionTags(edit = C.Tag.symptom_detail_edit, delete = C.Tag.symptom_detail_delete)
+
+private val deleteDialogTags =
+    DeleteDialogTags(
+        dialog = C.Tag.symptom_delete_dialog,
+        confirm = C.Tag.symptom_delete_confirm,
+        cancel = C.Tag.symptom_delete_cancel,
+        error = C.Tag.symptom_delete_error,
+    )
 
 /** "Monday 5 October 2026, 14:30". The app's UI is in English. */
 private val detailDateFormatter =
     DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH)
 
 /**
- * The detail of one symptom of the journal (US-8), from which the user can delete it (US-9). Goes
- * back to the journal once it is deleted.
+ * The detail of one symptom of the journal (US-8), from which the user can edit or delete it
+ * (US-9). Goes back to the journal once it is deleted.
  */
 @Composable
 fun SymptomDetailScreen(
@@ -60,12 +71,13 @@ fun SymptomDetailScreen(
 
   // Back to the journal, which no longer shows the symptom, once it is deleted
   val goBack by rememberUpdatedState(navigationActions::goBack)
-  LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) goBack() }
+  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) goBack() }
 
   SymptomDetailContent(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onRetry = viewModel::load,
+      onEdit = { uiState.entry?.let { navigationActions.navigateTo(Screen.symptomEdit(it.id)) } },
       onDelete = viewModel::requestDelete,
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,
@@ -77,6 +89,7 @@ fun SymptomDetailScreen(
  * Stateless content of the detail, so each state can be tested without a ViewModel.
  *
  * @param onRetry reloads the symptom after an error
+ * @param onEdit opens the symptom in the edit form
  * @param onDelete asks to confirm the deletion
  * @param onConfirmDelete deletes the symptom, from the confirmation dialog
  * @param onCancelDelete closes the confirmation dialog and keeps the symptom
@@ -93,6 +106,7 @@ fun SymptomDetailContent(
     onCancelDelete: () -> Unit,
     modifier: Modifier = Modifier,
     zone: ZoneId = ZoneId.systemDefault(),
+    onEdit: () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptom_detail_screen),
@@ -104,8 +118,6 @@ fun SymptomDetailContent(
             navigationIcon = { BackButton(onBack) },
         )
       },
-      // At the bottom, away from the back button, as in the Figma mockup
-      bottomBar = { if (uiState.canDelete) DeleteButton(onDelete) },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val entry = uiState.entry
@@ -128,88 +140,47 @@ fun SymptomDetailContent(
                 hint = stringResource(R.string.symptom_detail_not_found_hint),
                 testTag = C.Tag.symptom_detail_not_found,
             )
-        else -> EntryDetail(entry, zone)
+        // Edit and Delete at the bottom, away from the back button, as in the Figma mockup
+        else ->
+            DetailWithActions(
+                showActions = uiState.canDelete,
+                contentTestTag = C.Tag.symptom_detail_content,
+                actions = {
+                  DetailActions(
+                      editLabel = stringResource(R.string.symptom_detail_edit),
+                      deleteLabel = stringResource(R.string.symptom_detail_delete),
+                      onEdit = onEdit,
+                      onDelete = onDelete,
+                      tags = actionTags,
+                  )
+                },
+            ) {
+              EntryDetail(entry, zone)
+            }
       }
     }
   }
 
   if (uiState.isDeleteDialogShown) {
-    DeleteDialog(
-        isDeleting = uiState.isDeleting,
-        hasError = uiState.hasDeleteError,
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.symptom_delete_title),
+        message = stringResource(R.string.symptom_delete_message),
+        error = stringResource(R.string.symptom_delete_error),
+        confirmLabel = stringResource(R.string.symptom_delete_confirm),
+        cancelLabel = stringResource(R.string.symptom_delete_cancel),
+        isDeleting = uiState.delete.isDeleting,
+        hasError = uiState.delete.hasError,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
+        tags = deleteDialogTags,
     )
   }
 }
 
 @Composable
-private fun DeleteButton(onDelete: () -> Unit) {
-  Box(
-      modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-      contentAlignment = Alignment.Center,
-  ) {
-    TextButton(onClick = onDelete, modifier = Modifier.testTag(C.Tag.symptom_detail_delete)) {
-      Text(stringResource(R.string.symptom_detail_delete))
-    }
-  }
-}
-
-/** Asks to confirm the deletion, which can't be undone. Both buttons are disabled meanwhile. */
-@Composable
-private fun DeleteDialog(
-    isDeleting: Boolean,
-    hasError: Boolean,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-) {
-  AlertDialog(
-      onDismissRequest = { if (!isDeleting) onCancel() },
-      modifier = Modifier.testTag(C.Tag.symptom_delete_dialog),
-      title = { Text(stringResource(R.string.symptom_delete_title)) },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(stringResource(R.string.symptom_delete_message))
-          if (hasError) {
-            Text(
-                text = stringResource(R.string.symptom_delete_error),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(C.Tag.symptom_delete_error),
-            )
-          }
-        }
-      },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            enabled = !isDeleting,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.symptom_delete_confirm),
-        ) {
-          Text(stringResource(R.string.symptom_delete_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onCancel,
-            enabled = !isDeleting,
-            modifier = Modifier.testTag(C.Tag.symptom_delete_cancel),
-        ) {
-          Text(stringResource(R.string.symptom_delete_cancel))
-        }
-      },
-  )
-}
-
-@Composable
 private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
   Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .verticalScroll(rememberScrollState())
-              .padding(16.dp)
-              .testTag(C.Tag.symptom_detail_content),
+      modifier = Modifier.fillMaxWidth().padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(20.dp),
   ) {
     Field(stringResource(R.string.symptom_detail_when), C.Tag.symptom_detail_when) {

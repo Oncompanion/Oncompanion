@@ -147,6 +147,12 @@ dependencies {
   implementation(libs.androidx.camera.camera2)
   implementation(libs.androidx.camera.lifecycle)
   implementation(libs.androidx.camera.compose)
+  // Prescription scan (US-10): reads the photo's text on the device, with the model bundled in the
+  // app so it works offline from the first scan
+  implementation(libs.mlkit.text.recognition)
+  // Reads the photo's EXIF orientation more reliably than the platform version (already in the
+  // app through CameraX)
+  implementation(libs.androidx.exifinterface)
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)

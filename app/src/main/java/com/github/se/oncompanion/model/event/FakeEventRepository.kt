@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.flowOf
 /**
  * [EventRepository] backed by a fixed list, used until events are read from Firestore (#91). By
  * default it returns the events of the Figma mockup, scheduled in the coming days so the list is
- * never empty.
+ * never empty. The support group has no website link, so both cases are covered.
  *
  * @param now the current time, to leave out past events
  */
@@ -49,6 +49,7 @@ class FakeEventRepository(
                   "A relaxing session adapted to people in treatment, led by a certified " +
                       "instructor. Mats are provided. Come in comfortable clothes — all levels " +
                       "welcome.",
+              websiteUrl = "https://example.org/events/gentle-yoga",
           ),
           Event(
               id = "nutrition-workshop",
@@ -62,6 +63,7 @@ class FakeEventRepository(
                   "A dietitian shares simple, gentle recipes to keep your energy up during " +
                       "chemotherapy, and answers your questions about eating when you have " +
                       "little appetite.",
+              websiteUrl = "https://example.org/events/nutrition-workshop",
           ),
           Event(
               id = "support-group",
@@ -86,6 +88,7 @@ class FakeEventRepository(
               description =
                   "A 5 km walk at your own pace to raise awareness and funds for cancer " +
                       "research. Relatives and friends are welcome too.",
+              websiteUrl = "https://example.org/events/pink-october-walk",
           ),
       )
     }

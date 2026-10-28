@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
@@ -15,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -22,6 +24,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
@@ -39,6 +42,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
 import java.time.Clock
 import java.time.Instant
@@ -66,6 +70,7 @@ class OverviewScreenTest {
 
   private val appointment =
       NextAppointment(
+          id = "check-up",
           title = "Oncology check-up",
           dateTime = LocalDateTime.of(2026, 10, 4, 9, 30),
           place = "HUG, Oncology day unit",
@@ -108,13 +113,16 @@ class OverviewScreenTest {
           uiState = state,
           onShortcutClick = {},
           onOpenPlanning = {},
+          onOpenAppointment = {},
           onRetry = onRetry,
       )
     }
   }
 
   private fun setOverviewScreen(
-      planning: FakePlanningRepository = FakePlanningRepository()
+      planning: FakePlanningRepository = FakePlanningRepository(),
+      caregiverOf: String? = null,
+      onSwitchPatient: () -> Unit = {},
   ): RecordingNavigationActions {
     val viewModel =
         OverviewViewModel(
@@ -127,7 +135,12 @@ class OverviewScreenTest {
     lateinit var navigationActions: RecordingNavigationActions
     composeTestRule.setContent {
       navigationActions = RecordingNavigationActions(TestNavHostController(LocalContext.current))
-      OverviewScreen(navigationActions = navigationActions, viewModel = viewModel)
+      OverviewScreen(
+          navigationActions = navigationActions,
+          viewModel = viewModel,
+          caregiverOf = caregiverOf,
+          onSwitchPatient = onSwitchPatient,
+      )
     }
     return navigationActions
   }
@@ -144,7 +157,13 @@ class OverviewScreenTest {
   fun greeting_usesTheTimeOfDay_andTheFirstName() {
     var state by mutableStateOf(loaded.copy(firstName = "Alex"))
     composeTestRule.setContent {
-      OverviewContent(uiState = state, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+      OverviewContent(
+          uiState = state,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+      )
     }
     listOf(
             9 to R.string.overview_greeting_morning_name,
@@ -287,7 +306,7 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun appointmentCard_andSeePlanning_openPlanning() {
+  fun appointmentCardOpensDetailsAndSeePlanningOpensTab() {
     val checkUp =
         PlanningItem(
             PlanningSource.Appointment("check-up"),
@@ -302,8 +321,8 @@ class OverviewScreenTest {
 
     composeTestRule.runOnIdle {
       // Planning is a tab: it opens with tab navigation, not stacked on the Overview
-      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedTabs)
-      assertEquals(emptyList<String>(), navigationActions.openedRoutes)
+      assertEquals(listOf(Route.PLANNING), navigationActions.openedTabs)
+      assertEquals(listOf(Screen.appointmentDetail("check-up")), navigationActions.openedRoutes)
     }
   }
 
@@ -341,6 +360,7 @@ class OverviewScreenTest {
           uiState = loaded,
           onShortcutClick = {},
           onOpenPlanning = {},
+          onOpenAppointment = {},
           onRetry = {},
           bottomBar = { Text("bar", Modifier.testTag("bar")) },
       )
@@ -434,7 +454,13 @@ class OverviewScreenTest {
     composeTestRule.setContent {
       val density = LocalDensity.current
       CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
-        OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+        OverviewContent(
+            uiState = loaded,
+            onShortcutClick = {},
+            onOpenPlanning = {},
+            onOpenAppointment = {},
+            onRetry = {},
+        )
       }
     }
     val tops = tileTops()
@@ -464,8 +490,79 @@ class OverviewScreenTest {
   @Test
   fun overviewContent_hasNoBottomBarByDefault() {
     composeTestRule.setContent {
-      OverviewContent(uiState = loaded, onShortcutClick = {}, onOpenPlanning = {}, onRetry = {})
+      OverviewContent(
+          uiState = loaded,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+      )
     }
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
+  }
+
+  // --- Caregiver mode (US-20) ---
+
+  @Test
+  fun caregiverMode_titleNamesThePatient_andOpensWhoseCare() {
+    var switches = 0
+    setOverviewScreen(caregiverOf = "Anne", onSwitchPatient = { switches++ })
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertDoesNotExist()
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_whose_care)
+        .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
+        .assertTextContains("Saturday 3 October")
+        .performClick()
+    composeTestRule.runOnIdle { assertEquals(1, switches) }
+  }
+
+  @Test
+  fun caregiverMode_hidesTheShortcutsAndTheAddHint_butKeepsTheProfile() {
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = loaded,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
+        .assertDoesNotExist()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).assertIsDisplayed()
+  }
+
+  @Test
+  fun patientMode_suggestsAddingAnAppointment() {
+    setContent(loaded)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
+        .assertExists()
+  }
+
+  @Test
+  fun caregiverMode_errorDoesntMentionTheShortcuts() {
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = loaded.copy(hasError = true),
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_error).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_error_hint_caregiver))
+        .assertExists()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_error_hint))
+        .assertDoesNotExist()
   }
 }

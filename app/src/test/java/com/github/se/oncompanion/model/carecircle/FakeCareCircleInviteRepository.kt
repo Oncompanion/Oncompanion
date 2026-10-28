@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.carecircle
 
 import java.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,13 +21,13 @@ import kotlinx.coroutines.flow.merge
  * invite (or null), and writes refuse invalid details or emails. New invites are stored with
  * `isSynced = true` (the server has them); call [setInvites] to test unsynced ones. Test hooks:
  * [setInvites] replaces every invite, [observeError], [createError], [updateError] and
- * [cancelError] make the matching calls fail, [failObservations] makes the running observations
- * fail, [created] records the invites created (including renewed ones), and [nextInviteCode] picks
- * the next invite code.
+ * [cancelError] make the matching calls fail, [createGate] holds [createInvite] back,
+ * [failObservations] makes the running observations fail, [created] records the invites created
+ * (including renewed ones), and [nextInviteCode] picks the next invite code.
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
- * [joinedCircles]; [isOffline] makes it fail like without a connection. The caregiver's role isn't
- * checked.
+ * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly.
+ * [isOffline] makes [redeem] fail like without a connection. The caregiver's role isn't checked.
  *
  * @param circle when given, a successful [redeem] adds the member to it, so screens can watch a
  *   pending invite turn into a member
@@ -53,6 +54,9 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   /** When non-null, [createInvite] and [renewInvite] throw it. */
   var createError: Exception? = null
 
+  /** When non-null, [createInvite] waits for it before saving, like a slow write. */
+  var createGate: CompletableDeferred<Unit>? = null
+
   /** When non-null, [updateInvite] throws it. */
   var updateError: Exception? = null
 
@@ -68,10 +72,26 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   /** When true, [redeem] returns [RedeemResult.Offline] and saves nothing. */
   var isOffline = false
 
-  private val joined = mutableMapOf<String, List<JoinedCareCircle>>()
+  private val joined = MutableStateFlow<Map<String, List<JoinedCareCircle>>>(emptyMap())
 
   /** The circles [caregiverUid] joined with [redeem], in order. */
-  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> = joined[caregiverUid].orEmpty()
+  fun joinedCircles(caregiverUid: String): List<JoinedCareCircle> =
+      joined.value[caregiverUid].orEmpty()
+
+  /** Replaces the circles [caregiverUid] joined, e.g. to start a test already in a circle. */
+  fun setJoinedCircles(caregiverUid: String, circles: List<JoinedCareCircle>) {
+    joined.value += caregiverUid to circles
+  }
+
+  /** Like [observeJoinedCircles], fails with [observeError] when it is set. */
+  override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
+    observeError?.let { throw it }
+    return joinedCircles(caregiverUid).isNotEmpty()
+  }
+
+  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = observed {
+    joined.map { it[caregiverUid].orEmpty() }.distinctUntilChanged()
+  }
 
   /** The invite stored with [inviteCode], whatever its state, or null. */
   fun invite(inviteCode: String): CareCircleInvite? = invites.value[inviteCode]
@@ -87,6 +107,7 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
       details: CareCircleMemberDetails,
       email: String?,
   ): CareCircleInvite {
+    createGate?.await()
     createError?.let { throw it }
     requireValid(details, email)
     return store(
@@ -156,8 +177,9 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     // member are added together
     val now = Instant.now()
     invites.value -= invite.inviteCode
-    joined[caregiverUid] =
-        joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now)
+    joined.value +=
+        caregiverUid to
+            (joinedBefore + JoinedCareCircle(invite.ownerUid, invite.ownerFirstName, now))
     circle?.let {
       val details = invite.details
       val member =
