@@ -12,7 +12,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -22,23 +21,31 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
-import com.github.se.oncompanion.domain.auth.SessionMemory
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.auth.SignOutState
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.resources.C
 
 /** Destroys active and saved authenticated ViewModels and blocks access until cleanup succeeds. */
 @Composable
 fun SessionBoundary(
     credentials: GoogleCredentialProvider,
-    content: @Composable (afterCleanup: Boolean) -> Unit,
+    content:
+        @Composable
+        (afterCleanup: Boolean, savedState: SavedStateHandle, accountChanged: Boolean) -> Unit,
 ) {
   val signOut = SignOutProvider.signOut
+  val stores: SessionStores = viewModel { SessionStores(signOut, createSavedStateHandle()) }
+  val auth = AuthRepositoryProvider.repository
+  val user by
+      remember(auth) { auth.observeCurrentUser() }
+          .collectAsStateWithLifecycle(initialValue = auth.currentUser)
   val phase by signOut.state.collectAsStateWithLifecycle()
   val generation by signOut.generation.collectAsStateWithLifecycle()
   val blocked = phase == SignOutState.CLEANING || phase == SignOutState.FAILED
@@ -65,25 +72,12 @@ fun SessionBoundary(
     }
   } else {
     // The entire navigation store, including saved bottom tabs, belongs to this session alone.
-    key(generation) {
-      val owner = remember {
-        object : ViewModelStoreOwner, SessionMemory {
-              override val viewModelStore = ViewModelStore()
-
-              override fun clear() {
-                viewModelStore.clear()
-              }
-            }
-            .also(signOut::register)
-      }
+    val owner = stores.owner(generation, user?.uid)
+    key(owner) {
       val afterCleanup = remember(owner) { phase == SignOutState.COMPLETE }
-      DisposableEffect(owner) {
-        onDispose {
-          owner.clear()
-          signOut.unregister(owner)
-        }
+      CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+        content(afterCleanup, stores.savedState, stores.accountChanged)
       }
-      CompositionLocalProvider(LocalViewModelStoreOwner provides owner) { content(afterCleanup) }
     }
   }
 }

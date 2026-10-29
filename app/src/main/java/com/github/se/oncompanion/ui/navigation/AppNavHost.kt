@@ -94,12 +94,22 @@ fun AppNavHost(
     startRoute: String = Route.AUTH,
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
-  SessionBoundary(credentialProvider) { afterCleanup ->
-    SessionNavHost(
-        navController ?: rememberNavController(),
-        if (afterCleanup) Route.AUTH else startRoute,
-        credentialProvider,
-    )
+  SessionBoundary(credentialProvider) { afterCleanup, savedState, accountChanged ->
+    val route =
+        if (accountChanged && !afterCleanup) {
+          // External account switches must resolve the new role instead of restoring the old graph.
+          val start: StartViewModel = viewModel()
+          val resolved by start.startRoute.collectAsStateWithLifecycle()
+          resolved
+        } else if (afterCleanup) Route.AUTH else startRoute
+    route?.let { freshRoute ->
+      SessionNavHost(
+          navController ?: rememberNavController(),
+          freshRoute,
+          credentialProvider,
+          savedState,
+      )
+    }
   }
 }
 
@@ -108,12 +118,11 @@ private fun SessionNavHost(
     navController: NavHostController,
     startRoute: String,
     credentialProvider: GoogleCredentialProvider,
+    savedState: androidx.lifecycle.SavedStateHandle,
 ) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
-  val caregiverMode: CaregiverModeViewModel = viewModel {
-    CaregiverModeViewModel(createSavedStateHandle())
-  }
+  val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
   // A caregiver sees only the Ligue's events until #240, never their own appointments
   val planning = {

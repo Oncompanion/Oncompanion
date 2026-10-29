@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.appointment
@@ -345,19 +346,23 @@ class AppointmentNavigationTest {
     compose.onNodeWithTag(C.Tag.appointment_screen).assertDoesNotExist()
   }
 
-  /** A covered form waits for its own destination before redirecting after sign-out. */
+  /** The session boundary clears even covered private forms immediately after sign-out. */
   @Test
-  fun backgroundEditSignOutWaitsForResume() {
+  fun backgroundEditSignOutClearsPrivateHistoryImmediately() {
     show()
     compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.appointmentEdit("missing")) }
     compose.onNodeWithText("This appointment is unavailable.").assertIsDisplayed()
     compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.PLANNING) }
     compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
     compose.runOnIdle { auth.signOut() }
-    compose.runOnIdle { assertEquals(Screen.PLANNING, nav.currentDestination?.route) }
-    compose.runOnIdle { NavigationActions(nav).goBack() }
     compose.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
-    compose.runOnIdle { assertNull(nav.previousBackStackEntry) }
+    compose.onNodeWithTag(C.Tag.planning_screen).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_screen).assertDoesNotExist()
+    compose.runOnIdle {
+      assertEquals(Screen.SIGN_IN, nav.currentDestination?.route)
+      assertNull(nav.previousBackStackEntry)
+      assertFalse(nav.popBackStack())
+    }
   }
 
   /** Rescheduling across weeks keeps Back on the original day and moves exactly one stored row. */
