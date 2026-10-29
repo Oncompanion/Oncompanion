@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -7,6 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.model.session.FakeCleanupJournal
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
@@ -126,7 +130,12 @@ class ProfileSignOutScreenTest {
     val user = runBlocking { auth.signInWithGoogle("one") }
     val profiles =
         FakeUserProfileRepository().apply { seed(UserProfile(user.uid, Role.PATIENT, "Alex")) }
-    val vm = ProfileViewModel(auth, profiles)
+    val vm =
+        ProfileViewModel(
+            auth,
+            profiles,
+            SignOut(auth, FakeLocalSessionRepository()).apply { initialize(FakeCleanupJournal()) },
+        )
     compose.setContent {
       ProfileScreen(
           onBack = {},
@@ -156,7 +165,12 @@ class ProfileSignOutScreenTest {
     val user = runBlocking { auth.signInWithGoogle("one") }
     val profiles =
         FakeUserProfileRepository().apply { seed(UserProfile(user.uid, Role.PATIENT, "Alex")) }
-    val vm = ProfileViewModel(auth, profiles)
+    val vm =
+        ProfileViewModel(
+            auth,
+            profiles,
+            SignOut(auth, FakeLocalSessionRepository()).apply { initialize(FakeCleanupJournal()) },
+        )
     val gate = CompletableDeferred<Unit>()
     val provider = FakeGoogleCredentialProvider(onClear = { gate.await() })
     var completions = 0
@@ -188,5 +202,38 @@ class ProfileSignOutScreenTest {
     compose.waitForIdle()
     compose.runOnIdle { assertEquals(1, completions) }
     node(C.Tag.profile_name).assertDoesNotExist()
+  }
+
+  /** The discard warning explains local loss and gives initial focus to the safe choice. */
+  @Test
+  fun pendingChangesDialogDefaultsToStaySignedIn() {
+    var stays = 0
+    var discards = 0
+    compose.setContent {
+      ProfileContent(
+          ProfileUiState.ConfirmingSignOut(loaded, pendingChanges = true),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onSignOut = {},
+          onCancelSignOut = { stays++ },
+          onConfirmSignOut = { discards++ },
+      )
+    }
+    compose.onNodeWithText("Stay signed in").assertIsDisplayed()
+    compose
+        .onNodeWithText("older locally stored changes cannot be checked", substring = true)
+        .assertIsDisplayed()
+    compose
+        .onNodeWithText("even if nothing is waiting to sync", substring = true)
+        .assertIsDisplayed()
+    compose.onNodeWithText("Discard changes and sign out").assertIsDisplayed()
+    node(C.Tag.profile_sign_out_cancel).assertIsFocused().performClick()
+    compose.runOnIdle {
+      assertEquals(1, stays)
+      assertEquals(0, discards)
+    }
+    node(C.Tag.profile_sign_out_confirm).performClick()
+    compose.runOnIdle { assertEquals(1, discards) }
   }
 }

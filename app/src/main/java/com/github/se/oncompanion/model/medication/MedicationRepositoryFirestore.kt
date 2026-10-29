@@ -1,11 +1,12 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.medication
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -16,7 +17,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
@@ -34,7 +34,7 @@ import kotlinx.coroutines.tasks.await
  * logged; [Prescription.isValid] mirrors the rules so the former shouldn't happen.
  */
 class MedicationRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : MedicationRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
@@ -42,12 +42,13 @@ class MedicationRepositoryFirestore(
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
-  override fun newId(): String = db.collection(USERS).document().id
+  override fun newId(): String = SessionAccess.immediate { db.collection(USERS).document().id }
 
   override fun observePrescriptions(uid: String): Flow<List<Prescription>> =
-      prescriptions(uid).snapshots().map { documents ->
+      snapshots(uid).map { documents ->
         documents
             .mapNotNull(::toPrescription)
             .sortedWith(
@@ -57,46 +58,52 @@ class MedicationRepositoryFirestore(
             )
       }
 
-  override fun observePrescription(uid: String, id: String): Flow<Prescription?> = callbackFlow {
-    val registration =
-        prescriptions(uid).document(id).addSnapshotListener { snapshot, error ->
-          if (error != null) {
-            close(error)
-          } else {
-            trySend(snapshot?.let(::toPrescription))
-          }
-        }
-    awaitClose { registration.remove() }
-  }
+  override fun observePrescription(uid: String, id: String): Flow<Prescription?> =
+      SessionAccess.snapshots {
+        val registration =
+            prescriptions(uid).document(id).addSnapshotListener { snapshot, error ->
+              if (error != null) {
+                close(error)
+              } else {
+                trySend(snapshot?.let(::toPrescription))
+              }
+            }
+        awaitClose { registration.remove() }
+      }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
-      prescriptions(uid).snapshots().map { documents ->
+      snapshots(uid).map { documents ->
         documents
             .mapNotNull(::toPrescription)
             .flatMap { it.medications }
             .sortedWith(compareBy({ it.startDate }, { it.name }))
       }
 
-  override suspend fun addPrescription(uid: String, prescription: Prescription) {
-    require(prescription.isValid()) { "Invalid prescription" }
-    prescriptions(uid)
-        .document(prescription.id)
-        .set(prescriptionFields(prescription) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
-        .logServerRejection(prescription.id)
-  }
+  override suspend fun addPrescription(uid: String, prescription: Prescription): Unit =
+      SessionAccess.operation {
+        require(prescription.isValid()) { "Invalid prescription" }
+        prescriptions(uid)
+            .document(prescription.id)
+            .set(
+                prescriptionFields(prescription) +
+                    (FIELD_CREATED_AT to FieldValue.serverTimestamp())
+            )
+            .logServerRejection(prescription.id)
+      }
 
-  override suspend fun updatePrescription(uid: String, prescription: Prescription) {
-    require(prescription.isValid()) { "Invalid prescription" }
-    if (isKnownAsDeleted(uid, prescription.id)) return
-    // update() and not set(): createdAt stays as it is, and the server rejects the write if the
-    // prescription doesn't exist. The list of medications is replaced as a whole.
-    prescriptions(uid)
-        .document(prescription.id)
-        .update(prescriptionFields(prescription))
-        .logServerRejection(prescription.id)
-  }
+  override suspend fun updatePrescription(uid: String, prescription: Prescription): Unit =
+      SessionAccess.operation {
+        require(prescription.isValid()) { "Invalid prescription" }
+        if (isKnownAsDeleted(uid, prescription.id)) return@operation
+        // update() and not set(): createdAt stays as it is, and the server rejects the write if the
+        // prescription doesn't exist. The list of medications is replaced as a whole.
+        prescriptions(uid)
+            .document(prescription.id)
+            .update(prescriptionFields(prescription))
+            .logServerRejection(prescription.id)
+      }
 
-  override suspend fun deletePrescription(uid: String, id: String) {
+  override suspend fun deletePrescription(uid: String, id: String): Unit = SessionAccess.operation {
     prescriptions(uid).document(id).delete().logServerRejection(id)
   }
 
@@ -118,14 +125,15 @@ class MedicationRepositoryFirestore(
       }
 
   /** Emits the documents of the collection now and every time they change. */
-  private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> = callbackFlow {
-    val registration = addSnapshotListener { snapshot, error ->
-      if (error != null) {
-        close(error)
-      } else if (snapshot != null) {
-        trySend(snapshot.documents)
-      }
-    }
+  private fun snapshots(uid: String): Flow<List<DocumentSnapshot>> = SessionAccess.snapshots {
+    val registration =
+        prescriptions(uid).addSnapshotListener { snapshot, error ->
+          if (error != null) {
+            close(error)
+          } else if (snapshot != null) {
+            trySend(snapshot.documents)
+          }
+        }
     awaitClose { registration.remove() }
   }
 

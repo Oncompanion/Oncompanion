@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -20,6 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
@@ -29,6 +31,7 @@ import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.SessionBoundary
 import com.github.se.oncompanion.ui.auth.SignInScreen
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.carecircle.CareCircleInviteScreen
@@ -87,15 +90,39 @@ import java.time.LocalDate
  */
 @Composable
 fun AppNavHost(
-    navController: NavHostController = rememberNavController(),
+    navController: NavHostController? = null,
     startRoute: String = Route.AUTH,
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
 ) {
+  SessionBoundary(credentialProvider) { afterCleanup, savedState, accountChanged ->
+    val route =
+        if (accountChanged && !afterCleanup) {
+          // External account switches must resolve the new role instead of restoring the old graph.
+          val start: StartViewModel = viewModel()
+          val resolved by start.startRoute.collectAsStateWithLifecycle()
+          resolved
+        } else if (afterCleanup) Route.AUTH else startRoute
+    if (route != null) {
+      SessionNavHost(
+          navController ?: rememberNavController(),
+          route,
+          credentialProvider,
+          savedState,
+      )
+    }
+  }
+}
+
+@Composable
+private fun SessionNavHost(
+    navController: NavHostController,
+    startRoute: String,
+    credentialProvider: GoogleCredentialProvider,
+    savedState: androidx.lifecycle.SavedStateHandle,
+) {
   val navigationActions = remember(navController) { NavigationActions(navController) }
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
-  val caregiverMode: CaregiverModeViewModel = viewModel {
-    CaregiverModeViewModel(createSavedStateHandle())
-  }
+  val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
   // A caregiver sees only the Ligue's events until #240, never their own appointments
   val planning = {
@@ -113,6 +140,7 @@ fun AppNavHost(
         SignInScreen(
             credentialProvider = credentialProvider,
             onSignedIn = { next ->
+              SignOutProvider.signOut.sessionStarted()
               // Whoever signs in starts in patient mode; a caregiver chooses again in "Whose care?"
               caregiverMode.leave()
               navigationActions.navigateAndClearBackStack(

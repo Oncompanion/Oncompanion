@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.carecircle
@@ -10,6 +11,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.detailFields
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -22,7 +24,6 @@ import com.google.firebase.firestore.Transaction
 import java.time.Instant
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 
@@ -41,7 +42,7 @@ import kotlinx.coroutines.tasks.await
  * copies its invite.
  */
 class CareCircleInviteRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : CareCircleInviteRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
@@ -49,14 +50,15 @@ class CareCircleInviteRepositoryFirestore(
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
   override suspend fun createInvite(
       ownerUid: String,
       ownerFirstName: String,
       details: CareCircleMemberDetails,
       email: String?,
-  ): CareCircleInvite {
+  ): CareCircleInvite = SessionAccess.operation {
     requireValid(details, email)
     val invite =
         CareCircleInvite(
@@ -72,57 +74,61 @@ class CareCircleInviteRepositoryFirestore(
     invites().document(invite.inviteCode).set(newInviteFields(invite)).addOnFailureListener { e ->
       logRejected("invite ${invite.inviteCode}", e)
     }
-    return invite
+    return@operation invite
   }
 
   override fun observePendingInvites(ownerUid: String): Flow<List<CareCircleInvite>> =
-      callbackFlow {
-        // Two equality filters need no composite index; sorted here, so no orderBy index either
-        val registration =
-            invites()
-                .whereEqualTo(FIELD_OWNER_UID, ownerUid)
-                .whereEqualTo(FIELD_REDEEMER_UID, null)
-                // Metadata changes too, so isSynced turns true once the server has the invite
-                .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+      SessionAccess.snapshots {
+            // Two equality filters need no composite index; sorted here, so no orderBy index either
+            val registration =
+                invites()
+                    .whereEqualTo(FIELD_OWNER_UID, ownerUid)
+                    .whereEqualTo(FIELD_REDEEMER_UID, null)
+                    // Metadata changes too, so isSynced turns true once the server has the invite
+                    .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                      if (error != null) {
+                        close(error)
+                      } else if (snapshot != null) {
+                        trySend(
+                            snapshot.documents
+                                .mapNotNull(::fromDocument)
+                                .sortedWith(CareCircleInvite.BY_NAME)
+                        )
+                      }
+                    }
+            awaitClose { registration.remove() }
+          }
+          .distinctUntilChanged()
+
+  override fun observeInvite(ownerUid: String, inviteCode: String): Flow<CareCircleInvite?> =
+      SessionAccess.snapshots {
+            // All the owner's invites (a handful), not a document listener: the rules refuse to
+            // read a
+            // missing invite, so nobody learns which invite codes existed. Filtering on the
+            // document ID
+            // in the query would be checked against that missing document too.
+            val registration =
+                invites().whereEqualTo(FIELD_OWNER_UID, ownerUid).addSnapshotListener(
+                    MetadataChanges.INCLUDE
+                ) { snapshot, error ->
                   if (error != null) {
                     close(error)
                   } else if (snapshot != null) {
+                    // Used invites are deleted, so a used invite reads like a cancelled one
                     trySend(
-                        snapshot.documents
-                            .mapNotNull(::fromDocument)
-                            .sortedWith(CareCircleInvite.BY_NAME)
+                        snapshot.documents.firstOrNull { it.id == inviteCode }?.let(::fromDocument)
                     )
                   }
                 }
-        awaitClose { registration.remove() }
-      }
-      .distinctUntilChanged()
-
-  override fun observeInvite(ownerUid: String, inviteCode: String): Flow<CareCircleInvite?> =
-      callbackFlow {
-        // All the owner's invites (a handful), not a document listener: the rules refuse to read a
-        // missing invite, so nobody learns which invite codes existed. Filtering on the document ID
-        // in the query would be checked against that missing document too.
-        val registration =
-            invites().whereEqualTo(FIELD_OWNER_UID, ownerUid).addSnapshotListener(
-                MetadataChanges.INCLUDE
-            ) { snapshot, error ->
-              if (error != null) {
-                close(error)
-              } else if (snapshot != null) {
-                // Used invites are deleted, so a used invite reads like a cancelled one
-                trySend(snapshot.documents.firstOrNull { it.id == inviteCode }?.let(::fromDocument))
-              }
-            }
-        awaitClose { registration.remove() }
-      }
-      .distinctUntilChanged()
+            awaitClose { registration.remove() }
+          }
+          .distinctUntilChanged()
 
   override suspend fun updateInvite(
       inviteCode: String,
       details: CareCircleMemberDetails,
       email: String?,
-  ) {
+  ): Unit = SessionAccess.operation {
     requireValid(details, email)
     // update, never set: a cancelled invite must not come back
     invites()
@@ -131,42 +137,45 @@ class CareCircleInviteRepositoryFirestore(
         .addOnFailureListener { e -> logRejected("update of invite $inviteCode", e) }
   }
 
-  override suspend fun cancelInvite(inviteCode: String) {
+  override suspend fun cancelInvite(inviteCode: String): Unit = SessionAccess.operation {
     invites().document(inviteCode).delete().addOnFailureListener { e ->
       logRejected("cancellation of invite $inviteCode", e)
     }
   }
 
-  override suspend fun renewInvite(expired: CareCircleInvite): CareCircleInvite {
-    requireValid(expired.details, expired.email)
-    val renewed =
-        expired.copy(
-            inviteCode = CareCircleInvite.generateInviteCode(),
-            createdAt = null,
-            redeemerUid = null,
-            isSynced = false,
-        )
-    // One batch, so the patient never ends up with both invite codes or neither
-    db.batch()
-        .set(invites().document(renewed.inviteCode), newInviteFields(renewed))
-        .delete(invites().document(expired.inviteCode))
-        .commit()
-        .addOnFailureListener { e -> logRejected("renewal of invite ${expired.inviteCode}", e) }
-    return renewed
-  }
+  override suspend fun renewInvite(expired: CareCircleInvite): CareCircleInvite =
+      SessionAccess.operation {
+        requireValid(expired.details, expired.email)
+        val renewed =
+            expired.copy(
+                inviteCode = CareCircleInvite.generateInviteCode(),
+                createdAt = null,
+                redeemerUid = null,
+                isSynced = false,
+            )
+        // One batch, so the patient never ends up with both invite codes or neither
+        db.batch()
+            .set(invites().document(renewed.inviteCode), newInviteFields(renewed))
+            .delete(invites().document(expired.inviteCode))
+            .commit()
+            .addOnFailureListener { e -> logRejected("renewal of invite ${expired.inviteCode}", e) }
+        return@operation renewed
+      }
 
   override suspend fun redeem(
       inviteCode: String,
       caregiverUid: String,
       caregiverEmail: String?,
-  ): RedeemResult {
+  ): RedeemResult = SessionAccess.operation {
     val code = CareCircleInvite.normalizeInviteCode(inviteCode)
     // A mistyped invite code is answered at once, without the network
-    if (!CareCircleInvite.isWellFormedInviteCode(code)) return RedeemResult.InvalidOrUsed
-    return try {
+    if (!CareCircleInvite.isWellFormedInviteCode(code)) return@operation RedeemResult.InvalidOrUsed
+    return@operation try {
       val result =
-          db.runTransaction { transaction ->
-                redeemIn(transaction, code, caregiverUid, caregiverEmail)
+          SessionAccess.transaction {
+                db.runTransaction { transaction ->
+                  redeemIn(transaction, code, caregiverUid, caregiverEmail)
+                }
               }
               .await()
       if (result is RedeemResult.Joined) refreshJoinedCircles(caregiverUid)
@@ -181,7 +190,7 @@ class CareCircleInviteRepositoryFirestore(
     }
   }
 
-  override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
+  override suspend fun hasJoinedCircle(caregiverUid: String): Boolean = SessionAccess.operation {
     // The phone's copy may not know a circle joined a moment ago: a transaction doesn't update it
     val snapshot =
         try {
@@ -190,7 +199,7 @@ class CareCircleInviteRepositoryFirestore(
           if (e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
           patients(caregiverUid).get(Source.CACHE).await()
         }
-    return !snapshot.isEmpty
+    return@operation !snapshot.isEmpty
   }
 
   /**
@@ -206,15 +215,15 @@ class CareCircleInviteRepositoryFirestore(
   }
 
   override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> =
-      callbackFlow {
-        val registration =
-            patients(caregiverUid).addSnapshotListener { snapshot, error ->
-              if (error != null) close(error)
-              else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
-            }
-        awaitClose { registration.remove() }
-      }
-      .distinctUntilChanged()
+      SessionAccess.snapshots {
+            val registration =
+                patients(caregiverUid).addSnapshotListener { snapshot, error ->
+                  if (error != null) close(error)
+                  else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
+                }
+            awaitClose { registration.remove() }
+          }
+          .distinctUntilChanged()
 
   /**
    * Checks the invite [inviteCode] and the caregiver's membership on the server, then writes the

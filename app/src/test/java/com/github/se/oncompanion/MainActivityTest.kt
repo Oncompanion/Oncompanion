@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion
@@ -9,16 +10,40 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.domain.auth.SignOutProvider
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
 
-  @get:Rule val composeTestRule = createAndroidComposeRule<MainActivity>()
+  private val originalAuth = AuthRepositoryProvider.repository
+  private val originalSignOut = SignOutProvider.signOut
+
+  @get:Rule(order = 0)
+  val providers =
+      object : ExternalResource() {
+        override fun before() {
+          val auth = FakeAuthRepository()
+          AuthRepositoryProvider.repository = auth
+          SignOutProvider.signOut = SignOut(auth, FakeLocalSessionRepository())
+        }
+
+        override fun after() {
+          AuthRepositoryProvider.repository = originalAuth
+          SignOutProvider.signOut = originalSignOut
+        }
+      }
+
+  @get:Rule(order = 1) val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
   fun launchingMainActivity_displaysMainContainer() {

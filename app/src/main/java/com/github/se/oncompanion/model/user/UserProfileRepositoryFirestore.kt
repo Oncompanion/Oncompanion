@@ -4,6 +4,7 @@
 package com.github.se.oncompanion.model.user
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -13,7 +14,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -25,7 +25,7 @@ import kotlinx.coroutines.tasks.await
  * rejection is logged; [UserProfile.isValid] mirrors the rules so this shouldn't happen.
  */
 class UserProfileRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : UserProfileRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
@@ -33,21 +33,24 @@ class UserProfileRepositoryFirestore(
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
-  override suspend fun getProfile(uid: String): UserProfile? =
-      fromDocument(document(uid).get().await())
+  override suspend fun getProfile(uid: String): UserProfile? = SessionAccess.operation {
+    fromDocument(document(uid).get().await())
+  }
 
-  override suspend fun getCachedProfile(uid: String): UserProfile? =
-      try {
-        // A cached "doesn't exist" also reads as null: it may be outdated, the caller asks the
-        // server
-        fromDocument(document(uid).get(Source.CACHE).await())
-      } catch (e: FirebaseFirestoreException) {
-        null // UNAVAILABLE: nothing cached for this document
-      }
+  override suspend fun getCachedProfile(uid: String): UserProfile? = SessionAccess.operation {
+    try {
+      // A cached "doesn't exist" also reads as null: it may be outdated, the caller asks the
+      // server
+      fromDocument(document(uid).get(Source.CACHE).await())
+    } catch (e: FirebaseFirestoreException) {
+      null // UNAVAILABLE: nothing cached for this document
+    }
+  }
 
-  override fun observeProfile(uid: String): Flow<UserProfile?> = callbackFlow {
+  override fun observeProfile(uid: String): Flow<UserProfile?> = SessionAccess.snapshots {
     val registration =
         document(uid).addSnapshotListener { snapshot, error ->
           if (error != null) {
@@ -59,7 +62,7 @@ class UserProfileRepositoryFirestore(
     awaitClose { registration.remove() }
   }
 
-  override suspend fun createProfile(profile: UserProfile) {
+  override suspend fun createProfile(profile: UserProfile): Unit = SessionAccess.operation {
     require(profile.isValid()) { "Invalid profile" }
     document(profile.uid)
         .set(
@@ -72,7 +75,7 @@ class UserProfileRepositoryFirestore(
         .logServerRejection(profile.uid)
   }
 
-  override suspend fun updateProfile(profile: UserProfile) {
+  override suspend fun updateProfile(profile: UserProfile): Unit = SessionAccess.operation {
     require(profile.isValid()) { "Invalid profile" }
     // update() (not a merge set) so a missing profile is never created half-filled
     document(profile.uid).update(editableFields(profile)).logServerRejection(profile.uid)

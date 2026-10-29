@@ -1,19 +1,24 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.profile
 
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.FakeCleanupJournal
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -27,12 +32,15 @@ class ProfileSignOutViewModelTest {
   private val dispatcher = StandardTestDispatcher()
   private lateinit var auth: FakeAuthRepository
   private lateinit var profiles: FakeUserProfileRepository
+  private lateinit var signOut: SignOut
+  private val local = FakeLocalSessionRepository()
 
   @Before
   fun setUp() {
     Dispatchers.setMain(dispatcher)
     auth = FakeAuthRepository()
     profiles = FakeUserProfileRepository()
+    signOut = SignOut(auth, local).apply { initialize(FakeCleanupJournal()) }
   }
 
   @After
@@ -43,7 +51,7 @@ class ProfileSignOutViewModelTest {
   private suspend fun model(): ProfileViewModel {
     val user = auth.signInWithGoogle("one")
     profiles.seed(UserProfile(user.uid, Role.PATIENT, "Alex", cancerType = "Private"))
-    return ProfileViewModel(auth, profiles)
+    return ProfileViewModel(auth, profiles, signOut)
   }
 
   @Test
@@ -64,7 +72,7 @@ class ProfileSignOutViewModelTest {
 
   @Test
   fun confirmationIsRequiredAndCannotBeOpenedWhenSignedOut() = runTest {
-    val vm = ProfileViewModel(auth, profiles)
+    val vm = ProfileViewModel(auth, profiles, signOut)
     advanceUntilIdle()
     vm.requestSignOut()
     vm.confirmSignOut { fail("Cleanup must not run") }
@@ -90,6 +98,7 @@ class ProfileSignOutViewModelTest {
       clears++
       cleanup.await()
     }
+    runCurrent()
     assertNull(auth.currentUser)
     assertEquals(ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true), vm.uiState.value)
     vm.confirmSignOut { fail("Duplicate cleanup") }
@@ -97,7 +106,7 @@ class ProfileSignOutViewModelTest {
     vm.requestSignOut()
     vm.retry()
     profiles.seed(UserProfile(uid, Role.PATIENT, "Late cached profile"))
-    advanceUntilIdle()
+    runCurrent()
     assertEquals(ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true), vm.uiState.value)
     assertEquals(1, auth.signOutCalls)
     assertEquals(1, clears)
@@ -112,44 +121,56 @@ class ProfileSignOutViewModelTest {
   }
 
   @Test
-  fun firebaseFailureRetainsSessionAndAllowsRetry() = runTest {
+  fun firebaseFailureLocksPrivateDetailsAndAllowsCleanupRetry() = runTest {
     val vm = model()
     advanceUntilIdle()
-    vm.requestSignOut()
     auth.signOutError = IllegalStateException("Immediate failure")
-    vm.confirmSignOut { fail("Must not clear credentials on Firebase failure") }
-    val failure = vm.uiState.value as ProfileUiState.ConfirmingSignOut
-    assertTrue(failure.failed)
-    assertFalse(failure.isSigningOut)
-    assertTrue(failure.profile is ProfileUiState.Loaded)
-    assertNotNull(auth.currentUser)
-    auth.signOutError = null
+    vm.requestSignOut()
     vm.confirmSignOut {}
     advanceUntilIdle()
-    assertNull(auth.currentUser)
+    assertEquals(SignOutState.FAILED, signOut.state.value)
+    assertEquals(ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true), vm.uiState.value)
+    assertNotNull(auth.currentUser)
+    auth.signOutError = null
+    signOut.retry {}
+    advanceUntilIdle()
     assertEquals(ProfileUiState.SignOutComplete, vm.uiState.value)
   }
 
   @Test
-  fun credentialFailureStillLeavesSignedOutUserAtCompletion() = runTest {
+  fun credentialFailureCannotReportSuccessfulCleanup() = runTest {
     val vm = model()
     advanceUntilIdle()
     vm.requestSignOut()
     vm.confirmSignOut { error("Credential provider unavailable") }
     advanceUntilIdle()
     assertNull(auth.currentUser)
-    assertEquals(ProfileUiState.SignOutComplete, vm.uiState.value)
+    assertEquals(SignOutState.FAILED, signOut.state.value)
+    assertEquals(ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true), vm.uiState.value)
   }
 
   @Test
-  fun cancelledCredentialCleanupDoesNotReportFirebaseFailure() = runTest {
+  fun unsynchronizedChangesNeedASecondConfirmationAndCancelKeepsProfile() = runTest {
     val vm = model()
     advanceUntilIdle()
+    local.synchronizeAction = { error("unavailable") }
     vm.requestSignOut()
-    vm.confirmSignOut { throw CancellationException("Screen removed") }
+    vm.confirmSignOut {}
     advanceUntilIdle()
+    val decision = vm.uiState.value as ProfileUiState.ConfirmingSignOut
+    assertTrue(decision.pendingChanges)
+    assertFalse(decision.isSigningOut)
+    vm.cancelSignOut()
+    assertTrue(vm.uiState.value is ProfileUiState.Loaded)
+    assertNotNull(auth.currentUser)
+    assertTrue(local.offlineChanges)
+    vm.requestSignOut()
+    vm.confirmSignOut {}
+    advanceUntilIdle()
+    vm.confirmSignOut {}
+    advanceUntilIdle()
+    assertEquals(ProfileUiState.SignOutComplete, vm.uiState.value)
     assertNull(auth.currentUser)
-    assertFalse((vm.uiState.value as ProfileUiState.ConfirmingSignOut).failed)
   }
 
   @Test
@@ -159,10 +180,12 @@ class ProfileSignOutViewModelTest {
     vm.requestSignOut()
     vm.confirmSignOut {}
     advanceUntilIdle()
-    val reopened = ProfileViewModel(auth, profiles)
+    val reopened = ProfileViewModel(auth, profiles, signOut)
     advanceUntilIdle()
     assertEquals(ProfileUiState.SignedOut, reopened.uiState.value)
-    assertTrue(profiles.profiles.isNotEmpty()) // Persistence is retained, but not exposed by UI.
+    assertTrue(
+        profiles.profiles.isNotEmpty()
+    ) // The fake profile store is independent of the fake disk lifecycle.
     auth.onSignIn = { AuthUser("other") }
     profiles.seed(UserProfile("other", Role.PATIENT, "Sam"))
     auth.signInWithGoogle("two")

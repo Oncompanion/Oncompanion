@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
@@ -351,9 +352,14 @@ class CredentialManagerGoogleCredentialProviderTest {
   }
 
   @Test
-  fun clearCredentialState_swallowsClearCredentialException() = runTest {
+  fun clearCredentialState_propagatesFailureForCleanupRetry() = runTest {
     fake.clearError = ClearCredentialUnknownException("boom")
-    provider.clearCredentialState(context) // must not throw
+    try {
+      provider.clearCredentialState(context)
+      fail("Cleanup must report credential failures")
+    } catch (error: ClearCredentialUnknownException) {
+      assertSame(fake.clearError, error)
+    }
     assertEquals(1, fake.clearRequests.size)
   }
 }

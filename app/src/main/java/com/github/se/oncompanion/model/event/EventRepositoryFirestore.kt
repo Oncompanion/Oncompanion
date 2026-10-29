@@ -1,7 +1,9 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 package com.github.se.oncompanion.model.event
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -11,7 +13,6 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -25,7 +26,7 @@ import kotlinx.coroutines.tasks.await
  * @param zone the time zone events are shown in
  */
 class EventRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
     private val clock: Clock = Clock.systemUTC(),
     private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : EventRepository {
@@ -39,9 +40,10 @@ class EventRepositoryFirestore(
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
-  override fun getUpcomingEvents(): Flow<List<Event>> = callbackFlow {
+  override fun getUpcomingEvents(): Flow<List<Event>> = SessionAccess.snapshots {
     // Filtering and sorting on the same field only needs Firestore's automatic index
     val registration =
         db.collection(COLLECTION)
@@ -57,9 +59,9 @@ class EventRepositoryFirestore(
     awaitClose { registration.remove() }
   }
 
-  override suspend fun getEvent(id: String): Event? {
+  override suspend fun getEvent(id: String): Event? = SessionAccess.operation {
     val doc = db.collection(COLLECTION).document(id).get().await()
-    return if (doc.exists()) fromDocument(doc) else null
+    return@operation if (doc.exists()) fromDocument(doc) else null
   }
 
   /** The event in [doc], or null (logged) if a required field is missing or has the wrong type. */

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
@@ -5,12 +6,10 @@ package com.github.se.oncompanion.ui.auth
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
@@ -100,16 +99,7 @@ class CredentialManagerGoogleCredentialProvider(
   }
 
   override suspend fun clearCredentialState(context: Context) {
-    try {
-      credentialManagerFactory(context).clearCredentialState(ClearCredentialStateRequest())
-    } catch (e: ClearCredentialException) {
-      // Not critical: the user is signed out of Firebase anyway
-      Log.w(TAG, "Couldn't clear the Google credential state", e)
-    }
-  }
-
-  private companion object {
-    const val TAG = "GoogleCredentialProvider"
+    credentialManagerFactory(context).clearCredentialState(ClearCredentialStateRequest())
   }
 }
 
