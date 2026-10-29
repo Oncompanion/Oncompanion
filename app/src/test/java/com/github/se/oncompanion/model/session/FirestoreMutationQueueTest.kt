@@ -88,4 +88,23 @@ class FirestoreMutationQueueTest {
     }
     assertEquals(emptySet<String>(), FirestoreMutationQueue.owners(file))
   }
+
+  @Test
+  fun inaccessibleParentIsUncertaintyRatherThanAnEmptyQueue() {
+    val parent = File(file.parentFile, "inaccessible-${UUID.randomUUID()}").apply { mkdirs() }
+    val hiddenCache = File(parent, "cache")
+    SQLiteDatabase.openOrCreateDatabase(hiddenCache, null).use {
+      it.version = 18
+      it.execSQL("CREATE TABLE mutations (uid TEXT, batch_id INTEGER, mutations BLOB)")
+      it.execSQL("INSERT INTO mutations VALUES ('previous-user', 1, X'00')")
+    }
+    check(parent.setExecutable(false, false))
+    try {
+      assertThrows(IllegalStateException::class.java) { FirestoreMutationQueue.owners(hiddenCache) }
+    } finally {
+      check(parent.setExecutable(true, true))
+      SQLiteDatabase.deleteDatabase(hiddenCache)
+      parent.delete()
+    }
+  }
 }

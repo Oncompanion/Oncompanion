@@ -331,7 +331,8 @@ and offline changes. Successful cleanup resets the owner set for the next sessio
 
 This compatibility helper deliberately depends on Firebase's SQLite filename and schema versions
 16–18 because the public API has no all-user queue query. A new installation has no cache file;
-an unknown schema, missing table or unreadable existing cache fails closed. The reader overrides
+an unknown schema, missing table or unreadable existing cache fails closed. Only confirmed
+file absence is treated as a fresh installation; inaccessible paths remain uncertainty. The reader overrides
 Android's default corruption handler so a failed read cannot delete the SDK database. Firebase
 dependency updates must revalidate this helper and run the migration emulator tests. Initialization must stay
 before all Firestore operations. Do not replace this check with snapshot metadata: snapshots show
@@ -383,7 +384,7 @@ offline caching. No remote documents are deleted. Repositories hold no additiona
 screen drafts and lists belong to the destroyed ViewModels. Scan photos retain their existing
 disposal cleanup.
 
-**PR size / splitting:** the reader is only 59 production lines. Moving it out alone would remove
+**PR size / splitting:** the reader is only 61 production lines. Moving it out alone would remove
 cross-account legacy protection unless a prerequisite migration PR ships first, or the team accepts
 a blanket first-upgrade discard-consent policy. Keep the reader and its security tests together for
 now; a supported replacement/migration strategy can be reviewed separately after that decision.

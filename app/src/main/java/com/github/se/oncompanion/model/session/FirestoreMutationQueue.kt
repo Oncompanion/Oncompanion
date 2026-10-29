@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabaseCorruptException
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.net.URLEncoder
+import java.nio.file.Files
 
 /**
  * Records persisted mutation owners before the SDK acquires its exclusive SQLite lock.
@@ -36,7 +37,8 @@ internal object FirestoreMutationQueue {
    */
   fun owners(file: File): Set<String> {
     // Read only before SDK startup: a fresh installation has no disk queue.
-    if (!file.exists()) return emptySet()
+    // File.exists() also returns false on inaccessible paths; only confirmed absence is safe.
+    if (Files.notExists(file.toPath())) return emptySet()
     check(file.isFile) { "Firestore persistent mutation queue could not be inspected" }
     // Android's default corruption handler can delete files even for a read-only open.
     val database =
