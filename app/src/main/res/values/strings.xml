@@ -551,4 +551,7 @@
     <string name="appointment_cancel">Cancel</string>
     <string name="appointment_signed_out">Sign in again to save your appointment.</string>
     <string name="appointment_save_failed">Couldn\'t save your appointment. Please try again.</string>
+    <string name="appointment_edit">Edit appointment</string>
+    <string name="appointment_save_changes">Save changes</string>
+    <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
 </resources>

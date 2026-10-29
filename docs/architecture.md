@@ -163,7 +163,7 @@ overview identifies Profile hospital text and the reusable content alongside the
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
-## Appointment creation form (issue #147)
+## Appointment form (issues #147 and #206)
 
 Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
 `AppointmentFormUiState` and delegates to stateless `AppointmentFormContent`. Title and explicit
@@ -190,6 +190,18 @@ Local times are resolved in the display zone: spring gaps require correction, au
 times require an offset choice. Account changes clear private input and suppress stale completion.
 Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
 
+The same form edits an appointment when given its ID. It first reads the signed-in owner's cached
+appointment, then fills every field, including the original repeated-hour offset and time precision.
+Untouched drafts follow saved changes; edited drafts survive later snapshots and read retries.
+Unavailable appointments cannot be saved. Account changes clear private input and cancel old reads;
+stale saves cannot navigate. Save updates the existing ID and retains creation metadata, without
+waiting for server acknowledgement. Unchanged times preserve the exact original instant.
+
+Editing returns to the existing detail destination; its observation refreshes it. Back then returns
+to the originating screen/day. Only creation sends the saved-day result to Planning. Detail uses
+shared `DetailWithActions` and `DetailActions`: supported actions stay visible in normal windows
+and scroll after the content in compact windows. Edit mode reuses the form's keyboard handling.
+
 ## Appointment details (issue #205)
 
 `AppointmentDetailScreen` collects one `AppointmentDetailUiState`; its stateless Content follows
@@ -203,7 +215,14 @@ times respect the phone clock preference and display zone.
 Planning appointment rows and Overview's next-appointment card open the same detail destination.
 Overview preserves the source appointment ID rather than deriving it from display text. Back pops
 the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
-Unsupported Planning rows do not expose a clickable action. Editing remains a separate task.
+Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete asks for confirmation.
+
+### Appointment edit recovery
+
+The edit form offers Retry only for a failed load. An unavailable appointment keeps its
+message and Back without Retry. When authentication is lost, the resumed form opens sign-in
+and clears active and saved navigation stacks, matching Join and Whose care. A covered form
+waits until it resumes before redirecting.
 
 Appointment deletion (#207) reuses `DeleteState`, `DeleteConfirmation`, `DeleteConfirmationDialog`
 and the shared adaptive detail actions. Cancel changes nothing. Confirmation queues repository deletion
@@ -224,7 +243,7 @@ is not recreated. Writes are queued locally, including offline, without waiting 
 A later server rejection is logged and may roll back local changes. Owner
 updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
 owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
-list/detail observations, with no second Planning write. Detail and confirmed deletion are built; editing remains planned.
+list/detail observations, with no second Planning write. Detail, editing and confirmed deletion are built.
 
 ## Prescription scan
 

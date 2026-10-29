@@ -236,10 +236,28 @@ fun AppNavHost(
         AppointmentDetailScreen(
             detail,
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            onEdit = dropUnlessResumed { navigationActions.navigateTo(Screen.appointmentEdit(id)) },
             onDeleted = {
               // A completion may only pop the detail entry that initiated this deletion.
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
+        )
+      }
+      composable(
+          Screen.APPOINTMENT_EDIT,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val form: AppointmentFormViewModel = viewModel {
+          AppointmentFormViewModel(LocalDate.now(), appointmentId = id)
+        }
+        AppointmentFormScreen(
+            form,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onSaved = {
+              if (navController.currentBackStackEntry == entry) navigationActions.goBack()
+            },
+            onSignedOut = signOut,
         )
       }
       composable(

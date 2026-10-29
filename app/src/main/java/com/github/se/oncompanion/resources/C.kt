@@ -36,6 +36,10 @@ object C {
     /** Identifies the recorded appointment category choice. */
     fun appointmentType(type: String) = "appointment_type_$type"
 
+    const val appointment_form_feedback = "appointment_form_feedback"
+    const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_form_retry = "appointment_form_retry"
+
     // Hospital field
     const val hospital_field = "hospital_field"
     const val hospital_search = "hospital_search"

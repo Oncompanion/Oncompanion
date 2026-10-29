@@ -59,6 +59,11 @@ object Screen {
   /** Opens one appointment without changing the originating calendar selection. */
   fun appointmentDetail(id: String) = "appointment_detail/${Uri.encode(id)}"
 
+  const val APPOINTMENT_EDIT = "appointment_edit/{$APPOINTMENT_ID}"
+
+  /** Opens the shared form to correct an existing appointment. */
+  fun appointmentEdit(id: String) = "appointment_edit/${Uri.encode(id)}"
+
   const val APPOINTMENT_DATE = "appointmentDate"
   const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
   const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
