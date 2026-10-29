@@ -413,5 +413,14 @@ object C {
         "prescription_scan_nothing_read_enter_manually_button"
     const val prescription_scan_nothing_read_retake_button =
         "prescription_scan_nothing_read_retake_button"
+
+    // Reviewing the scanned prescription in the prescription form
+    const val prescription_review_notice = "prescription_review_notice"
+
+    /** Why a field is to check; [field] is "prescribed_by", "prescribed_on", or a detail's name. */
+    fun prescriptionReviewFieldCheck(field: String) = "prescription_review_field_check_$field"
+
+    /** What to check on the row of the medication at [position], when it isn't open. */
+    fun prescriptionReviewRowCheck(position: Int) = "prescription_review_row_check_$position"
   }
 }

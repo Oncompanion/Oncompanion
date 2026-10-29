@@ -388,9 +388,8 @@ fun AppNavHost(
       composable(Screen.PRESCRIPTION_ADD) { entry ->
         val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            // Starts from the scanned prescription if it was just read, empty otherwise
-            viewModel =
-                viewModel { PrescriptionFormViewModel(initialDraft = handoff.scanned?.draft) },
+            // Reviews the scanned prescription if it was just read, empty otherwise
+            viewModel = viewModel { PrescriptionFormViewModel(scan = handoff.scanned) },
             // A second tap while the form is already leaving is dropped, so Back happens once. The
             // scan's photo is no longer needed once the form is done
             onClose =

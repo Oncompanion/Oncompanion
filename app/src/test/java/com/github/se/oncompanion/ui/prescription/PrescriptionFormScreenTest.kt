@@ -14,6 +14,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -30,6 +32,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
+import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -375,7 +379,8 @@ class PrescriptionFormScreenTest {
 
     field(C.Tag.prescriptionFormMedicationRow(0)).assertExists()
     composeTestRule.onNodeWithText("Ondansetron 8 mg").assertExists()
-    composeTestRule.onNodeWithText("1 tablet · Twice a day · 5 days").assertExists()
+    // The start date is in the row too, short like the rest of it (Figma)
+    composeTestRule.onNodeWithText("1 tablet · Twice a day · from 30 Sep · 5 days").assertExists()
   }
 
   @Test
@@ -390,7 +395,7 @@ class PrescriptionFormScreenTest {
         )
     setContent(state)
 
-    composeTestRule.onNodeWithText("Twice a day · 1 day").assertExists()
+    composeTestRule.onNodeWithText("Twice a day · from 30 Sep · 1 day").assertExists()
   }
 
   @Test
@@ -603,6 +608,250 @@ class PrescriptionFormScreenTest {
     node(C.Tag.prescription_form_retry_button).performClick()
 
     assertEquals(listOf("retry"), events)
+  }
+
+  // ---------- Reviewing a scan ----------
+
+  private fun of(position: Int, detail: MedicationDetail) =
+      ScannedField.OfMedication(position, detail)
+
+  private fun notice() = node(C.Tag.prescription_review_notice)
+
+  // The reasons are merged into their field or row: found in the unmerged tree
+  private fun fieldCheck(field: String) =
+      composeTestRule.onNodeWithTag(
+          C.Tag.prescriptionReviewFieldCheck(field),
+          useUnmergedTree = true,
+      )
+
+  private fun rowCheck(position: Int) =
+      composeTestRule.onNodeWithTag(
+          C.Tag.prescriptionReviewRowCheck(position),
+          useUnmergedTree = true,
+      )
+
+  @Test
+  fun aScanIsReviewedWithWhatToCheckInTheNotice() {
+    // Dexamethasone is open; Ondansetron's frequency, on its closed row, is to check
+    setContent(
+        twoMedications.copy(
+            isScanned = true,
+            toCheck = setOf(ScannedField.PrescribedOn, of(0, MedicationDetail.FREQUENCY)),
+        )
+    )
+
+    composeTestRule.onNodeWithText(string(R.string.prescription_review_title)).assertExists()
+    notice().assertTextContains(string(R.string.prescription_review_read), substring = true)
+    notice().assertTextContains("2 details need checking", substring = true)
+    notice()
+        .assertTextContains(
+            string(R.string.prescription_review_correct_anything),
+            substring = true,
+        )
+    fieldCheck("prescribed_on")
+        .assertTextContains(string(R.string.prescription_review_date_hard_to_read))
+    rowCheck(0).assertTextContains(string(R.string.prescription_review_check_frequency))
+  }
+
+  @Test
+  fun detailsTheScanDidNotFindAreSaidToBeMissing() {
+    // No doctor, and Dexamethasone (closed, second) has no dosage
+    setContent(
+        twoMedications.copy(
+            draft = twoMedications.draft.copy(prescribedBy = ""),
+            openMedication = 0,
+            isScanned = true,
+            toCheck = setOf(ScannedField.PrescribedBy, of(1, MedicationDetail.DOSAGE)),
+        )
+    )
+
+    notice().assertTextContains(string(R.string.prescription_review_partly_read), substring = true)
+    fieldCheck("prescribed_by").assertTextContains(string(R.string.prescription_review_not_found))
+    rowCheck(1).assertTextContains(string(R.string.prescription_review_dosage_not_found))
+  }
+
+  @Test
+  fun aDateTheScanDidNotFindSaysTodayIsUsed() {
+    setContent(
+        twoMedications.copy(
+            isScanned = true,
+            toCheck = setOf(ScannedField.PrescribedOn),
+            dateFound = false,
+        )
+    )
+
+    // Today's date stands in for the missing one: only part of the prescription was read
+    notice().assertTextContains(string(R.string.prescription_review_partly_read), substring = true)
+    fieldCheck("prescribed_on")
+        .assertTextContains(string(R.string.prescription_review_date_not_found))
+  }
+
+  @Test
+  fun everyDetailOfTheOpenMedicationCanBeToCheck() {
+    setContent(
+        filled.copy(
+            isScanned = true,
+            toCheck = MedicationDetail.entries.map { of(0, it) }.toSet(),
+        )
+    )
+    val mayDiffer = string(R.string.prescription_review_may_differ)
+
+    for (detail in listOf("name", "dosage", "frequency", "duration")) {
+      fieldCheck(detail).assertTextContains(mayDiffer)
+    }
+    // Not the color alone: each field to check has an icon screen readers name
+    composeTestRule
+        .onAllNodes(hasContentDescription(string(R.string.prescription_review_needs_checking)))
+        .assertCountEquals(4)
+    notice().assertTextContains("4 details need checking", substring = true)
+  }
+
+  @Test
+  fun anEmptyDurationToCheckWasNotFound() {
+    setContent(
+        filled.copy(
+            draft = filled.draft.copy(medications = listOf(ondansetron.copy(durationDays = null))),
+            isScanned = true,
+            toCheck = setOf(of(0, MedicationDetail.DURATION)),
+        )
+    )
+
+    fieldCheck("duration").assertTextContains(string(R.string.prescription_review_not_found))
+  }
+
+  @Test
+  fun theNoticeCountsTheDetailsOfEveryMedication_andTheOpenOneHasNoRowLine() {
+    // Dexamethasone is open: its frequency is on its field, Ondansetron's dosage on its row
+    setContent(
+        twoMedications.copy(
+            isScanned = true,
+            toCheck =
+                setOf(
+                    ScannedField.PrescribedBy,
+                    of(0, MedicationDetail.DOSAGE),
+                    of(1, MedicationDetail.FREQUENCY),
+                ),
+        )
+    )
+
+    notice().assertTextContains("3 details need checking", substring = true)
+    fieldCheck("frequency").assertExists()
+    rowCheck(0).assertExists()
+    rowCheck(1).assertDoesNotExist()
+  }
+
+  @Test
+  fun detailsToCheckDoNotBlockSave() {
+    setContent(
+        filled.copy(
+            isScanned = true,
+            toCheck = setOf(ScannedField.PrescribedOn, of(0, MedicationDetail.DOSAGE)),
+        )
+    )
+
+    node(C.Tag.prescription_form_save_button).assertIsEnabled().performClick()
+
+    assertEquals(listOf("save"), events)
+  }
+
+  @Test
+  fun aRowWithSeveralDetailsToCheckSaysHowMany() {
+    setContent(
+        twoMedications.copy(
+            isScanned = true,
+            toCheck = setOf(of(0, MedicationDetail.DOSAGE), of(0, MedicationDetail.DURATION)),
+        )
+    )
+
+    rowCheck(0).assertTextContains("Please check 2 details")
+  }
+
+  @Test
+  fun aMissingNameOrAnInvalidDurationComesBeforeTheDetailToCheck() {
+    setContent(
+        filled.copy(
+            draft =
+                filled.draft.copy(
+                    medications = listOf(ondansetron.copy(name = "", durationDays = 0))
+                ),
+            isScanned = true,
+            toCheck = setOf(of(0, MedicationDetail.NAME), of(0, MedicationDetail.DURATION)),
+        )
+    )
+
+    // Both block Save: their red warning is shown, not the reason to check them
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_name_missing)).assertExists()
+    composeTestRule
+        .onNodeWithText(
+            context.getString(
+                R.string.prescription_form_duration_invalid,
+                Medication.MAX_DURATION_DAYS,
+            )
+        )
+        .assertExists()
+    fieldCheck("name").assertDoesNotExist()
+    fieldCheck("duration").assertDoesNotExist()
+  }
+
+  @Test
+  fun aClosedMedicationThatBlocksSaveShowsItsProblemNotWhatToCheck() {
+    setContent(
+        twoMedications.copy(
+            draft =
+                twoMedications.draft.copy(
+                    medications = listOf(ondansetron.copy(name = ""), dexamethasone)
+                ),
+            isScanned = true,
+            toCheck = setOf(of(0, MedicationDetail.FREQUENCY)),
+        )
+    )
+
+    rowCheck(0).assertDoesNotExist()
+  }
+
+  @Test
+  fun onceEverythingIsCheckedTheNoticeNoLongerCountsDetails() {
+    setContent(filled.copy(isScanned = true))
+
+    notice()
+        .assertTextEquals(
+            string(R.string.prescription_review_read) +
+                " " +
+                string(R.string.prescription_review_correct_anything)
+        )
+    composeTestRule
+        .onAllNodes(hasContentDescription(string(R.string.prescription_review_needs_checking)))
+        .assertCountEquals(0)
+  }
+
+  @Test
+  fun theNoticeSaysHowManyMedicationsWereLeftOut() {
+    setContent(filled.copy(isScanned = true, leftOut = 5))
+
+    notice()
+        .assertTextContains(
+            "5 more medications were read but not added: a prescription holds 20 at most.",
+            substring = true,
+        )
+  }
+
+  @Test
+  fun theNoticeSaysWhenOneMedicationWasLeftOut() {
+    setContent(filled.copy(isScanned = true, leftOut = 1))
+
+    notice()
+        .assertTextContains(
+            "1 more medication was read but not added: a prescription holds 20 at most.",
+            substring = true,
+        )
+  }
+
+  @Test
+  fun aFormNotFromAScanIsNotAReview() {
+    setContent(filled)
+
+    notice().assertDoesNotExist()
+    composeTestRule.onNodeWithText(string(R.string.prescription_form_add_title)).assertExists()
   }
 
   // ---------- Keyboard ----------

@@ -14,6 +14,7 @@ import com.github.se.oncompanion.model.medication.scan.comparable
 import java.time.LocalDate
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -266,7 +267,17 @@ class ReadPrescriptionTest {
     val read = readPrescription(linesOf("Ondansetron 8 mg", "1 tablet twice a day"), today)!!
     assertEquals("", read.draft.prescribedBy)
     assertEquals(today, read.draft.prescribedOn)
+    assertFalse(read.dateFound)
     assertTrue(ScannedField.PrescribedBy in read.toCheck)
+    assertTrue(ScannedField.PrescribedOn in read.toCheck)
+  }
+
+  @Test
+  fun aDateReadIsFound_evenWhenItIsToCheck() {
+    for (n in 1..6) assertTrue("Sheet $n", readPrescription(sheet(n), today)!!.dateFound)
+    val unsure = linesOf("Sion, le 11.11.2026", "Sion, le 12.11.2026", "Ondansetron 8 mg")
+    val read = readPrescription(unsure, today)!!
+    assertTrue(read.dateFound)
     assertTrue(ScannedField.PrescribedOn in read.toCheck)
   }
 
