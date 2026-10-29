@@ -25,7 +25,7 @@ interface CleanupJournal {
 }
 
 /** Session-owned memory that must be cleared before the operation gate can reopen. */
-interface SessionMemory {
+fun interface SessionMemory {
   /** Cancels old consumers and removes all retained user data synchronously. */
   fun clear()
 }

@@ -20,6 +20,7 @@ import com.google.firebase.firestore.Source
 import java.util.UUID
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -57,7 +58,7 @@ class LocalSessionRepositoryFirestoreTest {
           useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
         }
     restartDatabase()
-    local = LocalSessionRepositoryFirestore { db }
+    local = LocalSessionRepositoryFirestore(dbProvider = { db })
     local.prepare()
     profiles = UserProfileRepositoryFirestore { db }
   }
@@ -71,7 +72,7 @@ class LocalSessionRepositoryFirestoreTest {
 
   private suspend fun restartAsUpgrade() {
     db.terminate().await()
-    local = LocalSessionRepositoryFirestore { db }
+    local = LocalSessionRepositoryFirestore(dbProvider = { db })
     local.prepare()
     restartDatabase()
   }
@@ -303,5 +304,89 @@ class LocalSessionRepositoryFirestoreTest {
         "Original",
         db.collection("users").document(uid).get(Source.SERVER).await().getString("firstName"),
     )
+  }
+
+  /** A successful active-user barrier cannot certify an unreadable older account queue. */
+  @Test
+  fun unreadableLegacyCacheNeedsConsentEvenAfterCurrentUserAcknowledgement() = runBlocking {
+    unverifiableLegacyCacheRequiresConsent(java.io.IOException("Cache is locked or unreadable"))
+  }
+
+  /** Unknown schemas preserve data on cancel and only clear after explicit discard. */
+  @Test
+  fun unknownLegacySchemaNeedsConsentEvenWhenCurrentUserHasNoPendingWrites() = runBlocking {
+    unverifiableLegacyCacheRequiresConsent(IllegalStateException("Unknown schema"))
+  }
+
+  private suspend fun unverifiableLegacyCacheRequiresConsent(error: Exception) {
+    val uid = seed()
+    local =
+        LocalSessionRepositoryFirestore(dbProvider = { db }, inspectLegacyOwners = { throw error })
+    val preferences =
+        ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("unverifiable-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+    val signOut =
+        SignOut(
+                AuthRepositoryFirebase(auth),
+                local,
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()),
+            )
+            .apply { initialize(PreferencesCleanupJournal(preferences)) }
+    var credentialsCleared = false
+    signOut.begin { credentialsCleared = true }
+    withTimeout(10_000) { signOut.state.first { it == SignOutState.NEEDS_DISCARD_CONFIRMATION } }
+    assertFalse(credentialsCleared)
+    signOut.staySignedIn()
+    assertEquals(uid, auth.currentUser?.uid)
+    assertEquals("Original", profiles.getCachedProfile(uid)?.firstName)
+    signOut.begin { credentialsCleared = true }
+    withTimeout(10_000) { signOut.state.first { it == SignOutState.NEEDS_DISCARD_CONFIRMATION } }
+    signOut.discard { credentialsCleared = true }
+    withTimeout(10_000) { signOut.state.first { it == SignOutState.COMPLETE } }
+    assertTrue(credentialsCleared)
+    assertNull(auth.currentUser)
+    restartDatabase()
+    assertNull(profiles.getCachedProfile(uid))
+  }
+
+  /** New detail, joined-circle and registration listeners must end before cache termination. */
+  @Test
+  fun allNewRepositoryListenersAreRemovedAndRejectRecollectionAfterCleanup() = runBlocking {
+    val uid = seed()
+    val appointments =
+        com.github.se.oncompanion.model.appointment.AppointmentRepositoryFirestore(db)
+    val medications = com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore(db)
+    val invites = com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryFirestore(db)
+    val circle = com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore(db)
+    val registrations =
+        com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore(db)
+    val flows =
+        listOf(
+            appointments.observeAppointment(uid, "missing"),
+            medications.observePrescription(uid, "missing"),
+            invites.observeJoinedCircles(uid),
+            circle.observeMember(uid, "missing"),
+            registrations.observeIsRegistered(uid, "missing"),
+        )
+    val ready = flows.map { kotlinx.coroutines.CompletableDeferred<Unit>() }
+    val listeners = flows.mapIndexed { index, flow ->
+      launch { flow.collect { ready[index].complete(Unit) } }
+    }
+    withTimeout(10_000) { ready.forEach { it.await() } }
+    local.freeze()
+    local.seal()
+    assertTrue(listeners.all { it.isCompleted })
+    auth.signOut()
+    local.clear()
+    restartDatabase()
+    local.reopen()
+    for (flow in flows) {
+      try {
+        flow.first()
+        fail("Previous session listener restarted")
+      } catch (error: IllegalStateException) {
+        assertEquals("The session has ended", error.message)
+      }
+    }
   }
 }

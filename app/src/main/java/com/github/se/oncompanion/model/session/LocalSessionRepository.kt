@@ -34,6 +34,8 @@ interface LocalSessionRepository {
 /** Firebase lifecycle adapter. The terminated instance is retained only for cleanup retries. */
 class LocalSessionRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = FirebaseFirestore::getInstance,
+    private val inspectLegacyOwners: (FirebaseFirestore) -> Set<String> =
+        FirestoreMutationQueue::owners,
 ) : LocalSessionRepository {
   private var oldDb: FirebaseFirestore? = null
   private var termination: Task<Void>? = null
@@ -46,7 +48,7 @@ class LocalSessionRepositoryFirestore(
     if (prepared) return
     prepared = true
     // Failure remains uncertainty; never erase a cache whose legacy queues could not be read.
-    legacyOwners = runCatching { FirestoreMutationQueue.owners(dbProvider()) }.getOrNull()
+    legacyOwners = runCatching { inspectLegacyOwners(dbProvider()) }.getOrNull()
   }
 
   override suspend fun freeze() = SessionAccess.freeze()

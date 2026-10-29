@@ -221,6 +221,12 @@ class ProfileSignOutScreenTest {
       )
     }
     compose.onNodeWithText("Stay signed in").assertIsDisplayed()
+    compose
+        .onNodeWithText("older locally stored changes cannot be checked", substring = true)
+        .assertIsDisplayed()
+    compose
+        .onNodeWithText("even if nothing is waiting to sync", substring = true)
+        .assertIsDisplayed()
     compose.onNodeWithText("Discard changes and sign out").assertIsDisplayed()
     node(C.Tag.profile_sign_out_cancel).assertIsFocused().performClick()
     compose.runOnIdle {
