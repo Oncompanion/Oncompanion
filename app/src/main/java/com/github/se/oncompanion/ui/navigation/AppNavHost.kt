@@ -102,10 +102,10 @@ fun AppNavHost(
           val resolved by start.startRoute.collectAsStateWithLifecycle()
           resolved
         } else if (afterCleanup) Route.AUTH else startRoute
-    route?.let { freshRoute ->
+    if (route != null) {
       SessionNavHost(
           navController ?: rememberNavController(),
-          freshRoute,
+          route,
           credentialProvider,
           savedState,
       )
