@@ -547,18 +547,23 @@ test("upstream Retry-After is enforced in shared cooldown and HTTP response", as
   });
   for (const status of [429, 503])
     for (const [header, seconds] of [
-      ["900", 900],
-      ["Tue, 20 Oct 2026 00:30:00 GMT", 1800],
+      ["90", 90],
+      ["180", 180],
+      ["Tue, 20 Oct 2026 00:02:00 GMT", 120],
+      ["Mon, 19 Oct 2026 23:59:00 GMT", 60],
+      [null, 60],
       ["1", 60],
       ["invalid", 60],
-      ["99999999999999999999999999", 60],
       ["", 60],
     ]) {
       const store = fakeStore();
       const client = new NominatimClient(
         "a@example.org",
         async () =>
-          new Response("", { status, headers: { "Retry-After": header } }),
+          new Response("", {
+            status,
+            headers: header === null ? {} : { "Retry-After": header },
+          }),
       );
       const handler = createHandler(
         new HospitalSearchService(store, client),
@@ -574,6 +579,48 @@ test("upstream Retry-After is enforced in shared cooldown and HTTP response", as
       );
       assert.deepEqual(store.releases, [seconds * 1000]);
     }
+});
+
+test("oversized upstream waits bound the client hint and retain the fail-closed lock", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2026-10-20T00:00:00Z"),
+  });
+  for (const status of [429, 503]) {
+    for (const header of [
+      "181",
+      "900",
+      "9007199254740",
+      "9".repeat(400),
+      "Tue, 20 Oct 2026 00:03:01 GMT",
+      "Fri, 31 Dec 9999 23:59:59 GMT",
+    ]) {
+      await t.test(`${status}: ${header}`, async () => {
+        const store = fakeStore();
+        let calls = 0;
+        const client = new NominatimClient("a@example.org", async () => {
+          calls++;
+          return new Response("", {
+            status,
+            headers: { "Retry-After": header },
+          });
+        });
+        const handler = createHandler(
+          new HospitalSearchService(store, client),
+          async () => "a".repeat(64),
+        );
+        const res = response();
+        await handler(request(), res);
+        assert.equal(res.statusCode, status);
+        assert.equal(res.headers["Retry-After"], "180");
+        assert.equal(store.values.size, 0);
+        assert.deepEqual(store.releases, []);
+        assert.equal(store.locked, true);
+        await handler(request(url("Bern")), response());
+        assert.equal(calls, 1);
+      });
+    }
+  }
 });
 
 test("real hospital names retain accents and legitimate punctuation", async (t) => {
@@ -692,7 +739,9 @@ test("HTTP 503 Retry-After has a sanitized minimum and preserves longer hints", 
     [undefined, "60"],
     [0, "60"],
     [-1, "60"],
-    [900, "900"],
+    [900, "180"],
+    [Infinity, "180"],
+    [NaN, "60"],
   ]) {
     await t.test(String(hint), async () => {
       const res = response();

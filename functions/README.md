@@ -101,8 +101,13 @@ queries, credentials, stack traces or internal exception details:
 | 503 | Storage, limiter, configuration failure or upstream 503 |
 | 504 | Five-second upstream timeout |
 
-Responses disable HTTP caching. 429/503 include a minimum `Retry-After: 60` hint; a valid longer
-upstream Retry-After (seconds or HTTP date) extends both the shared cooldown and the response hint.
+Responses disable HTTP caching. 429/503 include a `Retry-After` hint bounded to 60–180 seconds.
+Valid upstream intervals (seconds or HTTP date) within that range extend the shared cooldown.
+An upstream wait above 180 seconds (including numeric overflow) retains the existing fail-closed
+owner lock instead of storing an unbounded cooldown or resuming before the requested wait.
+The client hint remains 180 seconds; it is not a promise that upstream access will resume then.
+Cached results remain available. Alert on `hospital_search_upstream_wait_exceeds_limit`.
+Three minutes bounds routine backoff and client waits; longer waits require operator review.
 Clients must not retry automatically. Platform rejections (for example oversized headers, infrastructure
 queues or timeouts) can have platform-defined bodies/statuses.
 
@@ -163,7 +168,7 @@ snapshot's server `readTime` against `releasedAt + cooldownMs`. Thus the next ou
 starts **at least one second after the previous operation completed**, which is stricter than
 one second between starts, without relying on instance clock synchronization. No future slots
 are reserved and no sleep is needed to enforce them. Upstream errors extend the cooldown to ten
-seconds, or at least sixty seconds for 429 (honoring valid longer upstream Retry-After values).
+seconds, or 60–180 seconds for 429/503; longer upstream waits retain the owner lock.
 The core `node:https` transport makes one wire attempt using a fresh connection. It does not
 follow redirects or retry errors. Native `fetch` is deliberately avoided: the Fetch standard
 allows an automatic retry after HTTP 421 even when redirects are disabled, which could otherwise
@@ -186,6 +191,10 @@ that use this coordinator, terminate or otherwise prove all potential owners can
 then wait at least one second after the final possible upstream request has completed. Only then
 replace the control document with a fresh server timestamp `releasedAt` and `cooldownMs: 1000`,
 and restore traffic after cooldown. Never delete/reset a held lock while an owner could resume.
+For `hospital_search_upstream_wait_exceeds_limit`, also verify the upstream waiting period
+has elapsed with the provider before restoring access; if it cannot be verified (for example an
+absurd numeric value), keep upstream traffic disabled until the provider clarifies or a reviewed
+provider change is available. Do not reset the lock merely because 180 seconds elapsed.
 This procedure is intentionally manual and cannot be inferred safely from lock age alone.
 
 A time-based lease, heartbeat, or final ownership recheck alone cannot safely automate recovery:

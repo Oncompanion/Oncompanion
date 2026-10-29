@@ -4,6 +4,8 @@ import { test, after } from "node:test";
 import { Firestore, Timestamp } from "firebase-admin/firestore";
 import { FirestoreSearchStore } from "../lib/firestore-store.js";
 import { HospitalSearchService } from "../lib/service.js";
+import { NominatimClient } from "../lib/nominatim.js";
+import { createHandler } from "../lib/handler.js";
 
 // Refuse production access even if developer credentials exist.
 if (
@@ -411,4 +413,79 @@ test("release retries recover transient failures and ambiguous acknowledgements 
       }).search("bern", "a".repeat(64));
       assert.equal(calls, 2);
     });
+});
+
+test("Retry-After persists only bounded cooldowns and never resumes oversized waits", async (t) => {
+  for (const status of [429, 503]) {
+    for (const [header, seconds] of [
+      [null, 60],
+      ["invalid", 60],
+      ["1", 60],
+      ["120", 120],
+      ["180", 180],
+      ["181", null],
+      ["9007199254740", null],
+      ["9".repeat(400), null],
+      ["Fri, 31 Dec 9999 23:59:59 GMT", null],
+    ]) {
+      await t.test(`${status}: ${header}`, async () => {
+        await reset();
+        let calls = 0;
+        const client = new NominatimClient("a@example.org", async () => {
+          calls++;
+          return new Response("", {
+            status,
+            headers: header === null ? {} : { "Retry-After": header },
+          });
+        });
+        const res = {
+          headers: {},
+          set(key, value) {
+            this.headers[key] = value;
+            return this;
+          },
+          status(value) {
+            this.statusCode = value;
+            return this;
+          },
+          json(value) {
+            this.body = value;
+            return this;
+          },
+        };
+        await createHandler(
+          new HospitalSearchService(firstStore, client),
+          async () => "a".repeat(64),
+        )(
+          {
+            method: "GET",
+            originalUrl: "/search?q=Geneva&format=jsonv2&limit=10",
+            headers: {},
+          },
+          res,
+        );
+        assert.equal(res.statusCode, status);
+        assert.equal(res.headers["Retry-After"], String(seconds ?? 180));
+        const stored = (await control.get()).data();
+        if (seconds === null) {
+          assert.equal(typeof stored.owner, "string");
+          assert.equal(stored.cooldownMs, undefined);
+          assert.equal(stored.releasedAt, undefined);
+        } else {
+          assert.equal(stored.owner, undefined);
+          assert.equal(stored.cooldownMs, seconds * 1000);
+          assert(stored.releasedAt instanceof Timestamp);
+        }
+        assert.equal(await secondStore.acquire("another-instance"), false);
+        await assert.rejects(
+          new HospitalSearchService(secondStore, client).search(
+            "bern",
+            "b".repeat(64),
+          ),
+          (error) => error.status === 429,
+        );
+        assert.equal(calls, 1);
+      });
+    }
+  }
 });

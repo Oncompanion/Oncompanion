@@ -34,6 +34,7 @@ export class HospitalSearchService {
         throw new SearchError(429, "capacity_exhausted");
       }
       let cooldown = 1000;
+      let upstreamPaused = false;
       try {
         const rechecked = await this.store.cached(key);
         if (rechecked !== undefined) return rechecked;
@@ -41,6 +42,15 @@ export class HospitalSearchService {
         await this.store.save(key, results);
         return results;
       } catch (error) {
+        // Retain the existing fail-closed lock rather than retry before a longer upstream wait.
+        if (
+          error instanceof SearchError &&
+          [429, 503].includes(error.status) &&
+          error.upstreamWaitExceedsLimit
+        ) {
+          upstreamPaused = true;
+          console.error("hospital_search_upstream_wait_exceeds_limit");
+        }
         // Back off all users after upstream failures; failures are never cached.
         cooldown =
           error instanceof SearchError && [429, 503].includes(error.status)
@@ -48,8 +58,12 @@ export class HospitalSearchService {
             : 10_000;
         throw error;
       } finally {
-        // Release only after upstream completion/abort and cache persistence, even on failures.
-        for (let attempt = 1; attempt <= MAX_RELEASE_ATTEMPTS; attempt++) {
+        // Release after completion, except when a longer upstream wait requires operator recovery.
+        for (
+          let attempt = 1;
+          attempt <= MAX_RELEASE_ATTEMPTS && !upstreamPaused;
+          attempt++
+        ) {
           try {
             await this.store.release(owner, cooldown);
             break;

@@ -123,11 +123,11 @@ export class NominatimClient implements HospitalClient {
 // Keep coordinates compatible with Kotlin Double parsing, excluding JavaScript-only hex syntax.
 const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
-// Preserve a valid upstream retry interval across all instances, with a sixty-second minimum.
+// Parse before bounding in SearchError so oversized waits can stop upstream access safely.
 function retryAfter(value: string | null): number {
   if (!value) return 60;
   const seconds = /^\d+$/.test(value)
     ? Number(value)
     : Math.ceil((Date.parse(value) - Date.now()) / 1000);
-  return Number.isSafeInteger(seconds * 1000) ? Math.max(60, seconds) : 60;
+  return Number.isNaN(seconds) ? 60 : seconds;
 }
