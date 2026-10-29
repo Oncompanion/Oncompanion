@@ -1,0 +1,26 @@
+{
+  "name": "oncompanion-hospital-proxy",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "format": "prettier --write src test package.json tsconfig.json",
+    "format:check": "prettier --check src test package.json tsconfig.json",
+    "test": "npm run build && node --test test/unit.test.mjs",
+    "test:emulator": "npm run build && node --test test/firestore.test.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0",
+    "firebase-functions": "7.4.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.19.7",
+    "prettier": "3.9.10"
+  }
+}
