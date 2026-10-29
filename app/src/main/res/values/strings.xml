@@ -339,11 +339,28 @@
     <!-- Not synced also happens online: the server just hasn\'t confirmed the invitation yet -->
     <string name="care_circle_invite_sync_warning">Waiting to sync. This code will work once the invitation has synced.</string>
     <string name="care_circle_invite_expired_on">The code stopped working on %1$s.</string>
+    <string name="care_circle_invite_send_email">Send by email</string>
+    <string name="care_circle_invite_share">Share</string>
+    <string name="care_circle_invite_copy">Copy</string>
+    <string name="care_circle_invite_copied">Invite code copied</string>
+    <string name="care_circle_invite_no_app">No app on this phone can send it. Copy the invite code instead.</string>
+    <string name="care_circle_invite_renew">Get a new code</string>
+    <string name="care_circle_invite_cancel">Cancel invitation</string>
+    <string name="care_circle_invite_cancel_title">Cancel %1$s\'s invitation?</string>
+    <string name="care_circle_invite_cancel_body">The code will stop working.</string>
+    <string name="care_circle_invite_cancel_keep">Keep</string>
+    <string name="care_circle_invite_action_error">Couldn\'t change this invitation. Try again.</string>
     <string name="care_circle_invite_joined_title">%1$s has joined your circle</string>
     <string name="care_circle_invite_joined_body">%1$s can now see: %2$s. You can change this any time.</string>
     <string name="care_circle_invite_back_to_circle">Back to circle</string>
     <string name="care_circle_invite_not_found">This invitation is no longer pending.</string>
     <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
+    <string name="care_circle_invite_email_subject">Join my care circle on Oncompanion</string>
+    <string name="care_circle_invite_message">Hi %1$s,\n\nI\'d like you to join my care circle on Oncompanion, so you can follow my care.\n\n1. Install Oncompanion and sign in with Google.\n2. Choose \"I\'m a caregiver\".\n3. Tap \"Join a care circle\" and enter this invite code: %2$s\n\n%4$s\n\n%3$s</string>
+    <!-- The message's validity line, e.g. "The code works until 19 Oct 2026." -->
+    <string name="care_circle_invite_message_valid_until">The code works until %1$s.</string>
+    <!-- While the invitation isn\'t on the server yet, its 7 days haven\'t started -->
+    <string name="care_circle_invite_message_valid_once_sent">The code will work for 7 days once my phone has sent the invitation.</string>
     <!-- Neutral: the invitation may have been used just before the new member reaches this phone -->
     <string name="care_circle_invite_not_found_body">It was cancelled, or the person has just joined. Your care circle shows who\'s in it.</string>
     <!-- Prescriptions -->
