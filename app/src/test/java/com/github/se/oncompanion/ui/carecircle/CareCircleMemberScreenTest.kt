@@ -166,6 +166,23 @@ class CareCircleMemberScreenTest {
   }
 
   @Test
+  fun member_justUpdated_saysSoInsteadOfWhenTheyJoined() {
+    setContent(CareCircleMemberUiState.Member(marc, updatedJustNow = true))
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_member_subtitle)
+        .assertTextEquals("Son · Updated just now")
+  }
+
+  @Test
+  fun previews_render() {
+    composeTestRule.setContent {
+      CareCircleMemberScreenPreview()
+      CareCircleMemberScreenNotFoundPreview()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_name).assertTextEquals("Marc Dubois")
+  }
+
+  @Test
   fun member_withoutAddedDate_showsOnlyTheRelationship() {
     setContent(CareCircleMemberUiState.Member(marc.copy(addedAt = null)))
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_subtitle).assertTextEquals("Son")
@@ -253,9 +270,14 @@ class CareCircleMemberScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     var backCalls = 0
+    val opened = mutableListOf<String>()
 
     override fun goBack() {
       backCalls++
+    }
+
+    override fun navigateTo(screen: String) {
+      opened += screen
     }
   }
 
@@ -287,14 +309,11 @@ class CareCircleMemberScreenTest {
   }
 
   @Test
-  fun screen_editingTheMember_explainsItIsNotImplemented() {
-    setScreen()
+  fun screen_editMember_opensTheMemberForm() {
+    val navigationActions = setScreen()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_edit_button).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_member_edit_not_implemented, "Marc"),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf("care_circle_edit_member/marc"), navigationActions.opened)
     }
   }
 

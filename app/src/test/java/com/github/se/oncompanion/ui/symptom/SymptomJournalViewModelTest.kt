@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
+import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
@@ -17,7 +18,17 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -135,14 +146,49 @@ class SymptomJournalViewModelTest {
     assertEquals(LocalTime.of(1, 30), day.entries.single().time)
   }
 
+  /**
+   * Runs [test] with `viewModelScope` on the test's virtual time, so the date alarm, which runs
+   * there, can be fast-forwarded.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun runTestOnVirtualMain(test: suspend TestScope.() -> Unit) = runTest {
+    Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    try {
+      test()
+    } finally {
+      Dispatchers.resetMain()
+    }
+  }
+
   @Test
-  fun refreshToday_followsTheClock() {
+  fun followToday_refreshesTheDateRightAway() = runTestOnVirtualMain {
     val vm = viewModel()
 
+    // The date changed while the journal was in the background
     current = Clock.fixed(Instant.parse("2026-10-06T00:05:00Z"), ZoneOffset.UTC)
-    vm.refreshToday()
+    val following = vm.followToday()
+    runCurrent()
 
     assertEquals(LocalDate.of(2026, 10, 6), vm.uiState.value.today)
+    following.cancel()
+  }
+
+  @Test
+  fun followToday_movesToTheNewDayAtMidnight() = runTestOnVirtualMain {
+    val clock = VirtualClock(testScheduler, Instant.parse("2026-10-05T23:59:00Z"), ZoneOffset.UTC)
+    repository.seed("alice", entry("evening", "2026-10-05T20:00:00Z"))
+    val vm = SymptomJournalViewModel(signedIn(), repository, clock)
+    val following = vm.followToday()
+    runCurrent()
+    assertEquals(LocalDate.of(2026, 10, 5), vm.uiState.value.today)
+
+    advanceTimeBy(1.minutes)
+    runCurrent()
+
+    // The entry stays on its day, which is now "Yesterday"
+    assertEquals(LocalDate.of(2026, 10, 6), vm.uiState.value.today)
+    assertEquals(LocalDate.of(2026, 10, 5), vm.uiState.value.days.single().date)
+    following.cancel()
   }
 
   @Test

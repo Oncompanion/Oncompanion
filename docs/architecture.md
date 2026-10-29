@@ -1,4 +1,3 @@
-<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 <!-- Co-authored-by: Codex <noreply@openai.com> -->
@@ -23,7 +22,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 
 - `LogSymptom` is planned with the voice journal. The add symptom form saves through `SymptomRepository` directly for now: it only uses that repository, so there is no logic to share yet. `LogSymptom` will turn a voice transcript into a draft of the same form, which the patient confirms before it is saved, and log it for the right patient once caregivers can log on a patient's behalf. The form's rule for when a symptom was felt (the pure function `occurredAt` in `AddSymptomViewModel.kt`) then moves to `domain/symptom` with it, so both use the same one.
 - `ManageMedicationSchedule` saves a confirmed prescription with its medications and keeps their reminders in sync. All medication writes go through it, so reminders never drift from the stored schedule; that is why it exposes three named operations (`add`, `update`, `delete`) instead of a single `invoke`.
-- `DraftMedicationFromScan` returns a *draft* with low-confidence fields flagged. Nothing is saved until the patient confirms it on the review screen.
+- `DraftPrescriptionFromScan` reads the photo of a scan with the `TextRecognizer`, then returns a *draft* with the details to check flagged (`readPrescription`), or nothing when nothing could be read or reading failed. Nothing is saved until the patient confirms the draft in the form. It is in `domain/` because it builds a `PrescriptionDraft`, while the reading steps it relies on (below, "Prescription scan") are in `model/`.
 - `GenerateAppointmentSummary` gathers the symptoms and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
 - `ObservePlanning` merges the Planning sources into one list sorted by day and time: appointments (`AppointmentPlanningSource`) and Ligue events (`EventPlanningSource`, every upcoming event until US-30 keeps only the confirmed ones). Medications are planned. Ligue events are optional: `PlanningRepositoryProvider` wraps them in `OptionalPlanningSource`, so if they fail to load they are left out and Planning still shows the rest. Appointments, and medications once added, are essential: if one of them fails, the whole list fails and Planning offers a retry, rather than a calendar that silently misses a medical appointment. `AppointmentPlanningSource` implements the `PlanningRepository` read contract for the signed-in patient: it adapts cached appointment observations to the requested date range and clears entries when the uid changes. Production Planning uses `ObservePlanning` over both sources through `PlanningRepositoryProvider`. `PlanningViewModel` defaults to the planning and auth providers, while navigation supplies only its saved state; its clock and display zone default to the system settings. Its ViewModel separately observes authentication and restarts the agenda on uid changes, so read failures cannot leave the previous patient's entries visible after an account change. Medications are not aggregated yet. Planning has no store of its own: each `PlanningSource` references the feature that owns the data and handles editing.
   - `PlanningTiming.Timed` holds an instant for an appointment or event. `DateOnly` holds a calendar date for an active medication; it is not a scheduled intake, and its day does not shift with the display zone. Medication frequency is recorded free text and is never interpreted into times or doses.
@@ -33,7 +32,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
   - Repositories are injected through the existing screen/ViewModel boundary. Tests and previews can supply mixed entries; production supplies appointments through `AppointmentPlanningSource`. No new collection, layer or dependency is introduced by the mixed-entry contract.
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path.
 
-**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
+**Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. The patient's confirmations that they registered for an event with its organizer (US-25) are in `EventRegistrationRepository`: one document per event, keyed by the event's id, so confirming twice never creates a duplicate. Oncompanion only records what the patient says; registering stays on the organizer's website, linked from the event's `websiteUrl`. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
 
 ## External hospital search (issue #142)
 
@@ -164,7 +163,7 @@ overview identifies Profile hospital text and the reusable content alongside the
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
-## Appointment creation form (issue #147)
+## Appointment form (issues #147 and #206)
 
 Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
 `AppointmentFormUiState` and delegates to stateless `AppointmentFormContent`. Title and explicit
@@ -191,15 +190,79 @@ Local times are resolved in the display zone: spring gaps require correction, au
 times require an offset choice. Account changes clear private input and suppress stale completion.
 Drafts survive rotation via their ViewModel, but process-death restoration is not implemented.
 
+The same form edits an appointment when given its ID. It first reads the signed-in owner's cached
+appointment, then fills every field, including the original repeated-hour offset and time precision.
+Untouched drafts follow saved changes; edited drafts survive later snapshots and read retries.
+Unavailable appointments cannot be saved. Account changes clear private input and cancel old reads;
+stale saves cannot navigate. Save updates the existing ID and retains creation metadata, without
+waiting for server acknowledgement. Unchanged times preserve the exact original instant.
+
+Editing returns to the existing detail destination; its observation refreshes it. Back then returns
+to the originating screen/day. Only creation sends the saved-day result to Planning. Detail uses
+shared `DetailWithActions` and `DetailActions`: supported actions stay visible in normal windows
+and scroll after the content in compact windows. Edit mode reuses the form's keyboard handling.
+
+## Appointment details (issue #205)
+
+`AppointmentDetailScreen` collects one `AppointmentDetailUiState`; its stateless Content follows
+Figma's entry-detail layout using the recorded type, title, start date/time and optional location
+and notes. No end time or reminder is inferred. `AppointmentDetailViewModel` reads the appointment
+repository directly, cancels old observations and clears private content on account changes.
+An unavailable cached snapshot does not confirm server-side deletion; read errors offer retry.
+Retry also restarts authentication observation after an auth failure. Both entry points share
+a resumed-only navigation guard in AppNavHost. Dates use English, matching Overview, while
+times respect the phone clock preference and display zone.
+Planning appointment rows and Overview's next-appointment card open the same detail destination.
+Overview preserves the source appointment ID rather than deriving it from display text. Back pops
+the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
+Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete asks for confirmation.
+
+### Appointment edit recovery
+
+The edit form offers Retry only for a failed load. An unavailable appointment keeps its
+message and Back without Retry. When authentication is lost, the resumed form opens sign-in
+and clears active and saved navigation stacks, matching Join and Whose care. A covered form
+waits until it resumes before redirecting.
+
+Appointment deletion (#207) reuses `DeleteState`, `DeleteConfirmation`, `DeleteConfirmationDialog`
+and the shared adaptive detail actions. Cancel changes nothing. Confirmation queues repository deletion
+for the displayed owner, stops the detail listener to avoid an unavailable-state flash, and returns to
+its originating screen. Immediate failure retains the detail/dialog with retry and resumes its listener.
+Account/session guards suppress stale success and failure. Completion is delivered on resume only while
+this detail is current; Planning keeps its selected day and both calendars update through observations.
+A successful enqueue, also offline, does not confirm server acceptance; deferred rejection feedback is
+outside this flow (#248).
+
 ## Appointment storage
 
 Appointments are stored under `/users/{uid}/appointments/{id}` and observed through Firestore's local cache. `scheduledAt` represents an actual instant rather than a calendar-only date; callers must cancel or replace patient-specific observations when the account changes.
 
+`AppointmentRepository.updateAppointment` updates editable fields on an existing document without
+changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
+is not recreated. Writes are queued locally, including offline, without waiting for server acknowledgement.
+A later server rejection is logged and may roll back local changes. Owner
+updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
+owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
+list/detail observations, with no second Planning write. Detail, editing and confirmed deletion are built.
+
 ## Prescription scan
 
-The scan screen (`ui/prescription/scan/`) uses the camera through CameraX. The camera stays in the UI layer, behind a small `ScanCamera` interface so the screen can be tested with a fake: its preview has to be drawn inside the screen, so it can't sit behind a device service like `TextRecognizer`. Only its result, the photo file, leaves the screen.
+The scan screen (`ui/prescription/scan/`) uses the camera through CameraX. The camera stays in the UI layer, behind a small `ScanCamera` interface so the screen can be tested with a fake: its preview has to be drawn inside the screen, so it can't sit behind a device service like `TextRecognizer`. Only its result, the photo file, leaves the screen. Each scan screen gets its camera from `ScanCameraProvider`, so tests can also give a fake one through the app's navigation.
 
-The photo of a prescription is a medical document, so it is never uploaded and never kept: `ScanPhotoStore` (`model/medication/scan/`) writes it to a `scans/` folder of the app's private cache, which is never backed up. There is at most one photo at a time. It is first shown on the same screen for the user to check (Retake deletes it and shows the camera again), and it is deleted when the scan screen is closed or destroyed, including when the screen is left while the photo is still being written. Photos left behind by an interrupted scan (e.g. the app was killed) are deleted the next time the scan screen opens. When text recognition exists, the photo is handed to `DraftMedicationFromScan`, which deletes it once read.
+The photo of a prescription is a medical document, so it is never uploaded and never kept: `ScanPhotoStore` (`model/medication/scan/`) writes it to a `scans/` folder of the app's private cache, which is never backed up. There is at most one photo at a time. It is first shown on the same screen for the user to check (Retake deletes it and shows the camera again), and it is deleted when the scan screen is closed or destroyed, including when the screen is left while the photo is still being written. Photos left behind by an interrupted scan (e.g. the app was killed) are deleted the next time the scan screen opens. "Use this photo" reads it with `DraftPrescriptionFromScan`. When a prescription is read, the form opens with it in place of the scan screen, as for manual entry: screens only pass text routes to each other, so `ScanHandoffViewModel`, shared by the prescriptions screens, holds the scanned prescription in memory and owns the photo from then on. The photo is deleted when the form is saved or closed, or when the user leaves the prescriptions screens, so a later version can keep it on the phone instead of deleting it. When nothing can be read, the photo stays on the scan screen until the user retakes it or enters the prescription manually. Closing the scan screen while it is read deletes it too.
+
+The text on the photo is read by a `TextRecognizer` (`model/medication/scan/`), a device service behind an interface like the repositories, with its `TextRecognizerProvider` and a `FakeTextRecognizer` for tests. Its implementation, `MlKitTextRecognizer`, uses ML Kit's Latin text recognition (French and English) with the model bundled in the app, so it works offline from the first scan. The photo and its text never leave the phone; ML Kit only sends usage metrics to Google. It returns a `RecognizedText`: plain Kotlin lines, each with its text, its box on the upright photo and ML Kit's confidence, so the prescription parser can be tested without Android or ML Kit. ML Kit doesn't know what a prescription is: it only reads lines, in no guaranteed order, and turning them into a doctor, a date and medications is the parser's job. The photo is read at full size (up to 4096 px), because scaling a page down makes ML Kit misread small print. The recognizer never deletes the photo; whoever owns it does.
+
+Reading a prescription from those lines is plain Kotlin in `model/medication/scan/` (it uses no repository, so it isn't a domain use case), in steps that are tested on their own with what ML Kit read on phone photos of six fictional prescriptions (`src/test/resources/scan/`):
+1. `readingOrder` puts the lines back in reading order: ML Kit returns them in no guaranteed order and splits a table row into cells. Each line joins the row of its left neighbor at about the same height, which follows a slightly tilted photo.
+2. `cleanedOcr` undoes the mistakes ML Kit predictably makes (O for 0 inside a number, a bar for 1 before a dose form, spaces inside a date) without touching words; `comparable` gives the lowercase, accent-free form text is matched in.
+3. `PrescriptionLexicon` holds the French and English words and patterns: dates read day first (05/11/2026 is 5 November), birth-date clues, doctor titles, strengths, dose quantities, frequencies, durations, headings, labels and contact details. A new format means a new word there, not new logic.
+4. `classify` says what each line is: the prescribing doctor, another doctor, the patient, the date, a medication, its dosing, a heading, a label or noise. A label ("PATIENT", "Médecin traitant") applies to the lines just below it in its column, so the family doctor isn't taken for the prescriber and the birth date isn't taken for the prescription's. Unsure lines touching the photo's edge are scraps of other sheets in the background. Doctor and patient lines are recognized before contact details, since they often end with an address.
+5. `readPrescription` (`domain/medication/scan/`) builds the `PrescriptionDraft` and the set of details to check (`ScannedPrescription`). Each medication starts at a name with its strength and takes the dosing below it or beside it in a table row; name, dosage and frequency are kept as written and never guessed ("1-0-0" alone doesn't become "1 comprimé"), and every medication starts on the prescription's date. Weeks and months are counted as 7 and 30 days. A detail is to check when ML Kit was unsure of its line (below 0.8), when it is missing, converted, a maximum or cut to fit, when the doctor or the date is missing, duplicated or improbable, or when ML Kit seems to have split a name ("Métoclopram ide"). No medication read means nothing to review: the patient enters the prescription by hand. A prescription holds 20 medications at most: those read beyond are counted (`leftOut`) so the review can tell the patient, never dropped silently.
+
+The rule the tests hold it to, on the six sheets: **every detail is right or to check**. A wrong detail that isn't flagged is the one the patient would trust. The sheets read right have nothing to check, so flagging everything doesn't pass either, and shuffled lines, unsure readings and digits read as letters must keep the rule.
+
+The patient reviews the draft in the prescription form, which starts from the `ScannedPrescription` the handoff holds. The details to check are shown in amber, with why ("it may not be what's on the paper", or "not found on the scan"), and an icon so they don't rely on the color alone. Amber is the theme's `warning` color, which Material 3 doesn't have: red stays for what blocks Save, and a detail to check doesn't, since the patient may find it right. A detail is no longer to check once the patient edits it; a removed medication takes its details with it. The form view model only keeps this set beside the draft: nothing about the scan is saved with the prescription.
 
 ## Care circle invitations
 
@@ -223,6 +286,8 @@ We didn't store pending members in `circle/` and move them on join (the document
 There are two emails: `invites/{inviteCode}.email` is where the patient sends the invitation (typed, optional, editable while pending), and `circle/{memberUid}.email` is the caregiver's Google account email, set when they join and read-only for the patient. Before joining there is no account to read it from, and after joining the account email is the one to trust. The caregiver's join screen tells them that the patient will see their email.
 
 **Invite codes.** The code is the document ID: 10 characters from an alphabet without 0, O, 1, I and L (they are read aloud and typed), generated on the phone with `SecureRandom`, and shown as `ABCDE-FGHJK`. Anyone signed in may `get` an invite by its code while it is valid; once it has expired, only the patient can, so they can still renew or cancel it. This means that while an invite is pending, anyone holding the code can read its details. Only the patient may `list` their invites, so codes can't be enumerated. A code is valid for 7 days from the **server** `createdAt`. Redeeming deletes the invite, so a code works once, and a removed caregiver can't rejoin with their old one. Invalid, used and expired codes look the same to a caregiver: the app shows one error, and Firestore refuses to read all three (a used invite is deleted, an expired one is readable only by the patient). Joining requires a profile with role `CAREGIVER`.
+
+**The invite code screen and sending the code.** It shows the invite code until the person uses it. There is no server to send email, so the invite code screen hands the invitation to the patient's own apps: "Send by email" opens their email app (`ACTION_SENDTO`) with the code and the steps to join, "Share" opens the share sheet, and "Copy" copies the code. While the invite only exists on the phone (`isSynced` false), the screen says the code works once the invitation has synced (not that the phone is offline: waiting for the server also happens online). A used invite is deleted, so it looks like a cancelled one; the screen tells them apart with the circle's members: someone whose `inviteCode` is this code has joined.
 
 **Redeeming is the one write that needs the network.** Only the server knows whether a code is valid, unused and unexpired, and a local "you joined" that the server later rejects would show someone's data and then take it away. So redeeming is one `runTransaction`, not a batch: a batch is applied to the local cache first, so a dropped connection could show the circle and then take it away. A transaction needs the network and is never queued offline: if it fails, nothing is written to the phone's local storage, and the join screen says why (no connection, or the code can't be used). It reads the invite and the caregiver's `circle/{caregiverUid}` doc (to detect an existing member), then creates the `circle/{caregiverUid}` and `patients/{patientUid}` docs and deletes the invite. The rules check the invite as it was before the transaction (`get`) and the new docs after it (`existsAfter`). Everything else (creating, editing or cancelling an invite, editing or removing a member) works offline. An invite created offline only exists on the patient's phone until it syncs, so the app says the code will work once the phone reconnects (`hasPendingWrites()`).
 
@@ -328,6 +393,7 @@ See the [Firebase Android lifecycle reference](https://firebase.google.com/docs/
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /users/{uid}/patients/{patientUid}    circles this caregiver joined
+/users/{uid}/eventRegistrations/{eventId}   events the user says they registered for (owner only)
 /invites/{inviteCode}                 pending care-circle members (invitations), deleted when redeemed
 /events/{id}                          Ligue events, read: signed in, write: nobody from the app
 /directory/{contacts|programs}/items/{id}   read: signed in, write: staff

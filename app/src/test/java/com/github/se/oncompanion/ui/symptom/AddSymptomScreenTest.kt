@@ -34,6 +34,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
+import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -96,6 +97,7 @@ class AddSymptomScreenTest {
             events += "errorShown"
             uiState = uiState.copy(error = null)
           },
+          onRetry = { events += "retry" },
       )
     }
   }
@@ -446,6 +448,95 @@ class AddSymptomScreenTest {
     node(C.Tag.symptom_add_time_picker).assertDoesNotExist()
   }
 
+  // ----- Editing a symptom -----
+
+  /** Logged yesterday at 09:12. */
+  private val logged =
+      SymptomEntry(
+          id = "s1",
+          types = listOf(SymptomType.FATIGUE),
+          intensity = 4,
+          occurredAt =
+              today.minusDays(1).atTime(9, 12).atZone(ZoneId.of("Europe/Zurich")).toInstant(),
+          notes = "After lunch",
+      )
+
+  /** The form editing [logged], before any change. */
+  private val editingForm =
+      empty.copy(
+          isEditing = true,
+          edited = EditedSymptom(logged, today.minusDays(1), LocalTime.of(9, 12)),
+          types = logged.types,
+          intensity = logged.intensity,
+          date = today.minusDays(1),
+          time = LocalTime.of(9, 12),
+          notes = "After lunch",
+      )
+
+  @Test
+  fun editing_whileLoading_showsTheSpinner_withoutTheFieldsOrSave() {
+    setContent(empty.copy(isEditing = true, isLoading = true))
+
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_title)).assertIsDisplayed()
+    node(C.Tag.symptom_edit_loading).assertIsDisplayed()
+    node(C.Tag.symptom_add_notes).assertDoesNotExist()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
+  }
+
+  @Test
+  fun editing_whenLoadingFailed_offersRetry() {
+    setContent(empty.copy(isEditing = true, hasLoadError = true))
+
+    node(C.Tag.symptom_edit_error).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_error_title)).assertIsDisplayed()
+    // A Firestore error isn't a connection problem: offline, the cache is served instead
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_error_hint)).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.symptom_error_hint)).assertDoesNotExist()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
+    node(C.Tag.symptom_edit_retry).performClick()
+
+    assertEquals(listOf("retry"), events)
+  }
+
+  @Test
+  fun editing_aSymptomThatNoLongerExists_saysSo_withoutRetryOrSave() {
+    setContent(empty.copy(isEditing = true, isNotFound = true))
+
+    node(C.Tag.symptom_edit_not_found).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.symptom_detail_not_found_title))
+        .assertIsDisplayed()
+    node(C.Tag.symptom_edit_retry).assertDoesNotExist()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
+  }
+
+  @Test
+  fun editing_showsWhatWasLogged_andSaveChangesIsDisabled_untilSomethingChanges() {
+    setContent(editingForm)
+
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_title)).assertIsDisplayed()
+    scrolledTo(C.Tag.symptomAddType(SymptomType.FATIGUE.name)).assertIsSelected()
+    scrolledTo(C.Tag.symptom_add_intensity_value)
+        .assertTextEquals(
+            string(
+                R.string.symptom_add_intensity_value,
+                4,
+                string(R.string.symptom_severity_moderate),
+            )
+        )
+    assertWhen("${string(R.string.symptom_journal_yesterday)} · 09:12")
+    composeTestRule.onNodeWithText(string(R.string.symptom_add_date_time_hint)).assertDoesNotExist()
+    scrolledTo(C.Tag.symptom_add_notes).assert(hasText("After lunch"))
+    node(C.Tag.symptom_add_save)
+        .assert(hasText(string(R.string.symptom_edit_save)))
+        .assertIsNotEnabled()
+
+    uiState = editingForm.copy(intensity = 7)
+
+    node(C.Tag.symptom_add_save).assertIsEnabled().performClick()
+    assertEquals(listOf("save"), events)
+  }
+
   // ----- Screen with its ViewModel -----
 
   @Test
@@ -476,5 +567,33 @@ class AddSymptomScreenTest {
     assertEquals(listOf(SymptomType.FATIGUE), entry.types)
     assertEquals(7, entry.intensity)
     assertEquals(clock.instant(), entry.occurredAt)
+  }
+
+  @Test
+  fun screen_editing_loadsTheSymptom_savesTheChange_andLeaves() {
+    val zone = ZoneId.of("Europe/Zurich")
+    val clock = Clock.fixed(now.atZone(zone).toInstant(), zone)
+    val repository = FakeSymptomRepository(clock = clock::instant).apply { seed("alice", logged) }
+    val auth =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    val viewModel = AddSymptomViewModel(auth, repository, clock, symptomId = logged.id)
+    var savedCount = 0
+    composeTestRule.setContent {
+      AddSymptomScreen(viewModel = viewModel, onBack = {}, onSaved = { savedCount++ })
+    }
+
+    assertWhen("${string(R.string.symptom_journal_yesterday)} · 09:12")
+    node(C.Tag.symptom_add_save).assertIsNotEnabled()
+    scrolledTo(C.Tag.symptomAddType(SymptomType.PAIN.name)).performClick()
+    node(C.Tag.symptom_add_save).performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(1, savedCount)
+    assertEquals(
+        logged.copy(types = listOf(SymptomType.FATIGUE, SymptomType.PAIN)),
+        repository.symptoms("alice").single(),
+    )
   }
 }

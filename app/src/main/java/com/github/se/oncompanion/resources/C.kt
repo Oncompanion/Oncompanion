@@ -7,6 +7,18 @@ package com.github.se.oncompanion.resources
 // Like R, but C
 object C {
   object Tag {
+    // Appointment detail
+    const val appointment_detail_screen = "appointment_detail_screen"
+    const val appointment_detail_loading = "appointment_detail_loading"
+    const val appointment_detail_feedback = "appointment_detail_feedback"
+    const val appointment_detail_retry = "appointment_detail_retry"
+    const val appointment_detail_content = "appointment_detail_content"
+    const val appointment_detail_edit_button = "appointment_detail_edit_button"
+    const val appointment_detail_delete_button = "appointment_detail_delete_button"
+    const val appointment_delete_dialog = "appointment_delete_dialog"
+    const val appointment_delete_confirm = "appointment_delete_confirm"
+    const val appointment_delete_cancel = "appointment_delete_cancel"
+    const val appointment_delete_error = "appointment_delete_error"
     // Appointment form
     const val appointment_screen = "appointment_screen"
     const val appointment_back = "appointment_back"
@@ -23,6 +35,10 @@ object C {
 
     /** Identifies the recorded appointment category choice. */
     fun appointmentType(type: String) = "appointment_type_$type"
+
+    const val appointment_form_feedback = "appointment_form_feedback"
+    const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_form_retry = "appointment_form_retry"
 
     // Hospital field
     const val hospital_field = "hospital_field"
@@ -83,6 +99,7 @@ object C {
     const val overview_today_list = "overview_today_list"
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
+    const val overview_whose_care = "overview_whose_care"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
@@ -111,6 +128,19 @@ object C {
     const val events_refresh_retry = "events_refresh_retry"
 
     fun eventCard(eventId: String) = "event_card_$eventId"
+
+    const val event_detail_back_to_events = "event_detail_back_to_events"
+    const val event_detail_visit_website = "event_detail_visit_website"
+    const val event_detail_confirm = "event_detail_confirm"
+    const val event_detail_registration_note = "event_detail_registration_note"
+    const val event_detail_registration_closed = "event_detail_registration_closed"
+    const val event_detail_registration_confirmed = "event_detail_registration_confirmed"
+    const val event_detail_remove = "event_detail_remove"
+    const val event_detail_remove_dialog = "event_detail_remove_dialog"
+    const val event_detail_remove_cancel = "event_detail_remove_cancel"
+    const val event_detail_remove_confirm = "event_detail_remove_confirm"
+    const val event_detail_registration_error = "event_detail_registration_error"
+    const val event_detail_registration_retry = "event_detail_registration_retry"
 
     const val symptoms_screen = "symptoms_screen"
     const val symptom_back_button = "symptom_back_button"
@@ -148,6 +178,11 @@ object C {
     const val symptom_delete_confirm = "symptom_delete_confirm"
     const val symptom_delete_cancel = "symptom_delete_cancel"
     const val symptom_delete_error = "symptom_delete_error"
+    const val symptom_edit_loading = "symptom_edit_loading"
+    const val symptom_edit_error = "symptom_edit_error"
+    const val symptom_edit_retry = "symptom_edit_retry"
+    const val symptom_edit_not_found = "symptom_edit_not_found"
+    const val symptom_detail_edit = "symptom_detail_edit"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
@@ -253,6 +288,9 @@ object C {
     const val care_circle_form_saving = "care_circle_form_saving"
     const val care_circle_form_missing = "care_circle_form_missing"
     const val care_circle_form_save_error = "care_circle_form_save_error"
+    const val care_circle_form_loading = "care_circle_form_loading"
+    const val care_circle_form_not_found = "care_circle_form_not_found"
+    const val care_circle_form_load_error = "care_circle_form_load_error"
 
     /** The relationship [relationshipName] in the relationship menu, e.g. "DAUGHTER". */
     fun careCircleFormRelationshipOption(relationshipName: String) =
@@ -261,6 +299,51 @@ object C {
     /** The switch giving access to [permissionName], e.g. "PLANNING". */
     fun careCircleFormPermission(permissionName: String) =
         "care_circle_form_permission_$permissionName"
+
+    // Join a care circle
+    const val join_circle_screen = "join_circle_screen"
+    const val join_circle_code_field = "join_circle_code_field"
+    const val join_circle_join_button = "join_circle_join_button"
+    const val join_circle_no_code_hint = "join_circle_no_code_hint"
+    const val join_circle_profile = "join_circle_profile"
+    const val join_circle_joining = "join_circle_joining"
+    const val join_circle_joined = "join_circle_joined"
+    const val join_circle_continue = "join_circle_continue"
+
+    // Whose care?
+    const val whose_care_screen = "whose_care_screen"
+    const val whose_care_back = "whose_care_back"
+    const val whose_care_loading = "whose_care_loading"
+    const val whose_care_error = "whose_care_error"
+    const val whose_care_empty = "whose_care_empty"
+    const val whose_care_action = "whose_care_action"
+    const val whose_care_join_another = "whose_care_join_another"
+
+    /** The row of the followed patient [uid] in "Whose care?". */
+    fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
+    // Care circle invite code
+    const val care_circle_invite_screen = "care_circle_invite_screen"
+    const val care_circle_invite_back_button = "care_circle_invite_back_button"
+    const val care_circle_invite_loading = "care_circle_invite_loading"
+    const val care_circle_invite_error = "care_circle_invite_error"
+    const val care_circle_invite_retry_button = "care_circle_invite_retry_button"
+    const val care_circle_invite_not_found = "care_circle_invite_not_found"
+    const val care_circle_invite_code = "care_circle_invite_code"
+    const val care_circle_invite_valid = "care_circle_invite_valid"
+    const val care_circle_invite_sync_warning = "care_circle_invite_sync_warning"
+    const val care_circle_invite_expired = "care_circle_invite_expired"
+    const val care_circle_invite_email_button = "care_circle_invite_email_button"
+    const val care_circle_invite_share_button = "care_circle_invite_share_button"
+    const val care_circle_invite_copy_button = "care_circle_invite_copy_button"
+    const val care_circle_invite_renew_button = "care_circle_invite_renew_button"
+    const val care_circle_invite_cancel_button = "care_circle_invite_cancel_button"
+    const val care_circle_invite_cancel_dialog = "care_circle_invite_cancel_dialog"
+    const val care_circle_invite_cancel_confirm = "care_circle_invite_cancel_confirm"
+    const val care_circle_invite_cancel_dismiss = "care_circle_invite_cancel_dismiss"
+    const val care_circle_invite_action_error = "care_circle_invite_action_error"
+    const val care_circle_invite_joined = "care_circle_invite_joined"
+    const val care_circle_invite_back_to_circle_button = "care_circle_invite_back_to_circle_button"
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
@@ -281,6 +364,11 @@ object C {
     const val prescription_form_date_picker = "prescription_form_date_picker"
     const val prescription_form_date_picker_confirm = "prescription_form_date_picker_confirm"
     const val prescription_form_date_picker_cancel = "prescription_form_date_picker_cancel"
+    const val prescription_form_loading = "prescription_form_loading"
+    const val prescription_form_not_found = "prescription_form_not_found"
+    const val prescription_form_not_signed_in = "prescription_form_not_signed_in"
+    const val prescription_form_load_error = "prescription_form_load_error"
+    const val prescription_form_retry_button = "prescription_form_retry_button"
 
     /** The row of a medication that isn't open; [position] is its position in the form. */
     fun prescriptionFormMedicationRow(position: Int) = "prescription_form_medication_row_$position"
@@ -299,6 +387,27 @@ object C {
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
 
+    const val prescription_detail_screen = "prescription_detail_screen"
+    const val prescription_detail_back_button = "prescription_detail_back_button"
+    const val prescription_detail_loading = "prescription_detail_loading"
+    const val prescription_detail_error = "prescription_detail_error"
+    const val prescription_detail_retry_button = "prescription_detail_retry_button"
+    const val prescription_detail_not_found = "prescription_detail_not_found"
+    const val prescription_detail_content = "prescription_detail_content"
+    const val prescription_detail_prescribed_by = "prescription_detail_prescribed_by"
+    const val prescription_detail_date = "prescription_detail_date"
+    const val prescription_detail_medications_header = "prescription_detail_medications_header"
+    const val prescription_detail_edit_button = "prescription_detail_edit_button"
+    const val prescription_detail_delete_button = "prescription_detail_delete_button"
+    const val prescription_delete_dialog = "prescription_delete_dialog"
+    const val prescription_delete_confirm = "prescription_delete_confirm"
+    const val prescription_delete_cancel = "prescription_delete_cancel"
+    const val prescription_delete_error = "prescription_delete_error"
+
+    /** One medication of the prescription detail. */
+    fun prescriptionDetailMedication(medicationId: String) =
+        "prescription_detail_medication_$medicationId"
+
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
     const val prescription_scan_close_button = "prescription_scan_close_button"
@@ -316,5 +425,20 @@ object C {
     const val prescription_scan_photo_unreadable = "prescription_scan_photo_unreadable"
     const val prescription_scan_retake_button = "prescription_scan_retake_button"
     const val prescription_scan_use_photo_button = "prescription_scan_use_photo_button"
+    const val prescription_scan_reading = "prescription_scan_reading"
+    const val prescription_scan_nothing_read = "prescription_scan_nothing_read"
+    const val prescription_scan_nothing_read_enter_manually_button =
+        "prescription_scan_nothing_read_enter_manually_button"
+    const val prescription_scan_nothing_read_retake_button =
+        "prescription_scan_nothing_read_retake_button"
+
+    // Reviewing the scanned prescription in the prescription form
+    const val prescription_review_notice = "prescription_review_notice"
+
+    /** Why a field is to check; [field] is "prescribed_by", "prescribed_on", or a detail's name. */
+    fun prescriptionReviewFieldCheck(field: String) = "prescription_review_field_check_$field"
+
+    /** What to check on the row of the medication at [position], when it isn't open. */
+    fun prescriptionReviewRowCheck(position: Int) = "prescription_review_row_check_$position"
   }
 }

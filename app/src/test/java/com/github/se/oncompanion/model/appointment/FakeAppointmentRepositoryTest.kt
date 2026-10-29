@@ -1,3 +1,5 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import java.time.Clock
@@ -30,6 +32,153 @@ class FakeAppointmentRepositoryTest {
           scheduledAt = Instant.parse(time),
           type = AppointmentType.CONSULTATION,
       )
+
+  /** Updates all editable fields without changing identity, metadata or another owner's data. */
+  @Test
+  fun updatePreservesIdentityAndMetadataAndClearsOptionalFields() = runTest {
+    val original =
+        appointment(id = "shared").copy(createdAt = now, location = "HUG", notes = "Note")
+    repository.seed("alice", original)
+    repository.seed("bob", original)
+    val changed =
+        original.copy(
+            title = "Treatment",
+            scheduledAt = now,
+            type = AppointmentType.TREATMENT,
+            location = null,
+            notes = null,
+            createdAt = Instant.EPOCH,
+        )
+    repository.updateAppointment("alice", changed)
+    assertEquals(listOf(changed.copy(createdAt = now)), repository.appointments("alice"))
+    assertEquals(listOf(original), repository.appointments("bob"))
+  }
+
+  /** Missing updates never insert a new record, including in another patient's collection. */
+  @Test
+  fun missingUpdateDoesNotCreateAnAppointment() = runTest {
+    repository.updateAppointment("alice", appointment(id = "missing"))
+    assertTrue(repository.appointments("alice").isEmpty())
+  }
+
+  /** Existing list and detail collectors receive edits and the resulting order changes. */
+  @Test
+  fun updateNotifiesObserversAndReordersAppointments() = runTest {
+    val first = appointment(id = "first")
+    val second = appointment("2026-10-16T08:00:00Z", "second")
+    repository.seed("alice", first, second)
+    val lists = mutableListOf<List<Appointment>>()
+    val details = mutableListOf<Appointment?>()
+    val listJob =
+        backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+          repository.observeAppointments("alice").toList(lists)
+        }
+    val detailJob =
+        backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+          repository.observeAppointment("alice", first.id).toList(details)
+        }
+    runCurrent()
+    val changed = first.copy(scheduledAt = Instant.parse("2026-10-17T08:00:00Z"))
+    repository.updateAppointment("alice", changed)
+    runCurrent()
+    assertEquals(listOf(listOf(first, second), listOf(second, changed)), lists)
+    assertEquals(listOf(first, changed), details)
+    listJob.cancel()
+    detailJob.cancel()
+  }
+
+  /** Rejected fields and simulated enqueue failure retain the original and permit a retry. */
+  @Test
+  fun invalidAndFailedUpdatesLeaveStorageUnchanged() = runTest {
+    val original = appointment(id = "saved")
+    repository.seed("alice", original)
+    for (invalid in
+        listOf(
+            original.copy(title = " "),
+            original.copy(location = "x".repeat(201)),
+            original.copy(notes = "x".repeat(1001)),
+            original.copy(scheduledAt = Instant.MAX),
+        )) {
+      assertTrue(
+          runCatching { repository.updateAppointment("alice", invalid) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.updateAppointment(value, original) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.updateAppointment("alice", original.copy(id = value)) }
+              .exceptionOrNull() is IllegalArgumentException
+      )
+    }
+    val failure = IllegalStateException("Write failed")
+    repository.writeError = failure
+    val changed = original.copy(title = "Changed")
+    assertSame(
+        failure,
+        runCatching { repository.updateAppointment("alice", changed) }.exceptionOrNull(),
+    )
+    assertEquals(listOf(original), repository.appointments("alice"))
+    repository.writeError = null
+    repository.updateAppointment("alice", changed)
+    assertEquals(listOf(changed), repository.appointments("alice"))
+  }
+
+  /** Removal reaches existing list/detail observers while another patient's data is untouched. */
+  @Test
+  fun deletionNotifiesObserversAndKeepsUsersSeparated() = runTest {
+    val original = appointment(id = "shared")
+    repository.seed("alice", original)
+    repository.seed("bob", original)
+    val lists = mutableListOf<List<Appointment>>()
+    val details = mutableListOf<Appointment?>()
+    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+      repository.observeAppointments("alice").toList(lists)
+    }
+    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+      repository.observeAppointment("alice", original.id).toList(details)
+    }
+    runCurrent()
+    repository.deleteAppointment("alice", original.id)
+    runCurrent()
+    repository.deleteAppointment("alice", original.id)
+    repository.deleteAppointment("nobody", "missing")
+    runCurrent()
+    assertEquals(listOf(listOf(original), emptyList<Appointment>()), lists)
+    assertEquals(listOf(original, null), details)
+    assertEquals(listOf(original), repository.appointments("bob"))
+    assertTrue(repository.appointments("nobody").isEmpty())
+  }
+
+  /** Invalid paths and simulated failures leave the appointment available for a retry. */
+  @Test
+  fun invalidAndFailedDeletionsLeaveStorageUnchanged() = runTest {
+    val original = appointment(id = "saved")
+    repository.seed("alice", original)
+    for (value in listOf("", " ", "nested/path")) {
+      assertTrue(
+          runCatching { repository.deleteAppointment(value, original.id) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+      assertTrue(
+          runCatching { repository.deleteAppointment("alice", value) }.exceptionOrNull()
+              is IllegalArgumentException
+      )
+    }
+    val failure = IllegalStateException("Write failed")
+    repository.writeError = failure
+    assertSame(
+        failure,
+        runCatching { repository.deleteAppointment("alice", original.id) }.exceptionOrNull(),
+    )
+    assertEquals(listOf(original), repository.appointments("alice"))
+    repository.writeError = null
+    repository.deleteAppointment("alice", original.id)
+    assertTrue(repository.appointments("alice").isEmpty())
+  }
 
   /** Distinguishes an empty collection from an existing appointment. */
   @Test
@@ -286,5 +435,25 @@ class FakeAppointmentRepositoryTest {
         appointment().copy(id = id, createdAt = now),
         repository.observeAppointment("alice", id).first(),
     )
+  }
+
+  /** The shared gate records the owner before holding deletion, and release applies the write. */
+  @Test
+  fun deletionGateHoldsUntilReleased() = runTest {
+    val original = appointment(id = "saved")
+    repository.seed("alice", original)
+    val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+    repository.writeGate = gate
+    val write =
+        launch(StandardTestDispatcher(testScheduler)) {
+          repository.deleteAppointment("alice", original.id)
+        }
+    runCurrent()
+    assertEquals(listOf("alice" to original.id), repository.deleteRequests)
+    assertEquals(listOf(original), repository.appointments("alice"))
+    gate.complete(Unit)
+    runCurrent()
+    write.join()
+    assertTrue(repository.appointments("alice").isEmpty())
   }
 }

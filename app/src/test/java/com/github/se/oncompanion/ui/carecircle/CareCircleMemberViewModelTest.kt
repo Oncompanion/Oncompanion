@@ -69,6 +69,25 @@ class CareCircleMemberViewModelTest {
   }
 
   @Test
+  fun memberEditedDuringTheVisit_saysItWasJustUpdated() = runTest {
+    repository.setMembers(ownerUid, listOf(marc))
+    val viewModel = createViewModel()
+    advanceUntilIdle()
+    assertEquals(CareCircleMemberUiState.Member(marc), viewModel.uiState.value)
+
+    // The edit form saved Marc's new access, then navigation came back here
+    val updated = marc.copy(permissions = CarePermission.entries.toSet())
+    repository.setMembers(ownerUid, listOf(updated))
+    viewModel.onMemberUpdated()
+    advanceUntilIdle()
+
+    assertEquals(
+        CareCircleMemberUiState.Member(updated, updatedJustNow = true),
+        viewModel.uiState.value,
+    )
+  }
+
+  @Test
   fun initialState_isLoading() {
     val viewModel = createViewModel()
     assertEquals(CareCircleMemberUiState.Loading, viewModel.uiState.value)

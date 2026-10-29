@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import android.util.Log
@@ -60,33 +62,55 @@ class AppointmentRepositoryFirestore(
     }
   }
 
-  override suspend fun addAppointment(uid: String, appointment: Appointment): String =
-      SessionAccess.operation {
-        requirePathSegment(uid)
-        require(appointment.isValid()) { "Invalid appointment" }
-        // Generate a fresh ID locally, ignoring any identity or creation time supplied by the
-        // caller.
-        val document = collection(uid).document()
-        document
-            .set(
-                mapOf(
-                    FIELD_TITLE to appointment.title,
-                    FIELD_SCHEDULED_AT to Timestamp(appointment.scheduledAt),
-                    FIELD_TYPE to appointment.type.name,
-                    FIELD_LOCATION to appointment.location,
-                    FIELD_NOTES to appointment.notes,
-                    FIELD_CREATED_AT to FieldValue.serverTimestamp(),
-                )
-            )
-            .addOnFailureListener { error ->
-              Log.e(
-                  TAG,
-                  "Appointment write ${document.id} was rejected; the local write was rolled back",
-                  error,
-              )
-            }
-        return@operation document.id
-      }
+  override suspend fun addAppointment(uid: String, appointment: Appointment): String = SessionAccess.operation {
+    requirePathSegment(uid)
+    require(appointment.isValid()) { "Invalid appointment" }
+    // Generate a fresh ID locally, ignoring any identity or creation time supplied by the caller.
+    val document = collection(uid).document()
+    document
+        .set(fieldsOf(appointment) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
+        .addOnFailureListener { error ->
+          Log.e(
+              TAG,
+              "Appointment write ${document.id} was rejected; the local write was rolled back",
+              error,
+          )
+        }
+    return@operation document.id
+  }
+
+  override suspend fun updateAppointment(uid: String, appointment: Appointment): Unit = SessionAccess.operation {
+    requirePathSegment(uid)
+    requirePathSegment(appointment.id)
+    require(appointment.isValid()) { "Invalid appointment" }
+    // Update only editable fields so missing documents and creation metadata stay protected.
+    collection(uid).document(appointment.id).update(fieldsOf(appointment)).addOnFailureListener {
+        error ->
+      Log.e(
+          TAG,
+          "Appointment update ${appointment.id} was rejected; local changes rolled back",
+          error,
+      )
+    }
+  }
+
+  override suspend fun deleteAppointment(uid: String, id: String): Unit = SessionAccess.operation {
+    requirePathSegment(uid)
+    requirePathSegment(id)
+    collection(uid).document(id).delete().addOnFailureListener { error ->
+      Log.e(TAG, "Appointment deletion $id was rejected; the local removal was rolled back", error)
+    }
+  }
+
+  /** Editable appointment fields, shared by creation and updates to keep storage consistent. */
+  private fun fieldsOf(appointment: Appointment): Map<String, Any?> =
+      mapOf(
+          FIELD_TITLE to appointment.title,
+          FIELD_SCHEDULED_AT to Timestamp(appointment.scheduledAt),
+          FIELD_TYPE to appointment.type.name,
+          FIELD_LOCATION to appointment.location,
+          FIELD_NOTES to appointment.notes,
+      )
 
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)

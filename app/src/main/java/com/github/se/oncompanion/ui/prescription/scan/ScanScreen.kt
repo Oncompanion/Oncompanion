@@ -20,6 +20,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,10 +43,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -95,19 +94,29 @@ import kotlinx.coroutines.withContext
  *
  * @param onEnterManually opens the manual entry form (US-24)
  * @param onBack leaves the scan screen
+ * @param onRead opens the form with the prescription read on the photo, which is now its own
  * @param camera the camera; replaced by a fake in tests
  */
 @Composable
 fun ScanScreen(
     onEnterManually: () -> Unit,
     onBack: () -> Unit,
+    onRead: (ReadScan) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ScanViewModel = scanViewModel(),
-    camera: ScanCamera = remember { CameraXScanCamera() },
+    camera: ScanCamera = remember { ScanCameraProvider.newCamera() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
+
+  // A prescription was read: the form opens with it, once
+  LaunchedEffect(uiState.read) {
+    uiState.read?.let {
+      onRead(it)
+      viewModel.onReadOpened()
+    }
+  }
 
   // Android's permission dialog; its answer goes to the view model
   val permissionLauncher =
@@ -219,26 +228,12 @@ fun ScanContent(
     viewfinder: @Composable (Modifier) -> Unit = {},
     photoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-  // One message at a time about the last photo, then the view model forgets it
+  // The message about the failed photo, then the view model forgets it
   val snackbarHostState = remember { SnackbarHostState() }
   val captureFailed = stringResource(R.string.prescription_scan_capture_failed)
-  val readingComingSoon = stringResource(R.string.prescription_scan_reading_coming_soon)
-  val enterManually = stringResource(R.string.prescription_scan_enter_manually)
-  LaunchedEffect(uiState.captureFailed, uiState.readingComingSoon) {
-    when {
-      uiState.captureFailed -> snackbarHostState.showSnackbar(captureFailed)
-      // Until prescriptions can be read, manual entry is the way forward (US-24)
-      uiState.readingComingSoon -> {
-        val result =
-            snackbarHostState.showSnackbar(
-                readingComingSoon,
-                actionLabel = enterManually,
-                duration = SnackbarDuration.Long,
-            )
-        if (result == SnackbarResult.ActionPerformed) onEnterManually()
-      }
-      else -> return@LaunchedEffect
-    }
+  LaunchedEffect(uiState.captureFailed) {
+    if (!uiState.captureFailed) return@LaunchedEffect
+    snackbarHostState.showSnackbar(captureFailed)
     onMessageShown()
   }
 
@@ -258,8 +253,12 @@ fun ScanContent(
               title = {
                 Text(
                     stringResource(
-                        if (uiState.photo != null) R.string.prescription_scan_check_title
-                        else R.string.prescription_scan_title
+                        when {
+                          uiState.isReading -> R.string.prescription_scan_reading_title
+                          uiState.nothingRead -> R.string.prescription_scan_nothing_read_title
+                          uiState.photo != null -> R.string.prescription_scan_check_title
+                          else -> R.string.prescription_scan_title
+                        }
                     )
                 )
               },
@@ -305,7 +304,13 @@ fun ScanContent(
                 R.string.prescription_scan_camera_unavailable_explanation,
             )
         uiState.photo != null ->
-            PhotoPreview(uiState.photo, onRetake, onUsePhoto, photoDispatcher, content)
+            PhotoPreview(uiState.photo, photoDispatcher, content) {
+              when {
+                uiState.isReading -> Reading()
+                uiState.nothingRead -> NothingRead(onEnterManually, onRetake)
+                else -> CheckPhoto(onUsePhoto, onRetake)
+              }
+            }
         else -> CameraView(uiState, onCapture, viewfinder, content)
       }
     }
@@ -404,16 +409,15 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
 }
 
 /**
- * The photo just taken, so the user checks it is sharp and complete before it's used (Figma "US-10
- * / Scan – Photo preview").
+ * The photo just taken, with [below] it what can be done with it: check it, see it being read, or
+ * see that nothing could be read on it.
  */
 @Composable
 private fun PhotoPreview(
     photo: File,
-    onRetake: () -> Unit,
-    onUsePhoto: () -> Unit,
     photoDispatcher: CoroutineDispatcher,
     modifier: Modifier,
+    below: @Composable ColumnScope.() -> Unit,
 ) {
   Column(
       modifier = modifier.testTag(C.Tag.prescription_scan_photo_preview),
@@ -437,31 +441,97 @@ private fun PhotoPreview(
             )
       }
     }
+    below()
+  }
+}
+
+/**
+ * Below the photo just taken: the user checks it is sharp and complete before it's used (Figma
+ * "US-10 / Scan – Photo preview").
+ */
+@Composable
+private fun CheckPhoto(onUsePhoto: () -> Unit, onRetake: () -> Unit) {
+  Text(
+      text = stringResource(R.string.prescription_scan_check_hint),
+      style = MaterialTheme.typography.bodyMedium,
+      modifier = Modifier.padding(horizontal = 16.dp),
+  )
+  // "Use this photo" first, as in the mockup: it's the expected next step
+  PhotoActions(
+      primary = R.string.prescription_scan_use_photo,
+      onPrimary = onUsePhoto,
+      primaryTag = C.Tag.prescription_scan_use_photo_button,
+      secondary = R.string.prescription_scan_retake,
+      onSecondary = onRetake,
+      secondaryTag = C.Tag.prescription_scan_retake_button,
+  )
+}
+
+/** Below the photo while the prescription is read on it (Figma "US-10 / Scan – Reading"). */
+@Composable
+private fun Reading() {
+  Column(
+      modifier =
+          Modifier.navigationBarsPadding().padding(24.dp).testTag(C.Tag.prescription_scan_reading),
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    CircularProgressIndicator()
     Text(
-        text = stringResource(R.string.prescription_scan_check_hint),
+        text = stringResource(R.string.prescription_scan_reading),
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp),
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = 16.dp),
     )
-    // "Use this photo" first, as in the mockup: it's the expected next step
-    Button(
-        onClick = onUsePhoto,
-        modifier =
-            Modifier.fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
-                .testTag(C.Tag.prescription_scan_use_photo_button),
-    ) {
-      Text(stringResource(R.string.prescription_scan_use_photo))
-    }
-    OutlinedButton(
-        onClick = onRetake,
-        modifier =
-            Modifier.fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(16.dp)
-                .testTag(C.Tag.prescription_scan_retake_button),
-    ) {
-      Text(stringResource(R.string.prescription_scan_retake))
-    }
+  }
+}
+
+/**
+ * Below the photo when no prescription could be read on it (Figma "US-10 / Scan – Nothing read"):
+ * entering it manually comes first, since a retake rarely helps with handwriting.
+ */
+@Composable
+private fun NothingRead(onEnterManually: () -> Unit, onRetake: () -> Unit) {
+  Text(
+      text = stringResource(R.string.prescription_scan_nothing_read),
+      style = MaterialTheme.typography.bodyMedium,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.padding(horizontal = 16.dp).testTag(C.Tag.prescription_scan_nothing_read),
+  )
+  PhotoActions(
+      primary = R.string.prescription_scan_enter_it_manually,
+      onPrimary = onEnterManually,
+      primaryTag = C.Tag.prescription_scan_nothing_read_enter_manually_button,
+      secondary = R.string.prescription_scan_retake_photo,
+      onSecondary = onRetake,
+      secondaryTag = C.Tag.prescription_scan_nothing_read_retake_button,
+  )
+}
+
+/** The two buttons below the photo: the expected next step first, then the other way. */
+@Composable
+private fun PhotoActions(
+    primary: Int,
+    onPrimary: () -> Unit,
+    primaryTag: String,
+    secondary: Int,
+    onSecondary: () -> Unit,
+    secondaryTag: String,
+) {
+  Button(
+      onClick = onPrimary,
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+              .testTag(primaryTag),
+  ) {
+    Text(stringResource(primary))
+  }
+  OutlinedButton(
+      onClick = onSecondary,
+      modifier =
+          Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).testTag(secondaryTag),
+  ) {
+    Text(stringResource(secondary))
   }
 }
 

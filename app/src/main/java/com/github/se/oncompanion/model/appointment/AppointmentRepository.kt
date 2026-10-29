@@ -1,10 +1,12 @@
+// Co-authored-by: Codex <noreply@openai.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Reads and creates a patient's appointments, independently of Firebase. Callers resolve the
- * patient uid and cancel their observations when the account changes.
+ * Reads and writes a patient's appointments, independently of Firebase. Callers resolve the patient
+ * uid and cancel their observations when the account changes.
  */
 interface AppointmentRepository {
   /**
@@ -26,6 +28,29 @@ interface AppointmentRepository {
    * @throws IllegalArgumentException if [uid] or [id] is blank or contains a path separator
    */
   fun observeAppointment(uid: String, id: String): Flow<Appointment?>
+
+  /**
+   * Enqueues changes to the existing [appointment] for [uid], preserving its stored creation time.
+   * Returns without waiting for server acknowledgement, including offline. An absent document is
+   * never created; its deferred update rejection is logged, not thrown to the caller.
+   *
+   * Validation and immediate enqueue failures are thrown. Later server rejection may roll back
+   * locally visible changes; completion does not confirm server acceptance or a disk flush.
+   *
+   * @throws IllegalArgumentException if editable fields are invalid, or [uid] or the appointment ID
+   *   is blank or contains a path separator
+   */
+  suspend fun updateAppointment(uid: String, appointment: Appointment)
+
+  /**
+   * Enqueues deletion of appointment [id] for [uid], including offline. Deleting an absent document
+   * is harmless. Returns without server acknowledgement or an independently verified disk flush.
+   * Immediate enqueue failures are thrown; deferred server rejection is logged and may restore the
+   * locally removed appointment.
+   *
+   * @throws IllegalArgumentException if [uid] or [id] is blank or contains a path separator
+   */
+  suspend fun deleteAppointment(uid: String, id: String)
 
   /**
    * Enqueues a new appointment for [uid] and returns its generated ID without waiting for server
