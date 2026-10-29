@@ -2,6 +2,11 @@
 import { FieldValue, Firestore, Timestamp } from "firebase-admin/firestore";
 import { Hospital, SearchError, SearchStore } from "./contracts.js";
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const MAX_HOURLY_CACHE_MISSES = 10;
+const MAX_DAILY_CACHE_MISSES = 50;
+
 /** Admin-only seven-day cache, distinct from both Android caches. */
 export class FirestoreSearchStore implements SearchStore {
   /** Creates an adapter for the selected server-side database. */
@@ -24,11 +29,11 @@ export class FirestoreSearchStore implements SearchStore {
     await ref.set({
       results,
       expiresAt: Timestamp.fromMillis(
-        snapshot.readTime.toMillis() + 7 * 86400_000,
+        snapshot.readTime.toMillis() + 7 * DAY_MS,
       ),
     });
   }
-  /** Atomically admits at most ten misses in any hour and fifty in any day. */
+  /** Atomically enforces the rolling hourly and daily cache-miss limits defined above. */
   async consumeQuota(key: string): Promise<void> {
     if (!/^[a-f0-9]{64}$/.test(key)) throw new Error("Invalid quota key");
     const ref = this.db.doc(`hospitalSearchQuota/${key}`);
@@ -42,18 +47,19 @@ export class FirestoreSearchStore implements SearchStore {
           stored.some((time) => !(time instanceof Timestamp))
         )
           throw new Error("Invalid quota state");
-        // Rolling windows avoid double bursts at calendar boundaries; the array is bounded to fifty.
+        // Rolling windows avoid double bursts at calendar boundaries; the array is bounded by the daily limit.
         const misses: Timestamp[] = stored.filter(
-          (time) => time.toMillis() > now - 86400_000,
+          (time) => time.toMillis() > now - DAY_MS,
         );
         if (
-          misses.length >= 50 ||
-          misses.filter((time) => time.toMillis() > now - 3600_000).length >= 10
+          misses.length >= MAX_DAILY_CACHE_MISSES ||
+          misses.filter((time) => time.toMillis() > now - HOUR_MS).length >=
+            MAX_HOURLY_CACHE_MISSES
         )
           throw new SearchError(429, "quota_exceeded");
         transaction.set(ref, {
           misses: [...misses, snapshot.readTime],
-          expiresAt: Timestamp.fromMillis(now + 86400_000),
+          expiresAt: Timestamp.fromMillis(now + DAY_MS),
         });
       },
       { maxAttempts: 10 },

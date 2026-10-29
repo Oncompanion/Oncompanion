@@ -100,21 +100,32 @@ test("reject missing, repeated, malformed, oversized and forwarding parameters",
     assert.throws(() => queryFromUrl(u), failure(400), u);
   assert.throws(() => queryFromUrl("x".repeat(2049)), failure(413));
 });
-test("service caches successful results and empty arrays under hashed keys", async () => {
+test("service caches successful results and empty arrays under hashed keys", async (t) => {
   for (const result of [[hospital], []]) {
-    const store = fakeStore();
-    let calls = 0;
-    const service = new HospitalSearchService(store, {
-      async search() {
-        calls++;
-        return result;
+    await t.test(
+      result.length ? "hospital results" : "empty results",
+      async () => {
+        const store = fakeStore();
+        let calls = 0;
+        const service = new HospitalSearchService(store, {
+          async search() {
+            calls++;
+            return result;
+          },
+        });
+        assert.deepEqual(
+          await service.search("genève", "a".repeat(64)),
+          result,
+        );
+        assert.deepEqual(
+          await service.search("genève", "a".repeat(64)),
+          result,
+        );
+        assert.equal(calls, 1);
+        assert.match([...store.values.keys()][0], /^[a-f0-9]{64}$/);
+        assert.deepEqual(store.releases, [1000]);
       },
-    });
-    assert.deepEqual(await service.search("genève", "a".repeat(64)), result);
-    assert.deepEqual(await service.search("genève", "a".repeat(64)), result);
-    assert.equal(calls, 1);
-    assert.match([...store.values.keys()][0], /^[a-f0-9]{64}$/);
-    assert.deepEqual(store.releases, [1000]);
+    );
   }
 });
 test("cache recheck inside acquired lock prevents duplicate upstream work", async () => {
@@ -143,7 +154,7 @@ test("busy requests recheck completed identical cache or reject without upstream
   store.cached = async () => (++reads === 1 ? undefined : []);
   assert.deepEqual(await service.search("genève", "a".repeat(64)), []);
 });
-test("cache and limiter failures fail closed; failed release never reports success", async () => {
+test("cache and limiter failures fail closed; failed release never reports success", async (t) => {
   for (const method of [
     "cached",
     "consumeQuota",
@@ -151,39 +162,43 @@ test("cache and limiter failures fail closed; failed release never reports succe
     "save",
     "release",
   ]) {
-    const store = fakeStore();
-    let calls = 0;
-    store[method] = async () => {
-      throw new Error("private data");
-    };
-    await assert.rejects(
-      new HospitalSearchService(store, {
-        async search() {
-          calls++;
-          return [];
-        },
-      }).search("genève", "a".repeat(64)),
-      failure(503, "storage_unavailable"),
-    );
-    assert.equal(calls, ["save", "release"].includes(method) ? 1 : 0);
+    await t.test(`storage method: ${method}`, async () => {
+      const store = fakeStore();
+      let calls = 0;
+      store[method] = async () => {
+        throw new Error("private data");
+      };
+      await assert.rejects(
+        new HospitalSearchService(store, {
+          async search() {
+            calls++;
+            return [];
+          },
+        }).search("genève", "a".repeat(64)),
+        failure(503, "storage_unavailable"),
+      );
+      assert.equal(calls, ["save", "release"].includes(method) ? 1 : 0);
+    });
   }
 });
-test("upstream failures never cache, always release, and apply shared cooldown", async () => {
+test("upstream failures never cache, always release, and apply shared cooldown", async (t) => {
   for (const status of [429, 502, 504]) {
-    const store = fakeStore();
-    await assert.rejects(
-      new HospitalSearchService(store, {
-        async search() {
-          throw new SearchError(status, "upstream_failure");
-        },
-      }).search("genève", "a".repeat(64)),
-      failure(status),
-    );
-    assert.equal(store.values.size, 0);
-    assert.deepEqual(store.releases, [status === 429 ? 60000 : 10000]);
+    await t.test(`upstream status: ${status}`, async () => {
+      const store = fakeStore();
+      await assert.rejects(
+        new HospitalSearchService(store, {
+          async search() {
+            throw new SearchError(status, "upstream_failure");
+          },
+        }).search("genève", "a".repeat(64)),
+        failure(status),
+      );
+      assert.equal(store.values.size, 0);
+      assert.deepEqual(store.releases, [status === 429 ? 60000 : 10000]);
+    });
   }
 });
-test("HTTP returns parser-compatible JSON, enforces auth, methods and request bounds", async () => {
+test("HTTP returns parser-compatible JSON, enforces auth, methods and request bounds", async (t) => {
   const service = new HospitalSearchService(fakeStore(), {
     async search() {
       return [hospital];
@@ -203,16 +218,20 @@ test("HTTP returns parser-compatible JSON, enforces auth, methods and request bo
     [{ ...request(), headers: { "content-length": "100000" } }, 413],
     [{ ...request(), headers: { "transfer-encoding": "chunked" } }, 413],
   ]) {
-    const res = response();
-    await handler(req, res);
-    assert.equal(res.statusCode, status);
+    await t.test(`request: ${JSON.stringify(req)}`, async () => {
+      const res = response();
+      await handler(req, res);
+      assert.equal(res.statusCode, status);
+    });
   }
   for (const status of [401, 403]) {
-    const res = response();
-    await createHandler(service, async () => {
-      throw new SearchError(status, "unauthorized");
-    })(request(), res);
-    assert.equal(res.statusCode, status);
+    await t.test(`authentication status: ${status}`, async () => {
+      const res = response();
+      await createHandler(service, async () => {
+        throw new SearchError(status, "unauthorized");
+      })(request(), res);
+      assert.equal(res.statusCode, status);
+    });
   }
   const sanitized = response();
   await createHandler(service, async () => {

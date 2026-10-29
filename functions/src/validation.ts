@@ -25,7 +25,8 @@ export function queryFromUrl(originalUrl: string): string {
     .trim()
     .replace(/\s+/gu, " ")
     .replace(/ \[hospital\]$/i, "");
-  // Exclude special search syntax and URL/email forwarding; retain public place-name punctuation.
+  // Allow letters, marks, numbers, spaces and place-name punctuation (including /).
+  // Reject other syntax such as brackets, colons and @; the client encodes the query to a fixed host.
   if (
     text.length < 2 ||
     text.length > 200 ||

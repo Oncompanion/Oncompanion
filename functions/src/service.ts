@@ -2,16 +2,22 @@
 import { createHash, randomUUID } from "node:crypto";
 import { HospitalClient, SearchError, SearchStore } from "./contracts.js";
 
+const MAX_RELEASE_ATTEMPTS = 3;
+
 /** Coordinates shared cache and exclusive upstream access without a request queue. */
 export class HospitalSearchService {
   /** Injects shared coordination and upstream boundaries for portability. */
   constructor(
     private readonly store: SearchStore,
     private readonly client: HospitalClient,
+    /** Logs a fixed storage-failure event; injectable to assert logging in tests without queries, UIDs or error details. */
     private readonly logFailure: () => void = () =>
       console.error("hospital_search_storage_failure"),
   ) {}
-  /** Returns shared results or makes one globally authorized upstream request. */
+  /**
+   * Returns shared results or makes one globally authorized upstream request.
+   * quotaKey is the hashed user UID; its quota is charged only on an initial cache miss.
+   */
   async search(query: string, quotaKey: string) {
     const key = createHash("sha256")
       .update(`hospital-jsonv2-v1:${query}`)
@@ -43,13 +49,13 @@ export class HospitalSearchService {
         throw error;
       } finally {
         // Release only after upstream completion/abort and cache persistence, even on failures.
-        for (let attempt = 0; ; attempt++) {
+        for (let attempt = 1; attempt <= MAX_RELEASE_ATTEMPTS; attempt++) {
           try {
             await this.store.release(owner, cooldown);
             break;
           } catch (error) {
             this.logFailure();
-            if (attempt === 2) throw error;
+            if (attempt === MAX_RELEASE_ATTEMPTS) throw error;
           }
         }
       }
