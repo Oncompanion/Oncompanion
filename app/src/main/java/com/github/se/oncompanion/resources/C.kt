@@ -286,6 +286,9 @@ object C {
     const val care_circle_form_saving = "care_circle_form_saving"
     const val care_circle_form_missing = "care_circle_form_missing"
     const val care_circle_form_save_error = "care_circle_form_save_error"
+    const val care_circle_form_loading = "care_circle_form_loading"
+    const val care_circle_form_not_found = "care_circle_form_not_found"
+    const val care_circle_form_load_error = "care_circle_form_load_error"
 
     /** The relationship [relationshipName] in the relationship menu, e.g. "DAUGHTER". */
     fun careCircleFormRelationshipOption(relationshipName: String) =

@@ -943,6 +943,53 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
   }
 
+  @Test
+  fun careCircleMember_editingTheirAccess_showsItOnTheMemberThenInTheList() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val careCircle = FakeCareCircleRepository()
+    careCircle.setMembers(
+        "owner",
+        listOf(
+            CareCircleMember(
+                uid = "marc",
+                firstName = "Marc",
+                relationship = Relationship.SON,
+                permissions = setOf(CarePermission.PLANNING),
+            )
+        ),
+    )
+    setNavHost(Route.CARE_CIRCLE, careCircleRepository = careCircle, authRepository = auth)
+
+    // List, then Marc, then "Edit member": the route's argument fills in the form with Marc
+    composeTestRule.onNodeWithTag(C.Tag.careCircleMember("marc")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_edit_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_first_name).assertTextContains("Marc")
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_EDIT_MEMBER, NavigationActions(navController).currentRoute())
+    }
+
+    // Symptoms on, then Save: back on Marc, who says he was just updated
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_save_button)
+        .performScrollTo()
+        .performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_member_subtitle)
+        .assertTextEquals("Son · Updated just now")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertDoesNotExist()
+
+    // The list shows his new access (#75)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_back_button).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleMember("marc"))
+        .assertTextContains("Planning & symptoms", substring = true)
+  }
+
   private fun assertOnTab(tab: Tab, screenTag: String) {
     composeTestRule.onNodeWithTag(screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(tab.testTag).assertIsSelected()

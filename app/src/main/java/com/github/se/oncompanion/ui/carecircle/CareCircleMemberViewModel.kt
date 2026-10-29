@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** What the care circle member screen shows. */
@@ -24,8 +25,13 @@ sealed interface CareCircleMemberUiState {
   /** Waiting for the first result (from the local cache or the server). */
   data object Loading : CareCircleMemberUiState
 
-  /** The member's details. */
-  data class Member(val member: CareCircleMember) : CareCircleMemberUiState
+  /**
+   * The member's details.
+   *
+   * @property updatedJustNow whether the patient saved changes to the member during this visit
+   */
+  data class Member(val member: CareCircleMember, val updatedJustNow: Boolean = false) :
+      CareCircleMemberUiState
 
   /**
    * The member isn't in the circle (anymore): they were removed, possibly from another device, or
@@ -57,10 +63,20 @@ class CareCircleMemberViewModel(
   private val _uiState = MutableStateFlow<CareCircleMemberUiState>(CareCircleMemberUiState.Loading)
   val uiState: StateFlow<CareCircleMemberUiState> = _uiState.asStateFlow()
 
+  private val updatedJustNow = MutableStateFlow(false)
+
   private var observeJob: Job? = null
 
   init {
     observeMember()
+  }
+
+  /**
+   * Called once the edit form saved this member, so the screen says "Updated just now" until the
+   * patient leaves it.
+   */
+  fun onMemberUpdated() {
+    updatedJustNow.value = true
   }
 
   /** Reads the member again after an [CareCircleMemberUiState.Error]. */
@@ -81,12 +97,12 @@ class CareCircleMemberViewModel(
         }
         careCircleRepository
             .observeMember(ownerUid, memberUid)
-            .catch { _uiState.value = CareCircleMemberUiState.Error }
-            .collect { member ->
-              _uiState.value =
-                  if (member == null) CareCircleMemberUiState.NotFound
-                  else CareCircleMemberUiState.Member(member)
+            .combine(updatedJustNow) { member, updated ->
+              if (member == null) CareCircleMemberUiState.NotFound
+              else CareCircleMemberUiState.Member(member, updatedJustNow = updated)
             }
+            .catch { _uiState.value = CareCircleMemberUiState.Error }
+            .collect { _uiState.value = it }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {

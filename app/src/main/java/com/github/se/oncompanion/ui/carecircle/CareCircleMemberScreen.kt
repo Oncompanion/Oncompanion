@@ -59,6 +59,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -69,10 +70,11 @@ import java.util.Locale
 private val addedAtFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 
 /**
- * One member of the signed-in user's care circle (US-14), following the "US-15 / Member detail"
- * Figma mockup: who they are, how to reach them and what they can see.
+ * One member of the signed-in user's care circle (US-14), following the "US-14 / Member detail"
+ * Figma mockup: who they are, how to reach them and what they can see. "Edit member" opens the
+ * member form.
  *
- * Editing and removing the member come in later PRs: for now both buttons show a toast.
+ * Removing the member comes in a later commit: for now its button shows a toast.
  */
 @Composable
 fun CareCircleMemberScreen(
@@ -90,12 +92,7 @@ fun CareCircleMemberScreen(
   CareCircleMemberContent(
       uiState = uiState,
       onBack = navigationActions::goBack,
-      onEdit = { member ->
-        // TODO: open the edit member screen (US-14) instead of this toast
-        val message =
-            resources.getString(R.string.care_circle_member_edit_not_implemented, member.firstName)
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-      },
+      onEdit = { member -> navigationActions.navigateTo(Screen.careCircleEditMember(member.uid)) },
       onRemove = { member ->
         // TODO: ask for confirmation, then remove the member (US-14) instead of this toast
         val message =
@@ -163,6 +160,7 @@ fun CareCircleMemberContent(
       is CareCircleMemberUiState.Member ->
           MemberDetails(
               member = uiState.member,
+              updatedJustNow = uiState.updatedJustNow,
               onEdit = { onEdit(uiState.member) },
               onRemove = { onRemove(uiState.member) },
               modifier = contentModifier,
@@ -195,10 +193,14 @@ private fun MessageState(
   }
 }
 
-/** The details scroll, while the actions stay at the bottom like in the mockup. */
+/**
+ * The details scroll, while the actions stay at the bottom like in the mockup. The subtitle says
+ * "Updated just now" instead of when they joined once the patient [updatedJustNow] saved changes.
+ */
 @Composable
 private fun MemberDetails(
     member: CareCircleMember,
+    updatedJustNow: Boolean,
     onEdit: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier,
@@ -215,13 +217,15 @@ private fun MemberDetails(
       MemberHeader(
           details = member.details,
           subtitle =
-              member.addedAt?.let { addedAt ->
-                stringResource(
-                    R.string.care_circle_member_since,
-                    relationship,
-                    addedAtFormatter.format(addedAt.atZone(ZoneId.systemDefault())),
-                )
-              } ?: relationship,
+              if (updatedJustNow) stringResource(R.string.care_circle_member_updated, relationship)
+              else
+                  member.addedAt?.let { addedAt ->
+                    stringResource(
+                        R.string.care_circle_member_since,
+                        relationship,
+                        addedAtFormatter.format(addedAt.atZone(ZoneId.systemDefault())),
+                    )
+                  } ?: relationship,
       )
 
       // Contact: the member's account email, hidden if their account has none
@@ -311,8 +315,7 @@ internal fun PermissionItem(permission: CarePermission, granted: Boolean) {
   ListItem(
       headlineContent = { Text(stringResource(permission.label)) },
       supportingContent = { Text(stringResource(permission.description)) },
-      // TODO: let the patient change access from the edit member screen (US-14). Until then the
-      //  switch only shows the current access: onCheckedChange = null makes it read-only.
+      // Access changes in the member form: onCheckedChange = null makes this switch read-only
       trailingContent = { Switch(checked = granted, onCheckedChange = null) },
       modifier =
           Modifier.semantics(mergeDescendants = true) { toggleableState = ToggleableState(granted) }

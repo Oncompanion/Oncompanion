@@ -134,6 +134,15 @@ object Screen {
    */
   fun careCircleInvite(inviteCode: String) = "care_circle_invite/$inviteCode"
 
+  /** The form editing a member. Navigate with [careCircleEditMember], not this pattern. */
+  const val CARE_CIRCLE_EDIT_MEMBER = "care_circle_edit_member/{$CARE_CIRCLE_MEMBER_ARG}"
+
+  /** The [CARE_CIRCLE_EDIT_MEMBER] form of [memberUid]. */
+  fun careCircleEditMember(memberUid: String) = "care_circle_edit_member/$memberUid"
+
+  /** Set on the [CARE_CIRCLE_MEMBER] back stack entry once its member was edited, to say so. */
+  const val CARE_CIRCLE_MEMBER_UPDATED = "memberUpdated"
+
   // Route.PROFILE
   const val PROFILE = "profile_home"
   const val EDIT_PROFILE = "edit_profile"
