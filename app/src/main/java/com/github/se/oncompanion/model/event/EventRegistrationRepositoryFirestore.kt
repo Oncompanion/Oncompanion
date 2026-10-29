@@ -1,14 +1,15 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.event
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * [EventRegistrationRepository] backed by Cloud Firestore, one document per confirmed event at
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.callbackFlow
  * write back, which [observeIsRegistered] then emits.
  */
 class EventRegistrationRepositoryFirestore(
-    dbProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
 ) : EventRegistrationRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
@@ -28,11 +29,14 @@ class EventRegistrationRepositoryFirestore(
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
-  private val db: FirebaseFirestore by lazy(dbProvider)
+  private val db: FirebaseFirestore
+    get() = dbProvider()
 
   override fun observeIsRegistered(uid: String, eventId: String): Flow<Boolean> {
-    val document = document(uid, eventId)
-    return callbackFlow {
+    requirePathSegment(uid)
+    requirePathSegment(eventId)
+    return SessionAccess.snapshots {
+      val document = document(uid, eventId)
       val registration = document.addSnapshotListener { snapshot, error ->
         if (error != null) {
           close(error)
@@ -44,14 +48,14 @@ class EventRegistrationRepositoryFirestore(
     }
   }
 
-  override fun confirm(uid: String, eventId: String) {
+  override fun confirm(uid: String, eventId: String): Unit = SessionAccess.immediate {
     // The server sets the time, so the rules can check it against the event's start
     document(uid, eventId)
         .set(mapOf(FIELD_CONFIRMED_AT to FieldValue.serverTimestamp()))
         .addOnFailureListener { Log.e(TAG, "Confirmation for event $eventId was rejected", it) }
   }
 
-  override fun remove(uid: String, eventId: String) {
+  override fun remove(uid: String, eventId: String): Unit = SessionAccess.immediate {
     document(uid, eventId).delete().addOnFailureListener {
       Log.e(TAG, "Removing the confirmation for event $eventId was rejected", it)
     }

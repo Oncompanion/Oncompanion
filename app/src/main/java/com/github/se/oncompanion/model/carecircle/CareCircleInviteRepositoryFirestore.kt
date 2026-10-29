@@ -172,9 +172,11 @@ class CareCircleInviteRepositoryFirestore(
     if (!CareCircleInvite.isWellFormedInviteCode(code)) return@operation RedeemResult.InvalidOrUsed
     return@operation try {
       val result =
-          SessionAccess.transaction { db.runTransaction { transaction ->
-                redeemIn(transaction, code, caregiverUid, caregiverEmail)
-              } }
+          SessionAccess.transaction {
+                db.runTransaction { transaction ->
+                  redeemIn(transaction, code, caregiverUid, caregiverEmail)
+                }
+              }
               .await()
       if (result is RedeemResult.Joined) refreshJoinedCircles(caregiverUid)
       result
@@ -214,14 +216,14 @@ class CareCircleInviteRepositoryFirestore(
 
   override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> =
       SessionAccess.snapshots {
-        val registration =
-            patients(caregiverUid).addSnapshotListener { snapshot, error ->
-              if (error != null) close(error)
-              else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
-            }
-        awaitClose { registration.remove() }
-      }
-      .distinctUntilChanged()
+            val registration =
+                patients(caregiverUid).addSnapshotListener { snapshot, error ->
+                  if (error != null) close(error)
+                  else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
+                }
+            awaitClose { registration.remove() }
+          }
+          .distinctUntilChanged()
 
   /**
    * Checks the invite [inviteCode] and the caregiver's membership on the server, then writes the

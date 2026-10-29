@@ -34,6 +34,13 @@ object SessionAccess {
         FirebaseFirestore.getInstance()
       }
 
+  /** Fences non-suspending local enqueues atomically with sign-out's operation gate. */
+  fun <T> immediate(block: () -> T): T =
+      synchronized(lock) {
+        check(accepting && !sealed) { "Sign-out is in progress" }
+        block()
+      }
+
   /** Runs one repository call in a child job that sign-out can stop and drain. */
   suspend fun <T> operation(block: suspend () -> T): T = coroutineScope {
     currentCoroutineContext().ensureActive()

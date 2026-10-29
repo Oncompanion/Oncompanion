@@ -7,7 +7,6 @@ import android.util.Log
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -46,10 +45,10 @@ class MedicationRepositoryFirestore(
   private val db: FirebaseFirestore
     get() = dbProvider()
 
-  override fun newId(): String = db.collection(USERS).document().id
+  override fun newId(): String = SessionAccess.immediate { db.collection(USERS).document().id }
 
   override fun observePrescriptions(uid: String): Flow<List<Prescription>> =
-      prescriptions(uid).snapshots().map { documents ->
+      snapshots(uid).map { documents ->
         documents
             .mapNotNull(::toPrescription)
             .sortedWith(
@@ -73,7 +72,7 @@ class MedicationRepositoryFirestore(
       }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
-      prescriptions(uid).snapshots().map { documents ->
+      snapshots(uid).map { documents ->
         documents
             .mapNotNull(::toPrescription)
             .flatMap { it.medications }
@@ -126,17 +125,17 @@ class MedicationRepositoryFirestore(
       }
 
   /** Emits the documents of the collection now and every time they change. */
-  private fun CollectionReference.snapshots(): Flow<List<DocumentSnapshot>> =
-      SessionAccess.snapshots {
-        val registration = addSnapshotListener { snapshot, error ->
+  private fun snapshots(uid: String): Flow<List<DocumentSnapshot>> = SessionAccess.snapshots {
+    val registration =
+        prescriptions(uid).addSnapshotListener { snapshot, error ->
           if (error != null) {
             close(error)
           } else if (snapshot != null) {
             trySend(snapshot.documents)
           }
         }
-        awaitClose { registration.remove() }
-      }
+    awaitClose { registration.remove() }
+  }
 
   private fun Task<Void>.logServerRejection(prescriptionId: String) {
     addOnFailureListener { e ->
