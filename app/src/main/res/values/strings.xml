@@ -273,10 +273,14 @@
     <string name="care_circle_member_remove">Remove from circle</string>
     <string name="care_circle_member_not_found">This person is no longer in your care circle.</string>
     <string name="care_circle_member_error">Couldn\'t load this member.</string>
-    <!-- Temporary message until removing members exists -->
-    <string name="care_circle_member_remove_not_implemented">Removing members isn\'t available yet. It will be added in a later version and let you take %1$s out of your circle.</string>
     <!-- Relationship · after the patient saved changes, e.g. "Son · Updated just now" -->
     <string name="care_circle_member_updated">%1$s · Updated just now</string>
+    <!-- Remove a member, e.g. "Remove Marc from your circle?" -->
+    <string name="care_circle_member_remove_title">Remove %1$s from your circle?</string>
+    <string name="care_circle_member_remove_body">They will no longer see your information.</string>
+    <string name="care_circle_member_remove_confirm">Remove</string>
+    <string name="care_circle_member_remove_dismiss">Cancel</string>
+    <string name="care_circle_member_remove_error">Couldn\'t remove this person. Try again.</string>
 
     <!-- What each section shows a member -->
     <string name="permission_planning_description">Treatments &amp; appointments</string>
