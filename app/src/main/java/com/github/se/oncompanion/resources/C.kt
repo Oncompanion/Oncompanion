@@ -36,6 +36,10 @@ object C {
     /** Identifies the recorded appointment category choice. */
     fun appointmentType(type: String) = "appointment_type_$type"
 
+    const val appointment_form_feedback = "appointment_form_feedback"
+    const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_form_retry = "appointment_form_retry"
+
     // Hospital field
     const val hospital_field = "hospital_field"
     const val hospital_search = "hospital_search"
@@ -265,6 +269,10 @@ object C {
     const val care_circle_member_email = "care_circle_member_email"
     const val care_circle_member_edit_button = "care_circle_member_edit_button"
     const val care_circle_member_remove_button = "care_circle_member_remove_button"
+    const val care_circle_member_remove_dialog = "care_circle_member_remove_dialog"
+    const val care_circle_member_remove_confirm = "care_circle_member_remove_confirm"
+    const val care_circle_member_remove_dismiss = "care_circle_member_remove_dismiss"
+    const val care_circle_member_remove_error = "care_circle_member_remove_error"
 
     /** The row showing whether the member can see [permissionName], e.g. "PLANNING". */
     fun careCircleMemberPermission(permissionName: String) =
@@ -282,6 +290,9 @@ object C {
     const val care_circle_form_saving = "care_circle_form_saving"
     const val care_circle_form_missing = "care_circle_form_missing"
     const val care_circle_form_save_error = "care_circle_form_save_error"
+    const val care_circle_form_loading = "care_circle_form_loading"
+    const val care_circle_form_not_found = "care_circle_form_not_found"
+    const val care_circle_form_load_error = "care_circle_form_load_error"
 
     /** The relationship [relationshipName] in the relationship menu, e.g. "DAUGHTER". */
     fun careCircleFormRelationshipOption(relationshipName: String) =
@@ -324,6 +335,15 @@ object C {
     const val care_circle_invite_valid = "care_circle_invite_valid"
     const val care_circle_invite_sync_warning = "care_circle_invite_sync_warning"
     const val care_circle_invite_expired = "care_circle_invite_expired"
+    const val care_circle_invite_email_button = "care_circle_invite_email_button"
+    const val care_circle_invite_share_button = "care_circle_invite_share_button"
+    const val care_circle_invite_copy_button = "care_circle_invite_copy_button"
+    const val care_circle_invite_renew_button = "care_circle_invite_renew_button"
+    const val care_circle_invite_cancel_button = "care_circle_invite_cancel_button"
+    const val care_circle_invite_cancel_dialog = "care_circle_invite_cancel_dialog"
+    const val care_circle_invite_cancel_confirm = "care_circle_invite_cancel_confirm"
+    const val care_circle_invite_cancel_dismiss = "care_circle_invite_cancel_dismiss"
+    const val care_circle_invite_action_error = "care_circle_invite_action_error"
     const val care_circle_invite_joined = "care_circle_invite_joined"
     const val care_circle_invite_back_to_circle_button = "care_circle_invite_back_to_circle_button"
 
@@ -413,5 +433,14 @@ object C {
         "prescription_scan_nothing_read_enter_manually_button"
     const val prescription_scan_nothing_read_retake_button =
         "prescription_scan_nothing_read_retake_button"
+
+    // Reviewing the scanned prescription in the prescription form
+    const val prescription_review_notice = "prescription_review_notice"
+
+    /** Why a field is to check; [field] is "prescribed_by", "prescribed_on", or a detail's name. */
+    fun prescriptionReviewFieldCheck(field: String) = "prescription_review_field_check_$field"
+
+    /** What to check on the row of the medication at [position], when it isn't open. */
+    fun prescriptionReviewRowCheck(position: Int) = "prescription_review_row_check_$position"
   }
 }

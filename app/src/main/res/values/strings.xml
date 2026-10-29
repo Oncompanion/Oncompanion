@@ -268,9 +268,14 @@
     <string name="care_circle_member_remove">Remove from circle</string>
     <string name="care_circle_member_not_found">This person is no longer in your care circle.</string>
     <string name="care_circle_member_error">Couldn\'t load this member.</string>
-    <!-- Temporary messages until editing and removing members exist -->
-    <string name="care_circle_member_edit_not_implemented">Editing members isn\'t available yet. It will be added in a later version and let you change %1$s\'s details and what they can see.</string>
-    <string name="care_circle_member_remove_not_implemented">Removing members isn\'t available yet. It will be added in a later version and let you take %1$s out of your circle.</string>
+    <!-- Relationship · after the patient saved changes, e.g. "Son · Updated just now" -->
+    <string name="care_circle_member_updated">%1$s · Updated just now</string>
+    <!-- Remove a member, e.g. "Remove Marc from your circle?" -->
+    <string name="care_circle_member_remove_title">Remove %1$s from your circle?</string>
+    <string name="care_circle_member_remove_body">They will no longer see your information.</string>
+    <string name="care_circle_member_remove_confirm">Remove</string>
+    <string name="care_circle_member_remove_dismiss">Cancel</string>
+    <string name="care_circle_member_remove_error">Couldn\'t remove this person. Try again.</string>
 
     <!-- What each section shows a member -->
     <string name="permission_planning_description">Treatments &amp; appointments</string>
@@ -296,6 +301,12 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+    <!-- Edit a care circle member (#75) -->
+    <string name="care_circle_form_edit_title">Edit member</string>
+    <string name="care_circle_form_account_email">Account email. It can\'t be changed.</string>
+    <string name="care_circle_form_save_changes">Save changes</string>
+    <string name="care_circle_form_missing_first_name_edit">Add a first name to save the changes.</string>
+    <string name="care_circle_form_update_error">Couldn\'t save the changes. Try again.</string>
 
     <!-- Join a care circle with an invite code (#137) -->
     <string name="join_circle_title">Join a care circle</string>
@@ -339,11 +350,28 @@
     <!-- Not synced also happens online: the server just hasn\'t confirmed the invitation yet -->
     <string name="care_circle_invite_sync_warning">Waiting to sync. This code will work once the invitation has synced.</string>
     <string name="care_circle_invite_expired_on">The code stopped working on %1$s.</string>
+    <string name="care_circle_invite_send_email">Send by email</string>
+    <string name="care_circle_invite_share">Share</string>
+    <string name="care_circle_invite_copy">Copy</string>
+    <string name="care_circle_invite_copied">Invite code copied</string>
+    <string name="care_circle_invite_no_app">No app on this phone can send it. Copy the invite code instead.</string>
+    <string name="care_circle_invite_renew">Get a new code</string>
+    <string name="care_circle_invite_cancel">Cancel invitation</string>
+    <string name="care_circle_invite_cancel_title">Cancel %1$s\'s invitation?</string>
+    <string name="care_circle_invite_cancel_body">The code will stop working.</string>
+    <string name="care_circle_invite_cancel_keep">Keep</string>
+    <string name="care_circle_invite_action_error">Couldn\'t change this invitation. Try again.</string>
     <string name="care_circle_invite_joined_title">%1$s has joined your circle</string>
     <string name="care_circle_invite_joined_body">%1$s can now see: %2$s. You can change this any time.</string>
     <string name="care_circle_invite_back_to_circle">Back to circle</string>
     <string name="care_circle_invite_not_found">This invitation is no longer pending.</string>
     <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
+    <string name="care_circle_invite_email_subject">Join my care circle on Oncompanion</string>
+    <string name="care_circle_invite_message">Hi %1$s,\n\nI\'d like you to join my care circle on Oncompanion, so you can follow my care.\n\n1. Install Oncompanion and sign in with Google.\n2. Choose \"I\'m a caregiver\".\n3. Tap \"Join a care circle\" and enter this invite code: %2$s\n\n%4$s\n\n%3$s</string>
+    <!-- The message's validity line, e.g. "The code works until 19 Oct 2026." -->
+    <string name="care_circle_invite_message_valid_until">The code works until %1$s.</string>
+    <!-- While the invitation isn\'t on the server yet, its 7 days haven\'t started -->
+    <string name="care_circle_invite_message_valid_once_sent">The code will work for 7 days once my phone has sent the invitation.</string>
     <!-- Neutral: the invitation may have been used just before the new member reaches this phone -->
     <string name="care_circle_invite_not_found_body">It was cancelled, or the person has just joined. Your care circle shows who\'s in it.</string>
     <!-- Prescriptions -->
@@ -374,6 +402,7 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+    <string name="prescription_form_from_date">from %1$s</string>
     <string name="prescription_form_edit_medication">Edit %1$s</string>
     <string name="prescription_form_remove_medication">Remove</string>
     <string name="prescription_form_add_medication">Add medication</string>
@@ -452,6 +481,37 @@
     <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
 
+    <!-- US-10: reviewing the prescription read from a scan, in the prescription form -->
+    <string name="prescription_review_title">Review prescription</string>
+    <string name="prescription_review_read">We read these details from your scan.</string>
+    <string name="prescription_review_partly_read">We could only read part of your prescription.</string>
+    <plurals name="prescription_review_to_check">
+        <item quantity="one">1 detail needs checking: it is marked in orange.</item>
+        <item quantity="other">%1$d details need checking: they are marked in orange.</item>
+    </plurals>
+    <plurals name="prescription_review_left_out">
+        <item quantity="one">1 more medication was read but not added: a prescription holds %2$d at most.</item>
+        <item quantity="other">%1$d more medications were read but not added: a prescription holds %2$d at most.</item>
+    </plurals>
+    <string name="prescription_review_correct_anything">You can correct anything before saving.</string>
+    <string name="prescription_review_may_differ">Please check: it may not be what\'s on the paper</string>
+    <string name="prescription_review_date_hard_to_read">Please check: the date was hard to read</string>
+    <string name="prescription_review_date_not_found">Not found on the scan: today\'s date is used</string>
+    <string name="prescription_review_not_found">Not found on the scan: add it if you want</string>
+    <string name="prescription_review_needs_checking">Needs checking</string>
+    <string name="prescription_review_check_name">Please check the name</string>
+    <string name="prescription_review_check_dosage">Please check the dosage</string>
+    <string name="prescription_review_check_frequency">Please check the frequency</string>
+    <string name="prescription_review_check_duration">Please check the duration</string>
+    <string name="prescription_review_name_not_found">Name not found</string>
+    <string name="prescription_review_dosage_not_found">Dosage not found</string>
+    <string name="prescription_review_frequency_not_found">Frequency not found</string>
+    <string name="prescription_review_duration_not_found">Duration not found</string>
+    <plurals name="prescription_review_check_details">
+        <item quantity="one">Please check 1 detail</item>
+        <item quantity="other">Please check %1$d details</item>
+    </plurals>
+
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>
     <string name="hospital_field_hint">Enter a hospital name or another location</string>
@@ -502,4 +562,7 @@
     <string name="appointment_cancel">Cancel</string>
     <string name="appointment_signed_out">Sign in again to save your appointment.</string>
     <string name="appointment_save_failed">Couldn\'t save your appointment. Please try again.</string>
+    <string name="appointment_edit">Edit appointment</string>
+    <string name="appointment_save_changes">Save changes</string>
+    <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
 </resources>

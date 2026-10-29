@@ -236,10 +236,28 @@ fun AppNavHost(
         AppointmentDetailScreen(
             detail,
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            onEdit = dropUnlessResumed { navigationActions.navigateTo(Screen.appointmentEdit(id)) },
             onDeleted = {
               // A completion may only pop the detail entry that initiated this deletion.
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
+        )
+      }
+      composable(
+          Screen.APPOINTMENT_EDIT,
+          arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
+      ) { entry ->
+        val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        val form: AppointmentFormViewModel = viewModel {
+          AppointmentFormViewModel(LocalDate.now(), appointmentId = id)
+        }
+        AppointmentFormScreen(
+            form,
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onSaved = {
+              if (navController.currentBackStackEntry == entry) navigationActions.goBack()
+            },
+            onSignedOut = signOut,
         )
       }
       composable(
@@ -388,9 +406,8 @@ fun AppNavHost(
       composable(Screen.PRESCRIPTION_ADD) { entry ->
         val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            // Starts from the scanned prescription if it was just read, empty otherwise
-            viewModel =
-                viewModel { PrescriptionFormViewModel(initialDraft = handoff.scanned?.draft) },
+            // Reviews the scanned prescription if it was just read, empty otherwise
+            viewModel = viewModel { PrescriptionFormViewModel(scan = handoff.scanned) },
             // A second tap while the form is already leaving is dropped, so Back happens once. The
             // scan's photo is no longer needed once the form is done
             onClose =
@@ -417,12 +434,16 @@ fun AppNavHost(
           Screen.CARE_CIRCLE_MEMBER,
           arguments =
               listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
-      ) {
-        CareCircleMemberScreen(
-            navigationActions = navigationActions,
-            // The SavedStateHandle holds the route's member uid
-            viewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) },
-        )
+      ) { entry ->
+        // The SavedStateHandle holds the route's member uid
+        val memberViewModel = viewModel { CareCircleMemberViewModel(createSavedStateHandle()) }
+        // Set by the edit form once it saved this member
+        val updated by
+            entry.savedStateHandle
+                .getStateFlow(Screen.CARE_CIRCLE_MEMBER_UPDATED, false)
+                .collectAsStateWithLifecycle()
+        LaunchedEffect(updated) { if (updated) memberViewModel.onMemberUpdated() }
+        CareCircleMemberScreen(navigationActions = navigationActions, viewModel = memberViewModel)
       }
       composable(Screen.CARE_CIRCLE_ADD) { entry ->
         CareCircleMemberFormScreen(
@@ -445,8 +466,33 @@ fun AppNavHost(
       ) {
         CareCircleInviteScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            // The new invite code replaces the expired one: Back still returns to the list
+            onRenewed = { inviteCode ->
+              navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
+            },
             // The SavedStateHandle holds the route's invite code
             viewModel = viewModel { CareCircleInviteViewModel(createSavedStateHandle()) },
+        )
+      }
+      composable(
+          Screen.CARE_CIRCLE_EDIT_MEMBER,
+          arguments =
+              listOf(navArgument(Screen.CARE_CIRCLE_MEMBER_ARG) { type = NavType.StringType }),
+      ) { entry ->
+        val memberUid = entry.arguments?.getString(Screen.CARE_CIRCLE_MEMBER_ARG).orEmpty()
+        CareCircleMemberFormScreen(
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            // Saving returns to the member, who shows "Updated just now" for this visit
+            onSaved = {
+              // A save finishing during the exit animation must not pop the member as well
+              if (navController.currentBackStackEntry == entry) {
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set(Screen.CARE_CIRCLE_MEMBER_UPDATED, true)
+                navigationActions.goBack()
+              }
+            },
+            viewModel = viewModel { CareCircleMemberFormViewModel(memberUid = memberUid) },
         )
       }
     }

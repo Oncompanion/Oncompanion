@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.carecircle
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -40,11 +41,26 @@ sealed interface CareCircleInviteUiState {
    * The invitation, waiting for its invite code to be used.
    *
    * @property expired whether the invite code can no longer be used, as of the last check
+   * @property confirmingCancel whether the "Cancel invitation?" dialog is open
+   * @property isWorking whether cancelling or renewing is under way; the actions are disabled
+   * @property actionFailed whether the last cancel or renew failed
    */
-  data class Invite(val invite: CareCircleInvite, val expired: Boolean) : CareCircleInviteUiState
+  data class Invite(
+      val invite: CareCircleInvite,
+      val expired: Boolean,
+      val confirmingCancel: Boolean = false,
+      val isWorking: Boolean = false,
+      val actionFailed: Boolean = false,
+  ) : CareCircleInviteUiState
 
   /** The person used the invite code: [member] is now in the circle. */
   data class Joined(val member: CareCircleMember) : CareCircleInviteUiState
+
+  /** The patient cancelled the invitation from this screen: the screen should close. */
+  data object Cancelled : CareCircleInviteUiState
+
+  /** The expired invitation was replaced by [inviteCode]: the screen should show that one. */
+  data class Renewed(val inviteCode: String) : CareCircleInviteUiState
 
   /**
    * The invitation is gone and nobody has joined with it, as far as this phone knows: it was
@@ -62,9 +78,9 @@ sealed interface CareCircleInviteUiState {
 }
 
 /**
- * Shows one invitation of the signed-in patient's care circle (#150): its invite code, until the
- * person uses it. The invite code is the [Screen.CARE_CIRCLE_INVITE_ARG] navigation argument, read
- * from [savedStateHandle].
+ * Shows one invitation of the signed-in patient's care circle (#150): its invite code, to send or
+ * share, until the person uses it. The invite code is the [Screen.CARE_CIRCLE_INVITE_ARG]
+ * navigation argument, read from [savedStateHandle].
  *
  * A used invitation is deleted (see docs/architecture.md, "Care circle invitations"), so it looks
  * like a cancelled one. The circle's members tell them apart: someone who joined with this invite
@@ -110,6 +126,69 @@ class CareCircleInviteViewModel(
   /** Reads the invitation again after an [CareCircleInviteUiState.Error]. */
   fun retry() {
     observeInvite()
+  }
+
+  /** Opens the "Cancel invitation?" dialog. */
+  fun askCancel() = updateInvite { it.copy(confirmingCancel = true, actionFailed = false) }
+
+  /** Closes the dialog without cancelling anything. */
+  fun dismissCancel() = updateInvite { it.copy(confirmingCancel = false) }
+
+  /**
+   * Deletes the invitation, so its invite code stops working, then reaches
+   * [CareCircleInviteUiState.Cancelled]. Returns once saved on the device, also offline.
+   */
+  fun confirmCancel() {
+    val state = startWork() ?: return
+    viewModelScope.launch {
+      runWork("Couldn't cancel the invitation") {
+        inviteRepository.cancelInvite(state.invite.inviteCode)
+        CareCircleInviteUiState.Cancelled
+      }
+    }
+  }
+
+  /**
+   * Replaces the expired invitation with a new invite code for the same person, then reaches
+   * [CareCircleInviteUiState.Renewed]. Does nothing while the invite code still works.
+   */
+  fun renew() {
+    if ((_uiState.value as? CareCircleInviteUiState.Invite)?.expired != true) return
+    val state = startWork() ?: return
+    viewModelScope.launch {
+      runWork("Couldn't renew the invitation") {
+        CareCircleInviteUiState.Renewed(inviteRepository.renewInvite(state.invite).inviteCode)
+      }
+    }
+  }
+
+  /** Marks the invitation as being changed, or returns null if it can't be (e.g. a second tap). */
+  private fun startWork(): CareCircleInviteUiState.Invite? {
+    val state = _uiState.value as? CareCircleInviteUiState.Invite ?: return null
+    if (state.isWorking) return null
+    val working = state.copy(confirmingCancel = false, isWorking = true, actionFailed = false)
+    _uiState.value = working
+    return working
+  }
+
+  private suspend fun runWork(failure: String, work: suspend () -> CareCircleInviteUiState) {
+    try {
+      val done = work()
+      // The listener stops here: the invitation it watches is gone on purpose
+      observeJob?.cancel()
+      _uiState.value = done
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Log.w(TAG, failure, e)
+      updateInvite { it.copy(isWorking = false, actionFailed = true) }
+    }
+  }
+
+  private fun updateInvite(
+      change: (CareCircleInviteUiState.Invite) -> CareCircleInviteUiState.Invite
+  ) {
+    _uiState.update { if (it is CareCircleInviteUiState.Invite) change(it) else it }
   }
 
   private fun observeInvite() {
@@ -158,10 +237,19 @@ class CareCircleInviteViewModel(
       invite: CareCircleInvite?,
       member: CareCircleMember?,
       now: Instant,
-  ): CareCircleInviteUiState =
-      when {
-        member != null -> CareCircleInviteUiState.Joined(member)
-        invite == null -> CareCircleInviteUiState.NotFound
-        else -> CareCircleInviteUiState.Invite(invite, invite.isExpired(now))
-      }
+  ): CareCircleInviteUiState {
+    if (member != null) return CareCircleInviteUiState.Joined(member)
+    val previous = _uiState.value as? CareCircleInviteUiState.Invite
+    if (invite == null) {
+      // Cancelling or renewing deletes it: wait for the action to end rather than flash NotFound
+      return if (previous?.isWorking == true) previous else CareCircleInviteUiState.NotFound
+    }
+    // Keeps the dialog and the progress of an action across updates of the invitation
+    return previous?.copy(invite = invite, expired = invite.isExpired(now))
+        ?: CareCircleInviteUiState.Invite(invite, invite.isExpired(now))
+  }
+
+  private companion object {
+    const val TAG = "CareCircleInvite"
+  }
 }

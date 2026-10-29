@@ -28,9 +28,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
@@ -311,7 +313,161 @@ class CareCircleMemberFormScreenTest {
     node(C.Tag.care_circle_form_back_button).performScrollTo().assertIsFullyVisible()
   }
 
+  // ---- editing a member ----
+
+  /** Marc as in the Figma "US-14 / Edit member (email read-only)". */
+  private val editing =
+      CareCircleMemberFormUiState(
+          firstName = "Marc",
+          familyName = "Dubois",
+          relationship = Relationship.SON,
+          email = "marc.dubois@email.com",
+          permissions = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+          isEditing = true,
+      )
+
+  @Test
+  fun edit_showsEditMember_saveChanges_andTheAccountEmailReadOnly() {
+    content(editing)
+    compose.onNodeWithText(string(R.string.care_circle_form_edit_title)).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.care_circle_form_add_title)).assertDoesNotExist()
+    node(C.Tag.care_circle_form_email)
+        .assertIsNotEnabled()
+        .assertTextContains("marc.dubois@email.com")
+        .assertTextContains(string(R.string.care_circle_form_account_email))
+    node(C.Tag.care_circle_form_first_name).assertIsEnabled()
+    node(C.Tag.care_circle_form_can_see).assertTextEquals("What can Marc see?")
+    node(C.Tag.care_circle_form_save_button)
+        .performScrollTo()
+        .assertIsEnabled()
+        .assertTextEquals(string(R.string.care_circle_form_save_changes))
+        .performClick()
+    node(C.Tag.care_circle_form_missing).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(1, saves) }
+  }
+
+  @Test
+  fun edit_unchanged_disablesSaveChanges_withoutAMissingText() {
+    content(editing.copy(loadedDetails = editing.details))
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.care_circle_form_missing).assertDoesNotExist()
+  }
+
+  @Test
+  fun edit_memberWithoutEmail_hidesTheEmail() {
+    content(editing.copy(email = ""))
+    node(C.Tag.care_circle_form_first_name).assertIsDisplayed()
+    node(C.Tag.care_circle_form_email).assertDoesNotExist()
+  }
+
+  @Test
+  fun edit_blankFirstName_saysItIsNeededToSave() {
+    content(editing.copy(firstName = "", firstNameTouched = true))
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.care_circle_form_missing)
+        .performScrollTo()
+        .assertTextEquals(string(R.string.care_circle_form_missing_first_name_edit))
+  }
+
+  @Test
+  fun edit_saveError_saysTheChangesWerentSaved() {
+    content(editing.copy(saveFailed = true))
+    node(C.Tag.care_circle_form_save_error)
+        .performScrollTo()
+        .assertTextEquals(string(R.string.care_circle_form_update_error))
+  }
+
+  @Test
+  fun edit_loadingNotFoundAndLoadError_replaceTheForm_butKeepTheWayBack() {
+    content(editing.copy(isLoading = true))
+    val states =
+        listOf(
+            editing.copy(isLoading = true) to C.Tag.care_circle_form_loading,
+            editing.copy(notFound = true) to C.Tag.care_circle_form_not_found,
+            editing.copy(loadFailed = true) to C.Tag.care_circle_form_load_error,
+        )
+    states.forEach { (uiState, tag) ->
+      compose.runOnIdle { state = uiState }
+      node(tag).assertIsDisplayed()
+      node(C.Tag.care_circle_form_first_name).assertDoesNotExist()
+      node(C.Tag.care_circle_form_save_button).assertDoesNotExist()
+      compose.onNodeWithText(string(R.string.care_circle_form_edit_title)).assertIsDisplayed()
+      node(C.Tag.care_circle_form_back_button).performClick()
+    }
+    compose.runOnIdle { assertEquals(states.size, backs) }
+    compose.onNodeWithText(string(R.string.care_circle_member_error)).assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun edit_landscapeKeyboardOpen_keepsTheTypedFieldAndSaveReachable() {
+    content(editing)
+    val keyboardHeight = 500
+    node(C.Tag.care_circle_form_first_name).requestFocus()
+    compose.showKeyboard(keyboardHeight)
+    node(C.Tag.care_circle_form_first_name).performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.care_circle_form_back_button).performScrollTo().assertIsFullyVisible()
+  }
+
+  @Test
+  fun previews_render() {
+    compose.setContent { CareCircleMemberFormEditPreview() }
+    compose.onNodeWithText(string(R.string.care_circle_form_save_changes)).assertExists()
+  }
+
+  @Test
+  fun addPreview_renders() {
+    compose.setContent { CareCircleMemberFormScreenPreview() }
+    node(C.Tag.care_circle_form_can_see).assertTextEquals("What can Julie see?")
+  }
+
   // ---- screen wired to its ViewModel ----
+
+  @Test
+  fun screen_editingAMember_savesTheChangesThroughTheViewModel_withoutAnInviteCode() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val circle =
+        FakeCareCircleRepository().apply {
+          setMembers(
+              "owner",
+              listOf(
+                  CareCircleMember(
+                      uid = "marc",
+                      firstName = "Marc",
+                      relationship = Relationship.SON,
+                      email = "marc.dubois@email.com",
+                  )
+              ),
+          )
+        }
+    val invites = FakeCareCircleInviteRepository()
+    val viewModel =
+        CareCircleMemberFormViewModel(
+            invites,
+            FakeUserProfileRepository(),
+            auth,
+            circle,
+            memberUid = "marc",
+        )
+    val savedCodes = mutableListOf<String?>()
+    compose.setContent {
+      CareCircleMemberFormScreen(onBack = {}, onSaved = { savedCodes += it }, viewModel = viewModel)
+    }
+
+    node(C.Tag.care_circle_form_email).assertTextContains("marc.dubois@email.com")
+    node(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .performClick()
+    node(C.Tag.care_circle_form_save_button).performScrollTo().performClick()
+
+    compose.runOnIdle {
+      assertEquals(listOf<String?>(null), savedCodes)
+      assertEquals(setOf(CarePermission.SYMPTOMS), circle.updated.single().second.permissions)
+      assertTrue(invites.created.isEmpty())
+    }
+  }
 
   @Test
   fun screen_savesTheInviteThroughTheViewModel_andReportsItsInviteCode() {

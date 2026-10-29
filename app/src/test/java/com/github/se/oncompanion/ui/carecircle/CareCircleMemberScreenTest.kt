@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
@@ -40,7 +42,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.shadows.ShadowToast
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleMemberScreenTest {
@@ -68,6 +69,8 @@ class CareCircleMemberScreenTest {
     var retryClicks = 0
     val edited = mutableListOf<CareCircleMember>()
     val removed = mutableListOf<CareCircleMember>()
+    var confirms = 0
+    var dismisses = 0
   }
 
   private fun setContent(uiState: CareCircleMemberUiState): Events =
@@ -92,6 +95,8 @@ class CareCircleMemberScreenTest {
           onBack = { events.backClicks++ },
           onEdit = { events.edited += it },
           onRemove = { events.removed += it },
+          onConfirmRemove = { events.confirms++ },
+          onDismissRemove = { events.dismisses++ },
           onRetry = { events.retryClicks++ },
       )
     }
@@ -163,6 +168,73 @@ class CareCircleMemberScreenTest {
         .onNodeWithTag(C.Tag.care_circle_member_subtitle)
         .assertTextEquals("Son · Member since Aug 2026")
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_loading).assertDoesNotExist()
+  }
+
+  @Test
+  fun member_justUpdated_saysSoInsteadOfWhenTheyJoined() {
+    setContent(CareCircleMemberUiState.Member(marc, updatedJustNow = true))
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_member_subtitle)
+        .assertTextEquals("Son · Updated just now")
+  }
+
+  @Test
+  fun previews_render() {
+    composeTestRule.setContent {
+      CareCircleMemberScreenPreview()
+      CareCircleMemberScreenNotFoundPreview()
+      CareCircleMemberScreenRemovePreview()
+    }
+    composeTestRule.onNodeWithText("Marc Dubois").assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dialog).assertExists()
+  }
+
+  // ---- removing ----
+
+  @Test
+  fun removeDialog_asksAboutTheMember_andReportsConfirmOrCancel() {
+    val events = setContent(CareCircleMemberUiState.Member(marc, confirmingRemoval = true))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dialog).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Remove Marc from your circle?").assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.care_circle_member_remove_body))
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dismiss).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_confirm).performClick()
+    composeTestRule.runOnIdle {
+      assertEquals(1, events.dismisses)
+      assertEquals(1, events.confirms)
+    }
+  }
+
+  @Test
+  fun removeDialog_isClosedUntilAsked() {
+    setContent(CareCircleMemberUiState.Member(marc))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dialog).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_error).assertDoesNotExist()
+  }
+
+  @Test
+  fun removing_disablesTheActions() {
+    setContent(CareCircleMemberUiState.Member(marc, isRemoving = true))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_edit_button).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).assertIsNotEnabled()
+  }
+
+  @Test
+  fun removeError_isShown_andRemoveCanBeTriedAgain() {
+    setContent(CareCircleMemberUiState.Member(marc, removeFailed = true))
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_member_remove_error)
+        .assertTextEquals(string(R.string.care_circle_member_remove_error))
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).assertIsEnabled()
+  }
+
+  @Test
+  fun removed_showsNoDetails() {
+    setContent(CareCircleMemberUiState.Removed)
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_details).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_not_found).assertDoesNotExist()
   }
 
   @Test
@@ -253,14 +325,20 @@ class CareCircleMemberScreenTest {
   private class RecordingNavigationActions(navController: NavHostController) :
       NavigationActions(navController) {
     var backCalls = 0
+    val opened = mutableListOf<String>()
 
     override fun goBack() {
       backCalls++
     }
+
+    override fun navigateTo(screen: String) {
+      opened += screen
+    }
   }
 
+  private val repository = FakeCareCircleRepository()
+
   private fun setScreen(): RecordingNavigationActions {
-    val repository = FakeCareCircleRepository()
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }
     repository.setMembers("owner", listOf(marc))
@@ -287,26 +365,27 @@ class CareCircleMemberScreenTest {
   }
 
   @Test
-  fun screen_editingTheMember_explainsItIsNotImplemented() {
-    setScreen()
+  fun screen_editMember_opensTheMemberForm() {
+    val navigationActions = setScreen()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_edit_button).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_member_edit_not_implemented, "Marc"),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf("care_circle_edit_member/marc"), navigationActions.opened)
     }
   }
 
   @Test
-  fun screen_removingTheMember_explainsItIsNotImplemented() {
-    setScreen()
+  fun screen_removingTheMember_asksFirst_thenRemovesAndGoesBack() {
+    val navigationActions = setScreen()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dismiss).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_dialog).assertDoesNotExist()
+    composeTestRule.runOnIdle { assertEquals(0, navigationActions.backCalls) }
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_member_remove_confirm).performClick()
     composeTestRule.runOnIdle {
-      assertEquals(
-          string(R.string.care_circle_member_remove_not_implemented, "Marc"),
-          ShadowToast.getTextOfLatestToast(),
-      )
+      assertEquals(listOf("marc"), repository.removed)
+      assertEquals(1, navigationActions.backCalls)
     }
   }
 }

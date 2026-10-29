@@ -59,6 +59,11 @@ object Screen {
   /** Opens one appointment without changing the originating calendar selection. */
   fun appointmentDetail(id: String) = "appointment_detail/${Uri.encode(id)}"
 
+  const val APPOINTMENT_EDIT = "appointment_edit/{$APPOINTMENT_ID}"
+
+  /** Opens the shared form to correct an existing appointment. */
+  fun appointmentEdit(id: String) = "appointment_edit/${Uri.encode(id)}"
+
   const val APPOINTMENT_DATE = "appointmentDate"
   const val APPOINTMENT_ADD = "appointment_add?date={$APPOINTMENT_DATE}"
   const val APPOINTMENT_SAVED_DATE = "appointmentSavedDate"
@@ -128,6 +133,15 @@ object Screen {
    * The [CARE_CIRCLE_INVITE] screen of [inviteCode]. Invite codes use [A-Z2-9], safe in a route.
    */
   fun careCircleInvite(inviteCode: String) = "care_circle_invite/$inviteCode"
+
+  /** The form editing a member. Navigate with [careCircleEditMember], not this pattern. */
+  const val CARE_CIRCLE_EDIT_MEMBER = "care_circle_edit_member/{$CARE_CIRCLE_MEMBER_ARG}"
+
+  /** The [CARE_CIRCLE_EDIT_MEMBER] form of [memberUid]. */
+  fun careCircleEditMember(memberUid: String) = "care_circle_edit_member/$memberUid"
+
+  /** Set on the [CARE_CIRCLE_MEMBER] back stack entry once its member was edited, to say so. */
+  const val CARE_CIRCLE_MEMBER_UPDATED = "memberUpdated"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"

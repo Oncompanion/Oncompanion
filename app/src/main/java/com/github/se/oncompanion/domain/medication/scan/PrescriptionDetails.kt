@@ -28,14 +28,14 @@ internal fun prescriberIn(lines: List<ClassifiedLine>): Reading<String> {
 }
 
 /**
- * The date of the prescription, read day first. [today] if none is found. Not sure then, nor if
- * several dates were found, if ML Kit was unsure of its line, or if it is in the future or more
- * than a year old (more likely misread than really so).
+ * The date of the prescription, read day first, or `null` if none is found. Not sure if several
+ * dates were found, if ML Kit was unsure of its line, or if it is in the future or more than a year
+ * before [today] (more likely misread than really so).
  */
-internal fun dateIn(lines: List<ClassifiedLine>, today: LocalDate): Reading<LocalDate> {
+internal fun dateIn(lines: List<ClassifiedLine>, today: LocalDate): Reading<LocalDate>? {
   val dateLines = lines.filter { it.kind == LineKind.DATE }
   val dates = dateLines.flatMap { PrescriptionLexicon.datesIn(comparable(it.text)) }.distinct()
-  val date = dates.firstOrNull() ?: return Reading(today, sure = false)
+  val date = dates.firstOrNull() ?: return null
   val plausible = !date.isAfter(today) && !date.isBefore(today.minusYears(1))
   return Reading(
       date,

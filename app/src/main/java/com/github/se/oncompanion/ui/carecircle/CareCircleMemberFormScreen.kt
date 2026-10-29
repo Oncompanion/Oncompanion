@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.carecircle
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -16,6 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -37,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,9 +64,12 @@ import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 
 /**
- * Adds someone to the care circle (#79), following the Figma "US-14 / Add member": their name,
+ * Adds someone to the care circle (#79), following the Figma "US-13 / Add member": their name,
  * relationship, an optional email and what they can see, all off by default. Saving creates their
  * invitation, then calls [onSaved] with its invite code.
+ *
+ * With a member to edit (#75, Figma "US-14 / Edit member"), the same form shows their details and
+ * account email, which can't be changed; saving updates them, then calls [onSaved] with null.
  */
 @Composable
 fun CareCircleMemberFormScreen(
@@ -104,18 +113,24 @@ fun CareCircleMemberFormContent(
     modifier: Modifier = Modifier,
 ) {
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
-  // keyboard open, a fixed one would leave no room for the field being typed
-  val topBarScrolls = isCompactHeight()
+  // keyboard open, a fixed one would leave no room for the field being typed. The loading and
+  // missing-member states have no text field, so they keep a fixed one
+  val topBarScrolls = isCompactHeight() && uiState.showsForm
   Scaffold(
       // Ends the screen at the keyboard (the activity is adjustResize): Send can be scrolled to
       modifier = modifier.testTag(C.Tag.care_circle_form_screen).imePadding(),
-      topBar = { if (!topBarScrolls) FormTopBar(onBack) },
+      topBar = { if (!topBarScrolls) FormTopBar(uiState.isEditing, onBack) },
   ) { padding ->
+    // Editing: the member's details are loading, or the member can't be edited
+    if (!uiState.showsForm) {
+      FormMessage(uiState, Modifier.fillMaxSize().padding(padding))
+      return@Scaffold
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
     ) {
       // The Scaffold already keeps the content clear of the status bar
-      if (topBarScrolls) FormTopBar(onBack, WindowInsets(0))
+      if (topBarScrolls) FormTopBar(uiState.isEditing, onBack, WindowInsets(0))
       Column(
           modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
           verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -125,19 +140,28 @@ fun CareCircleMemberFormContent(
         EmailField(uiState, onEmailChange)
       }
       PermissionSwitches(uiState, onPermissionChange)
-      SendInvitation(uiState, onSave)
+      SaveSection(uiState, onSave)
     }
   }
 }
 
+/** "Add a member", or "Edit member" when editing, with a back arrow. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormTopBar(
+    isEditing: Boolean,
     onBack: () -> Unit,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
   TopAppBar(
-      title = { Text(stringResource(R.string.care_circle_form_add_title)) },
+      title = {
+        Text(
+            stringResource(
+                if (isEditing) R.string.care_circle_form_edit_title
+                else R.string.care_circle_form_add_title
+            )
+        )
+      },
       navigationIcon = {
         IconButton(
             onClick = onBack,
@@ -151,6 +175,29 @@ private fun FormTopBar(
       },
       windowInsets = windowInsets,
   )
+}
+
+/** In place of the form while the member to edit loads, or when they can't be edited. */
+@Composable
+private fun FormMessage(uiState: CareCircleMemberFormUiState, modifier: Modifier) {
+  Box(modifier = modifier.padding(32.dp), contentAlignment = Alignment.Center) {
+    when {
+      uiState.isLoading ->
+          CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.care_circle_form_loading))
+      uiState.notFound ->
+          Text(
+              text = stringResource(R.string.care_circle_member_not_found),
+              textAlign = TextAlign.Center,
+              modifier = Modifier.testTag(C.Tag.care_circle_form_not_found),
+          )
+      else ->
+          Text(
+              text = stringResource(R.string.care_circle_member_error),
+              textAlign = TextAlign.Center,
+              modifier = Modifier.testTag(C.Tag.care_circle_form_load_error),
+          )
+    }
+  }
 }
 
 /**
@@ -235,19 +282,30 @@ private fun RelationshipField(
   }
 }
 
-/** The optional email the invitation is sent to, with an error once it doesn't look like one. */
+/**
+ * The optional email the invitation is sent to, with an error once it doesn't look like one. When
+ * editing, the member's account email, which can't be changed (hidden if their account has none).
+ */
 @Composable
 private fun EmailField(uiState: CareCircleMemberFormUiState, onEmailChange: (String) -> Unit) {
+  if (uiState.isEditing && uiState.email.isBlank()) return
   OutlinedTextField(
       value = uiState.email,
       onValueChange = onEmailChange,
-      enabled = uiState.canEdit,
+      enabled = uiState.canEdit && !uiState.isEditing,
       label = { Text(stringResource(R.string.care_circle_form_email)) },
+      trailingIcon =
+          if (uiState.isEditing) {
+            { Icon(Icons.Outlined.Email, contentDescription = null) }
+          } else null,
       supportingText = {
         Text(
             stringResource(
-                if (uiState.invalidEmail) R.string.care_circle_form_invalid_email
-                else R.string.care_circle_form_email_hint
+                when {
+                  uiState.isEditing -> R.string.care_circle_form_account_email
+                  uiState.invalidEmail -> R.string.care_circle_form_invalid_email
+                  else -> R.string.care_circle_form_email_hint
+                }
             )
         )
       },
@@ -300,14 +358,19 @@ private fun PermissionSwitches(
 }
 
 /**
- * The save error if the last save failed, "Send invitation", and under it what's still missing: the
- * button is disabled until the form is complete, so the patient must be told why.
+ * The save error if the last save failed, "Send invitation" (or "Save changes"), and under it
+ * what's still missing: the button is disabled until the form is complete, so the patient must be
+ * told why.
  */
 @Composable
-private fun SendInvitation(uiState: CareCircleMemberFormUiState, onSave: () -> Unit) {
+private fun SaveSection(uiState: CareCircleMemberFormUiState, onSave: () -> Unit) {
   if (uiState.saveFailed) {
     Text(
-        text = stringResource(R.string.care_circle_form_save_error),
+        text =
+            stringResource(
+                if (uiState.isEditing) R.string.care_circle_form_update_error
+                else R.string.care_circle_form_save_error
+            ),
         color = MaterialTheme.colorScheme.error,
         modifier =
             Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp)
@@ -315,7 +378,11 @@ private fun SendInvitation(uiState: CareCircleMemberFormUiState, onSave: () -> U
     )
   }
   SaveButton(
-      text = stringResource(R.string.care_circle_form_send_invitation),
+      text =
+          stringResource(
+              if (uiState.isEditing) R.string.care_circle_form_save_changes
+              else R.string.care_circle_form_send_invitation
+          ),
       enabled = uiState.canSave,
       isSaving = uiState.isSaving,
       onClick = onSave,
@@ -340,6 +407,9 @@ private fun SendInvitation(uiState: CareCircleMemberFormUiState, onSave: () -> U
 private fun missingText(uiState: CareCircleMemberFormUiState): Int? =
     when {
       !uiState.canEdit -> null
+      // A member always has a relationship: only the first name can be missing
+      uiState.isEditing ->
+          R.string.care_circle_form_missing_first_name_edit.takeIf { uiState.missingFirstName }
       uiState.missingFirstName && uiState.missingRelationship ->
           R.string.care_circle_form_missing_both
       uiState.missingFirstName -> R.string.care_circle_form_missing_first_name
@@ -358,6 +428,32 @@ fun CareCircleMemberFormScreenPreview() {
                 email = "julie@example.com",
                 permissions = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
                 firstNameTouched = true,
+            ),
+        onFirstNameChange = {},
+        onFamilyNameChange = {},
+        onRelationshipChange = {},
+        onEmailChange = {},
+        onPermissionChange = { _, _ -> },
+        onSave = {},
+        onBack = {},
+    )
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun CareCircleMemberFormEditPreview() {
+  OncompanionTheme {
+    CareCircleMemberFormContent(
+        uiState =
+            CareCircleMemberFormUiState(
+                firstName = "Marc",
+                familyName = "Dubois",
+                relationship = Relationship.SON,
+                email = "marc.dubois@email.com",
+                permissions =
+                    setOf(CarePermission.PLANNING, CarePermission.EVENTS, CarePermission.SYMPTOMS),
+                isEditing = true,
             ),
         onFirstNameChange = {},
         onFamilyNameChange = {},

@@ -104,7 +104,7 @@ fun ScanScreen(
     onRead: (ReadScan) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ScanViewModel = scanViewModel(),
-    camera: ScanCamera = remember { CameraXScanCamera() },
+    camera: ScanCamera = remember { ScanCameraProvider.newCamera() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current

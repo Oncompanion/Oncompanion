@@ -40,4 +40,14 @@ class ThemeTest {
   fun darkTheme_usesBaselinePrimary() {
     assertEquals(Color(0xFFD0BCFF), colorSchemeFor(darkTheme = true).primary)
   }
+
+  @Test
+  fun lightTheme_warningIsADarkAmber() {
+    assertEquals(Color(0xFFA15C00), colorSchemeFor(darkTheme = false).warning)
+  }
+
+  @Test
+  fun darkTheme_warningIsALightAmber() {
+    assertEquals(Color(0xFFFFB95C), colorSchemeFor(darkTheme = true).warning)
+  }
 }
