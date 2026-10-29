@@ -239,12 +239,13 @@ class LocalSessionRepositoryFirestoreTest {
     db.disableNetwork().await()
     val document = db.collection("users").document(uid)
     assertTrue(document.get(Source.CACHE).await().metadata.hasPendingWrites())
+    // Exercise production's cleanup budget too: the sync timeout also bounds SDK termination.
     val signOut =
-        SignOut(AuthRepositoryFirebase(auth), local, this, 1_000).apply {
+        SignOut(AuthRepositoryFirebase(auth), local, this).apply {
           initialize(PreferencesCleanupJournal(preferences))
         }
     signOut.begin { fail("Offline changes need consent before cleanup") }
-    withTimeout(10_000) { signOut.state.first { it == SignOutState.NEEDS_DISCARD_CONFIRMATION } }
+    withTimeout(20_000) { signOut.state.first { it == SignOutState.NEEDS_DISCARD_CONFIRMATION } }
     signOut.staySignedIn()
     assertEquals(SignOutState.IDLE, signOut.state.value)
     assertEquals(uid, auth.currentUser?.uid)
@@ -260,7 +261,7 @@ class LocalSessionRepositoryFirestoreTest {
     var credentialsCleared = false
     signOut.begin { credentialsCleared = true }
     val result =
-        withTimeout(10_000) {
+        withTimeout(20_000) {
           signOut.state.first {
             it == SignOutState.COMPLETE ||
                 it == SignOutState.FAILED ||
