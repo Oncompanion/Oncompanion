@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.medication.scan.ClassifiedLine
 import com.github.se.oncompanion.model.medication.scan.LineKind
 import com.github.se.oncompanion.model.medication.scan.PrescriptionLexicon
 import com.github.se.oncompanion.model.medication.scan.comparable
+import com.github.se.oncompanion.model.medication.scan.matchable
 import java.time.LocalDate
 
 /**
@@ -22,7 +23,10 @@ internal data class Reading<T>(val value: T, val sure: Boolean)
 internal fun prescriberIn(lines: List<ClassifiedLine>): Reading<String> {
   val doctors = lines.filter { it.kind == LineKind.DOCTOR }
   val doctor = doctors.firstOrNull() ?: return Reading("", sure = false)
-  val name = doctor.text.trim()
+  // A label before the title isn't part of the name: "Attending: Dr. Priya Shah, MD"
+  val title = PrescriptionLexicon.doctorTitleStartIn(matchable(doctor.text)) ?: 0
+  val labelled = doctor.text.substring(0, title).contains(':')
+  val name = (if (labelled) doctor.text.substring(title) else doctor.text).trim()
   val kept = name.take(Prescription.MAX_PRESCRIBED_BY_LENGTH).trim()
   return Reading(kept, sure = doctors.size == 1 && doctor.line.confidence >= SURE && kept == name)
 }

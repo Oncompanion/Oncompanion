@@ -42,6 +42,9 @@ internal object PrescriptionLexicon {
   /** Whether [text] names a doctor with their title ("Dr", "Dre", "Docteur", "Prof"). */
   fun hasDoctorTitle(text: String): Boolean = DOCTOR_TITLE.containsMatchIn(text)
 
+  /** Where the doctor's title starts in [text] ("Attending: Dr. Priya Shah"), if any. */
+  fun doctorTitleStartIn(text: String): Int? = DOCTOR_TITLE.find(text)?.range?.first
+
   /** Whether [text] is about the patient: "Patient", "Mme", an AVS or insurance number. */
   fun hasPatientClue(text: String): Boolean = PATIENT.containsMatchIn(text)
 
