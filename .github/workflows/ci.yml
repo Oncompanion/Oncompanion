@@ -45,6 +45,78 @@ jobs:
           --project demo-oncompanion-proxy
           'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 
+
+  # Formatting, lint and the release APK. They run beside the tests in the CI job, so a formatting
+  # or lint error shows up in a few minutes and lint no longer adds to the time of the whole run.
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: |
+          chmod +x ./gradlew
+
+      # Check formatting
+      - name: KTFmt Check
+        run: |
+          ./gradlew ktfmtCheck
+
+      - name: Lint
+        run: |
+          ./gradlew lintDebug --build-cache
+
+      # SonarCloud imports the lint issues: the CI job downloads this report before its analysis
+      - name: Upload lint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.xml
+          if-no-files-found: error
+          retention-days: 1
+
+      # Write the release key from the secrets, so the release APK is signed with the key registered
+      # in Firebase (Google Sign-In fails otherwise). Secrets are missing on PRs from forks: skipped.
+      - name: Decode release keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: Assemble release
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --build-cache
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: oncompanion-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Unit and connected tests, their coverage and the SonarCloud analysis
   ci:
     name: CI
     # Execute the CI on the course's runners
@@ -57,7 +129,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis (if we use Sonar Later)
-
 
       # Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux. Enabling it allows the Android emulator to run faster.
       - name: Enable KVM group perms
@@ -108,46 +179,11 @@ jobs:
         run: |
           chmod +x ./gradlew
 
-      # Check formatting
-      - name: KTFmt Check
-        run: |
-          ./gradlew ktfmtCheck
-
-      # Write the release key from the secrets, so the release APK is signed with the key registered
-      # in Firebase (Google Sign-In fails otherwise). Secrets are missing on PRs from forks: skipped.
-      - name: Decode release keystore
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-            echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          fi
-
-      # This step runs gradle commands to build the application
-      - name: Assemble
-        env:
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: |
-          # To run the CI with debug information, add --info
-          ./gradlew assemble lint --parallel --build-cache
-
-      # Publish the signed release APK, before the slow tests so it's there even if they fail
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: oncompanion-apk
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: warn
-          retention-days: 14
-
       # Run Unit tests
       - name: Run tests
         run: |
           # To run the CI with debug information, add --info
-          ./gradlew check --parallel --build-cache
+          ./gradlew testDebugUnitTest --build-cache
 
       # Firebase emulators (Auth + Firestore) used by the connected tests, see firebase.json.
       # The Android emulator reaches them on the host at 10.0.2.2.
@@ -192,6 +228,28 @@ jobs:
             app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 14
+
+      # The lint report comes from the Checks job, which runs at the same time and is usually done
+      # by now. Wait for it (at most 10 min), so SonarCloud still imports the lint issues
+      - name: Wait for the Checks job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for _ in $(seq 60); do
+            status=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+              --jq '.jobs[] | select(.name == "Checks") | .status')
+            [ "$status" = "completed" ] && exit 0
+            sleep 10
+          done
+          echo "The Checks job didn't finish in time" && exit 1
+
+      # Missing when the Checks job failed early (formatting): Sonar then runs without lint issues
+      - name: Download lint report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: lint-report
+          path: app/build/reports
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
