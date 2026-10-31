@@ -362,6 +362,7 @@ class PrescriptionLexiconTest {
             "2 Wochen" to (14 to false),
             "1 Monat" to (30 to false),
             "maximal 7 Tage" to (7 to false),
+            "pendant 7 jours au maximum" to (7 to false),
         )
     for ((text, expected) in durations) {
       val duration = PrescriptionLexicon.durationIn(c(text))

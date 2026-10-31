@@ -91,6 +91,12 @@ internal object PrescriptionLexicon {
   /** Where the first strength is in [text] ("8 mg"), if any. */
   fun strengthIn(text: String): IntRange? = STRENGTH.find(text)?.range
 
+  /**
+   * Where a box's size is at the start of [text], right after a strength ("2,5 mg, 30 comprimés"):
+   * how many come in the box, not how many to take.
+   */
+  fun packSizeIn(text: String): IntRange? = PACK_SIZE.find(text)?.range
+
   /** Where the first dose quantity is in [text] ("1 comprimé"), if any. */
   fun doseQuantityIn(text: String): IntRange? = DOSE_QUANTITY.find(text)?.range
 
@@ -110,10 +116,13 @@ internal object PrescriptionLexicon {
     var start = match.range.first
     DURATION_FOR.find(text.substring(0, start))?.let { start = it.range.first }
     val maximum = DURATION_MAXIMUM.find(text.substring(0, start))?.also { start = it.range.first }
+    // Or "au maximum" after it: "pendant 7 jours au maximum"
+    val maximumAfter = DURATION_MAXIMUM_AFTER.find(text.substring(match.range.last + 1))
+    val end = match.range.last + (maximumAfter?.range?.last?.plus(1) ?: 0)
     return Duration(
         number.toInt() * days,
-        exact = days == 1 && maximum == null,
-        start..match.range.last,
+        exact = days == 1 && maximum == null && maximumAfter == null,
+        start..end,
     )
   }
 
@@ -213,6 +222,7 @@ internal object PrescriptionLexicon {
           """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?|""" +
           // German: "1 Tabl.", "2 Tabletten", "1 Beutel"
           """filmtabl|tabl|tabletten?|kapseln?|beutel|tropfen|zapfchen|spritzen?)"""
+  private val PACK_SIZE = Regex("""^[\s,]*\d{2,}\s*$FORM\b""")
   // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
       Regex("""(?<![\p{L}\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
@@ -246,6 +256,8 @@ internal object PrescriptionLexicon {
   // As whole words, so "le matin 3 jours" is a duration
   private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every|alle)\s$""")
   private val DURATION_FOR = Regex("""\b(?:pendant|pdt|durant|for|sur|x|wahrend|fur)\s+$""")
+  private val DURATION_MAXIMUM_AFTER =
+      Regex("""^\s*(?:au maximum|maximum|max\.?|at most|maximal|hochstens)(?![a-z])""")
   private val DURATION_MAXIMUM =
       Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to|maximal|hochstens)\s+$""")
 

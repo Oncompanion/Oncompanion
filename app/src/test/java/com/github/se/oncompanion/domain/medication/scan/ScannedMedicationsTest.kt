@@ -282,6 +282,57 @@ class ScannedMedicationsTest {
   }
 
   @Test
+  fun theBoxSizeAndTheRenewalsAreNotHowToTakeIt() {
+    assertEquals(
+        listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null)),
+        medicationsOf(
+            linesOf("1. Létrozole 2,5 mg, 30 comprimés 1 comprimé par jour, renouvelable 3 fois")
+        ),
+    )
+  }
+
+  @Test
+  fun aCombinationKeepsEveryStrengthInItsName() {
+    val names =
+        mapOf(
+            "Calcium 500 mg + vitamine D3 400 UI 1 comprimé matin et soir" to
+                "Calcium 500 mg + vitamine D3 400 UI",
+            "Amoxicilline 875 mg + acide clavulanique 125 mg 1 cp 2x/jour" to
+                "Amoxicilline 875 mg + acide clavulanique 125 mg",
+            // A "+" without a strength after it isn't part of the name
+            "Ondansetron 8 mg + 1 tablet if needed" to "Ondansetron 8 mg",
+        )
+    for ((line, name) in names) {
+      assertEquals(line, name, medicationsOf(linesOf(line)).single().name.value)
+    }
+  }
+
+  @Test
+  fun anIReadAsASmallLAtTheStartOfANameIsAnI() {
+    val names =
+        mapOf(
+            "lbuprofène 400 mg" to "Ibuprofène 400 mg",
+            "lmatinib 400 mg" to "Imatinib 400 mg",
+            // A small l before a vowel is a real one
+            "levothyroxine 50 µg" to "levothyroxine 50 µg",
+        )
+    for ((line, name) in names) {
+      assertEquals(line, name, medicationsOf(linesOf(line)).single().name.value)
+    }
+  }
+
+  @Test
+  fun aMaximumAfterTheDurationIsAMaximumToo() {
+    val medication =
+        medicationsOf(
+                linesOf("Ibuprofène 400 mg 1 comprimé 3 fois par jour, pendant 7 jours au maximum")
+            )
+            .single()
+    assertEquals("3 fois par jour", medication.frequency.value)
+    assertEquals(Reading<Int?>(7, false), medication.durationDays)
+  }
+
+  @Test
   fun aShortWordAfterTheStrengthIsNotASplitName() {
     // "cp" comes after the strength: it describes the form, not a piece of the name
     assertTrue(medicationsOf(linesOf("Dexaméthasone 4 mg cp", "2 cp le matin")).single().name.sure)

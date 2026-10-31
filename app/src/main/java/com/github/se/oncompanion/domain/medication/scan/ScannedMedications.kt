@@ -52,10 +52,19 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   // A medication line has a strength: the name ends with it. Should it not be found here, the
   // whole line is the name, to check, rather than stopping the scan
   val strength = PrescriptionLexicon.strengthIn(matchable(first))
-  val nameEnd = strength?.let { it.last + 1 } ?: first.length
-  val name = first.substring(0, nameEnd).replace(NUMBERING, "").trim(*EDGES)
-  // After the strength, words before the first dosing word describe the form ("comprimés")
-  val after = first.substring(nameEnd)
+  val nameEnd = strength?.let { combinationEnd(first, it.last + 1) } ?: first.length
+  val name =
+      first
+          .substring(0, nameEnd)
+          .replace(NUMBERING, "")
+          .trim(*EDGES)
+          // ML Kit reads the I starting a name as l ("lbuprofène"): no name starts with a small l
+          .replace(MISREAD_I, "I")
+  // After the strength, the box's size ("30 comprimés") and the words before the first dosing
+  // word describe the medication, not how to take it ("comprimés")
+  val afterName = first.substring(nameEnd)
+  val packSize = PrescriptionLexicon.packSizeIn(matchable(afterName))
+  val after = afterName.substring(packSize?.let { it.last + 1 } ?: 0)
   val dosingAfter = PrescriptionLexicon.dosingStartIn(matchable(after))?.let(after::substring)
   val dosing = (listOfNotNull(dosingAfter) + lines.drop(1).map { it.text }).joinToString(" ")
 
@@ -71,6 +80,9 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
           .trim(*EDGES)
           // "x 2/j" is "2/j": the "x" only says "times"
           .replace(TIMES_BEFORE, "")
+          // How many times the prescription can be renewed isn't how often to take it
+          .replace(RENEWAL, "")
+          .trim(*EDGES)
 
   val linesSure = lines.all { it.line.confidence >= SURE }
   // A duration word left in the frequency ("twice a day S days") is a duration that couldn't be
@@ -96,6 +108,22 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   )
 }
 
+/**
+ * Where the name ends on [line] when its first strength ends at [strengthEnd]: after the last
+ * strength of a combination ("Calcium 500 mg + vitamine D3 400 UI").
+ */
+private fun combinationEnd(line: String, strengthEnd: Int): Int {
+  var end = strengthEnd
+  while (true) {
+    val rest = matchable(line.substring(end))
+    val plus = COMBINED_WITH.find(rest) ?: return end
+    val next = PrescriptionLexicon.strengthIn(rest) ?: return end
+    val dosing = PrescriptionLexicon.dosingStartIn(rest)
+    if (next.first < plus.range.last || (dosing != null && dosing < next.first)) return end
+    end += next.last + 1
+  }
+}
+
 /** [text] cut to what a medication can store; not sure if empty or cut. */
 private fun limited(text: String, sure: Boolean): Reading<String> {
   val kept = text.take(Medication.MAX_TEXT_LENGTH).trim()
@@ -114,6 +142,13 @@ private val NUMBERING = Regex("""^\s*[\dlIoO]{1,2}\s*[.)]\s+""")
 private val FRAGMENT = Regex("""\p{Ll}{1,3}""")
 private val SPACES = Regex("""\s+""")
 private val TIMES_BEFORE = Regex("""^[xX]\s+(?=\d)""")
+private val MISREAD_I = Regex("""^l(?=[bcdfghjkmnpqrstvwxz])""")
+private val COMBINED_WITH = Regex("""^\s*\+\s*""")
+private val RENEWAL =
+    Regex(
+        """[,;]?\s*\b(?:renouvelable|renewable|erneuerbar)\b(?:\s*\d+\s*(?:fois|x|times|mal)\b)?""",
+        RegexOption.IGNORE_CASE,
+    )
 
 /**
  * Whether [text] has a day, week or month that isn't part of a frequency ("par jour", "2x/jour").
