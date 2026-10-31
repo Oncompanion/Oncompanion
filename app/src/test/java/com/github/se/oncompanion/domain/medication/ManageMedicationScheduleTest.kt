@@ -104,6 +104,27 @@ class ManageMedicationScheduleTest {
   }
 
   @Test
+  fun refusedDrafts_keepTheirHealthDataOutOfTheErrorMessage() = runTest {
+    // These messages reach the log through the form's ViewModel
+    val invalid =
+        draft.copy(medications = listOf(draft.medications[0].copy(dosage = "x".repeat(9999))))
+    val alreadySaved = draft.copy(medications = listOf(draft.medications[0].copy(id = "med-7")))
+    val refusals: List<suspend () -> Unit> =
+        listOf(
+            { manageMedicationSchedule.add(uid, invalid) },
+            { manageMedicationSchedule.add(uid, alreadySaved) },
+            { manageMedicationSchedule.update(uid, "prescription-1", invalid) },
+        )
+
+    for (refusal in refusals) {
+      val message =
+          (runCatching { refusal() }.exceptionOrNull() as IllegalArgumentException).message
+      assertFalse(message, message!!.contains("Ondansetron"))
+      assertFalse(message, message.contains("Dr. Martin"))
+    }
+  }
+
+  @Test
   fun draftWithOneMedicationThatAlreadyHasAnIdIsRefused() = runTest {
     val mixed =
         draft.copy(

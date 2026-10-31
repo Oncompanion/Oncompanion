@@ -72,7 +72,7 @@ class CareCircleInviteRepositoryFirestore(
     // A set on an existing invite code counts as an update for the rules, so a (very unlikely)
     // collision is rejected and logged instead of overwriting another invite
     invites().document(invite.inviteCode).set(newInviteFields(invite)).addOnFailureListener { e ->
-      logRejected("invite ${invite.inviteCode}", e)
+      logRejected(RejectedWrite.CREATION, e)
     }
     return@operation invite
   }
@@ -134,12 +134,12 @@ class CareCircleInviteRepositoryFirestore(
     invites()
         .document(inviteCode)
         .update(detailFields(details) + (FIELD_EMAIL to email))
-        .addOnFailureListener { e -> logRejected("update of invite $inviteCode", e) }
+        .addOnFailureListener { e -> logRejected(RejectedWrite.UPDATE, e) }
   }
 
   override suspend fun cancelInvite(inviteCode: String): Unit = SessionAccess.operation {
     invites().document(inviteCode).delete().addOnFailureListener { e ->
-      logRejected("cancellation of invite $inviteCode", e)
+      logRejected(RejectedWrite.CANCELLATION, e)
     }
   }
 
@@ -158,7 +158,7 @@ class CareCircleInviteRepositoryFirestore(
             .set(invites().document(renewed.inviteCode), newInviteFields(renewed))
             .delete(invites().document(expired.inviteCode))
             .commit()
-            .addOnFailureListener { e -> logRejected("renewal of invite ${expired.inviteCode}", e) }
+            .addOnFailureListener { e -> logRejected(RejectedWrite.RENEWAL, e) }
         return@operation renewed
       }
 
@@ -182,9 +182,9 @@ class CareCircleInviteRepositoryFirestore(
       result
     } catch (e: FirebaseFirestoreException) {
       // Only a confirmed connection problem is reported as offline. Any rejection, such as reading
-      // an unknown, used or expired invite, means the invite code can't be used. The invite code
-      // isn't logged: it works like a password.
-      Log.w(TAG, "Redeeming an invite failed with ${e.code}", e)
+      // an unknown, used or expired invite, means the invite code can't be used. Only the error's
+      // code is logged, for the same reason as logRejected.
+      Log.w(TAG, "Redeeming an invite failed with ${e.code}")
       if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) RedeemResult.Offline
       else RedeemResult.InvalidOrUsed
     }
@@ -302,10 +302,6 @@ class CareCircleInviteRepositoryFirestore(
               FIELD_REDEEMER_UID to null,
           )
 
-  private fun logRejected(what: String, e: Exception) {
-    Log.e(TAG, "The server rejected the $what; it was rolled back", e)
-  }
-
   /** The patient's first name may be missing in a damaged document: shown empty, not dropped. */
   private fun joinedFromDocument(doc: DocumentSnapshot) =
       JoinedCareCircle(
@@ -319,7 +315,7 @@ class CareCircleInviteRepositoryFirestore(
     val firstName = doc.getString(FIELD_FIRST_NAME)
     val ownerUid = doc.getString(FIELD_OWNER_UID)
     if (firstName.isNullOrBlank() || ownerUid.isNullOrBlank()) {
-      Log.e(TAG, "Care circle invite ${doc.id} has no first name or owner, skipped")
+      logSkippedInvite()
       return null
     }
     val permissions = (doc.get(FIELD_PERMISSIONS) as? List<*>).orEmpty().filterIsInstance<String>()
@@ -355,5 +351,28 @@ class CareCircleInviteRepositoryFirestore(
     const val FIELD_PATIENT_FIRST_NAME = "patientFirstName"
     const val FIELD_JOINED_AT = "joinedAt"
     private const val TAG = "CareCircleInviteRepo"
+
+    /**
+     * Logs that the server rejected [write]. An invite code works like a password and is the
+     * document's ID, so the log says which kind of write failed but never which invite. [e] itself
+     * isn't logged because Firestore's error messages may contain the document's path.
+     */
+    internal fun logRejected(write: RejectedWrite, e: Exception) {
+      val reason = (e as? FirebaseFirestoreException)?.code ?: e.javaClass.simpleName
+      Log.e(TAG, "The server rejected the ${write.label} of an invite; rolled back ($reason)")
+    }
+
+    /** Logs a damaged invite without its ID, which is its invite code (see [logRejected]). */
+    internal fun logSkippedInvite() {
+      Log.e(TAG, "A care circle invite has no first name or owner, skipped")
+    }
+  }
+
+  /** The writes [logRejected] can report: an enum, so an invite code can't be passed by mistake. */
+  internal enum class RejectedWrite(val label: String) {
+    CREATION("creation"),
+    UPDATE("update"),
+    CANCELLATION("cancellation"),
+    RENEWAL("renewal"),
   }
 }
