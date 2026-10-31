@@ -190,6 +190,9 @@ class PrescriptionLexiconTest {
         "Vitamine D 1000 UI",
         "Salbutamol 100 µg",
         "Sirop 5 ml",
+        "Lidocaïne gel 2 %",
+        // ML Kit ran the next word into "%"
+        "Lidocaïne gel 2 %application locale",
     )
     assertAll(
         PrescriptionLexicon::hasStrength,
@@ -199,6 +202,11 @@ class PrescriptionLexiconTest {
         "3 jours",
         "1 cp toutes les 12 heures",
         "1700 Fribourg",
+        // A food label: a share in brackets and an amount per serving aren't strengths
+        "orange juice from concentrate (35%",
+        "stabiliser pectin (0,5%), vitamin B6",
+        "Nutrition per 100 ml",
+        "Valeurs nutritives pour 100 ml",
     )
   }
 

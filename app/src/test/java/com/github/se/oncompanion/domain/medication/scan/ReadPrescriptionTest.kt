@@ -173,6 +173,8 @@ class ReadPrescriptionTest {
     assertNull(readPrescription(RecognizedText(3000, 4000, emptyList()), today))
     assertNull(readPrescription(linesOf("Dr J. Roux - Oncologie", "Sion, le 11.11.2026"), today))
     assertNull(readPrescription(linesOf("Ordonnance", "Paracétamol si fièvre"), today))
+    // A drink label, with shares and amounts per serving (sheet 11, Sprint 3's phone test)
+    assertNull(readPrescription(sheet(11), today))
   }
 
   @Test

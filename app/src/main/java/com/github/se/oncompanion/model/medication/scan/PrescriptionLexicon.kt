@@ -185,8 +185,14 @@ internal object PrescriptionLexicon {
   private val FAMILY_DOCTOR = Regex("""^(?:medecin traitant|medecin de famille|family doctor)\b""")
 
   private const val UNIT = """(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol|%)"""
-  // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them
-  private val STRENGTH = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s*$UNIT(?![a-z])""")
+  // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them.
+  // "%" can't start a word, so it may touch the next one ("2 %application"). Not a share in
+  // brackets ("orange juice (35%)") nor an amount per serving ("per 100 ml"), as on a food label
+  private val STRENGTH =
+      Regex(
+          """(?<![\d.,(])(?<!\bper |\bpour |\bpro )\d+(?:[.,]\d+)?\s*""" +
+              """(?:(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol)(?![a-z])|%)"""
+      )
 
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +

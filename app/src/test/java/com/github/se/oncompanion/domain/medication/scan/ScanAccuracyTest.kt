@@ -111,9 +111,9 @@ class ScanAccuracyTest {
 
   private companion object {
     /** Details read right and not flagged, on all the sheets together. */
-    const val READ_RIGHT = 97
+    const val READ_RIGHT = 100
 
     /** Details wrong without being flagged: the ones the patient would trust. */
-    const val WRONG_UNFLAGGED = 12
+    const val WRONG_UNFLAGGED = 11
   }
 }
