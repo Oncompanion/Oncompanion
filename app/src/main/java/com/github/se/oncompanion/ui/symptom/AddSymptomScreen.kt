@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -37,8 +39,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +81,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.roundToInt
@@ -185,50 +190,19 @@ fun AddSymptomContent(
     }
   }
 
-  // No imePadding() yet: the keyboard covers Save and the bottom of the form while the notes are
-  // typed. Adding it, with its keyboard tests in portrait and landscape, is left for its own PR
+  // A short screen (a phone held sideways) keeps nothing fixed: with the keyboard open, a fixed top
+  // bar and Save would leave no room for the notes being typed
+  val scrollsEverything = isCompactHeight()
+
   Scaffold(
-      modifier = modifier.testTag(C.Tag.symptom_add_screen),
-      topBar = {
-        TopAppBar(
-            title = {
-              Text(
-                  stringResource(
-                      if (uiState.isEditing) R.string.symptom_edit_title
-                      else R.string.symptom_add_title
-                  )
-              )
-            },
-            navigationIcon = {
-              // Not while saving or once saved: the screen then leaves by itself, and a second way
-              // out would go back twice
-              IconButton(
-                  onClick = onBack,
-                  enabled = !uiState.isSaving && !uiState.isSaved,
-                  modifier = Modifier.testTag(C.Tag.symptom_add_close),
-              ) {
-                Icon(Icons.Default.Close, stringResource(R.string.symptom_add_close))
-              }
-            },
-        )
-      },
+      // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
+      modifier = modifier.testTag(C.Tag.symptom_add_screen).imePadding(),
+      // Without the form there is no keyboard, so the top bar can stay fixed
+      topBar = { if (!scrollsEverything || !uiState.isFormShown) FormTopBar(uiState, onBack) },
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = {
-        if (uiState.isFormShown) {
-          SaveButton(
-              text =
-                  stringResource(
-                      if (uiState.isEditing) R.string.symptom_edit_save
-                      else R.string.symptom_add_save
-                  ),
-              enabled = uiState.canSave,
-              isSaving = uiState.isSaving,
-              onClick = onSave,
-              testTag = C.Tag.symptom_add_save,
-              savingTestTag = C.Tag.symptom_add_saving,
-          )
-        }
+        if (!scrollsEverything && uiState.isFormShown) FormSaveButton(uiState, onSave)
       },
   ) { innerPadding ->
     // When editing, the symptom is loaded before the form can show it
@@ -266,13 +240,66 @@ fun AddSymptomContent(
               onDateChange = onDateChange,
               onTimeChange = onTimeChange,
               onNotesChange = onNotesChange,
+              scrollsEverything = scrollsEverything,
+              onBack = onBack,
+              onSave = onSave,
               modifier = Modifier.padding(innerPadding),
           )
     }
   }
 }
 
-/** The fields of the form, which scroll between the top bar and Save. */
+/** The title and the button that leaves the form without saving. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormTopBar(
+    uiState: AddSymptomUiState,
+    onBack: () -> Unit,
+    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
+) {
+  TopAppBar(
+      title = {
+        Text(
+            stringResource(
+                if (uiState.isEditing) R.string.symptom_edit_title else R.string.symptom_add_title
+            )
+        )
+      },
+      navigationIcon = {
+        // Not while saving or once saved: the screen then leaves by itself, and a second way out
+        // would go back twice
+        IconButton(
+            onClick = onBack,
+            enabled = !uiState.isSaving && !uiState.isSaved,
+            modifier = Modifier.testTag(C.Tag.symptom_add_close),
+        ) {
+          Icon(Icons.Default.Close, stringResource(R.string.symptom_add_close))
+        }
+      },
+      windowInsets = windowInsets,
+  )
+}
+
+/** The button that saves the symptom, worded for logging or for editing. */
+@Composable
+private fun FormSaveButton(uiState: AddSymptomUiState, onSave: () -> Unit) {
+  SaveButton(
+      text =
+          stringResource(
+              if (uiState.isEditing) R.string.symptom_edit_save else R.string.symptom_add_save
+          ),
+      enabled = uiState.canSave,
+      isSaving = uiState.isSaving,
+      onClick = onSave,
+      testTag = C.Tag.symptom_add_save,
+      savingTestTag = C.Tag.symptom_add_saving,
+  )
+}
+
+/**
+ * The fields of the form, which scroll between the top bar and Save, or with them when
+ * [scrollsEverything] is set.
+ */
 @Composable
 private fun SymptomFields(
     uiState: AddSymptomUiState,
@@ -282,27 +309,31 @@ private fun SymptomFields(
     onDateChange: (LocalDate) -> Unit,
     onTimeChange: (LocalTime) -> Unit,
     onNotesChange: (String) -> Unit,
+    scrollsEverything: Boolean,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-  Column(
-      modifier =
-          modifier
-              .fillMaxSize()
-              .verticalScroll(rememberScrollState())
-              .padding(horizontal = 24.dp, vertical = 8.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    SectionTitle(stringResource(R.string.symptom_add_types))
-    TypeChips(uiState.types, onToggleType)
+  Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    // The Scaffold already keeps the content clear of the status bar
+    if (scrollsEverything) FormTopBar(uiState, onBack, WindowInsets(0))
+    Column(
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      SectionTitle(stringResource(R.string.symptom_add_types))
+      TypeChips(uiState.types, onToggleType)
 
-    SectionTitle(stringResource(R.string.symptom_add_intensity))
-    IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
+      SectionTitle(stringResource(R.string.symptom_add_intensity))
+      IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
 
-    SectionTitle(stringResource(R.string.symptom_add_when))
-    WhenField(uiState, onDateChange, onTimeChange)
+      SectionTitle(stringResource(R.string.symptom_add_when))
+      WhenField(uiState, onDateChange, onTimeChange)
 
-    SectionTitle(stringResource(R.string.symptom_add_notes_title))
-    NotesField(uiState, onNotesChange)
+      SectionTitle(stringResource(R.string.symptom_add_notes_title))
+      NotesField(uiState, onNotesChange)
+    }
+    if (scrollsEverything) FormSaveButton(uiState, onSave)
   }
 }
 
@@ -573,6 +604,7 @@ private fun TimePickerDialogFor(
 ) {
   val pickerState =
       rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = true)
+  val compact = isCompactHeight()
   AlertDialog(
       onDismissRequest = onDismiss,
       confirmButton = {
@@ -592,7 +624,16 @@ private fun TimePickerDialogFor(
         }
       },
       text = {
-        TimePicker(state = pickerState, modifier = Modifier.testTag(C.Tag.symptom_add_time_picker))
+        // A short window (a phone held sideways) types the time: the clock has a fixed size and
+        // would be cut off
+        if (compact) {
+          TimeInput(state = pickerState, modifier = Modifier.testTag(C.Tag.symptom_add_time_picker))
+        } else {
+          TimePicker(
+              state = pickerState,
+              modifier = Modifier.testTag(C.Tag.symptom_add_time_picker),
+          )
+        }
       },
   )
 }

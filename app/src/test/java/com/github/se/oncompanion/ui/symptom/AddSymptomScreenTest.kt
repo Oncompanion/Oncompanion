@@ -19,15 +19,20 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,7 +42,12 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsAboveKeyboard
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.showKeyboard
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
@@ -48,6 +58,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class AddSymptomScreenTest {
@@ -448,6 +459,56 @@ class AddSymptomScreenTest {
     node(C.Tag.symptom_add_time_picker).assertDoesNotExist()
   }
 
+  // ----- Time picker on short windows -----
+
+  /** Opens the time step of the "When" pickers, past the day. */
+  private fun openTimePicker() {
+    scrolledTo(C.Tag.symptom_add_when).performClick()
+    node(C.Tag.symptom_add_picker_confirm).performClick()
+  }
+
+  /** A number of the clock, which Material only labels for screen readers. */
+  private fun clockNumber() = composeTestRule.onNodeWithContentDescription("23 hours")
+
+  @Test
+  fun portrait_timePicker_showsTheClock() {
+    setContent(filled)
+
+    openTimePicker()
+
+    clockNumber().assertExists()
+  }
+
+  /** The time is typed instead of picked on a clock, entirely above the buttons. */
+  private fun assertTimeIsTypedAboveTheButtons() {
+    setContent(filled)
+
+    openTimePicker()
+
+    clockNumber().assertDoesNotExist()
+    val picker = node(C.Tag.symptom_add_time_picker).assertIsDisplayed()
+    picker.assertIsFullyVisible()
+    val confirm = node(C.Tag.symptom_add_picker_confirm).assertIsDisplayed()
+    assertTrue(
+        picker.fetchSemanticsNode().boundsInRoot.bottom <=
+            confirm.fetchSemanticsNode().boundsInRoot.top
+    )
+    composeTestRule
+        .onNode(hasSetTextAction() and hasContentDescription("for minutes"), useUnmergedTree = true)
+        .performTextReplacement("30")
+    confirm.performClick()
+
+    assertEquals(listOf("date=2026-10-05", "time=14:30"), events)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_timePicker_typesTheTime() = assertTimeIsTypedAboveTheButtons()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun smallLandscape_timePicker_typesTheTime() = assertTimeIsTypedAboveTheButtons()
+
   // ----- Editing a symptom -----
 
   /** Logged yesterday at 09:12. */
@@ -535,6 +596,110 @@ class AddSymptomScreenTest {
 
     node(C.Tag.symptom_add_save).assertIsEnabled().performClick()
     assertEquals(listOf("save"), events)
+  }
+
+  // ----- Keyboard -----
+
+  /** Puts the focus on the notes and opens a keyboard of [keyboardHeight] pixels. */
+  private fun typeNotesWithKeyboard(keyboardHeight: Int) {
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    scrolledTo(C.Tag.symptom_add_notes).requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+  }
+
+  /** Save sits above the keyboard, and the notes being typed are in what is left above Save. */
+  private fun assertNotesAndSaveAboveKeyboard(keyboardHeight: Int) {
+    val save = node(C.Tag.symptom_add_save)
+    save.assertIsDisplayed().assertIsAboveKeyboard(keyboardHeight)
+    val saveTop = save.fetchSemanticsNode().boundsInRoot.top
+    val notes = node(C.Tag.symptom_add_notes).assertIsDisplayed()
+    assertTrue(notes.fetchSemanticsNode().boundsInRoot.bottom <= saveTop)
+  }
+
+  /** The whole notes field can be read above the keyboard, once scrolled to. */
+  private fun assertWholeNotesAboveKeyboard(keyboardHeight: Int) {
+    val notes = scrolledTo(C.Tag.symptom_add_notes)
+    notes.assertIsDisplayed().assertIsFullyVisible()
+    notes.assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  fun keyboardOpenOnNotes_keepsNotesAndSaveAboveIt() {
+    setContent(filled)
+
+    typeNotesWithKeyboard(600)
+
+    assertNotesAndSaveAboveKeyboard(600)
+  }
+
+  @Test
+  fun editing_keyboardOpenOnNotes_keepsNotesAndSaveChangesAboveIt() {
+    setContent(editingForm)
+
+    typeNotesWithKeyboard(600)
+
+    assertNotesAndSaveAboveKeyboard(600)
+    node(C.Tag.symptom_add_save).assert(hasText(string(R.string.symptom_edit_save)))
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_keyboardOpenOnNotes_keepsTheWholeFieldVisible() {
+    setContent(filled)
+
+    typeNotesWithKeyboard(500)
+
+    assertWholeNotesAboveKeyboard(500)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_editing_keyboardOpenOnNotes_keepsTheWholeFieldVisible() {
+    setContent(editingForm)
+
+    typeNotesWithKeyboard(500)
+
+    assertWholeNotesAboveKeyboard(500)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_keyboardOpen_saveAndCloseCanBeScrolledTo() {
+    setContent(filled)
+    composeTestRule.showKeyboard(500)
+
+    val save = scrolledTo(C.Tag.symptom_add_save)
+    save.assertIsDisplayed().assertIsFullyVisible()
+    save.assertIsAboveKeyboard(500)
+    scrolledTo(C.Tag.symptom_add_close).assertIsDisplayed().assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_whileLoading_keepsTitleAndCloseOnScreen_withoutSave() {
+    setContent(empty.copy(isEditing = true, isLoading = true))
+
+    composeTestRule.onNodeWithText(string(R.string.symptom_edit_title)).assertIsFullyVisible()
+    node(C.Tag.symptom_add_close).assertIsFullyVisible()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_whenLoadingFailed_keepsCloseOnScreen_withoutSave() {
+    setContent(empty.copy(isEditing = true, hasLoadError = true))
+
+    node(C.Tag.symptom_add_close).assertIsFullyVisible()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_whenNotFound_keepsCloseOnScreen_withoutSave() {
+    setContent(empty.copy(isEditing = true, isNotFound = true))
+
+    node(C.Tag.symptom_add_close).assertIsFullyVisible()
+    node(C.Tag.symptom_add_save).assertDoesNotExist()
   }
 
   // ----- Screen with its ViewModel -----

@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
@@ -62,7 +64,12 @@ fun DayPickerDialog(
         }
       },
   ) {
-    DatePicker(state = pickerState, modifier = Modifier.testTag(testTags.picker))
+    // Scrolls on a short window (a phone held sideways), where it would otherwise be squeezed and
+    // its rows overlap each other and the buttons
+    DatePicker(
+        state = pickerState,
+        modifier = Modifier.verticalScroll(rememberScrollState()).testTag(testTags.picker),
+    )
   }
 }
 
