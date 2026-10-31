@@ -1,0 +1,19 @@
+# Fictional test sheet 11 (11-not-a-prescription), as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.91	593,658,1924,723	Fruity Morning multivitamin drink (fictional)
+0.85	583,765,2331,800	Ingredients: water, orange juice from concentrate (35%), apple juice (20%), Sugar, acidifier citric acid, vitamin
+0.84	580,801,1366,839	C, flavouring, stabiliser pectin (0,5%), vitamin B6.
+0.85	591,902,897,937	Nutrition per 100 ml
+0.89	586,975,693,1008	Energy
+0.90	579,1043,691,1076	Sugars
+0.78	573,1116,723,1143	Vitamin C
+0.86	566,1186,740,1213	Vitamin B6
+0.84	1267,969,1512,1005	180 kJ / 43 kcal
+0.85	1261,1046,1339,1079	9,8 g
+0.83	1258,1117,1475,1154	24 mg (30%*)
+0.70	1255,1189,1507,1225	0,42 mg (30%*)
+0.89	538,1281,2277,1334	*of the reference intake. Shake before use. Once opened, keep in the fridge and drink within 3 days. Best
+0.88	534,1318,841,1355	before 12.03.2027.
+0.87	369,3450,1733,3545	SPECIMEN Fictional label made to test the oncompanion app Not a prescription

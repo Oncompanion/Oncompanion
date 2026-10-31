@@ -1,0 +1,35 @@
+# Fictional test sheet 08 (08-english-discharge), as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.89	614,523,1830,588	Riverside General Hospital (fictional) Oncology Unit
+0.88	562,668,880,703	Patient: Jordan Lee
+0.82	558,725,836,759	MRN: 0000-1234
+0.90	554,779,1039,827	Discharge date: Oct 27, 2026
+0.93	547,902,1040,950	Discharge medications
+0.90	566,1011,649,1042	Drug
+0.86	559,1084,916,1127	Capecitabine 500 mg
+0.88	555,1175,870,1207	Ondansetron 8 mg
+0.89	549,1255,832,1297	Lorazepam 1 mg
+0.90	1094,1004,1184,1031	Dose
+0.92	1094,1086,1233,1114	3 tablets
+0.88	1104,1164,1211,1199	1 tablet
+0.89	1098,1255,1211,1284	1 tablet
+0.87	1342,1000,1447,1026	Route
+0.76	1340,1082,1390,1110	PO
+0.74	1339,1165,1391,1193	PO
+0.72	1338,1251,1390,1279	PO
+0.86	1522,644,1792,688	DOB: 11/02/1971
+0.83	1528,701,1816,748	Allergies: penicilin
+0.87	1507,760,2014,807	Attending: Dr. Priya Shah, MD
+0.84	1543,993,1733,1027	Frequency
+0.81	1542,1078,1590,1106	bid
+0.88	1542,1151,1970,1196	every 8 hours as needed
+0.89	1542,1245,1722,1277	at bedtime
+0.86	516,1367,1876,1422	Follow-up: blood count on 03/11/2026. Call 000 000 0000 if fever above 38 °C.
+0.86	508,1481,1305,1531	Prescriber: Dr. Priya Shah, MD Oct 27, 2026
+0.90	2159,981,2315,1008	Duration
+0.88	2163,1060,2296,1100	14 days
+0.91	2166,1150,2280,1185	5 days
+0.88	2167,1234,2284,1269	7 days
+0.83	401,3449,2280,3499	SPECIMEN- Fictional prescription made to test the oncompanion app Not valid- No real person or clinic

@@ -45,7 +45,9 @@ class ScanAccuracyTest {
    * Scores [read] against [written]. Each written medication is matched with the medication read
    * under the same name, else the one in its place; medications read but not written are [extra].
    */
-  private fun score(written: Written, read: ScannedPrescription?): Score {
+  private fun score(written: Written?, read: ScannedPrescription?): Score {
+    // Not a prescription: anything read is made up
+    if (written == null) return Score(emptyList(), read?.draft?.medications?.size ?: 0)
     val details = 2 + 4 * written.medications.size
     if (read == null) return Score(List(details) { Outcome.MISSED }, 0)
     val toCheck = read.toCheck
@@ -80,10 +82,10 @@ class ScanAccuracyTest {
 
   @Test
   fun everySheetIsReadAtLeastAsWellAsBefore() {
-    val scores =
-        ScanAnswerKey.tuned.mapValues { (n, written) ->
-          score(written, readPrescription(sheet(n), today))
-        }
+    val sheets = ScanAnswerKey.tuned + ScanAnswerKey.heldOut
+    val scores = sheets.mapValues { (n, written) ->
+      score(written, readPrescription(sheet(n), today))
+    }
     printTable(scores)
 
     val all = Score(scores.values.flatMap { it.outcomes }, scores.values.sumOf { it.extra })
@@ -109,9 +111,9 @@ class ScanAccuracyTest {
 
   private companion object {
     /** Details read right and not flagged, on all the sheets together. */
-    const val READ_RIGHT = 60
+    const val READ_RIGHT = 97
 
     /** Details wrong without being flagged: the ones the patient would trust. */
-    const val WRONG_UNFLAGGED = 0
+    const val WRONG_UNFLAGGED = 12
   }
 }

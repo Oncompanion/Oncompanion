@@ -100,6 +100,68 @@ object ScanAnswerKey {
               ),
       )
 
+  /**
+   * The sheets made after the reading was written, answers written before they were read. `null`:
+   * not a prescription (sheet 11, a drink label), nothing must be read.
+   */
+  val heldOut: Map<Int, Written?> =
+      mapOf(
+          7 to
+              Written(
+                  "Dr. med. Thomas Huber",
+                  LocalDate.of(2026, 10, 21),
+                  listOf(
+                      Medication("Ondansetron 8 mg", "1 Tablette", "1-0-1", 5),
+                      Medication("Dexamethason 4 mg", "2 Tabletten", "2-0-0", 3),
+                      Medication("Macrogol 10 g", "1 Beutel", "täglich bei Verstopfung", null),
+                  ),
+              ),
+          8 to
+              Written(
+                  "Dr. Priya Shah, MD",
+                  LocalDate.of(2026, 10, 27),
+                  listOf(
+                      Medication("Capecitabine 500 mg", "3 tablets", "bid", 14),
+                      Medication("Ondansetron 8 mg", "1 tablet", "every 8 hours as needed", 5),
+                      Medication("Lorazepam 1 mg", "1 tablet", "at bedtime", 7),
+                  ),
+              ),
+          9 to
+              Written(
+                  "Dr Nadia Benali",
+                  LocalDate.of(2026, 10, 16),
+                  listOf(
+                      Medication("Ondansétron 4 mg", "1 cp", "2/j", 3),
+                      Medication("Prednisone 20 mg", "2 cp", "le matin", 5),
+                      Medication("Bain de bouche bicarbonate 1,4%", "", "3 fois par jour", 10),
+                      Medication("Movicol", "1 sachet", "par jour si constipation", null),
+                  ),
+              ),
+          10 to
+              Written(
+                  "Dr Étienne Favre",
+                  LocalDate.of(2026, 10, 22),
+                  listOf(
+                      Medication("Létrozole 2,5 mg", "1 comprimé", "par jour", null),
+                      Medication(
+                          "Calcium 500 mg + vitamine D3 400 UI",
+                          "1 comprimé",
+                          "matin et soir",
+                          null,
+                      ),
+                      Medication(
+                          "Ibuprofène 400 mg",
+                          "1 comprimé",
+                          "3 fois par jour si douleurs",
+                          7,
+                      ),
+                      Medication("Oméprazole 20 mg", "1 gélule", "le matin", 7),
+                      Medication("Lidocaïne gel 2 %", "", "2 fois par jour", null),
+                  ),
+              ),
+          11 to null,
+      )
+
   /** Same words, ignoring case, accents and punctuation ("Dr. Martin · Oncology"). */
   fun same(a: String, b: String) = words(a) == words(b)
 
