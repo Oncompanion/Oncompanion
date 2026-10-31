@@ -244,6 +244,18 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # Every run: the time of each test, to see what makes the tests slow
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 7
+
       # The lint report comes from the Checks job, which runs at the same time and is usually done
       # by now. Wait for it (at most 10 min), so SonarCloud still imports the lint issues
       - name: Wait for the Checks job
