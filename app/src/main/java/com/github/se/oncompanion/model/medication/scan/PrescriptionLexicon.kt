@@ -33,6 +33,12 @@ internal object PrescriptionLexicon {
   /** Whether [text] says a date is when someone was born ("née le", "date de naissance"). */
   fun hasBirthClue(text: String): Boolean = BIRTH.containsMatchIn(text)
 
+  /**
+   * Whether [text] is about something later than the prescription, whose date isn't the
+   * prescription's: until when it is valid, the next check-up ("Prochain contrôle le 05.11.2026").
+   */
+  fun isAboutLater(text: String): Boolean = LATER.containsMatchIn(text)
+
   /** Whether [text] names a doctor with their title ("Dr", "Dre", "Docteur", "Prof"). */
   fun hasDoctorTitle(text: String): Boolean = DOCTOR_TITLE.containsMatchIn(text)
 
@@ -179,6 +185,11 @@ internal object PrescriptionLexicon {
       Regex(
           """\bnee?\s+le\b|\bne\(e\)|date de naissance|\bnaissance\b|date of birth|\bdob\b|\bborn\b""" +
               """|\bgeb\.|\bgeboren\b|geburtsdatum"""
+      )
+  private val LATER =
+      Regex(
+          """\b(?:valable|valid|jusqu'au|until|prochaine?|next|controle|follow-up|rendez-vous|""" +
+              """appointment|gultig|bis zum|nachste)\b"""
       )
   private val DOCTOR_TITLE = Regex("""(?<![a-z])(?:dr|dre|docteur|doctoresse|prof)\.?\s+[a-z]""")
   private val PATIENT =

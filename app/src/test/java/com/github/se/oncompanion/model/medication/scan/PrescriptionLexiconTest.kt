@@ -310,6 +310,26 @@ class PrescriptionLexiconTest {
   }
 
   @Test
+  fun datesOfSomethingLaterAreRecognized() {
+    assertAll(
+        PrescriptionLexicon::isAboutLater,
+        true,
+        "Valable jusqu'au 31.01.2027. Prochain contrôle le 05.11.2026.",
+        "Follow-up: blood count on 03/11/2026.",
+        "Valid until 31.01.2027",
+        "Prochain rendez-vous le 12.11.2026",
+        "Gültig bis zum 31.01.2027",
+    )
+    assertAll(
+        PrescriptionLexicon::isAboutLater,
+        false,
+        "Genève, le 22.10.2026",
+        "Discharge date: Oct 27, 2026",
+        "Bern, 21.10.2026",
+    )
+  }
+
+  @Test
   fun swissGermanPrescriptionsAreReadLikeFrenchOnes() {
     assertAll(PrescriptionLexicon::hasBirthClue, true, "Patientin: Mia Keller, geb. 04.06.1959")
     assertAll(PrescriptionLexicon::hasPatientClue, true, "Patientin: Mia Keller", "Patient: Max")

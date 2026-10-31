@@ -77,7 +77,8 @@ private fun kindOf(line: RecognizedLine, words: String, label: Label?, width: In
         // After the doctor and the patient, whose lines often end with an address
         isContactOrIdentifier(words) -> LineKind.NOISE
         hasStrength(words) && NAME.containsMatchIn(words) -> LineKind.MEDICATION
-        datesIn(words).isNotEmpty() -> LineKind.DATE
+        // A validity or next check-up date never is the prescription's
+        datesIn(words).isNotEmpty() -> if (isAboutLater(words)) LineKind.OTHER else LineKind.DATE
         hasDoseQuantity(words) || hasFrequency(words) || hasDuration(words) -> LineKind.DOSING
         words.length <= 2 || words.none { it.isLetter() } -> LineKind.NOISE
         else -> LineKind.OTHER

@@ -74,6 +74,26 @@ class LineClassifierTest {
   }
 
   @Test
+  fun aValidityOrCheckUpDateIsNotThePrescriptionsDate() {
+    assertKinds(
+        sheet(10),
+        mapOf(
+            "Né(e) le 30.01.1983" to PATIENT,
+            "Genève, le 22.10.2026" to DATE,
+            "Valable jusqu'au 31.01.2027. Prochain contrôle le 05.11.2026." to OTHER,
+        ),
+    )
+    assertKinds(
+        sheet(8),
+        mapOf(
+            "Discharge date: Oct 27, 2026" to DATE,
+            "Follow-up: blood count on 03/11/2026. Call 000 000 0000 if fever above 38 °C." to
+                OTHER,
+        ),
+    )
+  }
+
+  @Test
   fun aDateInWordsAndMedicationsWithTheirDosingOnOneLine() {
     assertKinds(
         sheet(3),
