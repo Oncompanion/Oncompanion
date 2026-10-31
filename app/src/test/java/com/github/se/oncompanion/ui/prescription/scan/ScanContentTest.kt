@@ -249,8 +249,46 @@ class ScanContentTest {
   }
 
   @Test
+  fun eachReasonForNothingRead_hasItsTitleAndMessage() {
+    val texts =
+        mapOf(
+            NothingRead.NO_TEXT to
+                (R.string.prescription_scan_nothing_read_title to
+                    R.string.prescription_scan_nothing_read),
+            NothingRead.NOT_A_PRESCRIPTION to
+                (R.string.prescription_scan_not_a_prescription_title to
+                    R.string.prescription_scan_not_a_prescription),
+        )
+    var why by mutableStateOf(NothingRead.NO_TEXT)
+    val photo = photoFile()
+    compose.setContent {
+      ScanContent(
+          uiState = granted().copy(photo = photo, nothingRead = why),
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          onCapture = {},
+          onMessageShown = {},
+          onRetake = {},
+          onUsePhoto = {},
+          viewfinder = { camera.Viewfinder(it) },
+      )
+    }
+    for ((reason, strings) in texts) {
+      why = reason
+      compose.onNodeWithText(string(strings.first)).assertIsDisplayed()
+      compose
+          .onNodeWithTag(C.Tag.prescription_scan_nothing_read)
+          .assertTextEquals(string(strings.second))
+      compose
+          .onNodeWithTag(C.Tag.prescription_scan_nothing_read_enter_manually_button)
+          .assertIsDisplayed()
+    }
+  }
+
+  @Test
   fun nothingRead_offersManualEntryFirst_thenARetake() {
-    show(granted().copy(photo = photoFile(), nothingRead = true))
+    show(granted().copy(photo = photoFile(), nothingRead = NothingRead.NO_TEXT))
 
     compose
         .onNodeWithText(string(R.string.prescription_scan_nothing_read_title))

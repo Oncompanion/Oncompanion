@@ -480,6 +480,8 @@
     <string name="prescription_scan_reading">Reading your prescription… This takes a few seconds.</string>
     <string name="prescription_scan_nothing_read_title">Couldn\'t read the prescription</string>
     <string name="prescription_scan_nothing_read">We couldn\'t find any text on this photo. It may be handwritten, blurry or too dark.</string>
+    <string name="prescription_scan_not_a_prescription_title">Not a prescription</string>
+    <string name="prescription_scan_not_a_prescription">We found text on this photo, but no medication. Check that it\'s a prescription, or enter it manually.</string>
     <string name="prescription_scan_enter_it_manually">Enter it manually</string>
     <string name="prescription_scan_retake_photo">Retake the photo</string>
     <string name="prescription_scan_photo_description">Photo of the prescription</string>
