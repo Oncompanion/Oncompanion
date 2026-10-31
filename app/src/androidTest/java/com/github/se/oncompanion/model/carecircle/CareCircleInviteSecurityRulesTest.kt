@@ -6,19 +6,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryFirestore.Companion.COLLECTION
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.android.gms.tasks.Task
+import com.github.se.oncompanion.utils.allowed
+import com.github.se.oncompanion.utils.denied
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,17 +66,6 @@ class CareCircleInviteSecurityRulesTest {
   /** Creates a valid invite as alice and returns it. */
   private suspend fun aliceInvite(): DocumentReference =
       newInvite().also { allowed(it.set(inviteFields())) }
-
-  private suspend fun <T> allowed(task: Task<T>): T = withTimeout(10_000) { task.await() }
-
-  private suspend fun denied(task: Task<*>) {
-    try {
-      withTimeout(10_000) { task.await() }
-      fail("Expected PERMISSION_DENIED but the operation succeeded")
-    } catch (e: FirebaseFirestoreException) {
-      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
-    }
-  }
 
   // ---- allowed ----
 
