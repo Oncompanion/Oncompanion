@@ -65,8 +65,8 @@ private val endTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLI
 
 /**
  * The detail of one of the Ligue's events (Figma: "US-03 / Event details"), opened from the Events
- * list. The patient can open the organizer's website and confirm here that they registered there
- * (Figma: "US-25 / Event detail").
+ * list or from Planning. The patient can open the organizer's website and confirm here that they
+ * registered there (Figma: "US-25 / Event detail").
  *
  * @param readOnly a caregiver only reads the event: registering is the patient's (US-20)
  */

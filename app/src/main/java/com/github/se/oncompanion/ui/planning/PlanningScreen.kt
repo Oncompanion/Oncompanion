@@ -61,10 +61,16 @@ fun PlanningScreen(
     modifier: Modifier = Modifier,
     onAddAppointment: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (String) -> Unit,
+    onOpenEvent: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val openAppointment: (PlanningItem) -> Unit = { item ->
-    appointmentToOpen(item)?.let(onOpenAppointment)
+  // Each entry opens the page of the feature that owns it; medications have none here
+  val openItem: (PlanningItem) -> Unit = { item ->
+    when (val source = item.source) {
+      is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
+      is PlanningSource.Event -> onOpenEvent(source.eventId)
+      is PlanningSource.Medication -> Unit
+    }
   }
   // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
   // at each midnight
@@ -84,8 +90,8 @@ fun PlanningScreen(
               viewModel::goToToday,
               viewModel::retry,
               onAddAppointment = onAddAppointment,
-              onItemClick = openAppointment,
-              canOpenItem = { appointmentToOpen(it) != null },
+              onItemClick = openItem,
+              canOpenItem = { it.source !is PlanningSource.Medication },
           ),
       modifier = modifier,
       bottomBar = {
@@ -416,11 +422,3 @@ private fun PlanningRow(
               ),
   )
 }
-
-/** Keeps row availability and click handling consistent for supported appointment sources. */
-internal fun appointmentToOpen(item: PlanningItem): String? =
-    when (val source = item.source) {
-      is PlanningSource.Appointment -> source.appointmentId
-      is PlanningSource.Event,
-      is PlanningSource.Medication -> null
-    }
