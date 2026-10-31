@@ -310,6 +310,41 @@ class PrescriptionLexiconTest {
   }
 
   @Test
+  fun swissGermanPrescriptionsAreReadLikeFrenchOnes() {
+    assertAll(PrescriptionLexicon::hasBirthClue, true, "Patientin: Mia Keller, geb. 04.06.1959")
+    assertAll(PrescriptionLexicon::hasPatientClue, true, "Patientin: Mia Keller", "Patient: Max")
+    assertAll(PrescriptionLexicon::hasDoseQuantity, true, "1 Beutel", "2 Tabletten", "1 Tabl.")
+    assertAll(
+        PrescriptionLexicon::hasFrequency,
+        true,
+        "1 Beutel täglich bei Verstopfung",
+        "2x täglich",
+        "abends",
+        "bei Bedarf",
+    )
+    assertAll(PrescriptionLexicon::isListStart, true, "Rezept")
+    assertAll(PrescriptionLexicon::isTableHeading, true, "Medikament", "Dosierung", "Dauer")
+    assertEquals(
+        listOf(LocalDate.of(2026, 10, 21)),
+        PrescriptionLexicon.datesIn(c("Bern, 21. Oktober 2026")),
+    )
+    val durations =
+        mapOf(
+            "während 5 Tagen" to (5 to true),
+            "für 3 Tage" to (3 to true),
+            "2 Wochen" to (14 to false),
+            "1 Monat" to (30 to false),
+            "maximal 7 Tage" to (7 to false),
+        )
+    for ((text, expected) in durations) {
+      val duration = PrescriptionLexicon.durationIn(c(text))
+      assertEquals("\"$text\"", expected, duration?.let { it.days to it.exact })
+    }
+    // Every few days is how often, not for how long
+    assertAll(PrescriptionLexicon::hasDuration, false, "alle 3 Tage")
+  }
+
+  @Test
   fun headingsAndLabelsAreRecognizedOnlyWhenAlone() {
     assertAll(PrescriptionLexicon::isListStart, true, "Rp/", "Rx", "ORDONNANCE", "Ordonnance :")
     assertAll(PrescriptionLexicon::isListStart, false, "cIMEN Ordonnance", "Rx Ondansetron")

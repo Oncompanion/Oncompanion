@@ -118,10 +118,14 @@ private val SPACES = Regex("""\s+""")
 private fun hasUnreadDuration(text: String): Boolean =
     DURATION_WORD.findAll(text).any { !PER.containsMatchIn(text.substring(0, it.range.first)) }
 
-private val DURATION_WORD = Regex("""\b(?:jour|day|semaine|week|mois|month)s?\b""")
-private val PER = Regex("""(?:\b(?:par|a|per|every|chaque|each) |/)$""")
+private val DURATION_WORD =
+    Regex("""\b(?:jour|day|semaine|week|mois|month|tag|tage|tagen|woche|wochen|monat|monate)s?\b""")
+private val PER = Regex("""(?:\b(?:par|a|per|every|chaque|each|pro|je|alle) |/)$""")
 
 /** A cycle, which says how often and not for how long: "tous les 21 jours", "every 2 days". */
 private val EVERY_FEW_DAYS =
-    Regex("""\b(?:tous les|toutes les|every)\s+\d+\s*(?:jour|day|semaine|sem|week)s?\b""")
+    Regex(
+        """\b(?:tous les|toutes les|every|alle)\s+\d+\s*""" +
+            """(?:jour|day|semaine|sem|week|tagen|tage|wochen|woche)s?\b"""
+    )
 private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·')

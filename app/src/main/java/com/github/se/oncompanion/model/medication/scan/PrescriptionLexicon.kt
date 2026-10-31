@@ -6,9 +6,9 @@ import java.time.DateTimeException
 import java.time.LocalDate
 
 /**
- * The words and patterns of a French or English prescription, in one place so a new format means a
- * new word here, not new logic. Every function takes text in [comparable] form (lowercase, no
- * accents), after [cleanedOcr].
+ * The words and patterns of a French, German or English prescription, in one place so a new format
+ * means a new word here, not new logic. Every function takes text in [comparable] form (lowercase,
+ * no accents), after [cleanedOcr].
  */
 internal object PrescriptionLexicon {
 
@@ -94,8 +94,10 @@ internal object PrescriptionLexicon {
     val (number, unit) = match.destructured
     val days =
         when {
-          unit.startsWith("sem") || unit.startsWith("week") -> DAYS_IN_A_WEEK
-          unit.startsWith("mois") || unit.startsWith("month") -> DAYS_IN_A_MONTH
+          unit.startsWith("sem") || unit.startsWith("week") || unit.startsWith("woche") ->
+              DAYS_IN_A_WEEK
+          unit.startsWith("mois") || unit.startsWith("month") || unit.startsWith("monat") ->
+              DAYS_IN_A_MONTH
           else -> 1
         }
     // The words before it that go with it: "pendant", and before that "au maximum"
@@ -142,21 +144,21 @@ internal object PrescriptionLexicon {
     }
   }
 
-  // The names of each month, January first, in French and English, full and abbreviated
+  // The names of each month, January first, in French, English and German, full and abbreviated
   private val MONTHS: Map<String, Int> =
       listOf(
-              "janvier janv jan january",
-              "fevrier fevr fev feb february",
-              "mars mar march",
+              "janvier janv jan january januar",
+              "fevrier fevr fev feb february februar",
+              "mars mar march marz",
               "avril avr apr april",
               "mai may",
-              "juin jun june",
-              "juillet juil jul july",
+              "juin jun june juni",
+              "juillet juil jul july juli",
               "aout aug august",
               "septembre sept sep september",
-              "octobre oct october",
+              "octobre oct october oktober okt",
               "novembre nov november",
-              "decembre dec december",
+              "decembre dec december dezember dez",
           )
           .flatMapIndexed { i, names -> names.split(" ").map { it to i + 1 } }
           .toMap()
@@ -175,12 +177,13 @@ internal object PrescriptionLexicon {
 
   private val BIRTH =
       Regex(
-          """\bnee?\s+le\b|\bne\(e\)|date de naissance|\bnaissance\b|date of birth|\bdob\b|\bborn\b"""
+          """\bnee?\s+le\b|\bne\(e\)|date de naissance|\bnaissance\b|date of birth|\bdob\b|\bborn\b""" +
+              """|\bgeb\.|\bgeboren\b|geburtsdatum"""
       )
   private val DOCTOR_TITLE = Regex("""(?<![a-z])(?:dr|dre|docteur|doctoresse|prof)\.?\s+[a-z]""")
   private val PATIENT =
       Regex(
-          """\bpatiente?\b|^(?:mme|mlle|m\.|mr|mrs|ms|monsieur|madame)\s|\bavs\b|\bassurance\b|d'assure"""
+          """\bpatient(?:e|in)?\b|^(?:mme|mlle|m\.|mr|mrs|ms|monsieur|madame)\s|\bavs\b|\bassurance\b|d'assure"""
       )
   private val FAMILY_DOCTOR = Regex("""^(?:medecin traitant|medecin de famille|family doctor)\b""")
 
@@ -196,7 +199,9 @@ internal object PrescriptionLexicon {
 
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
-          """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?)"""
+          """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?|""" +
+          // German: "1 Tabl.", "2 Tabletten", "1 Beutel"
+          """filmtabl|tabl|tabletten?|kapseln?|beutel|tropfen|zapfchen|spritzen?)"""
   // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
       Regex("""(?<![\p{L}\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
@@ -211,20 +216,28 @@ internal object PrescriptionLexicon {
               """\b(?:tous les|toutes les|every)\s+\d+\s*(?:h|heure|hour|jour|day|semaine|sem|week)s?\b"""
           ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
-          Regex("""\b(?:par jour|a day|per day|daily)\b"""),
+          Regex("""\b(?:par jour|a day|per day|daily|taglich|pro tag)\b"""),
+          Regex("""\b(?:morgens|mittags|abends|zur nacht|bei bedarf)\b"""),
           Regex(
               """\bsi (?:nausees|douleurs?|fievre|besoin|anxiete)\b|\bas needed\b|\bapres chaque\b"""
           ),
       )
 
-  private val DURATION = Regex("""(?<!\d)(\d+)\s*(jour|j|day|semaine|sem|week|mois|month)s?\b""")
+  private val DURATION =
+      Regex(
+          """(?<!\d)(\d+)\s*""" +
+              """(jour|j|day|semaine|sem|week|mois|month|tagen|tage|tag|wochen|woche|monaten|monate|monat)""" +
+              """s?\b"""
+      )
   // As whole words, so "le matin 3 jours" is a duration
-  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every)\s$""")
-  private val DURATION_FOR = Regex("""\b(?:pendant|durant|for|sur|x)\s+$""")
-  private val DURATION_MAXIMUM = Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to)\s+$""")
+  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every|alle)\s$""")
+  private val DURATION_FOR = Regex("""\b(?:pendant|durant|for|sur|x|wahrend|fur)\s+$""")
+  private val DURATION_MAXIMUM =
+      Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to|maximal|hochstens)\s+$""")
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
-  private val LIST_STARTS = setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription")
+  private val LIST_STARTS =
+      setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription", "rezept")
   private val TABLE_HEADINGS =
       setOf(
           "medicament",
@@ -238,6 +251,11 @@ internal object PrescriptionLexicon {
           "duration",
           "quantite",
           "quantity",
+          "medikament",
+          "medikamente",
+          "dosierung",
+          "dauer",
+          "menge",
       )
   private val LABELS =
       mapOf(
