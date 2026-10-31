@@ -15,6 +15,12 @@ on:
       - synchronize
       - reopened
 
+# A new push to a PR cancels the run of the previous commit, which nobody needs anymore. Runs on
+# main are never cancelled, so every merged commit is checked and publishes its APK.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   hospital-proxy:
     name: Hospital proxy
