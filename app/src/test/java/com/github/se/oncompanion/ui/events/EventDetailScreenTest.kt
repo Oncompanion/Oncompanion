@@ -198,7 +198,7 @@ class EventDetailScreenTest {
   }
 
   @Test
-  fun notFoundState_explainsAndGoesBackToEvents() {
+  fun notFoundState_explainsAndGoesBack() {
     var backs = 0
     setContent(EventDetailUiState(isLoading = false, notFound = true), onBack = { backs++ })
 
@@ -206,7 +206,10 @@ class EventDetailScreenTest {
         context.getString(R.string.event_detail_not_found_hint),
         C.Tag.event_detail_not_found,
     )
-    composeTestRule.onNodeWithTag(C.Tag.event_detail_back_to_events).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_go_back)
+        .assertTextEquals(context.getString(R.string.event_detail_go_back))
+        .performClick()
 
     composeTestRule.runOnIdle { assertEquals(1, backs) }
   }

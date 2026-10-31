@@ -418,8 +418,8 @@ private fun MissingEvent(onBack: () -> Unit, modifier: Modifier = Modifier) {
       icon = R.drawable.ic_event,
       supportingText = stringResource(R.string.event_detail_not_found_hint),
   ) {
-    Button(onClick = onBack, modifier = Modifier.testTag(C.Tag.event_detail_back_to_events)) {
-      Text(stringResource(R.string.event_detail_back_to_events))
+    Button(onClick = onBack, modifier = Modifier.testTag(C.Tag.event_detail_go_back)) {
+      Text(stringResource(R.string.event_detail_go_back))
     }
   }
 }
