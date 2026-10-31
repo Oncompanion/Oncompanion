@@ -178,6 +178,86 @@ class ReadPrescriptionTest {
   }
 
   @Test
+  fun aValidityOrCheckUpDateNeverIsThePrescriptionsDate() {
+    val prescribed = "Lausanne, le 20.10.2026"
+    val medication = "Ondansétron 8 mg 1 comprimé 2 fois par jour pendant 5 jours"
+    for (later in
+        listOf(
+            "Valable jusqu'au 31.01.2027",
+            "Prochain contrôle le 05.11.2026",
+            "Follow-up: blood count on 03/11/2026",
+            "Valid until 31.01.2027",
+            "Gültig bis zum 31.01.2027",
+        )) {
+      for (lines in
+          listOf(
+              linesOf("Dr Jean Dupont", later, medication, prescribed),
+              linesOf("Dr Jean Dupont", prescribed, medication, later),
+          )) {
+        val read = readPrescription(lines, today)!!
+        assertEquals(later, LocalDate.of(2026, 10, 20), read.draft.prescribedOn)
+        assertFalse(later, ScannedField.PrescribedOn in read.toCheck)
+      }
+      // Alone, it isn't taken for the prescription's date either: none was found
+      assertFalse(
+          later,
+          readPrescription(linesOf("Dr Jean Dupont", medication, later), today)!!.dateFound,
+      )
+    }
+  }
+
+  @Test
+  fun aNoteInTheListDoesntChangeTheMedicationAboveIt() {
+    for (note in
+        listOf(
+            "- Contrôle sanguin dans 10 jours",
+            "*of the reference intake. Shake before use. Once opened, drink within 3 days.",
+            // A sentence with a frequency in it (found by the scan accuracy tests)
+            "- Merci de revenir au cabinet avec les résultats de la prise de sang 1 fois par semaine",
+        )) {
+      val read =
+          readPrescription(
+              linesOf(
+                  "Dr Nadia Benali",
+                  "Lausanne, le 16.10.2026",
+                  "- Prednisone 20 mg cp: 2 cp le matin pendant 5 jours",
+                  note,
+              ),
+              today,
+          )!!
+      val prednisone = read.draft.medications.single()
+      assertEquals(note, "le matin", prednisone.frequency)
+      assertEquals(note, emptySet<ScannedField>(), read.toCheck)
+    }
+    assertNull(
+        readPrescription(linesOf("Dr Nadia Benali", "- Contrôle sanguin dans 10 jours"), today)
+    )
+  }
+
+  @Test
+  fun everyListedMedicationWithoutAStrengthIsItsOwn() {
+    val read =
+        readPrescription(
+            linesOf(
+                "Dr Nadia Benali",
+                "Lausanne, le 16.10.2026",
+                "- Movicol : 1 sachet par jour",
+                "• Daflon : 2 comprimés le soir",
+                "3. Bepanthen crème : 1 application matin et soir",
+            ),
+            today,
+        )!!
+    assertEquals(
+        listOf("Movicol", "Daflon", "Bepanthen crème"),
+        read.draft.medications.map { it.name },
+    )
+    assertEquals(
+        setOf(0, 1, 2).map { ScannedField.OfMedication(it, NAME) }.toSet(),
+        read.toCheck.filter { it is ScannedField.OfMedication && it.detail == NAME }.toSet(),
+    )
+  }
+
+  @Test
   fun aMedicationAloneHasTheDoctorAndDateToCheck() {
     val read = readPrescription(linesOf("Ondansetron 8 mg", "1 tablet twice a day"), today)!!
     assertEquals("", read.draft.prescribedBy)

@@ -92,12 +92,14 @@ class LineClassifierTest {
             )
         )
     assertEquals(OTHER, kinds["- Contrôle sanguin dans 10 jours"])
+    // A footnote, even with "3 days" in it
     assertEquals(
-        DOSING,
+        OTHER,
         kinds["*of the reference intake. Shake before use. Once opened, drink within 3 days"],
     )
+    // A sentence in the list isn't how to take the medication above, even with "every morning"
     assertEquals(
-        DOSING,
+        OTHER,
         kinds["- Please take the tablets with a large glass of water every morning"],
     )
     assertEquals(MEDICATION, kinds["2. Movicol: 1 sachet le matin"])

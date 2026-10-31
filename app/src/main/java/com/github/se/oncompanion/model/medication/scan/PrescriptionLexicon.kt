@@ -220,6 +220,7 @@ internal object PrescriptionLexicon {
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
           """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?|""" +
+          """applications?|""" +
           // German: "1 Tabl.", "2 Tabletten", "1 Beutel"
           """filmtabl|tabl|tabletten?|kapseln?|beutel|tropfen|zapfchen|spritzen?)"""
   private val PACK_SIZE = Regex("""^[\s,]*\d{2,}\s*$FORM\b""")

@@ -170,4 +170,4 @@ private val EVERY_FEW_DAYS =
         """\b(?:tous les|toutes les|every|alle)\s+\d+\s*""" +
             """(?:jour|day|semaine|sem|week|tagen|tage|wochen|woche)s?\b"""
     )
-private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·')
+private val EDGES = charArrayOf(' ', ',', ';', ':', '.', '-', '·', '•', '–')
