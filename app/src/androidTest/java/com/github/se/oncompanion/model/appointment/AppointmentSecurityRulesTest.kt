@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.model.appointment
@@ -5,20 +6,18 @@ package com.github.se.oncompanion.model.appointment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.android.gms.tasks.Task
+import com.github.se.oncompanion.utils.allowed
+import com.github.se.oncompanion.utils.denied
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,17 +60,6 @@ class AppointmentSecurityRulesTest {
           "notes" to "Bring documents",
           "createdAt" to FieldValue.serverTimestamp(),
       )
-
-  private suspend fun <T> allowed(task: Task<T>): T = withTimeout(10_000) { task.await() }
-
-  private suspend fun denied(task: Task<*>) {
-    try {
-      withTimeout(10_000) { task.await() }
-      fail("Expected PERMISSION_DENIED")
-    } catch (error: FirebaseFirestoreException) {
-      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, error.code)
-    }
-  }
 
   private suspend fun deniedCreate(fields: Map<String, Any?>) {
     denied(appointments().document().set(fields))
