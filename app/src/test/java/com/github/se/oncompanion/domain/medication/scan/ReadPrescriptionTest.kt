@@ -6,11 +6,12 @@ import com.github.se.oncompanion.domain.medication.scan.MedicationDetail.DOSAGE
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail.DURATION
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail.FREQUENCY
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail.NAME
+import com.github.se.oncompanion.domain.medication.scan.ScanAnswerKey.Written
+import com.github.se.oncompanion.domain.medication.scan.ScanAnswerKey.same
 import com.github.se.oncompanion.model.medication.scan.RecognizedLine
 import com.github.se.oncompanion.model.medication.scan.RecognizedText
 import com.github.se.oncompanion.model.medication.scan.ScannedSheets.linesOf
 import com.github.se.oncompanion.model.medication.scan.ScannedSheets.sheet
-import com.github.se.oncompanion.model.medication.scan.comparable
 import java.time.LocalDate
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
@@ -21,102 +22,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [readPrescription] on the six test sheets, against what is really written on them (their answer
- * key): every detail must be read right or be to check, since a wrong detail the patient isn't told
- * to check is the one they would trust.
+ * [readPrescription] on the six test sheets, against what is really written on them
+ * ([ScanAnswerKey]): every detail must be read right or be to check, since a wrong detail the
+ * patient isn't told to check is the one they would trust.
  */
 class ReadPrescriptionTest {
   private val today = LocalDate.of(2026, 11, 20)
 
-  /** What is written on a sheet: the doctor, the date, and each medication's details. */
-  private data class Written(
-      val doctor: String,
-      val date: LocalDate,
-      val medications: List<Medication>,
-  )
-
-  private data class Medication(
-      val name: String,
-      val dosage: String,
-      val frequency: String,
-      val days: Int?,
-  )
-
-  private val answers =
-      mapOf(
-          1 to
-              Written(
-                  "Dr. Anna Martin · Oncology",
-                  LocalDate.of(2026, 9, 29),
-                  listOf(
-                      Medication("Ondansetron 8 mg", "1 tablet", "twice a day", 5),
-                      Medication("Dexamethasone 4 mg", "1 tablet", "each morning", 3),
-                  ),
-              ),
-          2 to
-              Written(
-                  "Dre Claire Fontaine",
-                  LocalDate.of(2026, 10, 14),
-                  listOf(
-                      Medication("Tamoxifène 20 mg", "1 comprimé", "1-0-0", 182),
-                      Medication("Pantoprazole 40 mg", "1 comprimé", "1-0-0", 30),
-                      Medication("Métoclopramide 10 mg", "1 comprimé", "1-1-1 si nausées", 5),
-                  ),
-              ),
-          3 to
-              Written(
-                  "Dr Marc Dubois",
-                  LocalDate.of(2026, 10, 20),
-                  listOf(
-                      Medication("Ondansétron 8 mg", "1 comprimé", "2x/jour", 5),
-                      Medication(
-                          "Paracétamol 500 mg",
-                          "2 comprimés",
-                          "3 fois par jour si douleurs",
-                          null,
-                      ),
-                  ),
-              ),
-          4 to
-              Written(
-                  "Dr Paul Keller",
-                  LocalDate.of(2026, 11, 3),
-                  listOf(
-                      Medication("Dexaméthasone 4 mg", "2 cp", "le matin", 3),
-                      Medication("Ondansétron 4 mg", "1 cp", "toutes les 12 heures", 5),
-                      Medication("Filgrastim 30 MU", "1 injection", "s.c. par jour", 5),
-                  ),
-              ),
-          5 to
-              Written(
-                  "Dre Léa Morel",
-                  LocalDate.of(2026, 11, 5),
-                  listOf(
-                      Medication(
-                          "Lopéramide 2 mg",
-                          "1 gélule",
-                          "après chaque selle liquide, au maximum 8 par jour",
-                          null,
-                      ),
-                      Medication("Ondansétron 8 mg", "1 comprimé", "matin et soir", 3),
-                  ),
-              ),
-          6 to
-              Written(
-                  "Dr J. Roux - Oncologie",
-                  LocalDate.of(2026, 11, 11),
-                  listOf(
-                      Medication("Dexaméthasone 4 mg", "1 comprimé", "1-0-0", 3),
-                      Medication("Métoclopramide 10 mg", "1 comprimé", "1-1-1", 5),
-                      Medication("Paracétamol 1 g", "", "si fièvre", null),
-                  ),
-              ),
-      )
-
-  /** Same words, ignoring case, accents and punctuation ("Dr. Martin · Oncology"). */
-  private fun same(a: String, b: String) = words(a) == words(b)
-
-  private fun words(text: String) = comparable(text).filter { it.isLetterOrDigit() }
+  private val answers = ScanAnswerKey.tuned
 
   /** Fails unless every detail of [read] is what is [written], or is to check. */
   private fun assertRightOrToCheck(sheet: Int, written: Written, read: ScannedPrescription) {
