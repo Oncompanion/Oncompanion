@@ -339,7 +339,10 @@ Known limitations:
 
 ## Sign-out (issue #35)
 
-`ProfileViewModel` delegates to the process-scoped `SignOut` coordinator. Confirmation freezes
+`ProfileViewModel` delegates to the process-scoped `SignOut` coordinator, and so does
+`OnboardingViewModel` for **Use another account** (#281), which signs out before any profile is
+saved so the user can pick another Google account; both show the same `SignOutDialog`
+(`ui/auth/`) when changes may be discarded, and onboarding only follows a sign-out it started itself. Confirmation freezes
 repository entry points and cancels/drains their active child jobs, including operations that
 suspended before enqueueing a write. SDK transactions are tracked separately because cancelling
 `Task.await()` does not cancel the task. The coordinator waits for transactions, then calls

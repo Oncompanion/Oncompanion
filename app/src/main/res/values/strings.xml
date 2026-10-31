@@ -177,6 +177,8 @@
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_signed_in_as">Signed in as %1$s</string>
+    <string name="onboarding_use_another_account">Use another account</string>
     <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>
     <string name="onboarding_required">*Required</string>
