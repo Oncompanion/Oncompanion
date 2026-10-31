@@ -52,8 +52,9 @@ jobs:
           'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 
 
-  # Formatting, lint and the release APK. They run beside the tests in the CI job, so a formatting
-  # or lint error shows up in a few minutes and lint no longer adds to the time of the whole run.
+  # Formatting, lint, unit tests and the release APK. They run beside the connected tests in the CI
+  # job, so a formatting, lint or unit test error shows up in a few minutes and they no longer add
+  # to the time of the whole run.
   checks:
     name: Checks
     runs-on: ubuntu-latest
@@ -91,13 +92,22 @@ jobs:
         run: |
           ./gradlew lintDebug --build-cache
 
-      # SonarCloud imports the lint issues: the CI job downloads this report before its analysis
-      - name: Upload lint report
+      - name: Unit tests
+        run: |
+          ./gradlew testDebugUnitTest --build-cache
+
+      # SonarCloud imports the lint issues, the unit test results and their coverage: the CI job
+      # downloads them before its analysis. Paths are kept under app/build/
+      - name: Upload reports for SonarCloud
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-report
-          path: app/build/reports/lint-results-debug.xml
-          if-no-files-found: error
+          name: checks-reports
+          path: |
+            app/build/reports/lint-results-debug.xml
+            app/build/test-results/testDebugUnitTest/
+            app/build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec
+          if-no-files-found: warn
           retention-days: 1
 
       # The signed release APK is built on main only: PRs never use it, and R8 takes about a minute.
@@ -131,7 +141,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # Unit and connected tests, their coverage and the SonarCloud analysis
+  # Connected tests, the coverage of all tests and the SonarCloud analysis
   ci:
     name: CI
     # Execute the CI on the course's runners
@@ -194,12 +204,6 @@ jobs:
         run: |
           chmod +x ./gradlew
 
-      # Run Unit tests
-      - name: Run tests
-        run: |
-          # To run the CI with debug information, add --info
-          ./gradlew testDebugUnitTest --build-cache
-
       # Firebase emulators (Auth + Firestore) used by the connected tests, see firebase.json.
       # The Android emulator reaches them on the host at 10.0.2.2.
       - name: Setup Node
@@ -252,12 +256,11 @@ jobs:
           name: test-results
           path: |
             app/build/outputs/androidTest-results/connected/
-            app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7
 
-      # The lint report comes from the Checks job, which runs at the same time and is usually done
-      # by now. Wait for it (at most 10 min), so SonarCloud still imports the lint issues
+      # The lint report and the unit tests come from the Checks job, which runs at the same time and
+      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them
       - name: Wait for the Checks job
         env:
           GH_TOKEN: ${{ github.token }}
@@ -270,13 +273,13 @@ jobs:
           done
           echo "The Checks job didn't finish in time" && exit 1
 
-      # Missing when the Checks job failed early (formatting): Sonar then runs without lint issues
-      - name: Download lint report
+      # Missing when the Checks job failed early (formatting): Sonar then runs without them
+      - name: Download reports of the Checks job
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: lint-report
-          path: app/build/reports
+          name: checks-reports
+          path: app/build
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
