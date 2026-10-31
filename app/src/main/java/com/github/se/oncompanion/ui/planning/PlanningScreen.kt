@@ -64,14 +64,7 @@ fun PlanningScreen(
     onOpenEvent: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  // Each entry opens the page of the feature that owns it; medications have none here
-  val openItem: (PlanningItem) -> Unit = { item ->
-    when (val source = item.source) {
-      is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
-      is PlanningSource.Event -> onOpenEvent(source.eventId)
-      is PlanningSource.Medication -> Unit
-    }
-  }
+  val openItem: (PlanningItem) -> Unit = { openPlanningItem(it, onOpenAppointment, onOpenEvent) }
   // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
   // at each midnight
   LifecycleResumeEffect(viewModel) {
@@ -98,6 +91,19 @@ fun PlanningScreen(
         BottomNavigationBar(Tab.PLANNING, { navigationActions.navigateToTab(it.route) })
       },
   )
+}
+
+/** Opens the page of the feature that owns [item]; medications have none here. */
+internal fun openPlanningItem(
+    item: PlanningItem,
+    onOpenAppointment: (String) -> Unit,
+    onOpenEvent: (String) -> Unit,
+) {
+  when (val source = item.source) {
+    is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
+    is PlanningSource.Event -> onOpenEvent(source.eventId)
+    is PlanningSource.Medication -> Unit
+  }
 }
 
 /** Stateless calendar and agenda; unavailable appointment actions are omitted. */

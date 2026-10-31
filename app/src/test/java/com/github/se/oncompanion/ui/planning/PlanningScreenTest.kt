@@ -365,4 +365,19 @@ class PlanningScreenTest {
     compose.onNodeWithTag(C.Tag.planningItem(item.key)).assertHasClickAction().performClick()
     assertEquals(item, opened)
   }
+
+  /** Each source only reaches its own page, and a medication can't be routed to either. */
+  @Test
+  fun openingAnItemRoutesItToItsOwner() {
+    val opened = mutableListOf<String>()
+    val open = { planned: PlanningItem ->
+      openPlanningItem(planned, { opened += "appointment:$it" }, { opened += "event:$it" })
+    }
+
+    open(item.copy(source = PlanningSource.Appointment("a")))
+    open(item.copy(source = PlanningSource.Event("e")))
+    open(medication())
+
+    assertEquals(listOf("appointment:a", "event:e"), opened)
+  }
 }
