@@ -77,6 +77,11 @@ jobs:
         run: |
           chmod +x ./gradlew
 
+      # The daemon runs on the JDK pinned in gradle/gradle-daemon-jvm.properties: show which one
+      - name: Gradle and JDK versions
+        run: |
+          ./gradlew --version
+
       # Check formatting
       - name: KTFmt Check
         run: |
