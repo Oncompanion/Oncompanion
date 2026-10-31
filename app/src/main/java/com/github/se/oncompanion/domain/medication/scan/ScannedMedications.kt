@@ -69,7 +69,9 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val afterName = first.substring(nameEnd)
   val packSize = PrescriptionLexicon.packSizeIn(matchable(afterName))
   val after = afterName.substring(packSize?.let { it.last + 1 } ?: 0)
-  val dosingAfter = PrescriptionLexicon.dosingStartIn(matchable(after))?.let(after::substring)
+  val dosingStart = PrescriptionLexicon.dosingStartIn(matchable(after))
+  val described = after.substring(0, dosingStart ?: after.length)
+  val dosingAfter = dosingStart?.let(after::substring)
   val dosing = (listOfNotNull(dosingAfter) + lines.drop(1).map { it.text }).joinToString(" ")
 
   val matched = matchable(dosing)
@@ -99,7 +101,13 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
               name,
               sure = strength != null && lines.first().line.confidence >= SURE && !looksSplit(name),
           ),
-      dosage = limited(quantity?.let(dosing::substring).orEmpty(), sure = linesSure),
+      // Without a quantity, a Swiss scheme gives it with the form ("1-0-1" and "comprimés" is
+      // "1 comprimé"): deduced, not read, so to check
+      dosage =
+          limited(
+              quantity?.let(dosing::substring) ?: dosageFromScheme(frequency, described),
+              sure = linesSure && quantity != null,
+          ),
       frequency = limited(frequency, sure = linesSure && !unreadDuration),
       durationDays =
           Reading(
@@ -128,6 +136,21 @@ private fun combinationEnd(line: String, strengthEnd: Int): Int {
   }
 }
 
+/**
+ * The dosage a Swiss scheme says, when every dose of [frequency] is the same number ("1-0-1",
+ * "2-0-0") and [described] names the form ("comprimés"): "1 comprimé". Empty otherwise ("1-0-2", or
+ * no form written): never guessed.
+ */
+private fun dosageFromScheme(frequency: String, described: String): String {
+  val doses =
+      SCHEME.find(frequency)?.groupValues?.drop(1)?.filter { it.isNotEmpty() && it != "0" }
+          ?: return ""
+  val count = doses.distinct().singleOrNull() ?: return ""
+  val form =
+      PrescriptionLexicon.formIn(matchable(described))?.let(described::substring) ?: return ""
+  return "$count ${if (count == "1") form.removeSuffix("s") else form}"
+}
+
 /** [text] cut to what a medication can store; not sure if empty or cut. */
 private fun limited(text: String, sure: Boolean): Reading<String> {
   val kept = text.take(Medication.MAX_TEXT_LENGTH).trim()
@@ -145,6 +168,7 @@ private fun looksSplit(name: String): Boolean =
 private val NUMBERING = Regex("""^\s*[\dlIoO]{1,2}\s*[.)]\s+""")
 private val FRAGMENT = Regex("""\p{Ll}{1,3}""")
 private val SPACES = Regex("""\s+""")
+private val SCHEME = Regex("""^(\d)\s*-\s*(\d)\s*-\s*(\d)(?:\s*-\s*(\d))?(?!\d)""")
 private val TIMES_BEFORE = Regex("""^[xX]\s+(?=\d)""")
 private val MISREAD_I = Regex("""^l(?=[bcdfghjkmnpqrstvwxz])""")
 private val COMBINED_WITH = Regex("""^\s*\+\s*""")

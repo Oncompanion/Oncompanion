@@ -48,24 +48,24 @@ class ScannedMedicationsTest {
   fun swissSheetWithoutDosageAMonthDurationAndASplitName() {
     assertEquals(
         listOf(
-            // No quantity is written ("1-0-0" alone): never guessed, so the dosage is to check;
+            // "1-0-0" and "comprimés" say 1 comprimé, deduced so to check (phone test);
             // 6 months counted as 180 days, to check
             ScannedMedication(
                 Reading("Tamoxifène 20 mg", true),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-0-0", true),
                 Reading(180, false),
             ),
             ScannedMedication(
                 Reading("Pantoprazole 40 mg", true),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-0-0", true),
                 Reading(30, true),
             ),
             // Read with a space inside the name, and "au maximum" is not an exact duration
             ScannedMedication(
                 Reading("Métoclopram ide 10 mg", false),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-1-1 si nausées", true),
                 Reading(5, false),
             ),
@@ -360,6 +360,26 @@ class ScannedMedicationsTest {
         ),
         medications,
     )
+  }
+
+  @Test
+  fun aSwissSchemeWithTheFormGivesTheDosageToCheck() {
+    val dosages =
+        mapOf(
+            listOf("Tamoxifène 20 mg, comprimés", "1-0-1, pendant 30 jours") to "1 comprimé",
+            listOf("Dexamethason 4 mg Tabl.", "2-0-0") to "2 Tabl",
+            listOf("Pantoprazole 40 mg gélules", "1-0-0-1") to "1 gélule",
+            // Not the same number each time, or no form written: never guessed
+            listOf("Prednisone 20 mg, comprimés", "1-0-2") to "",
+            listOf("Tamoxifène 20 mg", "1-0-0") to "",
+        )
+    for ((lines, dosage) in dosages) {
+      val medication = medicationsOf(linesOf(*lines.toTypedArray())).single()
+      assertEquals(lines.toString(), Reading(dosage, false), medication.dosage)
+    }
+    // A quantity written is read, and trusted
+    val written = medicationsOf(linesOf("Tamoxifène 20 mg, comprimés", "2 cp 1-0-1")).single()
+    assertEquals(Reading("2 cp", true), written.dosage)
   }
 
   @Test

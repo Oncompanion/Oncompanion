@@ -97,6 +97,9 @@ internal object PrescriptionLexicon {
    */
   fun packSizeIn(text: String): IntRange? = PACK_SIZE.find(text)?.range
 
+  /** Where the first form is in [text] ("comprimés", "Tabl."), if any. */
+  fun formIn(text: String): IntRange? = FORM_WORD.find(text)?.range
+
   /** Where the first dose quantity is in [text] ("1 comprimé"), if any. */
   fun doseQuantityIn(text: String): IntRange? = DOSE_QUANTITY.find(text)?.range
 
@@ -223,6 +226,7 @@ internal object PrescriptionLexicon {
           """applications?|""" +
           // German: "1 Tabl.", "2 Tabletten", "1 Beutel"
           """filmtabl|tabl|tabletten?|kapseln?|beutel|tropfen|zapfchen|spritzen?)"""
+  private val FORM_WORD = Regex("""(?<![\p{L}])$FORM\b""")
   private val PACK_SIZE = Regex("""^[\s,]*\d{2,}\s*$FORM\b""")
   // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
