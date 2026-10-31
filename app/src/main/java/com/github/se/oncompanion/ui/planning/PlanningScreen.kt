@@ -61,11 +61,10 @@ fun PlanningScreen(
     modifier: Modifier = Modifier,
     onAddAppointment: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (String) -> Unit,
+    onOpenEvent: (String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val openAppointment: (PlanningItem) -> Unit = { item ->
-    appointmentToOpen(item)?.let(onOpenAppointment)
-  }
+  val openItem: (PlanningItem) -> Unit = { openPlanningItem(it, onOpenAppointment, onOpenEvent) }
   // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
   // at each midnight
   LifecycleResumeEffect(viewModel) {
@@ -84,14 +83,27 @@ fun PlanningScreen(
               viewModel::goToToday,
               viewModel::retry,
               onAddAppointment = onAddAppointment,
-              onItemClick = openAppointment,
-              canOpenItem = { appointmentToOpen(it) != null },
+              onItemClick = openItem,
+              canOpenItem = { it.source !is PlanningSource.Medication },
           ),
       modifier = modifier,
       bottomBar = {
         BottomNavigationBar(Tab.PLANNING, { navigationActions.navigateToTab(it.route) })
       },
   )
+}
+
+/** Opens the page of the feature that owns [item]; medications have none here. */
+internal fun openPlanningItem(
+    item: PlanningItem,
+    onOpenAppointment: (String) -> Unit,
+    onOpenEvent: (String) -> Unit,
+) {
+  when (val source = item.source) {
+    is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
+    is PlanningSource.Event -> onOpenEvent(source.eventId)
+    is PlanningSource.Medication -> Unit
+  }
 }
 
 /** Stateless calendar and agenda; unavailable appointment actions are omitted. */
@@ -416,11 +428,3 @@ private fun PlanningRow(
               ),
   )
 }
-
-/** Keeps row availability and click handling consistent for supported appointment sources. */
-internal fun appointmentToOpen(item: PlanningItem): String? =
-    when (val source = item.source) {
-      is PlanningSource.Appointment -> source.appointmentId
-      is PlanningSource.Event,
-      is PlanningSource.Medication -> null
-    }

@@ -253,6 +253,7 @@ private fun SessionNavHost(
                 if (chosenPatient != null) null
                 else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
             onOpenAppointment = appointmentOpener(navigationActions),
+            onOpenEvent = eventOpener(navigationActions),
         )
       }
       composable(
@@ -333,7 +334,8 @@ private fun SessionNavHost(
         val eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty()
         EventDetailScreen(
             eventId = eventId,
-            onBack = navigationActions::goBack,
+            // A second tap during the exit animation must not pop the screen below as well
+            onBack = dropUnlessResumed { navigationActions.goBack() },
             viewModel = viewModel { EventDetailViewModel(eventId) },
             readOnly = chosenPatient != null,
         )
@@ -577,11 +579,24 @@ private fun onboardingViewModel(
 
 /** Shares the resumed-only guard for appointment navigation from either bottom tab. */
 @Composable
-private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit =
+    detailOpener(navigationActions, Screen::appointmentDetail)
+
+/** Opens an event's page from the current entry, with the same guard as [appointmentOpener]. */
+@Composable
+private fun eventOpener(navigationActions: NavigationActions): (String) -> Unit =
+    detailOpener(navigationActions, Screen::eventDetail)
+
+/** Opens the [route] of an id only while the current entry is resumed. */
+@Composable
+private fun detailOpener(
+    navigationActions: NavigationActions,
+    route: (String) -> String,
+): (String) -> Unit {
   val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
   return { id ->
     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-      navigationActions.navigateTo(Screen.appointmentDetail(id))
+      navigationActions.navigateTo(route(id))
     }
   }
 }

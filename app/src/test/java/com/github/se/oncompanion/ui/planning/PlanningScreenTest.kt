@@ -366,11 +366,18 @@ class PlanningScreenTest {
     assertEquals(item, opened)
   }
 
-  /** Even a future clickable event cannot be routed as an appointment. */
+  /** Each source only reaches its own page, and a medication can't be routed to either. */
   @Test
-  fun appointmentRoutingRejectsOtherSources() {
-    assertEquals("test", appointmentToOpen(item))
-    assertEquals(null, appointmentToOpen(item.copy(source = PlanningSource.Event("event"))))
-    assertEquals(null, appointmentToOpen(medication()))
+  fun openingAnItemRoutesItToItsOwner() {
+    val opened = mutableListOf<String>()
+    val open = { planned: PlanningItem ->
+      openPlanningItem(planned, { opened += "appointment:$it" }, { opened += "event:$it" })
+    }
+
+    open(item.copy(source = PlanningSource.Appointment("a")))
+    open(item.copy(source = PlanningSource.Event("e")))
+    open(medication())
+
+    assertEquals(listOf("appointment:a", "event:e"), opened)
   }
 }

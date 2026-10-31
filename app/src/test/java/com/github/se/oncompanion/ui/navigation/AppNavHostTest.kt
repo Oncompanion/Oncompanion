@@ -53,8 +53,11 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -1690,6 +1693,169 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
+  }
+
+  /** An event a week from now, on a different week of Planning than the one it opens on. */
+  private fun eventNextWeek() =
+      FakeEventRepository.sampleEvents(LocalDate.now())
+          .first()
+          .copy(startDateTime = LocalDate.now().plusWeeks(1).atTime(15, 0), endDateTime = null)
+
+  /** A Planning source listing [event], whatever the event repository says about it. */
+  private fun planningWith(event: Event) =
+      FakePlanningRepository().apply {
+        items.value =
+            listOf(
+                PlanningItem(
+                    PlanningSource.Event(event.id),
+                    PlanningTiming.Timed(
+                        event.startDateTime.atZone(ZoneId.systemDefault()).toInstant()
+                    ),
+                    event.title,
+                )
+            )
+      }
+
+  /** On Planning, moves to next week, opens [event] from there and returns the day's heading. */
+  private fun openEventFromNextWeek(event: Event): String {
+    composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+    val heading =
+        composeTestRule
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+            .single()
+            .text
+    composeTestRule.onNodeWithText(event.title).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_screen).assertIsDisplayed()
+    return heading
+  }
+
+  private fun assertBackOnPlanning(heading: String) {
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_heading).assertTextEquals(heading)
+  }
+
+  @Test
+  fun planningEvent_opensItsPage_andBackArrowKeepsTheSelectedDay() {
+    val event = eventNextWeek()
+    setNavHost(
+        Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+
+    val heading = openEventFromNextWeek(event)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertTextEquals(event.title)
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_location)
+        .assertTextContains(
+            event.place,
+            substring = true,
+        )
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_date_time).assertExists()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_description)
+        .assertTextEquals(event.description)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_systemBackKeepsTheSelectedDay() {
+    val event = eventNextWeek()
+    setNavHost(
+        Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+    val heading = openEventFromNextWeek(event)
+
+    Espresso.pressBack()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_tappingBackTwiceStaysOnPlanning() {
+    val event = eventNextWeek()
+    setNavHost(
+        Route.OVERVIEW,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    val heading = openEventFromNextWeek(event)
+
+    // Both taps land before the event page has left the screen
+    val backClick =
+        composeTestRule
+            .onNodeWithTag(C.Tag.event_detail_back)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsActions.OnClick]
+            .action!!
+    composeTestRule.runOnUiThread {
+      backClick()
+      backClick()
+    }
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_thatNoLongerExists_explainsAndGoesBackToPlanning() {
+    val event = eventNextWeek()
+    setNavHost(
+        Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(emptyList()),
+    )
+    val heading = openEventFromNextWeek(event)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_not_found).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.event_detail_not_found))
+        .assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_go_back).performClick()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun caregiver_opensAPlanningEvent_withoutRegistrationActions() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository = FakeEventRegistrationRepository()
+    try {
+      val event = eventNextWeek()
+      setNavHost(
+          Route.WHOSE_CARE,
+          publicEvents = planningWith(event),
+          careCircleRepository = circles,
+          careCircleInviteRepository = invites,
+          authRepository = auth,
+          eventRepository = FakeEventRepository(listOf(event)),
+      )
+      composeTestRule.waitUntil(timeoutMillis = 5_000) {
+        composeTestRule
+            .onAllNodesWithTag(C.Tag.overview_whose_care)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+
+      openEventFromNextWeek(event)
+
+      composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertTextEquals(event.title)
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertDoesNotExist()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
   }
 
   /** Verifies the default Planning source reads the appointment, auth and event providers. */
