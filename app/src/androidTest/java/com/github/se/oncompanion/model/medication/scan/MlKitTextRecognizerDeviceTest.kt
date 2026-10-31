@@ -28,7 +28,8 @@ import org.junit.runner.RunWith
  * [MlKitTextRecognizer] reading real photos with ML Kit's bundled model, on the device and offline:
  * upright and sideways photos, blank and tiny ones, photos larger than
  * [MlKitTextRecognizer.MAX_SIDE], and files that aren't images. The prescription in the test assets
- * is fictional (sheet 01 of the US-10 test prescriptions, 1588 × 2246).
+ * is fictional (sheet 01 of the US-10 test prescriptions, 1588 × 2246). Reading it takes seconds on
+ * CI's emulator, so only the test of what is read on it uses it: the others read small pages.
  */
 @RunWith(AndroidJUnit4::class)
 class MlKitTextRecognizerDeviceTest {
@@ -69,11 +70,13 @@ class MlKitTextRecognizerDeviceTest {
                 ExifInterface.ORIENTATION_ROTATE_270,
             )) {
           val text =
-              recognizer.recognize(jpeg(prescription(), "turned-$orientation.jpg", orientation))
+              recognizer.recognize(
+                  jpeg(smallPrescription(), "turned-$orientation.jpg", orientation)
+              )
 
-          assertEquals("Orientation $orientation", 1588, text.width)
-          assertEquals("Orientation $orientation", 2246, text.height)
-          assertReadTopToBottom(text, "Martin", "Ondansetron", "Dexamethasone", "Signature")
+          assertEquals("Orientation $orientation", SMALL_WIDTH, text.width)
+          assertEquals("Orientation $orientation", SMALL_HEIGHT, text.height)
+          assertReadTopToBottom(text, "MARTIN", "ONDANSETRON", "DEXAMETHASONE", "SIGNATURE")
           assertWellFormed(text)
         }
       }
@@ -81,14 +84,14 @@ class MlKitTextRecognizerDeviceTest {
   @Test
   fun aSidewaysPhotoGivesTheBoxesOfTheUprightPage() =
       runBlocking<Unit> {
-        val upright = recognizer.recognize(jpeg(prescription(), "upright.jpg"))
+        val upright = recognizer.recognize(jpeg(smallPrescription(), "upright.jpg"))
         val sideways =
             recognizer.recognize(
-                jpeg(prescription(), "sideways.jpg", ExifInterface.ORIENTATION_ROTATE_90)
+                jpeg(smallPrescription(), "sideways.jpg", ExifInterface.ORIENTATION_ROTATE_90)
             )
 
-        val expected = upright.lineWith("Ondansetron").box!!
-        val actual = sideways.lineWith("Ondansetron").box!!
+        val expected = upright.lineWith("ONDANSETRON").box!!
+        val actual = sideways.lineWith("ONDANSETRON").box!!
         // The same place, give or take JPEG noise
         assertTrue("$actual vs $expected", abs(actual.left - expected.left) < 30)
         assertTrue("$actual vs $expected", abs(actual.top - expected.top) < 30)
@@ -98,26 +101,26 @@ class MlKitTextRecognizerDeviceTest {
   fun aPngIsReadToo() =
       runBlocking<Unit> {
         val png = File(folder, "page.png")
-        png.outputStream().use { prescription().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        png.outputStream().use { smallPrescription().compress(Bitmap.CompressFormat.PNG, 100, it) }
 
-        assertReadTopToBottom(recognizer.recognize(png), "Martin", "Ondansetron", "Dexamethasone")
+        assertReadTopToBottom(recognizer.recognize(png), "MARTIN", "ONDANSETRON", "DEXAMETHASONE")
       }
 
   @Test
   fun aBlankPageHasNoTextButKeepsItsUprightSize() =
       runBlocking<Unit> {
-        val blank = recognizer.recognize(jpeg(page(800, 1000), "blank.jpg"))
+        val blank = recognizer.recognize(jpeg(page(400, 500), "blank.jpg"))
         assertTrue(blank.isEmpty())
-        assertEquals(800, blank.width)
-        assertEquals(1000, blank.height)
+        assertEquals(400, blank.width)
+        assertEquals(500, blank.height)
 
         val sideways =
             recognizer.recognize(
-                jpeg(page(600, 900), "blank-sideways.jpg", ExifInterface.ORIENTATION_ROTATE_90)
+                jpeg(page(300, 450), "blank-sideways.jpg", ExifInterface.ORIENTATION_ROTATE_90)
             )
         assertTrue(sideways.isEmpty())
-        assertEquals(600, sideways.width)
-        assertEquals(900, sideways.height)
+        assertEquals(300, sideways.width)
+        assertEquals(450, sideways.height)
       }
 
   @Test
@@ -149,18 +152,18 @@ class MlKitTextRecognizerDeviceTest {
       runBlocking<Unit> {
         val halved =
             recognizer.recognize(
-                jpeg(page(4100, 2000, "ONDANSETRON 8 MG", textSize = 200f), "large.jpg")
+                jpeg(page(4100, 600, "ONDANSETRON 8 MG", textSize = 200f), "large.jpg")
             )
         assertEquals(2050, halved.width)
-        assertEquals(1000, halved.height)
+        assertEquals(300, halved.height)
         halved.lineWith("ONDANSETRON")
 
         val quartered =
             recognizer.recognize(
-                jpeg(page(8200, 1200, "DEXAMETHASONE 4 MG", textSize = 300f), "huge.jpg")
+                jpeg(page(8200, 800, "DEXAMETHASONE 4 MG", textSize = 300f), "huge.jpg")
             )
         assertEquals(2050, quartered.width)
-        assertEquals(300, quartered.height)
+        assertEquals(200, quartered.height)
         quartered.lineWith("DEXAMETHASONE")
       }
 
@@ -170,13 +173,13 @@ class MlKitTextRecognizerDeviceTest {
         val text =
             recognizer.recognize(
                 jpeg(
-                    page(2000, 4100, "ONDANSETRON 8 MG", "TWICE A DAY", textSize = 160f),
+                    page(1400, 4100, "ONDANSETRON 8 MG", "TWICE A DAY", textSize = 140f),
                     "large-sideways.jpg",
                     ExifInterface.ORIENTATION_ROTATE_90,
                 )
             )
 
-        assertEquals(1000, text.width)
+        assertEquals(700, text.width)
         assertEquals(2050, text.height)
         assertReadTopToBottom(text, "ONDANSETRON", "TWICE")
       }
@@ -184,7 +187,7 @@ class MlKitTextRecognizerDeviceTest {
   @Test
   fun thePhotoIsKeptUnchanged() =
       runBlocking<Unit> {
-        val photo = jpeg(prescription(), "kept.jpg", ExifInterface.ORIENTATION_ROTATE_90)
+        val photo = jpeg(smallPrescription(), "kept.jpg", ExifInterface.ORIENTATION_ROTATE_90)
         val before = photo.readBytes()
 
         recognizer.recognize(photo)
@@ -220,6 +223,18 @@ class MlKitTextRecognizerDeviceTest {
 
   private fun prescription(): Bitmap =
       testAssets.open("scan/typed-prescription.png").use { BitmapFactory.decodeStream(it) }
+
+  /** A small page with the lines of a prescription, quicker for ML Kit to read than the photo. */
+  private fun smallPrescription(): Bitmap =
+      page(
+          SMALL_WIDTH,
+          SMALL_HEIGHT,
+          "DR MARTIN",
+          "ONDANSETRON 8 MG",
+          "DEXAMETHASONE 4 MG",
+          "SIGNATURE",
+          textSize = 40f,
+      )
 
   /** A white page of [width] × [height] with [lines] written one under the other. */
   private fun page(width: Int, height: Int, vararg lines: String, textSize: Float = 90f): Bitmap {
@@ -295,5 +310,10 @@ class MlKitTextRecognizerDeviceTest {
       assertTrue("$box outside the photo", box.left >= 0 && box.top >= 0)
       assertTrue("$box outside the photo", box.right <= text.width && box.bottom <= text.height)
     }
+  }
+
+  private companion object {
+    const val SMALL_WIDTH = 700
+    const val SMALL_HEIGHT = 900
   }
 }
