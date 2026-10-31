@@ -74,6 +74,36 @@ class LineClassifierTest {
   }
 
   @Test
+  fun aListedMedicationWithoutAStrengthStartsAMedication() {
+    assertKinds(
+        sheet(9),
+        mapOf(
+            "- Bain de bouche bicarbonate 1,4% :3 fois par jour pendant 10 jours" to MEDICATION,
+            "- Movicol sachets : 1 sachet par jour si constipation" to MEDICATION,
+        ),
+    )
+    val kinds =
+        kinds(
+            linesOf(
+                "- Contrôle sanguin dans 10 jours",
+                "*of the reference intake. Shake before use. Once opened, drink within 3 days",
+                "- Please take the tablets with a large glass of water every morning",
+                "2. Movicol: 1 sachet le matin",
+            )
+        )
+    assertEquals(OTHER, kinds["- Contrôle sanguin dans 10 jours"])
+    assertEquals(
+        DOSING,
+        kinds["*of the reference intake. Shake before use. Once opened, drink within 3 days"],
+    )
+    assertEquals(
+        DOSING,
+        kinds["- Please take the tablets with a large glass of water every morning"],
+    )
+    assertEquals(MEDICATION, kinds["2. Movicol: 1 sachet le matin"])
+  }
+
+  @Test
   fun aValidityOrCheckUpDateIsNotThePrescriptionsDate() {
     assertKinds(
         sheet(10),

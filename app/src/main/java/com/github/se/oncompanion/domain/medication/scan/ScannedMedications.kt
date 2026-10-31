@@ -49,10 +49,14 @@ internal fun medicationsIn(rows: List<ClassifiedRow>): List<ScannedMedication> {
 /** The medication written on [lines]: its name and strength first, then how to take it. */
 private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   val first = lines.first().text
-  // A medication line has a strength: the name ends with it. Should it not be found here, the
-  // whole line is the name, to check, rather than stopping the scan
+  // A medication line has a strength: the name ends with it. Without one (a listed medication,
+  // or should the classifier and the reader disagree), the name is all before how to take it, to
+  // check, rather than stopping the scan
   val strength = PrescriptionLexicon.strengthIn(matchable(first))
-  val nameEnd = strength?.let { combinationEnd(first, it.last + 1) } ?: first.length
+  val nameEnd =
+      strength?.let { combinationEnd(first, it.last + 1) }
+          ?: PrescriptionLexicon.dosingStartIn(matchable(first))
+          ?: first.length
   val name =
       first
           .substring(0, nameEnd)

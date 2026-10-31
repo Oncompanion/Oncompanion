@@ -333,6 +333,36 @@ class ScannedMedicationsTest {
   }
 
   @Test
+  fun aListedMedicationWithoutAStrengthHasItsNameToCheck() {
+    val medications =
+        medicationsOf(
+            linesOf(
+                "- Bain de bouche bicarbonate 1,4% : 3 fois par jour pendant 10 jours",
+                "- Movicol sachets : 1 sachet par jour si constipation",
+            )
+        )
+    assertEquals(
+        listOf(
+            // "de" looks like a word ML Kit split: to check
+            ScannedMedication(
+                Reading("Bain de bouche bicarbonate 1,4%", false),
+                Reading("", false),
+                Reading("3 fois par jour", true),
+                Reading(10, true),
+            ),
+            // Without a strength, the name can't be told from its form: to check
+            ScannedMedication(
+                Reading("Movicol sachets", false),
+                Reading("1 sachet", true),
+                Reading("par jour si constipation", true),
+                Reading(null, true),
+            ),
+        ),
+        medications,
+    )
+  }
+
+  @Test
   fun aShortWordAfterTheStrengthIsNotASplitName() {
     // "cp" comes after the strength: it describes the form, not a piece of the name
     assertTrue(medicationsOf(linesOf("Dexaméthasone 4 mg cp", "2 cp le matin")).single().name.sure)
