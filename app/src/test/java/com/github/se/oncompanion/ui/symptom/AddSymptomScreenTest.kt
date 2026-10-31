@@ -19,14 +19,18 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -37,6 +41,9 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -48,6 +55,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class AddSymptomScreenTest {
@@ -447,6 +455,56 @@ class AddSymptomScreenTest {
     assertEquals(listOf("date=2026-10-05"), events)
     node(C.Tag.symptom_add_time_picker).assertDoesNotExist()
   }
+
+  // ----- Time picker on short windows -----
+
+  /** Opens the time step of the "When" pickers, past the day. */
+  private fun openTimePicker() {
+    scrolledTo(C.Tag.symptom_add_when).performClick()
+    node(C.Tag.symptom_add_picker_confirm).performClick()
+  }
+
+  /** A number of the clock, which Material only labels for screen readers. */
+  private fun clockNumber() = composeTestRule.onNodeWithContentDescription("23 hours")
+
+  @Test
+  fun portrait_timePicker_showsTheClock() {
+    setContent(filled)
+
+    openTimePicker()
+
+    clockNumber().assertExists()
+  }
+
+  /** The time is typed instead of picked on a clock, entirely above the buttons. */
+  private fun assertTimeIsTypedAboveTheButtons() {
+    setContent(filled)
+
+    openTimePicker()
+
+    clockNumber().assertDoesNotExist()
+    val picker = node(C.Tag.symptom_add_time_picker).assertIsDisplayed()
+    picker.assertIsFullyVisible()
+    val confirm = node(C.Tag.symptom_add_picker_confirm).assertIsDisplayed()
+    assertTrue(
+        picker.fetchSemanticsNode().boundsInRoot.bottom <=
+            confirm.fetchSemanticsNode().boundsInRoot.top
+    )
+    composeTestRule
+        .onNode(hasSetTextAction() and hasContentDescription("for minutes"), useUnmergedTree = true)
+        .performTextReplacement("30")
+    confirm.performClick()
+
+    assertEquals(listOf("date=2026-10-05", "time=14:30"), events)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_timePicker_typesTheTime() = assertTimeIsTypedAboveTheButtons()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun smallLandscape_timePicker_typesTheTime() = assertTimeIsTypedAboveTheButtons()
 
   // ----- Editing a symptom -----
 

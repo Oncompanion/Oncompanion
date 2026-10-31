@@ -37,6 +37,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
@@ -77,6 +78,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.roundToInt
@@ -573,6 +575,7 @@ private fun TimePickerDialogFor(
 ) {
   val pickerState =
       rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = true)
+  val compact = isCompactHeight()
   AlertDialog(
       onDismissRequest = onDismiss,
       confirmButton = {
@@ -592,7 +595,16 @@ private fun TimePickerDialogFor(
         }
       },
       text = {
-        TimePicker(state = pickerState, modifier = Modifier.testTag(C.Tag.symptom_add_time_picker))
+        // A short window (a phone held sideways) types the time: the clock has a fixed size and
+        // would be cut off
+        if (compact) {
+          TimeInput(state = pickerState, modifier = Modifier.testTag(C.Tag.symptom_add_time_picker))
+        } else {
+          TimePicker(
+              state = pickerState,
+              modifier = Modifier.testTag(C.Tag.symptom_add_time_picker),
+          )
+        }
       },
   )
 }
