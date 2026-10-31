@@ -334,7 +334,8 @@ private fun SessionNavHost(
         val eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty()
         EventDetailScreen(
             eventId = eventId,
-            onBack = navigationActions::goBack,
+            // A second tap during the exit animation must not pop the screen below as well
+            onBack = dropUnlessResumed { navigationActions.goBack() },
             viewModel = viewModel { EventDetailViewModel(eventId) },
             readOnly = chosenPatient != null,
         )

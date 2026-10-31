@@ -1780,6 +1780,32 @@ class AppNavHostTest {
   }
 
   @Test
+  fun planningEvent_tappingBackTwiceStaysOnPlanning() {
+    val event = eventNextWeek()
+    setNavHost(
+        Route.OVERVIEW,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    val heading = openEventFromNextWeek(event)
+
+    // Both taps land before the event page has left the screen
+    val backClick =
+        composeTestRule
+            .onNodeWithTag(C.Tag.event_detail_back)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsActions.OnClick]
+            .action!!
+    composeTestRule.runOnUiThread {
+      backClick()
+      backClick()
+    }
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
   fun planningEvent_thatNoLongerExists_explainsAndGoesBackToPlanning() {
     val event = eventNextWeek()
     setNavHost(
