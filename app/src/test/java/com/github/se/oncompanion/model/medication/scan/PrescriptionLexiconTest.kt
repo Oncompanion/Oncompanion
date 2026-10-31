@@ -265,6 +265,12 @@ class PrescriptionLexiconTest {
         "1 injection s.c. par jour",
         "après chaque selle liquide",
         "as needed",
+        // Abbreviations
+        "bid",
+        "1 tablet tid",
+        "q8h",
+        "1 cp x 2/j",
+        "2/j",
     )
     assertAll(
         PrescriptionLexicon::hasFrequency,
@@ -289,6 +295,7 @@ class PrescriptionLexiconTest {
         "for 2 weeks",
         "pendant 3 semaines",
         "10 j",
+        "1 cp x 2/j pdt 3j",
         // After a word ending in "in" or "dans" (a table row read as one line)
         "2 cp le matin 3 jours",
         "1 tablet each morning 5 days",

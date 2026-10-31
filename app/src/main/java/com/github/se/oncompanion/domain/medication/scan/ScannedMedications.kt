@@ -69,6 +69,8 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
           .fold(dosing) { text, range -> text.removeRange(range) }
           .replace(SPACES, " ")
           .trim(*EDGES)
+          // "x 2/j" is "2/j": the "x" only says "times"
+          .replace(TIMES_BEFORE, "")
 
   val linesSure = lines.all { it.line.confidence >= SURE }
   // A duration word left in the frequency ("twice a day S days") is a duration that couldn't be
@@ -111,6 +113,7 @@ private fun looksSplit(name: String): Boolean =
 private val NUMBERING = Regex("""^\s*[\dlIoO]{1,2}\s*[.)]\s+""")
 private val FRAGMENT = Regex("""\p{Ll}{1,3}""")
 private val SPACES = Regex("""\s+""")
+private val TIMES_BEFORE = Regex("""^[xX]\s+(?=\d)""")
 
 /**
  * Whether [text] has a day, week or month that isn't part of a frequency ("par jour", "2x/jour").

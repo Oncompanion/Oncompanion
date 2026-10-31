@@ -221,6 +221,9 @@ internal object PrescriptionLexicon {
       listOf(
           Regex("""(?<![\d-])\d\s*-\s*\d\s*-\s*\d(?:\s*-\s*\d)?(?![\d-])"""),
           Regex("""\b\d+\s*(?:x|fois)\s*/?\s*(?:par\s+)?(?:jour|j|day|d|semaine|week)\b"""),
+          // Abbreviated: "x 2/j" or "2/j" (twice a day), "bid", "tid", "q8h"
+          Regex("""(?:\bx\s*)?\b\d+\s*/\s*(?:jour|j|day|d)\b"""),
+          Regex("""\b(?:bid|tid|qid|qd|q\d+h)\b"""),
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
           // Also days and weeks: chemotherapy cycles ("tous les 21 jours", "toutes les 3 semaines")
           Regex(
@@ -242,7 +245,7 @@ internal object PrescriptionLexicon {
       )
   // As whole words, so "le matin 3 jours" is a duration
   private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every|alle)\s$""")
-  private val DURATION_FOR = Regex("""\b(?:pendant|durant|for|sur|x|wahrend|fur)\s+$""")
+  private val DURATION_FOR = Regex("""\b(?:pendant|pdt|durant|for|sur|x|wahrend|fur)\s+$""")
   private val DURATION_MAXIMUM =
       Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to|maximal|hochstens)\s+$""")
 
