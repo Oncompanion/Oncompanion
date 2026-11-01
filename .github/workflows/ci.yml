@@ -110,7 +110,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
-      # The signed release APK is built on main only: PRs never use it, and R8 takes about a minute.
+      # The release APK is built on every run, so a PR that breaks R8 (a missing keep rule) fails
+      # here; it's signed and uploaded on main only, since PRs never use it.
       # Write the release key from the secrets, so the release APK is signed with the key registered
       # in Firebase (Google Sign-In fails otherwise). Secrets are missing on PRs from forks: skipped.
       - name: Decode release keystore
@@ -124,7 +125,6 @@ jobs:
           fi
 
       - name: Assemble release
-        if: github.event_name == 'push'
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
