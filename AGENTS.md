@@ -162,8 +162,9 @@ Run these before every push and make sure they pass:
   - A PR over these limits says why in its description: a mechanical refactor, a rename, code moved without change, a dependency update.
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
-- If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram and the overview in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)).
-  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone; details stay in the feature diagrams, and a box appears once per diagram (M1 report).
+- If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)). Update the overview only when a core flow changes.
+  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone (#264); details stay in the feature diagrams, and a box appears once per diagram (M1 report).
+  - **Stay ahead of the code**: draw a new feature as planned in its diagram, and in Figma, before implementing it. Both are graded on this.
   - Agents update the diagrams themselves by editing the `.excalidraw` JSON:
     - Copy an existing box, label or arrow that already has the style you need (see the legend in architecture.md), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
     - A box's label is a separate `text` element whose `containerId` is the box: `x` = box `x` + 10, `width` = box width − 20, `height` = number of lines × 25, centered vertically in the box. Set both `text` and `originalText`.
