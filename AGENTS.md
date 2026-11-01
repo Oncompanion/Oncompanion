@@ -154,7 +154,7 @@ Run these before every push and make sure they pass:
 
 ## Pull requests
 
-- Never push to `main`. Work on a branch and open a pull request. Merging needs one approving review and a green CI (tests + SonarCloud).
+- Never push to `main`. Work on a branch and open a pull request. Merge only with one approving review and a green CI (tests + SonarCloud): a team rule, since `main`'s branch protection doesn't require the checks.
 - Branch names: `feature/<short-name>`, `fix/<short-name>`, `chore/<short-name>`, `ci/<short-name>`, `docs/<short-name>`. Never rename the branch of an open PR: GitHub closes the PR.
 - PR titles follow the same convention as commit titles.
 - Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md). Put `Closes #<issue>` in the description so the issue closes on merge.
@@ -185,6 +185,6 @@ The same files change in almost every PR: `strings.xml`, `C.kt`, `AppNavHost.kt`
 - Use **Request changes** for bugs, missing tests, and convention problems (naming, commits, architecture); **Comment** for suggestions.
 - Check the PR's size: above the limits in "Pull requests", without a reason in its description, ask for a split.
 - Read SonarCloud's list of new issues, not only the quality gate: a PR should add **0 new issues** (bugs, code smells, security hotspots). Ask for each one to be fixed, with its file and line.
-- A new commit pushed after a review makes that review no longer count: the author re-requests it.
+- A new commit pushed after a review, merges of `main` included, makes that review no longer count in the course's grading (GitHub still shows it): the author re-requests it.
 - When you address a comment, reply on its thread with the commit that fixes it (e.g. "Done in 3f6531b"). Let the reviewer resolve the thread.
 - If you disagree, explain why in the thread instead of ignoring the comment.
