@@ -7,7 +7,7 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 ## Project context
 
 - Android app in Kotlin with Jetpack Compose (Material 3). `minSdk 28`, `targetSdk 34`, JVM target 17.
-- Backend: Firebase Authentication (Google Sign-In) and Cloud Firestore. Firebase project: `oncompanion-c4144`.
+- Backend: Firebase Authentication (Google Sign-In), Cloud Firestore, and Cloud Functions in TypeScript (`functions/`, the hospital search proxy, checked with App Check). Firebase project: `oncompanion-c4144`.
 - Package root: `com.github.se.oncompanion`. New user-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion").
 - Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved.
 
@@ -121,7 +121,9 @@ Run these before every push and make sure they pass:
 ./gradlew connectedCheck   # instrumented tests, needs an emulator/device and the Firebase emulators
 ```
 
-- CI runs two jobs in parallel on every PR (`.github/workflows/ci.yml`):
+- If you change `functions/`, also run what CI runs on it: `npm --prefix functions ci`, `npm --prefix functions run format:check`, `npm --prefix functions run lint`, `npm --prefix functions run build`, and its tests on the Firestore emulator (the last step of the `hospital-proxy` job in `ci.yml`).
+- CI runs three jobs in parallel on every PR (`.github/workflows/ci.yml`):
+  - **Hospital proxy**: the `functions/` checks above.
   - **Checks**: ktfmt, lint, unit + Robolectric tests, and the release build. A formatting, lint or unit test error shows up here in a few minutes.
   - **CI**: the connected tests on an emulator with the Firebase emulators, the coverage report and SonarCloud, which gets the lint report and the unit test coverage from Checks.
   - The signed release APK is uploaded on `main` only, and every run keeps its test results (with each test's time) for 7 days.
