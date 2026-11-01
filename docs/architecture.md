@@ -456,12 +456,23 @@ See the [Firebase Android lifecycle reference](https://firebase.google.com/docs/
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /users/{uid}/patients/{patientUid}    circles this caregiver joined
-/users/{uid}/eventRegistrations/{eventId}   events the user says they registered for (owner only)
+/users/{uid}/eventRegistrations/{eventId}   events the user says they registered for
 /invites/{inviteCode}                 pending care-circle members (invitations), deleted when redeemed
 /events/{id}                          Ligue events, read: signed in, write: nobody from the app
 /directory/{contacts|programs}/items/{id}   read: signed in, write: staff
 ```
 
 Care-circle members read a patient's data through rules that check `/users/{uid}/circle/{request.auth.uid}`. Staff status comes from a custom claim set by the team, never from a field users can write.
+
+**What each permission unlocks.** Each `CarePermission` the patient turns on for a member lets that member read exactly one collection of the patient's, with `get` and with queries (`canRead` in `firestore.rules`):
+
+| Permission | Shown to the patient as | The member can read |
+|---|---|---|
+| `PLANNING` | Planning: Treatments & appointments | `/users/{uid}/appointments` |
+| `EVENTS` | Events: Activities you join | `/users/{uid}/eventRegistrations` |
+| `SYMPTOMS` | Symptoms: Your symptom log | `/users/{uid}/symptoms` |
+| `PRESCRIPTIONS` | Prescriptions: Your saved prescriptions | `/users/{uid}/prescriptions` |
+
+It is read only: creating, editing and deleting stay with the patient in every collection. The profile (`/users/{uid}`) is never shared; the caregiver gets the patient's first name from their own `patients/{patientUid}` link. The rule reads the member doc on every request, so removing the member or turning a permission off stops the next server read and ends open listeners with `PERMISSION_DENIED`. Rules can't reach what is already cached on the caregiver's phone: the screens must stop showing a patient's section as soon as it is no longer shared or the caregiver is removed, and never fall back to the cache for it.
 
 A prescription is one document: the prescribing doctor and the date, stored once, and the list of its medications, each with its own ID, start date and duration. A prescription and its medications are always written together (one form, one use case), so keeping them in one document makes saving, replacing or deleting a prescription a single write. It can't be half saved, and its medications can't be partly known by a device that is offline, mixed when two devices edit at once, or left behind after a deletion. Planning, reminders and the appointment summary still work on single medications: the repository reads them out of the prescriptions, so they never deal with a prescription. Anything recorded per intake later (e.g. a medication marked as taken) would go in its own collection, not in the prescription.

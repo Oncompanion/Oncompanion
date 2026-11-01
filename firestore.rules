@@ -143,6 +143,28 @@ service cloud.firestore {
           && member.relationship == invite.relationship
           && member.permissions == invite.permissions;
     }
+    // The signed-in user's member doc in ownerUid's circle: the one a caregiver already reads.
+    function memberDoc(ownerUid) {
+      return /databases/$(database)/documents/users/$(ownerUid)/circle/$(request.auth.uid);
+    }
+    // The signed-in user is in ownerUid's circle and the patient shares `section` with them.
+    // It doesn't depend on `resource`, so a query on a whole collection is allowed or denied at once.
+    // signedIn() comes first: memberDoc needs request.auth.
+    function sharesWith(ownerUid, section) {
+      return signedIn() && memberShares(get(memberDoc(ownerUid)), section);
+    }
+    // `member` exists and its permissions are a list holding `section` (`in` would also match the
+    // keys of a map).
+    function memberShares(member, section) {
+      return member != null
+          && member.data.get('permissions', null) is list
+          && section in member.data.permissions;
+    }
+    // The owner, or a member the owner shares `section` with (a CarePermission). Read only:
+    // writes stay owner-only.
+    function canRead(ownerUid, section) {
+      return isOwner(ownerUid) || sharesWith(ownerUid, section);
+    }
 
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
@@ -160,7 +182,8 @@ service cloud.firestore {
       // /users/{uid}/prescriptions/{prescriptionId}: a prescription and the list of its
       // medications, in one document. There is no medications collection.
       match /prescriptions/{prescriptionId} {
-        allow read, delete: if isOwner(uid);
+        allow read: if canRead(uid, 'PRESCRIPTIONS');
+        allow delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidPrescription(request.resource.data)
                       && request.resource.data.createdAt == request.time;
@@ -173,7 +196,8 @@ service cloud.firestore {
       // /users/{uid}/symptoms/{symptomId}: the symptom journal. Editing an entry follows the same
       // validation as logging it, and keeps when it was first logged.
       match /symptoms/{symptomId} {
-        allow read, delete: if isOwner(uid);
+        allow read: if canRead(uid, 'SYMPTOMS');
+        allow delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidSymptom(request.resource.data)
                       && request.resource.data.createdAt == request.time;
@@ -183,10 +207,11 @@ service cloud.firestore {
       }
 
       // ---------- Appointments ----------
-      // /users/{uid}/appointments/{appointmentId}: owner reads, validated writes and deletion.
-      // Caregiver access remains denied.
+      // /users/{uid}/appointments/{appointmentId}: read by the owner and by members the owner
+      // shares Planning with; validated writes and deletion by the owner only.
       match /appointments/{appointmentId} {
-        allow read, delete: if isOwner(uid);
+        allow read: if canRead(uid, 'PLANNING');
+        allow delete: if isOwner(uid);
         allow create: if isOwner(uid)
                       && isValidAppointment(request.resource.data)
                       && request.resource.data.createdAt == request.time;
@@ -198,15 +223,17 @@ service cloud.firestore {
       // ---------- Event registrations ----------
       // /users/{uid}/eventRegistrations/{eventId}: the user's own statement that they registered
       // with the organizer of /events/{eventId}. It is keyed by the event, so confirming twice
-      // writes the same document instead of a duplicate. Only the owner reads, saves and removes
-      // it. Saving needs an existing event that hasn't started yet, by the server's clock: a
-      // confirmation made offline that only syncs once the event has started is rejected.
+      // writes the same document instead of a duplicate. Members the owner shares Events with
+      // can read it; only the owner saves and removes it. Saving needs an existing event that
+      // hasn't started yet, by the server's clock: a confirmation made offline that only syncs
+      // once the event has started is rejected.
       match /eventRegistrations/{eventId} {
         function isUpcomingEvent() {
           let event = /databases/$(database)/documents/events/$(eventId);
           return exists(event) && get(event).data.startAt > request.time;
         }
-        allow read, delete: if isOwner(uid);
+        allow read: if canRead(uid, 'EVENTS');
+        allow delete: if isOwner(uid);
         allow create, update: if isOwner(uid)
                       && request.resource.data.keys().hasOnly(['confirmedAt'])
                       && request.resource.data.confirmedAt == request.time
