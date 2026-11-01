@@ -82,6 +82,7 @@ com.github.se.oncompanion/
 
 ## Firebase and data
 
+- **Sign-out**: a new Firestore repository or local cache goes through `SessionAccess` (`operation`, `snapshots`, the shared instance accessor), as described in the "Sign-out" section of [docs/architecture.md](docs/architecture.md): otherwise its listeners and writes survive sign-out, and the next account can see them.
 - Personal data lives under `/users/{uid}/...`. Every collection needs its own `match` in [firestore.rules](firestore.rules) with validation that matches the Kotlin class (fields, types, length limits); anything not matched is denied. Never add a catch-all or loosen a rule to make something "just work".
 - Rules changes come with rule tests on the Firestore emulator (allowed and denied cases).
 - Offline mode is a requirement:
