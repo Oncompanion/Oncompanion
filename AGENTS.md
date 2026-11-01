@@ -77,7 +77,7 @@ com.github.se.oncompanion/
 - A short one-line comment above each non-obvious block (what this part of the screen or function does), so reviewers can find their way quickly. No comments that repeat the code.
 - All user-visible text goes in `res/values/strings.xml`, in English. Escape apostrophes: `Couldn\'t`.
 - Every element that a test needs to find gets a test tag declared in `resources/C.kt`, named `<feature>_<element>`.
-- **Logging**: never log secrets or personal data (invite codes, tokens, health details): log what failed, not the value.
+- **Logging**: never log secrets or personal data (invite codes, tokens, emails, health details): log what failed, not the value. An exception's message can contain the value (e.g. a failed write names its document path, `invites/<code>`, #288): log the exception's type, not its message, when the path or message can hold a secret. Uids and generated record IDs may be logged: they identify nothing outside the app.
 - Dates: store calendar days at midnight `Europe/Zurich` so they never shift by a day; display dates and times in the phone's time zone (`ZoneId.systemDefault()`), never in UTC.
 
 ## Firebase and data
