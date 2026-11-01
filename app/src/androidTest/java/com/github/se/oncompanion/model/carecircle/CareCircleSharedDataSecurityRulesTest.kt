@@ -194,6 +194,14 @@ class CareCircleSharedDataSecurityRulesTest {
           val values = granted.joinToString(", ") { """{"stringValue": "${it.name}"}""" }
           """"permissions": {"arrayValue": {"values": [$values]}},"""
         } ?: ""
+    return memberFieldsWith(permissionsField)
+  }
+
+  /**
+   * Carol's member doc like [memberFields], with [permissionsField] written as given: a REST field
+   * followed by a comma, or "" to leave it out.
+   */
+  private fun memberFieldsWith(permissionsField: String): String {
     return """{"firstName": {"stringValue": "Carol"},
                "relationship": {"stringValue": "SISTER"},
                $permissionsField
@@ -288,6 +296,19 @@ class CareCircleSharedDataSecurityRulesTest {
   @Test
   fun memberDocWithoutPermissions_readsNothing(): Unit = runBlocking {
     shareWithCarol(null)
+    for (section in sections) assertCannotRead(aliceUid, section)
+  }
+
+  @Test
+  fun permissionsStoredAsMap_readsNothing(): Unit = runBlocking {
+    // Every section is a key of the map: `in` would match them if the rule didn't require a list
+    val keys =
+        CarePermission.entries.joinToString(", ") { """"${it.name}": {"booleanValue": true}""" }
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/$COLLECTION",
+        carolUid,
+        memberFieldsWith(""""permissions": {"mapValue": {"fields": {$keys}}},"""),
+    )
     for (section in sections) assertCannotRead(aliceUid, section)
   }
 
