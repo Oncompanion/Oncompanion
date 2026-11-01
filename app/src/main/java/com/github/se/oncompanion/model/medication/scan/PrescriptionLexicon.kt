@@ -49,7 +49,7 @@ internal object PrescriptionLexicon {
   fun hasPatientClue(text: String): Boolean = PATIENT.containsMatchIn(text)
 
   /** Whether [text] has a medication's strength ("8 mg", "0,5 mg", "1 g", "30 MU"). */
-  fun hasStrength(text: String): Boolean = STRENGTH.containsMatchIn(text)
+  fun hasStrength(text: String): Boolean = strengthsIn(text).any()
 
   /** Whether [text] says how much to take each time ("1 comprimé", "2 cp", "1 injection"). */
   fun hasDoseQuantity(text: String): Boolean = DOSE_QUANTITY.containsMatchIn(text)
@@ -92,7 +92,7 @@ internal object PrescriptionLexicon {
   data class Duration(val days: Int, val exact: Boolean, val range: IntRange)
 
   /** Where the first strength is in [text] ("8 mg"), if any. */
-  fun strengthIn(text: String): IntRange? = STRENGTH.find(text)?.range
+  fun strengthIn(text: String): IntRange? = strengthsIn(text).firstOrNull()?.range
 
   /**
    * Where a box's size is at the start of [text], right after a strength ("2,5 mg, 30 comprimés"):
@@ -217,11 +217,18 @@ internal object PrescriptionLexicon {
   // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them.
   // "%" can't start a word, so it may touch the next one ("2 %application"). Not a share in
   // brackets ("orange juice (35%)") nor an amount per serving ("per 100 ml"), as on a food label
-  private val STRENGTH =
-      Regex(
-          """(?<![\d.,(])(?<!\bper |\bpour |\bpro )\d+(?:[.,]\d+)?\s*""" +
-              """(?:(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol)(?![a-z])|%)"""
-      )
+  // A number with a word or "%" after it, kept when the word is a unit. In parts, so each pattern
+  // stays simple
+  private val NUMBER_AND_UNIT = Regex("""(?<![\d.,(])\d+(?:[.,]\d+)?\s*(%|[a-zµ]+)""")
+  private val UNITS = setOf("mg", "g", "µg", "mcg", "ug", "ml", "mu", "ui", "iu", "mmol")
+  private val PER_SERVING = Regex("""\b(?:per|pour|pro)\s$""")
+
+  private fun strengthsIn(text: String): Sequence<MatchResult> =
+      NUMBER_AND_UNIT.findAll(text).filter { match ->
+        val unit = match.groupValues[1]
+        (unit == "%" || unit in UNITS) &&
+            !PER_SERVING.containsMatchIn(text.substring(0, match.range.first))
+      }
 
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
