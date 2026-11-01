@@ -465,13 +465,7 @@ class PrescriptionFormViewModel(
       _uiState.update { it.copy(error = PrescriptionFormError.NOT_SIGNED_IN) }
       return
     }
-    if (!confirmed && prescriptionId == null) {
-      val same = similarPrescription(state.draft, saved) as? SimilarPrescription.Same
-      if (same != null) {
-        _uiState.update { it.copy(alreadySaved = same.prescription) }
-        return
-      }
-    }
+    if (!confirmed && asksAboutTheSame(state.draft)) return
     _uiState.update { it.copy(isSaving = true, error = null) }
     viewModelScope.launch {
       try {
@@ -494,6 +488,17 @@ class PrescriptionFormViewModel(
         _uiState.update { it.copy(isSaving = false, error = PrescriptionFormError.SAVE_FAILED) }
       }
     }
+  }
+
+  /**
+   * Whether a new [draft] is the same as a saved prescription:
+   * [PrescriptionFormUiState.alreadySaved] then asks the patient before saving it again.
+   */
+  private fun asksAboutTheSame(draft: PrescriptionDraft): Boolean {
+    if (prescriptionId != null) return false
+    val same = similarPrescription(draft, saved) as? SimilarPrescription.Same ?: return false
+    _uiState.update { it.copy(alreadySaved = same.prescription) }
+    return true
   }
 
   /** The error has been shown. */
