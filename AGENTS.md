@@ -44,7 +44,10 @@ com.github.se.oncompanion/
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
   - No Firebase calls from composables.
   - **Landscape is supported** on every screen: no portrait lock. Check the layout held sideways (the M1 APK test found date pickers, Profile, Planning and the camera broken in landscape).
-  - **Reuse shared components** from `ui/common` (form fields, buttons, dialogs) rather than building one per screen, so the same element looks and behaves the same everywhere (M1 report: two different time pickers).
+  - A flow the user is pushed into (onboarding, a scan, a form) always offers a way back or out (M1: no way back to choose another Google account).
+  - A temporary message (snackbar) never covers an action, and goes away on its own (M1: the scan error covered Retake).
+  - The add, edit and detail views of the same item share their components and show the fields in the same order (M1 report).
+  - **Reuse shared components** from `ui/common` rather than building one per screen, so the same element looks and behaves the same everywhere (M1 report: two different time pickers): `DayPickerDialog`, `SaveButton`, `DetailActions`, `DeleteConfirmationDialog`, `ClickableReadOnlyField`, `isCompactHeight()`.
   - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
     - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
@@ -95,7 +98,7 @@ com.github.se.oncompanion/
 - Where tests go:
   - Unit and Robolectric tests in `app/src/test`; instrumented Kaspresso/Compose and emulator tests in `app/src/androidTest`.
   - One fake per repository, shared by every test: `app/src/test/.../model/<feature>/Fake<Name>Repository.kt`. Reuse it rather than writing a local one.
-- A screen with text fields gets a test with the keyboard open, in portrait and landscape (`showKeyboard` and `LANDSCAPE_PHONE` in `app/src/test/.../ui/KeyboardInsets.kt`).
+- A screen with text fields gets a test with the keyboard open, in portrait and landscape (`showKeyboard`, `assertIsAboveKeyboard` and `LANDSCAPE_PHONE` in `app/src/test/.../ui/KeyboardInsets.kt`).
 - Every screen with state gets a **rotation test**: what the user typed or chose survives the activity being recreated.
   - With a ViewModel: `createAndroidComposeRule<ComponentActivity>()`, then `compose.activityRule.scenario.recreate()` and **set the content again** with the same ViewModel (`compose.activity.setContent { ... }`), or the screen is blank (see `ScanScreenTest`).
   - For state kept in the composition (`rememberSaveable`) on `XContent`: `StateRestorationTester` (see `PlanningScreenTest`).
