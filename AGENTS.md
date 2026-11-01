@@ -8,14 +8,16 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 
 - Android app in Kotlin with Jetpack Compose (Material 3). `minSdk 28`, `targetSdk 34`, JVM target 17.
 - Backend: Firebase Authentication (Google Sign-In) and Cloud Firestore. Firebase project: `oncompanion-c4144`.
-- Package root: `com.github.se.oncompanion`. The app is named **Oncompanion** (never "OnCompanion").
+- Package root: `com.github.se.oncompanion`. New user-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion").
 - Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved.
 
 ## Before you start a task
 
 1. Read the issue and its definition of done. If you will do something different, say so in the PR.
 2. Read [docs/architecture.md](docs/architecture.md) before adding a feature, a collection or a use case.
-3. Look for what already exists before writing something new: fakes in `app/src/test`, test helpers in `app/src/androidTest/.../utils`, shared composables in `ui/common`, repositories in `model/`.
+3. Look for what already exists before writing something new: fakes in `app/src/test`, test helpers in `app/src/androidTest/.../utils`, shared composables in `ui/common`, repositories in `model/`. In particular:
+   - rules tests: `allowed()` / `denied()` in `utils/SecurityRulesAssertions.kt`, and the care circle paths (`circle()`, `member()`, `joined()`) in `model/carecircle/CareCirclePaths.kt`;
+   - the scan: what ML Kit read on the fictional test prescriptions (`ScannedSheets.sheet(n)`, `app/src/test`).
 4. Only change files the task needs. No drive-by refactors or reformatting of unrelated code.
 5. Ask the team before adding a dependency, changing the build or CI, or changing a convention in this file.
 
@@ -72,6 +74,7 @@ com.github.se.oncompanion/
 - A short one-line comment above each non-obvious block (what this part of the screen or function does), so reviewers can find their way quickly. No comments that repeat the code.
 - All user-visible text goes in `res/values/strings.xml`, in English. Escape apostrophes: `Couldn\'t`.
 - Every element that a test needs to find gets a test tag declared in `resources/C.kt`, named `<feature>_<element>`.
+- **Logging**: never log secrets or personal data (invite codes, tokens, health details): log what failed, not the value.
 - Dates: store calendar days at midnight `Europe/Zurich` so they never shift by a day; display dates and times in the phone's time zone (`ZoneId.systemDefault()`), never in UTC.
 
 ## Firebase and data
@@ -110,6 +113,11 @@ Run these before every push and make sure they pass:
 ./gradlew connectedCheck   # instrumented tests, needs an emulator/device and the Firebase emulators
 ```
 
+- CI runs two jobs in parallel on every PR (`.github/workflows/ci.yml`):
+  - **Checks**: ktfmt, lint, unit + Robolectric tests, and the release build. A formatting, lint or unit test error shows up here in a few minutes.
+  - **CI**: the connected tests on an emulator with the Firebase emulators, the coverage report and SonarCloud, which gets the lint report and the unit test coverage from Checks.
+  - The signed release APK is uploaded on `main` only, and every run keeps its test results (with each test's time) for 7 days.
+- `gradle/gradle-daemon-jvm.properties` pins the Gradle daemon to Java 25, so everyone's builds run on the same Java. The first build downloads it into `~/.gradle/jdks`; on CI it's already installed.
 - Dependency versions are locked (`app/gradle.lockfile`, `settings-gradle.lockfile`). After adding or updating a dependency in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated lock files with your change.
 
 ## Issues and the Scrum board
