@@ -8,8 +8,6 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.github.se.oncompanion.utils.allowed
 import com.github.se.oncompanion.utils.denied
-import com.github.se.oncompanion.utils.joined
-import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Source
@@ -73,11 +71,8 @@ class CareCircleSecurityRulesTest {
     FirebaseEmulator.auth.signOut()
   }
 
-  private fun circle(uid: String): CollectionReference =
-      db.collection("users").document(uid).collection(COLLECTION)
-
   private val member: DocumentReference
-    get() = circle(aliceUid).document(memberUid)
+    get() = db.member(aliceUid, memberUid)
 
   /** [caregiverUid]'s link to [patientUid]'s circle. */
 
@@ -95,28 +90,28 @@ class CareCircleSecurityRulesTest {
 
   @Test
   fun ownerCanRead(): Unit = runBlocking {
-    assertTrue(allowed(circle(aliceUid).document(memberUid).get(Source.SERVER)).exists())
-    assertEquals(1, allowed(circle(aliceUid).get(Source.SERVER)).size())
+    assertTrue(allowed(db.circle(aliceUid).document(memberUid).get(Source.SERVER)).exists())
+    assertEquals(1, allowed(db.circle(aliceUid).get(Source.SERVER)).size())
   }
 
   @Test
   fun otherUserCannotRead(): Unit = runBlocking {
     EmulatorTestData.signIn("bob")
-    denied(circle(aliceUid).document(memberUid).get(Source.SERVER))
-    denied(circle(aliceUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).document(memberUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).get(Source.SERVER))
   }
 
   @Test
   fun signedOutCannotRead(): Unit = runBlocking {
     EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
-    denied(circle(aliceUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).get(Source.SERVER))
   }
 
   // ---- the owner edits and removes members ----
 
   @Test
   fun ownerCannotCreate(): Unit = runBlocking {
-    denied(circle(aliceUid).document(bobUid).set(detailFields()))
+    denied(db.circle(aliceUid).document(bobUid).set(detailFields()))
     // Replacing the whole member doc would drop its email, invite code and join time
     denied(member.set(detailFields()))
   }
@@ -172,7 +167,7 @@ class CareCircleSecurityRulesTest {
   @Test
   fun otherUserCannotWrite(): Unit = runBlocking {
     EmulatorTestData.signIn("bob")
-    denied(circle(aliceUid).document(bobUid).set(mapOf("firstName" to "Bob")))
+    denied(db.circle(aliceUid).document(bobUid).set(mapOf("firstName" to "Bob")))
     denied(member.update(detailFields()))
     denied(member.delete())
     denied(db.joined(memberUid, aliceUid).delete())

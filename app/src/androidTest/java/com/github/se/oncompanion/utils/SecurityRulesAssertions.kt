@@ -2,10 +2,7 @@
 
 package com.github.se.oncompanion.utils
 
-import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryFirestore
 import com.google.android.gms.tasks.Task
-import com.google.firebase.firestore.DocumentReference
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.tasks.await
@@ -28,10 +25,3 @@ suspend fun denied(task: Task<*>) {
     assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
   }
 }
-
-/** The document saying that [caregiverUid] joined the care circle of [patientUid]. */
-fun FirebaseFirestore.joined(caregiverUid: String, patientUid: String): DocumentReference =
-    collection("users")
-        .document(caregiverUid)
-        .collection(CareCircleInviteRepositoryFirestore.PATIENTS_COLLECTION)
-        .document(patientUid)

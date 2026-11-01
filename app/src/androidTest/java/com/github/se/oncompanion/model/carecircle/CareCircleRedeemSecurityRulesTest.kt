@@ -7,7 +7,6 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.github.se.oncompanion.utils.allowed
 import com.github.se.oncompanion.utils.denied
-import com.github.se.oncompanion.utils.joined
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
@@ -58,9 +57,6 @@ class CareCircleRedeemSecurityRulesTest {
 
   private fun invite(inviteCode: String): DocumentReference =
       db.collection(CareCircleInviteRepositoryFirestore.COLLECTION).document(inviteCode)
-
-  private fun member(ownerUid: String, memberUid: String): DocumentReference =
-      db.collection("users").document(ownerUid).collection("circle").document(memberUid)
 
   /** Creates a valid invite as the signed-in user, waits for the server and returns its code. */
   private suspend fun createInvite(): String {
@@ -125,7 +121,7 @@ class CareCircleRedeemSecurityRulesTest {
   ): Task<Void> {
     val uid = FirebaseEmulator.auth.currentUser!!.uid
     val batch = db.batch()
-    member?.let { batch.set(member(ownerUid, uid), it) }
+    member?.let { batch.set(db.member(ownerUid, uid), it) }
     if (deleteInvite) batch.delete(invite(inviteCode))
     joined?.let { batch.set(db.joined(uid, ownerUid), it) }
     return batch.commit()
@@ -155,7 +151,7 @@ class CareCircleRedeemSecurityRulesTest {
     val inviteCode = aliceInviteThenSignIn()
     allowed(redeemBatch(inviteCode))
 
-    val memberDoc = allowed(member(aliceUid, bobUid).get(Source.SERVER))
+    val memberDoc = allowed(db.member(aliceUid, bobUid).get(Source.SERVER))
     assertEquals("Julie", memberDoc.getString("firstName"))
     assertEquals(listOf("PLANNING", "SYMPTOMS"), memberDoc.get("permissions"))
     assertEquals(FirebaseEmulator.auth.currentUser!!.email, memberDoc.getString("email"))
@@ -171,9 +167,9 @@ class CareCircleRedeemSecurityRulesTest {
   fun memberReadsTheirOwnCircleDoc_evenBeforeJoining(): Unit = runBlocking {
     val inviteCode = aliceInviteThenSignIn()
     // What the redeem transaction reads to tell a new member from an existing one
-    assertFalse(allowed(member(aliceUid, bobUid).get(Source.SERVER)).exists())
+    assertFalse(allowed(db.member(aliceUid, bobUid).get(Source.SERVER)).exists())
     allowed(redeemBatch(inviteCode))
-    assertTrue(allowed(member(aliceUid, bobUid).get(Source.SERVER)).exists())
+    assertTrue(allowed(db.member(aliceUid, bobUid).get(Source.SERVER)).exists())
   }
 
   @Test
@@ -181,7 +177,7 @@ class CareCircleRedeemSecurityRulesTest {
     val inviteCode = aliceInviteThenSignIn()
     allowed(redeemBatch(inviteCode))
     EmulatorTestData.signIn("alice")
-    assertTrue(allowed(member(aliceUid, bobUid).get(Source.SERVER)).exists())
+    assertTrue(allowed(db.member(aliceUid, bobUid).get(Source.SERVER)).exists())
   }
 
   @Test
@@ -328,7 +324,7 @@ class CareCircleRedeemSecurityRulesTest {
     val inviteCode = aliceInviteThenSignIn()
     allowed(redeemBatch(inviteCode))
     EmulatorTestData.signIn("carol")
-    denied(member(aliceUid, bobUid).get(Source.SERVER))
+    denied(db.member(aliceUid, bobUid).get(Source.SERVER))
     denied(db.joined(bobUid, aliceUid).get(Source.SERVER))
   }
 }
