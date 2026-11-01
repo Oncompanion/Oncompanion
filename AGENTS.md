@@ -112,6 +112,16 @@ Run these before every push and make sure they pass:
 
 - Dependency versions are locked (`app/gradle.lockfile`, `settings-gradle.lockfile`). After adding or updating a dependency in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated lock files with your change.
 
+## Issues and the Scrum board
+
+- **Titles**: a user story is `US-<n>: <what the user can do>` (e.g. `US-39: Be warned before adding a prescription I already have`); a bug is `fix: <what to fix>`; a technical task is an imperative sentence (e.g. `Make CI faster`).
+- Use the issue templates. A task belongs to a user story: link it as a **sub-issue** of the story and write `Part of US-<n>`. A technical task writes "Parent user story: None (technical task)".
+- **Labels**: `enhancement` for stories and tasks, `bug` for bugs, `documentation` for docs, plus the feature's `epic: <feature>` label.
+- **Every task on the board has** an estimate, a priority, a Type, an assignee, and a Sprint that matches its status column. Fill in **Actual Time** when you close it, so we can check our estimates.
+- **The status follows the work**, and each person moves their own items: Product Backlog → Sprint Backlog → In Development (when you start) → In review (when the PR opens) → Done in S<n> (when it's merged).
+- User stories are on the board next to their tasks. The Product Backlog is ordered by priority, P0 first.
+- **The Sprint Backlog is ready before the sprint starts**: it is a milestone deliverable, and being late costs 2% of the team's grade per hour.
+
 ## Commits
 
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `test:`, `refactor:`, `chore:`, `ci:`, `docs:`, followed by a short imperative summary (e.g. `feat: add one-tap fatigue logging`).
