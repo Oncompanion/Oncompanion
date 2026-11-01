@@ -1,12 +1,13 @@
+# Co-authored-by: Claude Code <noreply@anthropic.com>
 name: Sprint task
 description: A concrete task that implements part of a user story
-labels: ["task"]
+labels: ["enhancement"]
 body:
   - type: input
     id: user-story
     attributes:
       label: Parent user story
-      description: Link the user story this task belongs to.
+      description: Link the user story this task belongs to ("Part of US-<n>"), or write "None (technical task)".
       placeholder: "#123"
     validations:
       required: true
