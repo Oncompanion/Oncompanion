@@ -41,6 +41,8 @@ com.github.se.oncompanion/
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
   - No Firebase calls from composables.
+  - **Landscape is supported** on every screen: no portrait lock. Check the layout held sideways (the M1 APK test found date pickers, Profile, Planning and the camera broken in landscape).
+  - **Reuse shared components** from `ui/common` (form fields, buttons, dialogs) rather than building one per screen, so the same element looks and behaves the same everywhere (M1 report: two different time pickers).
   - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
     - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
@@ -84,13 +86,17 @@ com.github.se.oncompanion/
 
 ## Tests
 
-- New code needs tests: SonarCloud's quality gate requires **≥ 80% coverage on new code**. Don't add coverage exclusions to `app/build.gradle.kts` to make the gate pass; ask the team first.
+- New code needs tests: SonarCloud's quality gate requires **≥ 90% coverage on new code** (M2 requires 90% overall). Don't add coverage exclusions to `app/build.gradle.kts` to make the gate pass; ask the team first.
 - Write tests from the issue's definition of done and the expected behavior, not by reading the implementation.
 - Test the different states of a screen (loading, empty, error, filled) on `XContent`, plus one test of `XScreen` with its ViewModel. Compose adds hidden branches, so "it renders" isn't enough.
 - Where tests go:
   - Unit and Robolectric tests in `app/src/test`; instrumented Kaspresso/Compose and emulator tests in `app/src/androidTest`.
   - One fake per repository, shared by every test: `app/src/test/.../model/<feature>/Fake<Name>Repository.kt`. Reuse it rather than writing a local one.
 - A screen with text fields gets a test with the keyboard open, in portrait and landscape (`showKeyboard` and `LANDSCAPE_PHONE` in `app/src/test/.../ui/KeyboardInsets.kt`).
+- Every screen with state gets a **rotation test**: the activity is recreated (`createAndroidComposeRule<ComponentActivity>()` and `activityRule.scenario.recreate()`), and what the user typed or chose is still there.
+- Anything a user can add (a symptom, a member, a prescription...) gets a test of **adding the same one twice**.
+- None of the bugs found in the M1 APK test was caught by a test, and they were all of these three kinds (keyboard, rotation, duplicates).
+- Tests worth their lines: cases that differ only by their input go in one parameterised test, not one test each, and a fake is never tested on its own: test the code that uses it.
 - Coroutines: use `StandardTestDispatcher` with `runTest` and virtual time (`advanceTimeBy`, `advanceUntilIdle`). Never `Thread.sleep` or real delays.
 - While working, run only the tests you touch (`./gradlew testDebugUnitTest --tests '*Symptom*'`). The full checks below take about 10 minutes; run them before pushing.
 
