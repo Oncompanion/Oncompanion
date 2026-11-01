@@ -74,8 +74,6 @@ class CareCircleSecurityRulesTest {
   private val member: DocumentReference
     get() = db.member(aliceUid, memberUid)
 
-  /** [caregiverUid]'s link to [patientUid]'s circle. */
-
   /** Valid details, as the patient saves them when editing a member. */
   private fun detailFields(vararg changes: Pair<String, Any?>) =
       mutableMapOf<String, Any?>(

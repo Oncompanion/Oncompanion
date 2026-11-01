@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 
 /** How long a security rules test waits for the Firestore emulator to answer one operation. */
-val RULES_TIMEOUT = 10.seconds
+private val RULES_TIMEOUT = 10.seconds
 
 /** Waits for [task], which the rules must allow, and returns its result. */
 suspend fun <T> allowed(task: Task<T>): T = withTimeout(RULES_TIMEOUT) { task.await() }
