@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.prescription
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,13 +13,14 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -28,12 +31,14 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.requestFocus
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
+import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -59,7 +64,8 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 class PrescriptionFormScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  // An activity rule, so the phone can be rotated (the activity recreated)
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -156,6 +162,8 @@ class PrescriptionFormScreenTest {
             uiState = uiState.copy(error = null)
           },
           onRetry = { events += "retry" },
+          onKeepEditing = { events += "keepEditing" },
+          onSaveAnyway = { events += "saveAnyway" },
       )
     }
   }
@@ -1058,5 +1066,90 @@ class PrescriptionFormScreenTest {
 
     node(C.Tag.prescription_form_load_error).assertDoesNotExist()
     field(C.Tag.prescription_form_prescribed_by_field).assertTextContains("Dr. Martin")
+  }
+
+  // ---------- A prescription already saved (US-39) ----------
+
+  private val savedBefore =
+      Prescription(
+          id = "presc-1",
+          prescribedBy = "Dr. Martin",
+          prescribedOn = LocalDate.of(2026, 9, 29),
+          medications =
+              listOf("Ondansetron 8 mg", "Dexamethasone 4 mg").mapIndexed { i, name ->
+                Medication("med-$i", "presc-1", name, startDate = LocalDate.of(2026, 9, 29))
+              },
+      )
+
+  @Test
+  fun alreadySaved_saysWhichPrescription_andOffersBothChoices() {
+    val messages =
+        mapOf(
+            savedBefore to
+                "The prescription from Dr. Martin of 29 Sep 2026, with the same 2 medications",
+            savedBefore.copy(prescribedBy = null, medications = savedBefore.medications.take(1)) to
+                "Your prescription of 29 Sep 2026, with the same medication",
+        )
+    setContent(empty)
+    for ((prescription, message) in messages) {
+      uiState = empty.copy(alreadySaved = prescription)
+      composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_dialog).assertIsDisplayed()
+      composeTestRule
+          .onNodeWithText(string(R.string.prescription_already_saved_title))
+          .assertIsDisplayed()
+      composeTestRule.onNodeWithText(message, substring = true).assertIsDisplayed()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_keep_editing).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_save_anyway).performClick()
+    // Back, like tapping outside, goes back to the form
+    Espresso.pressBack()
+    composeTestRule.runOnIdle {
+      assertEquals(listOf("keepEditing", "saveAnyway", "keepEditing"), events)
+    }
+  }
+
+  @Test
+  fun aRenewal_isSaidAboveTheForm_withOrWithoutAPrescriber() {
+    val notices =
+        mapOf(
+            savedBefore to
+                "Same medications as your prescription of 29 Sep 2026 from Dr. Martin: this looks like a renewal.",
+            savedBefore.copy(prescribedBy = null) to
+                "Same medications as your prescription of 29 Sep 2026: this looks like a renewal.",
+        )
+    setContent(empty)
+    composeTestRule.onNodeWithTag(C.Tag.prescription_renewal_notice).assertDoesNotExist()
+    for ((prescription, notice) in notices) {
+      uiState = empty.copy(renewalOf = prescription)
+      composeTestRule.onNodeWithTag(C.Tag.prescription_renewal_notice).assertIsDisplayed()
+      composeTestRule.onNodeWithText(notice, substring = true).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun phoneRotated_whileAskingAboutAPrescriptionAlreadySaved_stillAsks() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "patient-1") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val medications = FakeMedicationRepository().apply { seed("patient-1", savedBefore) }
+    val draft =
+        savedBefore.toDraft().let {
+          it.copy(medications = it.medications.map { m -> m.copy(id = null) })
+        }
+    val viewModel = PrescriptionFormViewModel(auth, medications, initialDraft = draft)
+    val show = {
+      composeTestRule.activity.setContent {
+        PrescriptionFormScreen(viewModel = viewModel, onClose = {}, onSaved = {})
+      }
+    }
+    composeTestRule.runOnUiThread(show)
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_dialog).assertIsDisplayed()
+
+    // Rotating recreates the activity; the form's ViewModel survives it
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(show)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_dialog).assertIsDisplayed()
+    assertEquals(listOf(savedBefore), medications.prescriptionsOf("patient-1"))
   }
 }
