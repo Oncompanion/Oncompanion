@@ -56,6 +56,7 @@ jobs:
   # job, so a formatting, lint or unit test error shows up in a few minutes and they no longer add
   # to the time of the whole run.
   checks:
+    # The CI job waits for this job by its name ("Wait for the Checks job"): rename both together
     name: Checks
     runs-on: ubuntu-latest
 
@@ -268,6 +269,8 @@ jobs:
           for _ in $(seq 60); do
             status=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
               --jq '.jobs[] | select(.name == "Checks") | .status')
+            # Renamed job: fail now with the reason rather than after 10 minutes
+            [ -z "$status" ] && echo "No job named Checks in this run" && exit 1
             [ "$status" = "completed" ] && exit 0
             sleep 10
           done
