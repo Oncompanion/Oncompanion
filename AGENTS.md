@@ -96,10 +96,15 @@ com.github.se.oncompanion/
   - Unit and Robolectric tests in `app/src/test`; instrumented Kaspresso/Compose and emulator tests in `app/src/androidTest`.
   - One fake per repository, shared by every test: `app/src/test/.../model/<feature>/Fake<Name>Repository.kt`. Reuse it rather than writing a local one.
 - A screen with text fields gets a test with the keyboard open, in portrait and landscape (`showKeyboard` and `LANDSCAPE_PHONE` in `app/src/test/.../ui/KeyboardInsets.kt`).
-- Every screen with state gets a **rotation test**: the activity is recreated (`createAndroidComposeRule<ComponentActivity>()` and `activityRule.scenario.recreate()`), and what the user typed or chose is still there.
-- Anything a user can add (a symptom, a member, a prescription...) gets a test of **adding the same one twice**.
-- None of the bugs found in the M1 APK test was caught by a test, and they were all of these three kinds (keyboard, rotation, duplicates).
-- Tests worth their lines: cases that differ only by their input go in one parameterised test, not one test each, and a fake is never tested on its own: test the code that uses it.
+- Every screen with state gets a **rotation test**: what the user typed or chose survives the activity being recreated.
+  - With a ViewModel: `createAndroidComposeRule<ComponentActivity>()`, then `compose.activityRule.scenario.recreate()` and **set the content again** with the same ViewModel (`compose.activity.setContent { ... }`), or the screen is blank (see `ScanScreenTest`).
+  - For state kept in the composition (`rememberSaveable`) on `XContent`: `StateRestorationTester` (see `PlanningScreenTest`).
+- Every screen and dialog gets a test at `LANDSCAPE_PHONE`: its main actions can be reached and are fully visible (`assertIsFullyVisible`). Dialogs are also tested at `SMALL_LANDSCAPE_PHONE` (both in `ui/KeyboardInsets.kt`). A rotation test checks state, not layout: it wouldn't catch overlapping buttons.
+- Anything a user can add (a symptom, a member, a prescription...): the issue says whether a duplicate is rejected, merged, warned about or allowed, and a test checks that behavior.
+- None of the bugs found in the M1 APK test was caught by a test (keyboard, landscape, duplicates, no way back, a message covering a button).
+- **Fix the whole bug**: before fixing a bug, look for the same pattern on the other screens, fix them too, and add a regression test (#170 fixed the keyboard on the other forms but not Log symptom).
+- Tests worth their lines: cases that differ only by their input go in one test that runs through a list of cases (`for ((input, expected) in cases)`), not one test each. A fake is never tested on its own: test the code that uses it (cleanup in #296).
+- A feature that works with others extends `M1EndToEndTest` (`app/src/androidTest`): the graders assess it directly.
 - Coroutines: use `StandardTestDispatcher` with `runTest` and virtual time (`advanceTimeBy`, `advanceUntilIdle`). Never `Thread.sleep` or real delays.
 - While working, run only the tests you touch (`./gradlew testDebugUnitTest --tests '*Symptom*'`). The full checks below take about 10 minutes; run them before pushing.
 
