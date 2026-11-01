@@ -139,10 +139,12 @@ Run these before every push and make sure they pass:
 - Branch names: `feature/<short-name>`, `fix/<short-name>`, `chore/<short-name>`, `ci/<short-name>`, `docs/<short-name>`. Never rename the branch of an open PR: GitHub closes the PR.
 - PR titles follow the same convention as commit titles.
 - Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md). Put `Closes #<issue>` in the description so the issue closes on merge.
-- Keep PRs small and focused on one task from the Scrum board: about **400 lines of production code** at most, tests not counted. Split the data layer (model, repository, rules) from the UI when a task needs both.
+- Keep PRs small and focused on one task from the Scrum board: about **400 lines of production code** at most, and about **1,000 changed lines in total**, tests included. Generated files (lock files, diagram SVGs) and test data (fixtures) don't count. Split the data layer (model, repository, rules) from the UI when a task needs both.
+  - A PR over these limits says why in its description: a mechanical refactor, a rename, code moved without change, a dependency update.
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
 - If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram and the overview in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)).
+  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone; details stay in the feature diagrams, and a box appears once per diagram (M1 report).
   - Agents update the diagrams themselves by editing the `.excalidraw` JSON:
     - Copy an existing box, label or arrow that already has the style you need (see the legend in architecture.md), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
     - A box's label is a separate `text` element whose `containerId` is the box: `x` = box `x` + 10, `width` = box width − 20, `height` = number of lines × 25, centered vertically in the box. Set both `text` and `originalText`.
@@ -161,5 +163,8 @@ The same files change in almost every PR: `strings.xml`, `C.kt`, `AppNavHost.kt`
 ## Reviews
 
 - Use **Request changes** for bugs, missing tests, and convention problems (naming, commits, architecture); **Comment** for suggestions.
+- Check the PR's size: above the limits in "Pull requests", without a reason in its description, ask for a split.
+- Read SonarCloud's list of new issues, not only the quality gate: a PR should add **0 new issues** (bugs, code smells, security hotspots). Ask for each one to be fixed, with its file and line.
+- A new commit pushed after a review makes that review no longer count: the author re-requests it.
 - When you address a comment, reply on its thread with the commit that fixes it (e.g. "Done in 3f6531b"). Let the reviewer resolve the thread.
 - If you disagree, explain why in the thread instead of ignoring the comment.
