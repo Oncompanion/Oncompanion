@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 # AGENTS.md
 
 Rules for coding agents (Claude Code, Codex, Copilot, etc.) working on Oncompanion.
@@ -8,7 +9,7 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 
 - Android app in Kotlin with Jetpack Compose (Material 3). `minSdk 28`, `targetSdk 34`, JVM target 17.
 - Backend: Firebase Authentication (Google Sign-In), Cloud Firestore, and Cloud Functions in TypeScript (`functions/`, the hospital search proxy, checked with App Check). Firebase project: `oncompanion-c4144`.
-- Package root: `com.github.se.oncompanion`. New user-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion").
+- Package root: `com.github.se.oncompanion`. User-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion"); #297 renames the strings that still say "Oncompanion".
 - Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved.
 
 ## Before you start a task
@@ -63,7 +64,7 @@ com.github.se.oncompanion/
 
 ## Code style
 
-- **AI acknowledgment (required by the course)**: an AI that writes code is a contributor, so credit it at the top of the file, above `package`, with one `Co-authored-by` line per AI. This applies to every source file (Kotlin, Gradle scripts, `firestore.rules`, workflows; `#` instead of `//` in YAML). A missing line counts as plagiarism.
+- **AI acknowledgment (required by the course)**: an AI that writes code is a contributor, so credit it at the top of the file, above `package`, with one `Co-authored-by` line per AI. This applies to every source file (Kotlin, Gradle scripts, `firestore.rules`, workflows; `#` instead of `//` in YAML) and to Markdown documentation (`<!-- Co-authored-by: ... -->`). A missing line counts as plagiarism.
   - Template: `// Co-authored-by: <AI name> <contact email, if any>`
   - When you create a file, or change one with an AI that isn't credited yet, add its line. Examples:
     ```kotlin
