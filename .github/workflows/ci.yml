@@ -271,25 +271,31 @@ jobs:
           retention-days: 7
 
       # The lint report and the unit tests come from the Checks job, which runs at the same time and
-      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them
+      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them.
+      # If Checks failed, its reports are missing or partial and SonarCloud would show a wrong
+      # coverage: stop here, and "Re-run failed jobs" runs both jobs again (#300)
       - name: Wait for the Checks job
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           for _ in $(seq 60); do
-            status=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
-              --jq '.jobs[] | select(.name == "Checks") | .status')
+            checks=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+              --jq '.jobs[] | select(.name == "Checks") | "\(.status) \(.conclusion)"')
             # Renamed job: fail now with the reason rather than after 10 minutes
-            [ -z "$status" ] && echo "No job named Checks in this run" && exit 1
-            [ "$status" = "completed" ] && exit 0
+            [ -z "$checks" ] && echo "No job named Checks in this run" && exit 1
+            case "$checks" in
+              "completed success") exit 0 ;;
+              completed*)
+                echo "The Checks job failed: SonarCloud isn't run without its reports."
+                echo "Fix it, or use \"Re-run failed jobs\" to run Checks and this job again."
+                exit 1 ;;
+            esac
             sleep 10
           done
           echo "The Checks job didn't finish in time" && exit 1
 
-      # Missing when the Checks job failed early (formatting): Sonar then runs without them
       - name: Download reports of the Checks job
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: checks-reports
           path: app/build
