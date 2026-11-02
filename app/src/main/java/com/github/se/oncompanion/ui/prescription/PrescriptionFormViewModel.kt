@@ -525,7 +525,11 @@ class PrescriptionFormViewModel(
     edit { it.withOpenMedication(transform).openChecked(detail) }
   }
 
-  /** The saved prescription a new one looks like a renewal of, if any (US-39). */
+  /**
+   * Sets [PrescriptionFormUiState.renewalOf] to the saved prescription with the same medications on
+   * another date (US-39), or to null when there is none. A correction of a saved prescription is
+   * never compared, so its renewalOf stays null.
+   */
   private fun PrescriptionFormUiState.withRenewal() =
       copy(
           renewalOf =
