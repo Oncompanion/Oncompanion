@@ -1087,9 +1087,9 @@ class PrescriptionFormScreenTest {
     val messages =
         mapOf(
             savedBefore to
-                "The prescription from Dr. Martin of 29 Sep 2026, with the same 2 medications",
+                "Dr. Martin's prescription from 29 Sep 2026, with the same 2 medications",
             savedBefore.copy(prescribedBy = null, medications = savedBefore.medications.take(1)) to
-                "Your prescription of 29 Sep 2026, with the same medication",
+                "Your prescription from 29 Sep 2026, with the same medication",
         )
     setContent(empty)
     for ((prescription, message) in messages) {
@@ -1137,9 +1137,9 @@ class PrescriptionFormScreenTest {
     val notices =
         mapOf(
             savedBefore to
-                "Same medications as your prescription of 29 Sep 2026 from Dr. Martin: this looks like a renewal.",
+                "Same medications as Dr. Martin's prescription from 29 Sep 2026: this looks like a renewal.",
             savedBefore.copy(prescribedBy = null) to
-                "Same medications as your prescription of 29 Sep 2026: this looks like a renewal.",
+                "Same medications as your prescription from 29 Sep 2026: this looks like a renewal.",
         )
     setContent(empty)
     composeTestRule.onNodeWithTag(C.Tag.prescription_renewal_notice).assertDoesNotExist()

@@ -462,17 +462,17 @@
     </plurals>
     <string name="prescription_already_saved_title">Already in your prescriptions</string>
     <plurals name="prescription_already_saved_by">
-        <item quantity="one">The prescription from %1$s of %2$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
-        <item quantity="other">The prescription from %1$s of %2$s, with the same %3$d medications, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="one">%1$s\'s prescription from %2$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="other">%1$s\'s prescription from %2$s, with the same %3$d medications, is already saved. Save it again only if you got it twice.</item>
     </plurals>
     <plurals name="prescription_already_saved">
-        <item quantity="one">Your prescription of %1$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
-        <item quantity="other">Your prescription of %1$s, with the same %2$d medications, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="one">Your prescription from %1$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="other">Your prescription from %1$s, with the same %2$d medications, is already saved. Save it again only if you got it twice.</item>
     </plurals>
     <string name="prescription_already_saved_keep_editing">Keep editing</string>
     <string name="prescription_already_saved_save_anyway">Save anyway</string>
-    <string name="prescription_renewal_by">Same medications as your prescription of %1$s from %2$s: this looks like a renewal. Saving adds it as a new prescription.</string>
-    <string name="prescription_renewal">Same medications as your prescription of %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
+    <string name="prescription_renewal_by">Same medications as %2$s\'s prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
+    <string name="prescription_renewal">Same medications as your prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
