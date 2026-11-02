@@ -94,7 +94,7 @@ com.github.se.oncompanion/
 
 ## Tests
 
-- New code needs tests: SonarCloud's quality gate requires **≥ 90% coverage on new code** (M2 requires 90% overall). Don't add coverage exclusions to `app/build.gradle.kts` to make the gate pass; ask the team first.
+- New code needs tests: SonarCloud's quality gate requires **≥ 90% coverage on new code** (M2 requires 90% overall). The 90% covers `functions/` too: SonarCloud doesn't measure it, so the Hospital proxy job requires 90% of its lines, branches and functions. Don't add coverage exclusions to `app/build.gradle.kts` to make the gate pass; ask the team first.
 - Write tests from the issue's definition of done and the expected behavior, not by reading the implementation.
 - Test the different states of a screen (loading, empty, error, filled) on `XContent`, plus one test of `XScreen` with its ViewModel. Compose adds hidden branches, so "it renders" isn't enough.
 - Where tests go:
