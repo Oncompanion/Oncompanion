@@ -6,11 +6,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
+import java.time.Instant
 import java.time.LocalDateTime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,6 +40,9 @@ class EventsViewModelTest {
 
     override fun getUpcomingEvents(): Flow<List<Event>> = events
 
+    override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+        flowOf(emptyList())
+
     override suspend fun getEvent(id: String): Event? = null
   }
 
@@ -50,6 +55,9 @@ class EventsViewModelTest {
       emit(events)
     }
 
+    override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+        flowOf(emptyList())
+
     override suspend fun getEvent(id: String): Event? = null
   }
 
@@ -61,6 +69,9 @@ class EventsViewModelTest {
       if (observations++ == 0) throw IllegalStateException("no network")
       emit(events)
     }
+
+    override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+        flowOf(emptyList())
 
     override suspend fun getEvent(id: String): Event? = null
   }
@@ -131,6 +142,9 @@ class EventsViewModelTest {
             emit(events)
             throw IllegalStateException("connection lost")
           }
+
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+              flowOf(emptyList())
 
           override suspend fun getEvent(id: String): Event? = null
         }

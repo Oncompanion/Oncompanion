@@ -13,6 +13,7 @@ import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.
 import com.github.se.oncompanion.model.event.EventRepositoryFirestore.Companion.FIELD_WEBSITE_URL
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.firestore.FirebaseFirestoreException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -77,7 +78,8 @@ class EventRepositoryFirestoreTest {
 
   /**
    * Writes an event bypassing the rules, like an event added from the Firebase console. A null
-   * field is left out of the document.
+   * field is left out of the document. With [replace], it overwrites the event, like an edit in the
+   * console.
    */
   private suspend fun addEvent(
       name: String,
@@ -89,6 +91,7 @@ class EventRepositoryFirestoreTest {
       summary: Any? = "Short summary",
       description: Any? = "Full description",
       websiteUrl: Any? = null,
+      replace: Boolean = false,
   ) {
     val fields =
         mapOf(
@@ -105,7 +108,8 @@ class EventRepositoryFirestoreTest {
     val json = JSONObject()
     fields.forEach { (key, value) -> json.put(key, restValue(value!!)) }
     withTimeout(10_000) {
-      EmulatorTestData.createRawDocument(COLLECTION, id(name), json.toString())
+      if (replace) EmulatorTestData.replaceRawDocument(COLLECTION, id(name), json.toString())
+      else EmulatorTestData.createRawDocument(COLLECTION, id(name), json.toString())
     }
     created += id(name)
   }
@@ -295,6 +299,97 @@ class EventRepositoryFirestoreTest {
   fun defaultConstructor_usesTheSharedInstance(): Unit = runBlocking {
     addEvent("walk")
     assertUpcomingIds(listOf(id("walk")), EventRepositoryFirestore())
+  }
+
+  // ---- observeEvents ----
+
+  // A week around now, as Planning asks for: it holds past and upcoming events
+  private val weekStart = now.minus(Duration.ofDays(3))
+  private val weekEnd = now.plus(Duration.ofDays(4))
+
+  /** This test's events in the week, as their first emission matching [condition] gives them. */
+  private suspend fun awaitWeek(condition: (List<Event>) -> Boolean): List<Event> =
+      withTimeout(10_000) {
+        repository
+            .observeEvents(weekStart, weekEnd)
+            .map { events -> events.filter { it.id in created } }
+            .first(condition)
+      }
+
+  @Test
+  fun eventsInARange_startInIt_pastOnesIncluded_soonestFirst(): Unit = runBlocking {
+    // (event, when it starts, whether it is in the week)
+    val cases =
+        listOf(
+            Triple("after-the-week", weekEnd.plus(Duration.ofDays(1)), false),
+            Triple("tomorrow", now.plus(Duration.ofDays(1)), true),
+            Triple("at-the-end", weekEnd, false),
+            Triple("yesterday", now.minus(Duration.ofDays(1)), true),
+            Triple("before-the-start", weekStart.minusSeconds(1), false),
+            Triple("at-the-start", weekStart, true),
+        )
+    cases.forEach { (name, startAt, _) -> addEvent(name, startAt = startAt) }
+
+    val inTheWeek = cases.filter { it.third }.sortedBy { it.second }.map { id(it.first) }
+    val events = awaitWeek { events -> events.map { it.id } == inTheWeek }
+    assertEquals(inTheWeek, events.map { it.id })
+  }
+
+  @Test
+  fun eventsInARange_followEditsAndDeletions(): Unit = runBlocking {
+    val tomorrow = now.plus(Duration.ofDays(1))
+    addEvent("yoga", startAt = tomorrow, title = "Gentle yoga")
+    awaitWeek { events -> events.map { it.title } == listOf("Gentle yoga") }
+
+    // Renamed in the console
+    addEvent("yoga", startAt = tomorrow, title = "Chair yoga", replace = true)
+    awaitWeek { events -> events.map { it.title } == listOf("Chair yoga") }
+
+    // Moved to another week, then back
+    addEvent(
+        "yoga",
+        startAt = weekEnd.plus(Duration.ofDays(2)),
+        title = "Chair yoga",
+        replace = true,
+    )
+    awaitWeek { it.isEmpty() }
+    addEvent("yoga", startAt = tomorrow, title = "Chair yoga", replace = true)
+    awaitWeek { it.isNotEmpty() }
+
+    // Deleted by the Ligue
+    EmulatorTestData.deleteRawDocument("$COLLECTION/${id("yoga")}")
+    awaitWeek { it.isEmpty() }
+  }
+
+  @Test
+  fun eventsInARange_signedOut_fail(): Unit = runBlocking {
+    // Events can only be read when signed in: the rules deny the read, and the flow reports it
+    EmulatorTestData.signOut()
+
+    val error = runCatching {
+      withTimeout(10_000) { repository.observeEvents(weekStart, weekEnd).collect {} }
+    }
+        .exceptionOrNull()
+
+    assertEquals(
+        FirebaseFirestoreException.Code.PERMISSION_DENIED,
+        (error as? FirebaseFirestoreException)?.code,
+    )
+  }
+
+  @Test
+  fun eventsInARange_offline_readTheCache(): Unit = runBlocking {
+    addEvent("yesterday", startAt = now.minus(Duration.ofDays(1)))
+    awaitWeek { it.isNotEmpty() } // loads it into the cache
+
+    db.disableNetwork().await()
+
+    assertEquals(
+        listOf(id("yesterday")),
+        withTimeout(10_000) { repository.observeEvents(weekStart, weekEnd).first() }
+            .map { it.id }
+            .filter { it in created },
+    )
   }
 
   // ---- getEvent ----
