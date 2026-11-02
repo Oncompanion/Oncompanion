@@ -9,6 +9,9 @@ tests run in CI; deployment stays manual. This endpoint is public at the network
 Firebase Auth and App Check are
 mandatory in its handler.
 
+For the deployment checklist, native alert setup and incident procedure, see
+[deployment and operations](OPERATIONS.md). Alert policies are not configured by this repository.
+
 ## Development and tests
 
 Use Node 22 (the deployed runtime), Java 21, and the Firebase CLI used by the Android project.
@@ -182,8 +185,11 @@ write errors return 503 after releasing with a failure cooldown. Release is idem
 recorded releasing owner and is retried at most three times.
 A transient failure or lost acknowledgement can therefore recover without another upstream call.
 A persistent release error leaves the lock held or cooldown committed, never silently bypassed.
-Storage failures log only `hospital_search_storage_failure`, without exception contents, queries,
-UIDs or credentials. Alert on this marker and investigate held control state before rollout.
+Storage failures emit structured `hospital_search_storage_failure` events without exception
+contents, queries, UIDs or credentials. Exhausted release retries additionally emit
+`hospital_search_release_failed`. Upstream failures and handler 503/capacity failures have separate
+fixed events; see the operations runbook for alert filters and their detection limits.
+Alert on these markers and investigate held control state before rollout.
 Corrupt control state fails closed.
 
 Recovery is an operator action, not a timer: stop/disable traffic to **all** revisions/services

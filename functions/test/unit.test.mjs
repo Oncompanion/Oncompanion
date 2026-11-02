@@ -812,3 +812,155 @@ test("invalid or unauthenticated requests never spend quota or acquire the globa
       assert.equal(res.statusCode, status);
     });
 });
+
+test("operational storage events contain no request or exception data", async (t) => {
+  for (const method of [
+    "cached",
+    "consumeQuota",
+    "acquire",
+    "save",
+    "release",
+  ]) {
+    await t.test(method, async () => {
+      const store = fakeStore();
+      const events = [];
+      store[method] = async () => {
+        throw new Error("private-token patient-identity private-query");
+      };
+      const res = response();
+      const log = (...args) => events.push(args);
+      await createHandler(
+        new HospitalSearchService(
+          store,
+          {
+            async search() {
+              return [];
+            },
+          },
+          log,
+        ),
+        async () => "a".repeat(64),
+        log,
+      )(request(url("private-query")), res);
+      assert.equal(res.statusCode, 503);
+      assert.deepEqual(
+        events,
+        method === "release"
+          ? [
+              ["hospital_search_storage_failure"],
+              ["hospital_search_storage_failure"],
+              ["hospital_search_storage_failure"],
+              ["hospital_search_release_failed"],
+              ["hospital_search_storage_failure"],
+              ["hospital_search_unavailable"],
+            ]
+          : [
+              ["hospital_search_storage_failure"],
+              ["hospital_search_unavailable"],
+            ],
+      );
+    });
+  }
+});
+
+test("upstream failure remains observable when release also fails", async () => {
+  const store = fakeStore();
+  store.release = async () => {
+    throw new Error("private release");
+  };
+  const events = [];
+  const service = new HospitalSearchService(
+    store,
+    {
+      async search() {
+        throw new SearchError(503, "upstream_unavailable", 900);
+      },
+    },
+    (event) => events.push(event),
+  );
+  await assert.rejects(
+    service.search("private-query", "a".repeat(64)),
+    failure(503),
+  );
+  assert.deepEqual(events, [
+    "hospital_search_upstream_failure",
+    "hospital_search_upstream_wait_exceeds_limit",
+  ]);
+  // The oversized wait intentionally skips release; test ordinary failure plus exhausted release separately.
+  const second = new HospitalSearchService(
+    fakeStoreWithFailedRelease(),
+    {
+      async search() {
+        throw new SearchError(502, "upstream_failure");
+      },
+    },
+    (event) => events.push(event),
+  );
+  await assert.rejects(
+    second.search("private-query", "a".repeat(64)),
+    failure(503),
+  );
+  assert(events.includes("hospital_search_release_failed"));
+  assert.equal(
+    events.filter((e) => e === "hospital_search_upstream_failure").length,
+    2,
+  );
+  function fakeStoreWithFailedRelease() {
+    const value = fakeStore();
+    value.release = store.release;
+    return value;
+  }
+});
+
+test("HTTP logs only fixed failure events and stays quiet for successful/cache and quota requests", async () => {
+  for (const [error, expected, status] of [
+    [undefined, [], 200],
+    [new SearchError(429, "quota_exceeded"), [], 429],
+    [
+      new SearchError(429, "capacity_exhausted"),
+      ["hospital_search_capacity_exhausted"],
+      429,
+    ],
+    [
+      new Error("private-token private-patient"),
+      ["hospital_search_unexpected_failure", "hospital_search_unavailable"],
+      503,
+    ],
+  ]) {
+    const events = [];
+    const res = response();
+    await createHandler(
+      {
+        async search() {
+          if (error) throw error;
+          return [];
+        },
+      },
+      async () => "a".repeat(64),
+      (...args) => events.push(args),
+    )(request(), res);
+    assert.equal(res.statusCode, status);
+    assert.deepEqual(
+      events,
+      expected.map((event) => [event]),
+    );
+  }
+});
+
+test("default logger writes structured fixed events without exception fields", async () => {
+  const script = `import { logFailure } from ${JSON.stringify(new URL("../lib/logging.js", import.meta.url).href)};
+    logFailure("hospital_search_release_failed");`;
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.deepEqual(JSON.parse(result.stderr), {
+    severity: "ERROR",
+    message: "hospital_search_release_failed",
+    event: "hospital_search_release_failed",
+  });
+});
