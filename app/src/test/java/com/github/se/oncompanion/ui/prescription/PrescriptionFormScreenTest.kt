@@ -45,6 +45,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -1107,6 +1108,29 @@ class PrescriptionFormScreenTest {
       assertEquals(listOf("keepEditing", "saveAnyway", "keepEditing"), events)
     }
   }
+
+  /**
+   * The longest message (a prescriber and several medications) still leaves both choices visible.
+   */
+  private fun alreadySaved_showsBothChoicesSideways() {
+    setContent(empty.copy(alreadySaved = savedBefore))
+    composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_dialog).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_already_saved_keep_editing)
+        .assertIsFullyVisible()
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_already_saved_save_anyway)
+        .assertIsFullyVisible()
+  }
+
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  @Test
+  fun alreadySaved_onALandscapePhone_showsBothChoices() = alreadySaved_showsBothChoicesSideways()
+
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  @Test
+  fun alreadySaved_onASmallLandscapePhone_showsBothChoices() =
+      alreadySaved_showsBothChoicesSideways()
 
   @Test
   fun aRenewal_isSaidAboveTheForm_withOrWithoutAPrescriber() {
