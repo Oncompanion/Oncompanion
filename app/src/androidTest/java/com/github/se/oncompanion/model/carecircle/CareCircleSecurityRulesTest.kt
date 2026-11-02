@@ -6,20 +6,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.COLLECTION
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.android.gms.tasks.Task
-import com.google.firebase.firestore.CollectionReference
+import com.github.se.oncompanion.utils.allowed
+import com.github.se.oncompanion.utils.denied
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,15 +71,8 @@ class CareCircleSecurityRulesTest {
     FirebaseEmulator.auth.signOut()
   }
 
-  private fun circle(uid: String): CollectionReference =
-      db.collection("users").document(uid).collection(COLLECTION)
-
   private val member: DocumentReference
-    get() = circle(aliceUid).document(memberUid)
-
-  /** [caregiverUid]'s link to [patientUid]'s circle. */
-  private fun joined(caregiverUid: String, patientUid: String): DocumentReference =
-      db.collection("users").document(caregiverUid).collection(PATIENTS).document(patientUid)
+    get() = db.member(aliceUid, memberUid)
 
   /** Valid details, as the patient saves them when editing a member. */
   private fun detailFields(vararg changes: Pair<String, Any?>) =
@@ -94,43 +84,32 @@ class CareCircleSecurityRulesTest {
           )
           .apply { changes.forEach { (key, value) -> this[key] = value } }
 
-  private suspend fun <T> allowed(task: Task<T>): T = withTimeout(10_000) { task.await() }
-
-  private suspend fun denied(task: Task<*>) {
-    try {
-      withTimeout(10_000) { task.await() }
-      fail("Expected PERMISSION_DENIED but the operation succeeded")
-    } catch (e: FirebaseFirestoreException) {
-      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
-    }
-  }
-
   // ---- read ----
 
   @Test
   fun ownerCanRead(): Unit = runBlocking {
-    assertTrue(allowed(circle(aliceUid).document(memberUid).get(Source.SERVER)).exists())
-    assertEquals(1, allowed(circle(aliceUid).get(Source.SERVER)).size())
+    assertTrue(allowed(db.circle(aliceUid).document(memberUid).get(Source.SERVER)).exists())
+    assertEquals(1, allowed(db.circle(aliceUid).get(Source.SERVER)).size())
   }
 
   @Test
   fun otherUserCannotRead(): Unit = runBlocking {
     EmulatorTestData.signIn("bob")
-    denied(circle(aliceUid).document(memberUid).get(Source.SERVER))
-    denied(circle(aliceUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).document(memberUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).get(Source.SERVER))
   }
 
   @Test
   fun signedOutCannotRead(): Unit = runBlocking {
     EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
-    denied(circle(aliceUid).get(Source.SERVER))
+    denied(db.circle(aliceUid).get(Source.SERVER))
   }
 
   // ---- the owner edits and removes members ----
 
   @Test
   fun ownerCannotCreate(): Unit = runBlocking {
-    denied(circle(aliceUid).document(bobUid).set(detailFields()))
+    denied(db.circle(aliceUid).document(bobUid).set(detailFields()))
     // Replacing the whole member doc would drop its email, invite code and join time
     denied(member.set(detailFields()))
   }
@@ -167,29 +146,29 @@ class CareCircleSecurityRulesTest {
 
   @Test
   fun ownerRemovesTheMember_andTheirLinkToTheCircle(): Unit = runBlocking {
-    allowed(db.batch().delete(member).delete(joined(memberUid, aliceUid)).commit())
+    allowed(db.batch().delete(member).delete(db.joined(memberUid, aliceUid)).commit())
 
     assertFalse(allowed(member.get(Source.SERVER)).exists())
     EmulatorTestData.signIn("carol")
-    assertFalse(allowed(joined(memberUid, aliceUid).get(Source.SERVER)).exists())
+    assertFalse(allowed(db.joined(memberUid, aliceUid).get(Source.SERVER)).exists())
     // Their link to another patient's circle stays
-    assertTrue(allowed(joined(memberUid, bobUid).get(Source.SERVER)).exists())
+    assertTrue(allowed(db.joined(memberUid, bobUid).get(Source.SERVER)).exists())
   }
 
   @Test
   fun patientCannotTouchTheMembersOtherLinks(): Unit = runBlocking {
-    denied(joined(memberUid, bobUid).delete())
-    denied(joined(memberUid, aliceUid).update("patientFirstName", "Alicia"))
-    denied(joined(memberUid, aliceUid).get(Source.SERVER))
+    denied(db.joined(memberUid, bobUid).delete())
+    denied(db.joined(memberUid, aliceUid).update("patientFirstName", "Alicia"))
+    denied(db.joined(memberUid, aliceUid).get(Source.SERVER))
   }
 
   @Test
   fun otherUserCannotWrite(): Unit = runBlocking {
     EmulatorTestData.signIn("bob")
-    denied(circle(aliceUid).document(bobUid).set(mapOf("firstName" to "Bob")))
+    denied(db.circle(aliceUid).document(bobUid).set(mapOf("firstName" to "Bob")))
     denied(member.update(detailFields()))
     denied(member.delete())
-    denied(joined(memberUid, aliceUid).delete())
+    denied(db.joined(memberUid, aliceUid).delete())
   }
 
   @Test

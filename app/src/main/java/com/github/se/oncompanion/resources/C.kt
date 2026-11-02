@@ -129,7 +129,7 @@ object C {
 
     fun eventCard(eventId: String) = "event_card_$eventId"
 
-    const val event_detail_back_to_events = "event_detail_back_to_events"
+    const val event_detail_go_back = "event_detail_go_back"
     const val event_detail_visit_website = "event_detail_visit_website"
     const val event_detail_confirm = "event_detail_confirm"
     const val event_detail_registration_note = "event_detail_registration_note"

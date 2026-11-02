@@ -4,18 +4,15 @@ package com.github.se.oncompanion.model.event
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.android.gms.tasks.Task
+import com.github.se.oncompanion.utils.allowed
+import com.github.se.oncompanion.utils.denied
 import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,17 +49,6 @@ class EventSecurityRulesTest {
   }
 
   private fun events(): CollectionReference = db.collection(COLLECTION)
-
-  private suspend fun <T> allowed(task: Task<T>): T = withTimeout(10_000) { task.await() }
-
-  private suspend fun denied(task: Task<*>) {
-    try {
-      withTimeout(10_000) { task.await() }
-      fail("Expected PERMISSION_DENIED but the operation succeeded")
-    } catch (e: FirebaseFirestoreException) {
-      assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
-    }
-  }
 
   // ---- read ----
 
