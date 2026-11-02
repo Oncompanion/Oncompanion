@@ -9,12 +9,15 @@ import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -33,6 +36,8 @@ class PlanningRepositoryProviderTest {
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
+  private val appRegistrationRepository = EventRegistrationRepositoryProvider.repository
+  private val appCaregiverPlaceholder = PlanningRepositoryProvider.caregiverPlaceholder
 
   @After
   fun restoreProviders() {
@@ -40,10 +45,12 @@ class PlanningRepositoryProviderTest {
     AppointmentRepositoryProvider.repository = appAppointmentRepository
     AuthRepositoryProvider.repository = appAuthRepository
     EventRepositoryProvider.repository = appEventRepository
+    EventRegistrationRepositoryProvider.repository = appRegistrationRepository
+    PlanningRepositoryProvider.caregiverPlaceholder = appCaregiverPlaceholder
   }
 
   /**
-   * Planning shows the signed-in patient's appointments and the upcoming Ligue events from their
+   * Planning shows the signed-in patient's appointments and the events they confirmed, from their
    * providers, sorted by time, even when they were replaced after the planning provider was first
    * used.
    */
@@ -65,20 +72,45 @@ class PlanningRepositoryProviderTest {
     )
     AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = appointments
-    // An event two hours after the appointment; the fake's "now" is before the day starts
-    val event =
-        FakeEventRepository.sampleEvents(day)
-            .first()
-            .copy(
-                startDateTime =
-                    LocalDateTime.ofInstant(range.startInclusive, range.zoneId).plusHours(2)
-            )
+    // Two events two hours after the appointment: only the confirmed one is shown
+    val (confirmed, other) =
+        FakeEventRepository.sampleEvents(day).take(2).map {
+          it.copy(
+              startDateTime =
+                  LocalDateTime.ofInstant(range.startInclusive, range.zoneId).plusHours(2)
+          )
+        }
     EventRepositoryProvider.repository =
-        FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
+        FakeEventRepository(listOf(confirmed, other), zone = { range.zoneId })
+    val registrations = FakeEventRegistrationRepository()
+    registrations.confirm("patient", confirmed.id)
+    EventRegistrationRepositoryProvider.repository = registrations
 
-    val items = original.observeItems(range).first { it.size == 2 }
+    val items = original.observeItems(range).first { it.size >= 2 }
 
-    assertEquals(listOf("Saved consultation", event.title), items.map { it.title })
+    assertEquals(listOf("Saved consultation", confirmed.title), items.map { it.title })
+  }
+
+  /**
+   * Until #240, a caregiver's Planning and Overview show no events: never the events the patient
+   * didn't confirm, nor the caregiver's own confirmations as if they were the patient's.
+   */
+  @Test
+  fun caregiverPlaceholder_showsNoEventsByDefault() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
+    val auth = FakeAuthRepository { AuthUser(it) }
+    auth.signInWithGoogle("caregiver")
+    val event = FakeEventRepository.sampleEvents(day.minusDays(1)).first()
+    val registrations = FakeEventRegistrationRepository()
+    registrations.confirm("caregiver", event.id)
+    AuthRepositoryProvider.repository = auth
+    EventRepositoryProvider.repository = FakeEventRepository(listOf(event), zone = { range.zoneId })
+    EventRegistrationRepositoryProvider.repository = registrations
+
+    val items = appCaregiverPlaceholder.observeItems(range).first()
+
+    assertEquals(emptyList<String>(), items.map { it.title })
   }
 
   /** If the events can't be read, the default provider still shows the appointments. */
@@ -102,7 +134,7 @@ class PlanningRepositoryProviderTest {
     AppointmentRepositoryProvider.repository = appointments
     EventRepositoryProvider.repository =
         object : EventRepository by FakeEventRepository(emptyList()) {
-          override fun getUpcomingEvents(): Flow<List<Event>> = flow {
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> = flow {
             error("Events couldn't be read")
           }
         }

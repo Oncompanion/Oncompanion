@@ -2,13 +2,17 @@
 
 package com.github.se.oncompanion.domain.planning
 
+import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -17,8 +21,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -26,12 +31,19 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * [EventPlanningSource] shows in Planning only the events the signed-in patient confirmed
+ * (US-30, #139), on their day, past weeks included.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventPlanningSourceTest {
 
   private val zone = ZoneId.of("Europe/Zurich")
   private val monday = LocalDate.of(2026, 10, 19)
   private val week = PlanningRange(monday, monday.plusWeeks(1), zone)
+
+  private val auth = FakeAuthRepository { AuthUser(it) }
+  private val registrations = FakeEventRegistrationRepository()
 
   private fun event(id: String, start: LocalDateTime, place: String = "Ligue office") =
       Event(
@@ -43,18 +55,40 @@ class EventPlanningSourceTest {
           description = "Description",
       )
 
-  /** A repository that gives [events] as they are, like the Firestore one gives upcoming events. */
-  private fun repository(vararg events: Event) =
-      FakeEventRepository(events.toList(), now = { LocalDateTime.MIN })
+  /** The source over [events], whose local times are in Planning's zone. */
+  private fun source(vararg events: Event, repository: EventRepository = fakeEvents(*events)) =
+      EventPlanningSource(repository, registrations, auth)
 
-  private suspend fun itemsOf(repository: EventRepository, range: PlanningRange = week) =
-      EventPlanningSource(repository).observeItems(range).first()
+  private fun fakeEvents(vararg events: Event) =
+      FakeEventRepository(events.toList(), zone = { zone })
+
+  /** Signs [uid] in and confirms their registration for each of [eventIds]. */
+  private suspend fun signInAndConfirm(uid: String, vararg eventIds: String) {
+    auth.signInWithGoogle(uid)
+    eventIds.forEach { registrations.confirm(uid, it) }
+  }
+
+  /** Collects every list the source emits for [range], in the background of the test. */
+  private fun TestScope.collect(
+      source: EventPlanningSource,
+      range: PlanningRange = week,
+  ): MutableList<List<PlanningItem>> {
+    val emissions = mutableListOf<List<PlanningItem>>()
+    backgroundScope.launch { source.observeItems(range).collect { emissions += it } }
+    runCurrent()
+    return emissions
+  }
+
+  /** What the source shows for [range] once everything available has been read. */
+  private fun TestScope.latest(source: EventPlanningSource, range: PlanningRange = week) =
+      collect(source, range).last()
 
   @Test
-  fun anEvent_becomesATimedEntryOnItsDay() = runTest {
+  fun aConfirmedEvent_becomesATimedEntryOnItsDay_withItsPlace() = runTest {
     val start = monday.plusDays(2).atTime(18, 30)
+    signInAndConfirm("patient", "walk")
 
-    val item = itemsOf(repository(event("walk", start, place = "Parc des Bastions"))).single()
+    val item = latest(source(event("walk", start, place = "Parc des Bastions"))).single()
 
     assertEquals(
         PlanningItem(
@@ -70,64 +104,168 @@ class EventPlanningSourceTest {
 
   @Test
   fun aBlankPlace_givesNoSubtitle() = runTest {
-    assertNull(
-        itemsOf(repository(event("yoga", monday.atTime(10, 0), place = "  "))).single().subtitle
-    )
+    signInAndConfirm("patient", "yoga")
+
+    val item = latest(source(event("yoga", monday.atTime(10, 0), place = "  "))).single()
+
+    assertNull(item.subtitle)
   }
 
   @Test
-  fun eventsOutsideTheRange_areLeftOut() = runTest {
+  fun onlyTheConfirmedEvents_areShown() = runTest {
+    signInAndConfirm("patient", "yoga")
+
     val items =
-        itemsOf(
-            repository(
-                event("sunday-before", monday.minusDays(1).atTime(23, 59)),
-                event("monday-midnight", monday.atStartOfDay()),
-                event("sunday-last", monday.plusDays(6).atTime(23, 59)),
-                event("next-monday", monday.plusWeeks(1).atStartOfDay()),
-            )
+        latest(source(event("yoga", monday.atTime(10, 0)), event("walk", monday.atTime(14, 0))))
+
+    assertEquals(listOf(PlanningSource.Event("yoga")), items.map { it.source })
+  }
+
+  @Test
+  fun confirmedEvents_areShownOnlyWithinTheDisplayedWeek() = runTest {
+    // (event, when it starts, whether the week shows it)
+    val cases =
+        listOf(
+            Triple("sunday-before", monday.minusDays(1).atTime(23, 59), false),
+            Triple("monday-midnight", monday.atStartOfDay(), true),
+            Triple("sunday-last", monday.plusDays(6).atTime(23, 59), true),
+            Triple("next-monday", monday.plusWeeks(1).atStartOfDay(), false),
         )
+    signInAndConfirm("patient", *cases.map { it.first }.toTypedArray())
+    val events = cases.map { (id, start, _) -> event(id, start) }.toTypedArray()
+
+    val items = latest(source(*events))
 
     assertEquals(
-        listOf(PlanningSource.Event("monday-midnight"), PlanningSource.Event("sunday-last")),
+        cases.filter { it.third }.map { PlanningSource.Event(it.first) },
         items.map { it.source },
     )
   }
 
   @Test
+  fun aPastWeek_showsTheConfirmedEventsThatTookPlaceThen() = runTest {
+    // The patient confirmed a workshop that took place three weeks before this week
+    val pastMonday = monday.minusWeeks(3)
+    signInAndConfirm("patient", "workshop")
+
+    val items =
+        latest(
+            source(event("workshop", pastMonday.plusDays(1).atTime(18, 0))),
+            PlanningRange(pastMonday, pastMonday.plusWeeks(1), zone),
+        )
+
+    assertEquals(listOf(PlanningSource.Event("workshop")), items.map { it.source })
+  }
+
+  @Test
   fun aWeekAcrossTheClockChange_keepsItsEventsOnTheirDay() = runTest {
     // Summer time ends on Sunday 25 October 2026 in Zurich
-    val clockChangeWeek = PlanningRange(monday, monday.plusWeeks(1), zone)
     val sunday = LocalDate.of(2026, 10, 25)
+    signInAndConfirm("patient", "late")
 
-    val item = itemsOf(repository(event("late", sunday.atTime(23, 30))), clockChangeWeek).single()
+    val item = latest(source(event("late", sunday.atTime(23, 30)))).single()
 
     assertEquals(sunday, item.timing.dateIn(zone))
   }
 
   @Test
-  fun noUpcomingEvents_givesAnEmptyList() = runTest { assertTrue(itemsOf(repository()).isEmpty()) }
+  fun confirmingAndRemoving_updatesPlanningRightAway() = runTest {
+    signInAndConfirm("patient")
+    val emissions = collect(source(event("yoga", monday.atTime(10, 0))))
+    assertTrue(emissions.last().isEmpty())
+
+    registrations.confirm("patient", "yoga")
+    runCurrent()
+    assertEquals(listOf(PlanningSource.Event("yoga")), emissions.last().map { it.source })
+
+    registrations.remove("patient", "yoga")
+    runCurrent()
+    assertTrue(emissions.last().isEmpty())
+  }
 
   @Test
-  fun newEvents_updateTheEntries() = runTest {
-    val upcoming = MutableStateFlow(listOf(event("first", monday.atTime(9, 0))))
-    val repository =
-        object : EventRepository {
-          override fun getUpcomingEvents(): Flow<List<Event>> = upcoming
+  fun confirmingTwice_showsTheEventOnce() = runTest {
+    signInAndConfirm("patient", "yoga", "yoga")
+    val emissions = collect(source(event("yoga", monday.atTime(10, 0))))
 
+    registrations.confirm("patient", "yoga")
+    runCurrent()
+
+    assertEquals(listOf(PlanningSource.Event("yoga")), emissions.last().map { it.source })
+  }
+
+  @Test
+  fun editedAndDeletedEvents_updateTheirEntry() = runTest {
+    // The Ligue edits its events in the console: Firestore sends the new list
+    val week = MutableStateFlow(listOf(event("yoga", monday.atTime(10, 0))))
+    val liveEvents =
+        object : EventRepository by fakeEvents() {
           override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
-              flowOf(emptyList())
-
-          override suspend fun getEvent(id: String): Event? = null
+              week.map { events ->
+                events.filter { it.startDateTime.atZone(zone).toInstant() in from..<until }
+              }
         }
-    val emissions = mutableListOf<Int>()
-    backgroundScope.launch {
-      EventPlanningSource(repository).observeItems(week).collect { emissions += it.size }
+    signInAndConfirm("patient", "yoga")
+    val emissions = collect(source(repository = liveEvents))
+
+    // Renamed
+    week.value = listOf(event("yoga", monday.atTime(10, 0)).copy(title = "Chair yoga"))
+    runCurrent()
+    assertEquals(listOf("Chair yoga"), emissions.last().map { it.title })
+
+    // Moved to another day of the week
+    week.value = listOf(event("yoga", monday.plusDays(3).atTime(10, 0)))
+    runCurrent()
+    assertEquals(monday.plusDays(3), emissions.last().single().timing.dateIn(zone))
+
+    // Deleted
+    week.value = emptyList()
+    runCurrent()
+    assertTrue(emissions.last().isEmpty())
+  }
+
+  @Test
+  fun signedOut_showsNoEvents() = runTest {
+    registrations.confirm("patient", "yoga")
+
+    assertTrue(latest(source(event("yoga", monday.atTime(10, 0)))).isEmpty())
+  }
+
+  @Test
+  fun switchingAccounts_showsOnlyTheNewPatientsEvents_andSigningOutClearsThem() = runTest {
+    registrations.confirm("anne", "yoga")
+    registrations.confirm("bob", "walk")
+    auth.signInWithGoogle("anne")
+    val emissions =
+        collect(source(event("yoga", monday.atTime(10, 0)), event("walk", monday.atTime(14, 0))))
+    assertEquals(listOf(PlanningSource.Event("yoga")), emissions.last().map { it.source })
+
+    emissions.clear()
+    auth.signInWithGoogle("bob")
+    runCurrent()
+    // Anne's events are cleared before Bob's are shown
+    assertTrue(emissions.first().isEmpty())
+    assertEquals(listOf(PlanningSource.Event("walk")), emissions.last().map { it.source })
+
+    // Anne's later confirmations no longer reach the screen
+    registrations.confirm("anne", "walk")
+    runCurrent()
+    assertEquals(listOf(PlanningSource.Event("walk")), emissions.last().map { it.source })
+
+    auth.signOut()
+    runCurrent()
+    assertTrue(emissions.last().isEmpty())
+  }
+
+  @Test
+  fun failingRegistrations_failTheSource() = runTest {
+    signInAndConfirm("patient", "yoga")
+    registrations.observeError = IOException("offline")
+
+    val result = runCatching {
+      source(event("yoga", monday.atTime(10, 0))).observeItems(week).first { it.isNotEmpty() }
     }
-    runCurrent()
 
-    upcoming.value = upcoming.value + event("second", monday.atTime(11, 0))
-    runCurrent()
-
-    assertEquals(listOf(1, 2), emissions)
+    assertTrue(result.exceptionOrNull() is IOException)
   }
 }

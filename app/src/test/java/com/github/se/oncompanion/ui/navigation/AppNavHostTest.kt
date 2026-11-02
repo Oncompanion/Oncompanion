@@ -110,7 +110,7 @@ class AppNavHostTest {
 
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
-  private val appPublicEvents = PlanningRepositoryProvider.publicEvents
+  private val appCaregiverPlaceholder = PlanningRepositoryProvider.caregiverPlaceholder
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
@@ -123,7 +123,7 @@ class AppNavHostTest {
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
-    PlanningRepositoryProvider.publicEvents = appPublicEvents
+    PlanningRepositoryProvider.caregiverPlaceholder = appCaregiverPlaceholder
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
@@ -138,7 +138,7 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
-      publicEvents: PlanningRepository = EmptyPlanningRepository,
+      caregiverPlaceholder: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
@@ -148,7 +148,7 @@ class AppNavHostTest {
       credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
-    PlanningRepositoryProvider.publicEvents = publicEvents
+    PlanningRepositoryProvider.caregiverPlaceholder = caregiverPlaceholder
     CareCircleRepositoryProvider.repository = careCircleRepository
     CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
@@ -411,7 +411,7 @@ class AppNavHostTest {
     setNavHost(
         Route.WHOSE_CARE,
         planningRepository = own,
-        publicEvents = events,
+        caregiverPlaceholder = events,
         careCircleRepository = circles,
         careCircleInviteRepository = invites,
         authRepository = auth,
@@ -427,7 +427,7 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithText("Own dentist").assertDoesNotExist()
     composeTestRule.runOnIdle {
-      // The Overview and Planning only read the Ligue's events
+      // The Overview and Planning only read the caregiver placeholder
       assertTrue(own.ranges.isEmpty())
       assertTrue(events.ranges.isNotEmpty())
     }
@@ -1834,7 +1834,7 @@ class AppNavHostTest {
       val event = eventNextWeek()
       setNavHost(
           Route.WHOSE_CARE,
-          publicEvents = planningWith(event),
+          caregiverPlaceholder = planningWith(event),
           careCircleRepository = circles,
           careCircleInviteRepository = invites,
           authRepository = auth,
@@ -1858,9 +1858,12 @@ class AppNavHostTest {
     }
   }
 
-  /** Verifies the default Planning source reads the appointment, auth and event providers. */
+  /**
+   * Verifies the default Planning source reads the appointment, auth, event and registration
+   * providers: it shows the appointments and only the events the patient confirmed (US-30).
+   */
   @Test
-  fun defaultPlanningSourceShowsAppointmentsAndEvents() {
+  fun defaultPlanningSourceShowsAppointmentsAndConfirmedEvents() {
     val auth = FakeAuthRepository()
     runTest { auth.signInWithGoogle("planning-owner") }
     val appointments = FakeAppointmentRepository()
@@ -1874,26 +1877,63 @@ class AppNavHostTest {
         ),
     )
     AppointmentRepositoryProvider.repository = appointments
-    // An event later today: the fake's "now" is midnight, so it counts as upcoming
+    // Two events later today: the patient confirmed only the first one
     val today = LocalDate.now()
-    val events =
-        FakeEventRepository(
-            listOf(
-                FakeEventRepository.sampleEvents(today)
-                    .first()
-                    .copy(startDateTime = today.atTime(15, 0))
-            ),
-            now = { today.atStartOfDay() },
-        )
-    // The planning provider keeps its default, so the entries can only come through it
-    setNavHost(
-        Route.PLANNING,
-        planningRepository = appPlanningRepository,
-        authRepository = auth,
-        eventRepository = events,
+    val (confirmed, other) =
+        FakeEventRepository.sampleEvents(today).take(2).map {
+          it.copy(startDateTime = today.atTime(15, 0))
+        }
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository =
+        FakeEventRegistrationRepository().apply { confirm(auth.currentUser!!.uid, confirmed.id) }
+    try {
+      // The planning provider keeps its default, so the entries can only come through it
+      setNavHost(
+          Route.PLANNING,
+          planningRepository = appPlanningRepository,
+          authRepository = auth,
+          eventRepository = FakeEventRepository(listOf(confirmed, other)),
+      )
+      composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+      composeTestRule.onNodeWithText(confirmed.title).assertIsDisplayed()
+      composeTestRule.onNodeWithText(other.title).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
+  }
+
+  /** Events are optional: if the confirmations can't be read, Planning still shows appointments. */
+  @Test
+  fun failingEventConfirmations_keepTheAppointments_withoutAnError() {
+    val auth = FakeAuthRepository()
+    runTest { auth.signInWithGoogle("planning-owner") }
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        auth.currentUser!!.uid,
+        Appointment(
+            id = "saved",
+            title = "Saved consultation",
+            scheduledAt = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            type = AppointmentType.CONSULTATION,
+        ),
     )
-    composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Gentle yoga for patients").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
+    AppointmentRepositoryProvider.repository = appointments
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository =
+        FakeEventRegistrationRepository().apply {
+          observeError = IllegalStateException("Confirmations couldn't be read")
+        }
+    try {
+      setNavHost(
+          Route.PLANNING,
+          planningRepository = appPlanningRepository,
+          authRepository = auth,
+      )
+      composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+      composeTestRule.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
   }
 }

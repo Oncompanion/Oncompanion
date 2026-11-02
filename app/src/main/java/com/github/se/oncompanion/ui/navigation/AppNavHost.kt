@@ -124,10 +124,11 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
-  // A caregiver sees only the Ligue's events until #240, never their own appointments
+  // Temporary until #240: a caregiver's Planning shows no entries, never their own (see
+  // PlanningRepositoryProvider.caregiverPlaceholder)
   val planning = {
     if (chosenPatient == null) PlanningRepositoryProvider.repository
-    else PlanningRepositoryProvider.publicEvents
+    else PlanningRepositoryProvider.caregiverPlaceholder
   }
   val signOut = {
     caregiverMode.leave()
