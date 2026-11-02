@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestor
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore.Companion.USERS_COLLECTION
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Duration
 import java.time.Instant
@@ -196,6 +197,68 @@ class EventRegistrationRepositoryFirestoreTest {
     assertTrue(registrations().get(Source.SERVER).await().isEmpty)
   }
 
+  /** Waits until the ids of [uid]'s confirmed events are observed as [expected]. */
+  private suspend fun awaitRegisteredIds(expected: Set<String>) {
+    withTimeout(10_000) { repository.observeRegisteredEventIds(uid).first { it == expected } }
+  }
+
+  @Test
+  fun registeredEventIds_areEmpty_atFirst(): Unit = runBlocking {
+    assertEquals(
+        emptySet<String>(),
+        withTimeout(10_000) { repository.observeRegisteredEventIds(uid).first() },
+    )
+  }
+
+  @Test
+  fun registeredEventIds_followConfirmAndRemove(): Unit = runBlocking {
+    repository.confirm(uid, upcomingId)
+    repository.confirm(uid, otherUpcomingId)
+    awaitRegisteredIds(setOf(upcomingId, otherUpcomingId))
+
+    repository.remove(uid, upcomingId)
+    awaitRegisteredIds(setOf(otherUpcomingId))
+  }
+
+  @Test
+  fun registeredEventIds_offline_includeAConfirmationNotSyncedYet(): Unit = runBlocking {
+    db.disableNetwork().await()
+
+    repository.confirm(uid, upcomingId)
+
+    awaitRegisteredIds(setOf(upcomingId))
+  }
+
+  @Test
+  fun registeredEventIds_keepAConfirmation_afterItsEventIsOver(): Unit = runBlocking {
+    repository.confirm(uid, upcomingId)
+    awaitSynced()
+
+    // The event took place two days ago: the event page hides its confirmation, Planning doesn't
+    EmulatorTestData.replaceRawDocument(
+        "events",
+        upcomingId,
+        """{"title": {"stringValue": "Gentle yoga"}, """ +
+            """"startAt": {"timestampValue": "${Instant.now().minus(Duration.ofDays(2))}"}}""",
+    )
+
+    awaitRegisteredIds(setOf(upcomingId))
+  }
+
+  @Test
+  fun registeredEventIds_ofSomeoneWhoDoesNotShareThem_fail(): Unit = runBlocking {
+    // Not in that user's care circle: the rules deny the read, and the flow reports it
+    val error = runCatching {
+      withTimeout(10_000) { repository.observeRegisteredEventIds("not-shared-$runId").collect {} }
+    }
+        .exceptionOrNull()
+
+    assertEquals(
+        FirebaseFirestoreException.Code.PERMISSION_DENIED,
+        (error as? FirebaseFirestoreException)?.code,
+    )
+  }
+
   @Test
   fun defaultConstructor_usesTheSharedInstance(): Unit = runBlocking {
     val shared = EventRegistrationRepositoryFirestore()
@@ -210,5 +273,6 @@ class EventRegistrationRepositoryFirestoreTest {
     }
     assertThrows(IllegalArgumentException::class.java) { repository.confirm("", upcomingId) }
     assertThrows(IllegalArgumentException::class.java) { repository.remove(uid, " ") }
+    assertThrows(IllegalArgumentException::class.java) { repository.observeRegisteredEventIds("") }
   }
 }
