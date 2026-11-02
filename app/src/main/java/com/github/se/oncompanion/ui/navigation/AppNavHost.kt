@@ -162,6 +162,7 @@ private fun SessionNavHost(
             viewModel = onboardingViewModel(navController, entry),
             onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
             onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
       composable(Screen.ONBOARDING_INFORMATION) { entry ->
@@ -174,6 +175,7 @@ private fun SessionNavHost(
               )
             },
             onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
     }
