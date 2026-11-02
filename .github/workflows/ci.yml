@@ -75,6 +75,16 @@ jobs:
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v6
 
+      # Robolectric downloads its Android jars (android-all) from Maven into ~/.m2, which the Gradle
+      # cache doesn't keep: a failed download failed every Robolectric test of the run (#300). The
+      # key changes with libs.versions.toml, so a Robolectric upgrade downloads the new jars once
+      - name: Robolectric cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-
+
       - name: Grant execute permission for gradlew
         run: |
           chmod +x ./gradlew
