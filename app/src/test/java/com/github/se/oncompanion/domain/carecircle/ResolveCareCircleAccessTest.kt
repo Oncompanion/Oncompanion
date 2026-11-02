@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /**
@@ -59,6 +60,13 @@ class ResolveCareCircleAccessTest {
     }
     runCurrent()
     return emissions
+  }
+
+  @Test
+  fun blankPatientUidIsRejected() {
+    listOf("", "   ").forEach { blank ->
+      assertThrows(IllegalArgumentException::class.java) { resolve(blank) }
+    }
   }
 
   @Test

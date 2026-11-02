@@ -45,24 +45,26 @@ class ResolveCareCircleAccess(
    * can't be read, like the repositories'.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
-  operator fun invoke(patientUid: String?): Flow<CareAccess> =
-      auth
-          .observeCurrentUser()
-          .map { it?.uid }
-          .distinctUntilChanged()
-          // A new account cancels the previous account's listeners
-          .flatMapLatest { me ->
-            if (me == null) {
-              flowOf(CareAccess.Denied)
-            } else {
-              profiles
-                  .observeProfile(me)
-                  .map { it?.role }
-                  .distinctUntilChanged()
-                  .flatMapLatest { role -> accessFor(me, role, patientUid) }
-            }
+  operator fun invoke(patientUid: String?): Flow<CareAccess> {
+    require(patientUid == null || patientUid.isNotBlank()) { "patientUid must not be blank" }
+    return auth
+        .observeCurrentUser()
+        .map { it?.uid }
+        .distinctUntilChanged()
+        // A new account cancels the previous account's listeners
+        .flatMapLatest { me ->
+          if (me == null) {
+            flowOf(CareAccess.Denied)
+          } else {
+            profiles
+                .observeProfile(me)
+                .map { it?.role }
+                .distinctUntilChanged()
+                .flatMapLatest { role -> accessFor(me, role, patientUid) }
           }
-          .distinctUntilChanged()
+        }
+        .distinctUntilChanged()
+  }
 
   /** The access [me], whose profile has [role] (null when not known yet), has to [patientUid]. */
   private fun accessFor(me: String, role: Role?, patientUid: String?): Flow<CareAccess> {
