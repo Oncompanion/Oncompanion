@@ -44,11 +44,11 @@ com.github.se.oncompanion/
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
   - No Firebase calls from composables.
-  - **Landscape is supported** on every screen: no portrait lock. Check the layout held sideways (the M1 APK test found date pickers, Profile, Planning and the camera broken in landscape).
-  - A flow the user is pushed into (onboarding, a scan, a form) always offers a way back or out (M1: no way back to choose another Google account).
-  - A temporary message (snackbar) never covers an action, and goes away on its own (M1: the scan error covered Retake).
-  - The add, edit and detail views of the same item share their components and show the fields in the same order (M1 report).
-  - **Reuse shared components** from `ui/common` rather than building one per screen, so the same element looks and behaves the same everywhere (M1 report: two different time pickers): `DayPickerDialog`, `SaveButton`, `DetailActions`, `DeleteConfirmationDialog`, `ClickableReadOnlyField`, `isCompactHeight()`.
+  - **Landscape is supported** on every screen: no portrait lock. Check the layout held sideways.
+  - A flow the user is pushed into (onboarding, a scan, a form) always offers a way back or out.
+  - A temporary message (snackbar) never covers an action, and goes away on its own.
+  - The add, edit and detail views of the same item share their components and show the fields in the same order.
+  - **Reuse shared components** from `ui/common` rather than building one per screen, so the same element looks and behaves the same everywhere: `DayPickerDialog`, `SaveButton`, `DetailActions`, `DeleteConfirmationDialog`, `ClickableReadOnlyField`, `isCompactHeight()`.
   - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
     - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
@@ -106,10 +106,9 @@ com.github.se.oncompanion/
   - For state kept in the composition (`rememberSaveable`) on `XContent`: `StateRestorationTester` (see `PlanningScreenTest`).
 - Every screen and dialog gets a test at `LANDSCAPE_PHONE`: its main actions can be reached and are fully visible (`assertIsFullyVisible`). Dialogs are also tested at `SMALL_LANDSCAPE_PHONE` (both in `ui/KeyboardInsets.kt`). A rotation test checks state, not layout: it wouldn't catch overlapping buttons.
 - Anything a user can add (a symptom, a member, a prescription...): the issue says whether a duplicate is rejected, merged, warned about or allowed, and a test checks that behavior.
-- None of the bugs found in the M1 APK test was caught by a test (keyboard, landscape, duplicates, no way back, a message covering a button).
-- **Fix the whole bug**: before fixing a bug, look for the same pattern on the other screens, fix them too, and add a regression test (#170 fixed the keyboard on the other forms but not Log symptom).
+- **Fix the whole bug**: before fixing a bug, look for the same pattern on the other screens, fix them too, and add a regression test.
 - Tests worth their lines: cases that differ only by their input go in one test that runs through a list of cases (`for ((input, expected) in cases)`), not one test each. A fake is never tested on its own: test the code that uses it (cleanup in #296).
-- A feature that works with others extends `M1EndToEndTest` (`app/src/androidTest`): the graders assess it directly.
+- A feature that works with others extends `M1EndToEndTest` (`app/src/androidTest`).
 - Coroutines: use `StandardTestDispatcher` with `runTest` and virtual time (`advanceTimeBy`, `advanceUntilIdle`). Never `Thread.sleep` or real delays.
 - While working, run only the tests you touch (`./gradlew testDebugUnitTest --tests '*Symptom*'`). The full checks below take about 10 minutes; run them before pushing.
 
@@ -140,7 +139,7 @@ Run these before every push and make sure they pass:
 - **Every item on the board, stories included,** has its board fields: `Nature` (User Story or Sprint Task), `Epic`, `Priority`, and for a task `Types`, an estimate and an assignee. Its `Sprint` matches its column: empty in the Product Backlog, the current sprint in Sprint Backlog, In Development and In review, the sprint it was done in for Done. Fill in **Actual Time** when you close a task, so we can check our estimates.
 - **The status follows the work**, and each person moves their own items: Product Backlog → Sprint Backlog → In Development (when you start) → In review (when the PR opens) → Done in S<n> (when it's merged).
 - User stories are on the board next to their tasks. The Product Backlog is ordered by priority, P0 first.
-- **The Sprint Backlog is ready before the sprint starts**, holds only the current sprint (later work stays in the Product Backlog), and every member has a task in it: it is a milestone deliverable, and being late costs 2% of the team's grade per hour.
+- **The Sprint Backlog is ready before the sprint starts**, holds only the current sprint (later work stays in the Product Backlog), and every member has a task in it: it is a milestone deliverable.
 
 ## Commits
 
@@ -164,8 +163,8 @@ Run these before every push and make sure they pass:
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
 - If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)). Update the overview only when a core flow changes.
-  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone (#264); details stay in the feature diagrams, and a box appears once per diagram (M1 report).
-  - **Stay ahead of the code**: draw a new feature as planned in its diagram, and in Figma, before implementing it. Both are graded on this.
+  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone (#264); details stay in the feature diagrams, and a box appears once per diagram.
+  - **Stay ahead of the code**: draw a new feature as planned in its diagram, and in Figma, before implementing it.
   - Agents update the diagrams themselves by editing the `.excalidraw` JSON:
     - Copy an existing box, label or arrow that already has the style you need (see the legend in architecture.md), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
     - A box's label is a separate `text` element whose `containerId` is the box: `x` = box `x` + 10, `width` = box width − 20, `height` = number of lines × 25, centered vertically in the box. Set both `text` and `originalText`.
@@ -186,6 +185,6 @@ The same files change in almost every PR: `strings.xml`, `C.kt`, `AppNavHost.kt`
 - Use **Request changes** for bugs, missing tests, and convention problems (naming, commits, architecture); **Comment** for suggestions.
 - Check the PR's size: above the limits in "Pull requests", without a reason in its description, ask for a split.
 - Read SonarCloud's list of new issues, not only the quality gate: a PR should add **0 new issues** (bugs, code smells, security hotspots). Ask for each one to be fixed, with its file and line.
-- A new commit pushed after a review, merges of `main` included, makes that review no longer count in the course's grading (GitHub still shows it): the author re-requests it.
+- A new commit pushed after a review, merges of `main` included, makes that review no longer count (GitHub still shows it): the author re-requests it.
 - When you address a comment, reply on its thread with the commit that fixes it (e.g. "Done in 3f6531b"). Let the reviewer resolve the thread.
 - If you disagree, explain why in the thread instead of ignoring the comment.
