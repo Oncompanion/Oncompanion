@@ -623,43 +623,37 @@ class AddSymptomScreenTest {
     notes.assertIsAboveKeyboard(keyboardHeight)
   }
 
-  @Test
-  fun keyboardOpenOnNotes_keepsNotesAndSaveAboveIt() {
-    setContent(filled)
+  /** The form when logging a symptom and when editing one. */
+  private val loggingAndEditing = listOf(filled, editingForm)
 
-    typeNotesWithKeyboard(600)
-
-    assertNotesAndSaveAboveKeyboard(600)
+  /** Shows each of [states] in turn, on one content: a test can only set its content once. */
+  private fun forEachState(states: List<AddSymptomUiState>, check: (AddSymptomUiState) -> Unit) {
+    setContent(states.first())
+    states.forEach { state ->
+      composeTestRule.runOnIdle { uiState = state }
+      check(state)
+    }
   }
 
   @Test
-  fun editing_keyboardOpenOnNotes_keepsNotesAndSaveChangesAboveIt() {
-    setContent(editingForm)
+  fun keyboardOpenOnNotes_keepsNotesAndSaveAboveIt_whenLoggingAndEditing() {
+    forEachState(loggingAndEditing) { state ->
+      typeNotesWithKeyboard(600)
 
-    typeNotesWithKeyboard(600)
-
-    assertNotesAndSaveAboveKeyboard(600)
-    node(C.Tag.symptom_add_save).assert(hasText(string(R.string.symptom_edit_save)))
-  }
-
-  @Test
-  @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscape_keyboardOpenOnNotes_keepsTheWholeFieldVisible() {
-    setContent(filled)
-
-    typeNotesWithKeyboard(500)
-
-    assertWholeNotesAboveKeyboard(500)
+      assertNotesAndSaveAboveKeyboard(600)
+      val save = if (state.isEditing) R.string.symptom_edit_save else R.string.symptom_add_save
+      node(C.Tag.symptom_add_save).assert(hasText(string(save)))
+    }
   }
 
   @Test
   @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscape_editing_keyboardOpenOnNotes_keepsTheWholeFieldVisible() {
-    setContent(editingForm)
+  fun landscape_keyboardOpenOnNotes_keepsTheWholeFieldVisible_whenLoggingAndEditing() {
+    forEachState(loggingAndEditing) {
+      typeNotesWithKeyboard(500)
 
-    typeNotesWithKeyboard(500)
-
-    assertWholeNotesAboveKeyboard(500)
+      assertWholeNotesAboveKeyboard(500)
+    }
   }
 
   @Test
@@ -676,30 +670,19 @@ class AddSymptomScreenTest {
 
   @Test
   @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscape_whileLoading_keepsTitleAndCloseOnScreen_withoutSave() {
-    setContent(empty.copy(isEditing = true, isLoading = true))
-
-    composeTestRule.onNodeWithText(string(R.string.symptom_edit_title)).assertIsFullyVisible()
-    node(C.Tag.symptom_add_close).assertIsFullyVisible()
-    node(C.Tag.symptom_add_save).assertDoesNotExist()
-  }
-
-  @Test
-  @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscape_whenLoadingFailed_keepsCloseOnScreen_withoutSave() {
-    setContent(empty.copy(isEditing = true, hasLoadError = true))
-
-    node(C.Tag.symptom_add_close).assertIsFullyVisible()
-    node(C.Tag.symptom_add_save).assertDoesNotExist()
-  }
-
-  @Test
-  @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscape_whenNotFound_keepsCloseOnScreen_withoutSave() {
-    setContent(empty.copy(isEditing = true, isNotFound = true))
-
-    node(C.Tag.symptom_add_close).assertIsFullyVisible()
-    node(C.Tag.symptom_add_save).assertDoesNotExist()
+  fun landscape_loadingErrorAndNotFound_keepTitleAndCloseOnScreen_withoutSave() {
+    val editing = empty.copy(isEditing = true)
+    val withoutForm =
+        listOf(
+            editing.copy(isLoading = true),
+            editing.copy(hasLoadError = true),
+            editing.copy(isNotFound = true),
+        )
+    forEachState(withoutForm) {
+      composeTestRule.onNodeWithText(string(R.string.symptom_edit_title)).assertIsFullyVisible()
+      node(C.Tag.symptom_add_close).assertIsFullyVisible()
+      node(C.Tag.symptom_add_save).assertDoesNotExist()
+    }
   }
 
   // ----- Screen with its ViewModel -----
