@@ -1,5 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -12,13 +13,13 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.planning.PatientProfiles
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
-import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -59,7 +60,7 @@ class AppointmentNavigationTest {
   }
 
   private fun show(startRoute: String = Route.PLANNING) {
-    UserProfileRepositoryProvider.repository = FakeUserProfileRepository()
+    UserProfileRepositoryProvider.repository = PatientProfiles
     AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = repository
     runTest { auth.signInWithGoogle("patient") }

@@ -33,12 +33,15 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
@@ -128,7 +131,7 @@ class OverviewScreenTest {
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
             profileRepository = FakeUserProfileRepository(),
-            planningRepository = planning,
+            observePlanning = ownPlanning(planning),
             clock = clockAt(morning),
             zoneId = ZoneOffset.UTC,
         )
@@ -412,7 +415,7 @@ class OverviewScreenTest {
         OverviewViewModel(
             authRepository = FakeAuthRepository(),
             profileRepository = FakeUserProfileRepository(),
-            planningRepository = FakePlanningRepository(),
+            observePlanning = ownPlanning(FakePlanningRepository()),
             clock = clock,
             zoneId = ZoneOffset.UTC,
         )
@@ -564,5 +567,51 @@ class OverviewScreenTest {
     composeTestRule
         .onNodeWithText(context.getString(R.string.overview_error_hint))
         .assertDoesNotExist()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: OverviewUiState, onOpenPlanning: () -> Unit = {}) {
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = state,
+          onShortcutClick = {},
+          onOpenPlanning = onOpenPlanning,
+          onOpenAppointment = { error("A caregiver can't open an appointment's page yet") },
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_planningNotShared_saysSo_insteadOfTheDay() {
+    setCaregiverContent(loaded.copy(isNotShared = true))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Planning with you").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_tappingTheNextAppointment_opensPlanning() {
+    var openedPlanning = false
+    setCaregiverContent(
+        loaded.copy(
+            nextAppointment = NextAppointment("chemo", "Chemotherapy", morning.plusDays(1))
+        ),
+        onOpenPlanning = { openedPlanning = true },
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+
+    assertTrue(openedPlanning)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_planningNotShared_isFullyVisibleInLandscape() {
+    setCaregiverContent(loaded.copy(isNotShared = true))
+
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
   }
 }

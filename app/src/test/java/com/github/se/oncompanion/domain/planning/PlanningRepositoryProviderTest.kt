@@ -76,7 +76,7 @@ class PlanningRepositoryProviderTest {
     EventRepositoryProvider.repository =
         FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
 
-    val items = original.observeItems(range).first { it.size == 2 }
+    val items = original.observeItems("patient", range).first { it.size == 2 }
 
     assertEquals(listOf("Saved consultation", event.title), items.map { it.title })
   }
@@ -107,7 +107,7 @@ class PlanningRepositoryProviderTest {
           }
         }
 
-    val items = original.observeItems(range).first { it.isNotEmpty() }
+    val items = original.observeItems("patient", range).first { it.isNotEmpty() }
 
     assertEquals(listOf("Saved consultation"), items.map { it.title })
   }

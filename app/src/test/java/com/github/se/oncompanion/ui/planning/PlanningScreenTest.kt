@@ -19,6 +19,8 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalDate
 import java.time.ZoneId
@@ -379,5 +381,47 @@ class PlanningScreenTest {
     open(medication())
 
     assertEquals(listOf("appointment:a", "event:e"), opened)
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun renderCaregiver(state: PlanningUiState) {
+    compose.setContent {
+      OncompanionTheme {
+        PlanningContent(
+            state,
+            date,
+            zone,
+            PlanningActions({}, {}, {}, {}, {}),
+            caregiverOf = "Anne",
+        )
+      }
+    }
+  }
+
+  @Test
+  fun caregiver_planningNotShared_saysSo_insteadOfAnEmptyDay() {
+    renderCaregiver(state().copy(isNotShared = true))
+
+    compose.onNodeWithTag(C.Tag.not_shared).assertIsDisplayed()
+    compose.onNodeWithText("Anne doesn't share Planning with you").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_empty).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_list).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_planningShared_showsTheDayAsUsual() {
+    renderCaregiver(state())
+
+    compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_planningNotShared_isFullyVisibleInLandscape() {
+    renderCaregiver(state().copy(isNotShared = true))
+
+    compose.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
   }
 }

@@ -6,12 +6,12 @@ package com.github.se.oncompanion.ui.overview
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.domain.planning.CarePlanning
+import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
-import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.model.user.UserProfileRepository
@@ -92,6 +92,7 @@ data class TodayEntry(
  * @property todayEntries today's entries: those without a time first, then by time
  * @property isLoading true until the planning data arrives
  * @property hasError true if it couldn't be loaded
+ * @property isNotShared in caregiver mode, the patient doesn't share their planning: no entries
  */
 data class OverviewUiState(
     val now: LocalDateTime,
@@ -100,6 +101,7 @@ data class OverviewUiState(
     val todayEntries: List<TodayEntry> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
+    val isNotShared: Boolean = false,
 )
 
 /**
@@ -107,15 +109,20 @@ data class OverviewUiState(
  * today's entries. The appointment and the entries come from the same planning data as the Planning
  * screen, so both always agree.
  *
+ * In caregiver mode (US-20), the day is that of [patientUid], when the patient shares their
+ * planning.
+ *
  * @param clock the current time
  * @param zoneId the time zone the day is shown in
+ * @param patientUid in caregiver mode, the patient whose day is shown; null for the user's own
  */
 class OverviewViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
-    private val planningRepository: PlanningRepository = PlanningRepositoryProvider.repository,
+    private val observePlanning: ObserveCarePlanning = ObserveCarePlanning(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val patientUid: String? = null,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(OverviewUiState(now = now()))
@@ -142,16 +149,22 @@ class OverviewViewModel(
     val today = now.toLocalDate()
     val range = PlanningRange(today, today.plus(LOOKAHEAD), zoneId)
     dayObservation = viewModelScope.launch {
-      planningRepository
-          .observeItems(range)
+      observePlanning(patientUid, range)
           .catch { e ->
             Log.e(TAG, "Failed to load the day", e)
             _uiState.update { it.copy(isLoading = false, hasError = true) }
           }
-          .collect { planned ->
-            items = planned
+          .collect { planning ->
+            if (planning is CarePlanning.Failed) Log.e(TAG, "Failed to load the day")
+            else items = (planning as? CarePlanning.Shown)?.items.orEmpty()
             _uiState.update { state ->
-              state.copy(isLoading = false, hasError = false).withItems(planned, state.now)
+              state
+                  .copy(
+                      isLoading = planning is CarePlanning.Loading,
+                      hasError = planning is CarePlanning.Failed,
+                      isNotShared = planning is CarePlanning.NotShared,
+                  )
+                  .withItems(items, state.now)
             }
           }
     }
