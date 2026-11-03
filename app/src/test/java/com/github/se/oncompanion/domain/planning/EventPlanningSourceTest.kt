@@ -21,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -258,14 +259,37 @@ class EventPlanningSourceTest {
   }
 
   @Test
-  fun failingRegistrations_failTheSource() = runTest {
+  fun aFailingConfirmationsOrEventsRead_failsTheSource() = runTest {
     signInAndConfirm("patient", "yoga")
-    registrations.observeError = IOException("offline")
+    val yoga = event("yoga", monday.atTime(10, 0))
+    val failingEvents =
+        object : EventRepository by fakeEvents(yoga) {
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> = flow {
+            throw IOException("events")
+          }
+        }
+    // (the read that fails, the source with that read failing)
+    val cases: List<Pair<String, () -> EventPlanningSource>> =
+        listOf(
+            "confirmations" to
+                {
+                  registrations.observeError = IOException("confirmations")
+                  source(yoga)
+                },
+            "events" to
+                {
+                  registrations.observeError = null
+                  source(repository = failingEvents)
+                },
+        )
 
-    val result = runCatching {
-      source(event("yoga", monday.atTime(10, 0))).observeItems(week).first { it.isNotEmpty() }
+    for ((read, failingSource) in cases) {
+      val error = runCatching {
+        failingSource().observeItems(week).first { it.isNotEmpty() }
+      }
+          .exceptionOrNull()
+
+      assertEquals("A failing $read read", read, (error as? IOException)?.message)
     }
-
-    assertTrue(result.exceptionOrNull() is IOException)
   }
 }
