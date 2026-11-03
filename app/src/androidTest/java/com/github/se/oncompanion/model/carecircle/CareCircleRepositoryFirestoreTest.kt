@@ -5,6 +5,7 @@ package com.github.se.oncompanion.model.carecircle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.COLLECTION
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_ADDED_AT
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_CAN_ADD
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_EMAIL
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
@@ -77,6 +78,7 @@ class CareCircleRepositoryFirestoreTest {
       email: Any? = null,
       addedAt: Any? = null,
       inviteCode: String? = null,
+      canAdd: Any? = null,
   ) {
     val fields =
         mapOf(
@@ -87,6 +89,7 @@ class CareCircleRepositoryFirestoreTest {
                 FIELD_EMAIL to email,
                 FIELD_ADDED_AT to addedAt,
                 FIELD_INVITE_CODE to inviteCode,
+                FIELD_CAN_ADD to canAdd,
             )
             .filterValues { it != null }
     val json = JSONObject()
@@ -149,6 +152,7 @@ class CareCircleRepositoryFirestoreTest {
     assertEquals("familyName", FIELD_FAMILY_NAME)
     assertEquals("relationship", FIELD_RELATIONSHIP)
     assertEquals("permissions", FIELD_PERMISSIONS)
+    assertEquals("canAdd", FIELD_CAN_ADD)
     assertEquals("email", FIELD_EMAIL)
     assertEquals("addedAt", FIELD_ADDED_AT)
   }
@@ -231,6 +235,18 @@ class CareCircleRepositoryFirestoreTest {
     assertTrue(members[1].permissions.isEmpty())
     assertNull(members[1].email)
     assertNull(members[1].addedAt)
+  }
+
+  @Test
+  fun canAdd_isRead_andEmptyWhenMissingOrMalformed(): Unit = runBlocking {
+    addMember("a", "Ann", permissions = listOf("SYMPTOMS"), canAdd = listOf("SYMPTOMS", "EDIT"))
+    addMember("b", "Bob", permissions = listOf("SYMPTOMS"))
+    addMember("c", "Cleo", permissions = listOf("SYMPTOMS"), canAdd = "SYMPTOMS")
+
+    assertEquals(
+        listOf(setOf(CarePermission.SYMPTOMS), emptySet(), emptySet()),
+        firstMembers().map { it.canAdd },
+    )
   }
 
   @Test
@@ -507,6 +523,18 @@ class CareCircleRepositoryFirestoreTest {
     val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
     assertEquals("Marcus", saved.getString(FIELD_FIRST_NAME))
     assertEquals(listOf("EVENTS", "SYMPTOMS"), saved.get(FIELD_PERMISSIONS))
+  }
+
+  @Test
+  fun updateMember_savesWhatTheyCanAddTo(): Unit = runBlocking {
+    addMember("marc", "Marc", permissions = listOf("SYMPTOMS"))
+
+    repository.updateMember(aliceUid, "marc", UPDATED.copy(canAdd = setOf(CarePermission.SYMPTOMS)))
+
+    assertEquals(setOf(CarePermission.SYMPTOMS), firstMember("marc")?.canAdd)
+    synced()
+    val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
+    assertEquals(listOf("SYMPTOMS"), saved.get(FIELD_CAN_ADD))
   }
 
   @Test

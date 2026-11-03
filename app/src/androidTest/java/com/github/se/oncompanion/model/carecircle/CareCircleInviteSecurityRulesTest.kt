@@ -79,6 +79,8 @@ class CareCircleInviteSecurityRulesTest {
           remove("email")
         }
     allowed(newInvite().set(minimal))
+    allowed(newInvite().set(inviteFields(aliceUid, "canAdd" to listOf("SYMPTOMS"))))
+    allowed(newInvite().set(inviteFields(aliceUid, "canAdd" to emptyList<String>())))
   }
 
   @Test
@@ -103,6 +105,11 @@ class CareCircleInviteSecurityRulesTest {
             )
         )
     )
+  }
+
+  @Test
+  fun ownerCanLetTheInvitedPersonAddSymptoms(): Unit = runBlocking {
+    allowed(aliceInvite().update("canAdd", listOf("SYMPTOMS")))
   }
 
   @Test fun ownerCanDelete(): Unit = runBlocking { allowed(aliceInvite().delete()) }
@@ -147,6 +154,19 @@ class CareCircleInviteSecurityRulesTest {
     denied(newInvite().set(inviteFields(aliceUid, "familyName" to "a".repeat(51))))
     denied(newInvite().set(inviteFields(aliceUid, "firstName" to "  ")))
     denied(newInvite().set(inviteFields(aliceUid, "ownerFirstName" to "a".repeat(51))))
+    // Adding to a section needs seeing it
+    denied(
+        newInvite()
+            .set(
+                inviteFields(
+                    aliceUid,
+                    "permissions" to listOf("PLANNING"),
+                    "canAdd" to listOf("SYMPTOMS"),
+                )
+            )
+    )
+    denied(newInvite().set(inviteFields(aliceUid, "canAdd" to listOf("EDIT"))))
+    denied(newInvite().set(inviteFields(aliceUid, "canAdd" to "SYMPTOMS")))
   }
 
   @Test

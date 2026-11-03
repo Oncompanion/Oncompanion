@@ -120,6 +120,7 @@ class FakeCareCircleRepository : CareCircleRepository {
                   familyName = details.familyName,
                   relationship = details.relationship,
                   permissions = details.permissions,
+                  canAdd = details.canAdd,
               )
         },
     )

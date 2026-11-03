@@ -80,6 +80,7 @@ class CareCircleMemberFormViewModelTest {
     val state = viewModel().uiState.value
     assertEquals(CareCircleMemberFormUiState(), state)
     assertTrue(state.permissions.isEmpty())
+    assertTrue(state.canAdd.isEmpty())
     assertNull(state.relationship)
     assertFalse(state.firstNameTouched)
     assertFalse(state.canSave)
@@ -145,6 +146,38 @@ class CareCircleMemberFormViewModelTest {
   }
 
   @Test
+  fun addingToASection_needsSeeingIt() {
+    val viewModel = viewModel()
+    viewModel.onCanAddChange(CarePermission.SYMPTOMS, true)
+    assertTrue(viewModel.uiState.value.canAdd.isEmpty())
+
+    viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+    viewModel.onCanAddChange(CarePermission.SYMPTOMS, true)
+    assertEquals(setOf(CarePermission.SYMPTOMS), viewModel.uiState.value.canAdd)
+
+    viewModel.onCanAddChange(CarePermission.SYMPTOMS, false)
+    assertTrue(viewModel.uiState.value.canAdd.isEmpty())
+  }
+
+  @Test
+  fun hidingASection_alsoStopsAddingToIt_andOnlyToIt() {
+    val viewModel = viewModel()
+    viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+    viewModel.onPermissionChange(CarePermission.PLANNING, true)
+    viewModel.onCanAddChange(CarePermission.SYMPTOMS, true)
+    viewModel.onCanAddChange(CarePermission.PLANNING, true)
+
+    viewModel.onPermissionChange(CarePermission.PLANNING, false)
+    assertEquals(setOf(CarePermission.SYMPTOMS), viewModel.uiState.value.canAdd)
+
+    viewModel.onPermissionChange(CarePermission.SYMPTOMS, false)
+    assertTrue(viewModel.uiState.value.canAdd.isEmpty())
+    // Seeing it again doesn't bring adding back
+    viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+    assertTrue(viewModel.uiState.value.canAdd.isEmpty())
+  }
+
+  @Test
   fun save_createsTheInvite_withThePatientsFirstName_trimmedDetailsAndEmail() =
       runTest(dispatcher) {
         val viewModel = viewModel()
@@ -154,6 +187,7 @@ class CareCircleMemberFormViewModelTest {
         viewModel.onEmailChange(" julie@example.com ")
         viewModel.onPermissionChange(CarePermission.PLANNING, true)
         viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+        viewModel.onCanAddChange(CarePermission.SYMPTOMS, true)
 
         saved(viewModel)
 
@@ -166,6 +200,7 @@ class CareCircleMemberFormViewModelTest {
                 familyName = "Martin",
                 relationship = Relationship.DAUGHTER,
                 permissions = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+                canAdd = setOf(CarePermission.SYMPTOMS),
             ),
             invite.details,
         )
@@ -374,6 +409,27 @@ class CareCircleMemberFormViewModelTest {
         // Nothing changed yet
         assertTrue(state.unchanged)
         assertFalse(state.canSave)
+      }
+
+  @Test
+  fun edit_memberWhoAddsSymptoms_keepsItWhenSavingOtherChanges() =
+      runTest(dispatcher) {
+        val sophie =
+            marc.copy(
+                uid = "sophie",
+                permissions = setOf(CarePermission.SYMPTOMS),
+                canAdd = setOf(CarePermission.SYMPTOMS),
+            )
+        circle.setMembers(ownerUid, listOf(marc, sophie))
+        val viewModel = editViewModel(sophie.uid)
+        advanceUntilIdle()
+        assertEquals(setOf(CarePermission.SYMPTOMS), viewModel.uiState.value.canAdd)
+        assertTrue(viewModel.uiState.value.unchanged)
+
+        viewModel.onFirstNameChange("Sophie")
+        saved(viewModel)
+
+        assertEquals(setOf(CarePermission.SYMPTOMS), circle.updated.single().second.canAdd)
       }
 
   @Test

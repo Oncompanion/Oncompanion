@@ -47,6 +47,7 @@ class CareCircleInviteRepositoryFirestoreTest {
           familyName = "Martin",
           relationship = Relationship.DAUGHTER,
           permissions = setOf(CarePermission.SYMPTOMS, CarePermission.PLANNING),
+          canAdd = setOf(CarePermission.SYMPTOMS),
       )
 
   @Before
@@ -112,6 +113,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertEquals("julie@example.com", doc.getString("email"))
     // Stored in display order, whatever the order of the set
     assertEquals(listOf("PLANNING", "SYMPTOMS"), doc.get("permissions"))
+    assertEquals(listOf("SYMPTOMS"), doc.get("canAdd"))
     assertNotNull(doc.getTimestamp("createdAt"))
     assertTrue(doc.contains("redeemerUid"))
     assertNull(doc.get("redeemerUid"))

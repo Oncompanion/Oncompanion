@@ -119,6 +119,9 @@ class CareCircleSecurityRulesTest {
     allowed(member.update(detailFields()))
     allowed(member.update(detailFields("familyName" to null, "permissions" to emptyList<String>())))
 
+    allowed(member.update(detailFields("canAdd" to listOf("SYMPTOMS"))))
+    allowed(member.update(detailFields("canAdd" to emptyList<String>())))
+
     val saved = allowed(member.get(Source.SERVER))
     assertEquals("Caroline", saved.getString("firstName"))
     assertEquals("FRIEND", saved.getString("relationship"))
@@ -142,6 +145,24 @@ class CareCircleSecurityRulesTest {
     denied(member.update(detailFields("familyName" to "a".repeat(51))))
     denied(member.update(detailFields("permissions" to listOf("EDIT"))))
     denied(member.update(detailFields("permissions" to "PLANNING")))
+    denied(member.update(detailFields("canAdd" to "SYMPTOMS")))
+    denied(member.update(detailFields("canAdd" to listOf("EDIT"))))
+    denied(
+        member.update(
+            detailFields("permissions" to listOf("PLANNING"), "canAdd" to listOf("SYMPTOMS"))
+        )
+    )
+  }
+
+  @Test
+  fun ownerCannotHideASectionButLeaveAddingToIt(): Unit = runBlocking {
+    allowed(member.update(detailFields("canAdd" to listOf("SYMPTOMS"))))
+    denied(member.update("permissions", listOf("PLANNING")))
+    allowed(
+        member.update(
+            detailFields("permissions" to listOf("PLANNING"), "canAdd" to emptyList<String>())
+        )
+    )
   }
 
   @Test
@@ -177,6 +198,7 @@ class CareCircleSecurityRulesTest {
     assertTrue(allowed(member.get(Source.SERVER)).exists())
     denied(member.update(detailFields()))
     denied(member.update("permissions", listOf("PLANNING", "EVENTS", "SYMPTOMS", "PRESCRIPTIONS")))
+    denied(member.update("canAdd", listOf("SYMPTOMS")))
   }
 
   private companion object {

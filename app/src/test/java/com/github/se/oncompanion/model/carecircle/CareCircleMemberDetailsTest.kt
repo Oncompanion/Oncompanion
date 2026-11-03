@@ -45,6 +45,37 @@ class CareCircleMemberDetailsTest {
   }
 
   @Test
+  fun canAdd_isEmptyByDefault() {
+    assertTrue(
+        CareCircleMemberDetails("Julie", permissions = setOf(CarePermission.SYMPTOMS))
+            .canAdd
+            .isEmpty()
+    )
+  }
+
+  @Test
+  fun isValid_addingToASectionNeedsSeeingIt() {
+    val sees = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS)
+    assertTrue(
+        CareCircleMemberDetails(
+                "Julie",
+                permissions = sees,
+                canAdd = setOf(CarePermission.SYMPTOMS),
+            )
+            .isValid()
+    )
+    assertTrue(CareCircleMemberDetails("Julie", permissions = sees, canAdd = sees).isValid())
+    assertFalse(
+        CareCircleMemberDetails(
+                "Julie",
+                permissions = sees,
+                canAdd = setOf(CarePermission.SYMPTOMS, CarePermission.EVENTS),
+            )
+            .isValid()
+    )
+  }
+
+  @Test
   fun fullName_joinsFirstAndFamilyName() {
     assertEquals("Julie Martin", CareCircleMemberDetails("Julie", "Martin").fullName)
   }
@@ -91,5 +122,17 @@ class CareCircleMemberDetailsTest {
         ),
         member.details,
     )
+  }
+
+  @Test
+  fun memberDetails_copyWhatTheyCanAddTo() {
+    val member =
+        CareCircleMember(
+            uid = "u1",
+            firstName = "Julie",
+            permissions = setOf(CarePermission.SYMPTOMS),
+            canAdd = setOf(CarePermission.SYMPTOMS),
+        )
+    assertEquals(setOf(CarePermission.SYMPTOMS), member.details.canAdd)
   }
 }

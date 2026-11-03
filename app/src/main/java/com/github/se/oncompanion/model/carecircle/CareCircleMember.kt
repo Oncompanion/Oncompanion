@@ -26,8 +26,9 @@ enum class Relationship {
 }
 
 /**
- * A section of the patient's data that a care circle member can see. Access is always read-only: a
- * member never edits or logs anything for the patient. Declared in display order.
+ * A section of the patient's data that a care circle member can see. Access is read-only unless the
+ * patient also lets the member add to the section ([CareCircleMemberDetails.canAdd]). Declared in
+ * display order.
  */
 enum class CarePermission {
   PLANNING,
@@ -55,6 +56,7 @@ enum class CarePermission {
  * @property addedAt when the member joined the circle, or null if unknown
  * @property inviteCode the invite code the member joined with, or null if unknown. Not shown; it
  *   tells a used invite (deleted when redeemed) from a cancelled one.
+ * @property canAdd the sections the member can also add to, among [permissions]
  */
 data class CareCircleMember(
     val uid: String,
@@ -65,10 +67,11 @@ data class CareCircleMember(
     val email: String? = null,
     val addedAt: Instant? = null,
     val inviteCode: String? = null,
+    val canAdd: Set<CarePermission> = emptySet(),
 ) {
   /** What the patient decided about this member: name, relationship and permissions. */
   val details: CareCircleMemberDetails
-    get() = CareCircleMemberDetails(firstName, familyName, relationship, permissions)
+    get() = CareCircleMemberDetails(firstName, familyName, relationship, permissions, canAdd)
 
   /** First and family name, e.g. "Sophie Dubois". */
   val fullName: String

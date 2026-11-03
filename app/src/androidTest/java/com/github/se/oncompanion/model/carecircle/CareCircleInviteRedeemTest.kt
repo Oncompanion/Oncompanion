@@ -46,6 +46,7 @@ class CareCircleInviteRedeemTest {
           familyName = "Martin",
           relationship = Relationship.DAUGHTER,
           permissions = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+          canAdd = setOf(CarePermission.SYMPTOMS),
       )
 
   @Before
