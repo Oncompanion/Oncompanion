@@ -33,30 +33,49 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 
 /**
  * First onboarding step (Figma "US-01 / Onboarding – Role"): patient or caregiver. The role decides
  * what the next steps ask (a caregiver has no cancer type) and can't change afterwards.
  *
  * @param onContinue called to go to the next step
+ * @param onSignedOut called once signed out to use another account
  */
 @Composable
-fun RoleScreen(viewModel: OnboardingViewModel, onContinue: () -> Unit) {
+fun RoleScreen(
+    viewModel: OnboardingViewModel,
+    onContinue: () -> Unit,
+    onSignedOut: () -> Unit,
+    credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
+) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val useAnotherAccount = accountSwitch(uiState, viewModel, credentialProvider, onSignedOut)
   RoleContent(
       selectedRole = uiState.role,
       onRoleSelected = viewModel::selectRole,
       onContinue = onContinue,
+      email = uiState.email,
+      canSwitchAccount = uiState.canSwitchAccount,
+      onUseAnotherAccount = useAnotherAccount,
   )
 }
 
-/** Stateless content of the role step. */
+/**
+ * Stateless content of the role step.
+ *
+ * @param email the signed-in account's, shown above "Use another account" when known
+ */
 @Composable
 fun RoleContent(
     selectedRole: Role?,
     onRoleSelected: (Role) -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
+    email: String? = null,
+    canSwitchAccount: Boolean = true,
+    onUseAnotherAccount: () -> Unit = {},
 ) {
   Scaffold(modifier = modifier.testTag(C.Tag.onboarding_role_screen)) { innerPadding ->
     Column(
@@ -104,6 +123,8 @@ fun RoleContent(
       ) {
         Text(stringResource(R.string.onboarding_continue))
       }
+      Spacer(Modifier.height(8.dp))
+      SignedInAs(email, canSwitchAccount, onUseAnotherAccount)
     }
   }
 }

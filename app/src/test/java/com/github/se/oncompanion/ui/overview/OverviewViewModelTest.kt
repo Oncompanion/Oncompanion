@@ -6,8 +6,11 @@ package com.github.se.oncompanion.ui.overview
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
 import com.github.se.oncompanion.domain.planning.ObservePlanning
+import com.github.se.oncompanion.domain.planning.followedPlanning
+import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
@@ -103,7 +106,7 @@ class OverviewViewModelTest {
       profiles: FakeUserProfileRepository = FakeUserProfileRepository(),
       planning: PlanningRepository = FakePlanningRepository(),
       clock: Clock = TestClock(now),
-  ) = OverviewViewModel(auth, profiles, planning, clock, zone)
+  ) = OverviewViewModel(auth, profiles, ownPlanning(planning), clock, zone)
 
   /** Saved medication days reach Overview without a time or a claim about intake status. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -144,7 +147,7 @@ class OverviewViewModelTest {
       val vm =
           viewModel(
               auth = auth,
-              planning = ObservePlanning(MedicationPlanningSource(repository, auth)),
+              planning = ObservePlanning(MedicationPlanningSource(repository)),
           )
       runCurrent()
       val entry = vm.uiState.value.todayEntries.single()
@@ -501,5 +504,39 @@ class OverviewViewModelTest {
     assertEquals(2, planning.ranges.size)
     assertEquals(tomorrow, planning.ranges.last().startDateInclusive)
     following.cancel()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(planning: FakePlanningRepository, vararg shared: CarePermission) =
+      OverviewViewModel(
+          observePlanning = followedPlanning(planning, shared.toSet()),
+          clock = TestClock(now),
+          zoneId = zone,
+          patientUid = "patient",
+      )
+
+  @Test
+  fun caregiver_planningShared_showsThePatientsNextAppointment() {
+    val planning = planning(appointment("chemo", now.plusDays(2)))
+
+    val state = caregiverViewModel(planning, CarePermission.PLANNING).uiState.value
+
+    assertEquals("chemo", state.nextAppointment?.id)
+    assertFalse(state.isNotShared)
+    assertTrue(planning.owners.all { it == "patient" })
+  }
+
+  @Test
+  fun caregiver_planningNotShared_isNotShared_withNothingToShow() {
+    val planning = planning(appointment("chemo", now.plusDays(2)))
+
+    val state = caregiverViewModel(planning, CarePermission.SYMPTOMS).uiState.value
+
+    assertTrue(state.isNotShared)
+    assertFalse(state.isLoading)
+    assertNull(state.nextAppointment)
+    assertTrue(state.todayEntries.isEmpty())
+    assertTrue(planning.owners.isEmpty())
   }
 }

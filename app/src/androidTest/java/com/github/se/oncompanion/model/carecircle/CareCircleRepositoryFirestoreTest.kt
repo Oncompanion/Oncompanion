@@ -15,7 +15,9 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.Source
 import java.time.Instant
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -341,6 +343,132 @@ class CareCircleRepositoryFirestoreTest {
     try {
       assertEquals("marc", firstMember("marc")?.uid)
     } finally {
+      db.enableNetwork().await()
+    }
+  }
+
+  // ---- observeMembership ----
+
+  /** Collects alice's membership of [uid] into a channel, in the background, until [job] ends. */
+  private fun CoroutineScope.membershipsOf(uid: String): Pair<Job, Channel<CareCircleMembership>> {
+    val emissions = Channel<CareCircleMembership>(Channel.UNLIMITED)
+    val job =
+        launch(Dispatchers.IO) {
+          repository.observeMembership(aliceUid, uid).collect(emissions::send)
+        }
+    return job to emissions
+  }
+
+  /** The first membership that isn't [CareCircleMembership.Unconfirmed]: the server's answer. */
+  private suspend fun Channel<CareCircleMembership>.confirmed(): CareCircleMembership =
+      withTimeout(10_000) {
+        var current = receive()
+        while (current == CareCircleMembership.Unconfirmed) current = receive()
+        current
+      }
+
+  @Test
+  fun observeMembership_existingMember_isMember(): Unit = runBlocking {
+    addMember("marc", "Marc", permissions = listOf("SYMPTOMS"))
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      val membership = emissions.confirmed() as CareCircleMembership.Member
+      assertEquals("marc", membership.member.uid)
+      assertEquals(setOf(CarePermission.SYMPTOMS), membership.member.permissions)
+    } finally {
+      job.cancel()
+    }
+  }
+
+  @Test
+  fun observeMembership_missingMember_isNotMember(): Unit = runBlocking {
+    addMember("sophie", "Sophie")
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      assertEquals(CareCircleMembership.NotMember, emissions.confirmed())
+    } finally {
+      job.cancel()
+    }
+  }
+
+  @Test
+  fun observeMembership_memberNotOnThisDevice_isUnconfirmedThenMember(): Unit = runBlocking {
+    addMember("marc", "Marc") // on the server only: never read on this device
+    db.disableNetwork().await()
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      // The device has no record of the document, and the server can't answer yet
+      assertEquals(CareCircleMembership.Unconfirmed, withTimeout(10_000) { emissions.receive() })
+
+      db.enableNetwork().await()
+      assertEquals("marc", (emissions.confirmed() as CareCircleMembership.Member).member.uid)
+    } finally {
+      job.cancel()
+      db.enableNetwork().await()
+    }
+  }
+
+  @Test
+  fun observeMembership_missingAndNeverCached_isUnconfirmedThenNotMember(): Unit = runBlocking {
+    db.disableNetwork().await()
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      assertEquals(CareCircleMembership.Unconfirmed, withTimeout(10_000) { emissions.receive() })
+
+      // The server's "still missing" changes no document: it must still be delivered
+      db.enableNetwork().await()
+      assertEquals(CareCircleMembership.NotMember, emissions.confirmed())
+    } finally {
+      job.cancel()
+      db.enableNetwork().await()
+    }
+  }
+
+  @Test
+  fun observeMembership_memberRemovedWhileListening_isNotMember(): Unit = runBlocking {
+    addMember("marc", "Marc")
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      assertTrue(emissions.confirmed() is CareCircleMembership.Member)
+
+      EmulatorTestData.deleteRawDocument("users/$aliceUid/$COLLECTION/marc")
+      assertEquals(CareCircleMembership.NotMember, emissions.confirmed())
+    } finally {
+      job.cancel()
+    }
+  }
+
+  @Test
+  fun observeMembership_withoutFirstName_isNotMember(): Unit = runBlocking {
+    addMember("blank", "  ", familyName = "Dubois")
+    val (job, emissions) = membershipsOf("blank")
+    try {
+      assertEquals(CareCircleMembership.NotMember, emissions.confirmed())
+    } finally {
+      job.cancel()
+    }
+  }
+
+  @Test
+  fun observeMembership_cachedMember_isMemberWithoutTheServer(): Unit = runBlocking {
+    addMember("marc", "Marc")
+    // Read once while the server answers, so the member document is in this device's cache
+    val (online, onlineEmissions) = membershipsOf("marc")
+    try {
+      assertTrue(onlineEmissions.confirmed() is CareCircleMembership.Member)
+    } finally {
+      online.cancel()
+    }
+
+    db.disableNetwork().await()
+    val (job, emissions) = membershipsOf("marc")
+    try {
+      // A member document this device has a record of answers at once, not Unconfirmed
+      val first = withTimeout(10_000) { emissions.receive() }
+      assertTrue("Expected the cached member, got $first", first is CareCircleMembership.Member)
+      assertEquals("marc", (first as CareCircleMembership.Member).member.uid)
+    } finally {
+      job.cancel()
       db.enableNetwork().await()
     }
   }

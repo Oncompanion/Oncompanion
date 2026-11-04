@@ -83,6 +83,8 @@ object C {
     const val onboarding_family_name_field = "onboarding_family_name_field"
     const val onboarding_save_button = "onboarding_save_button"
     const val onboarding_saving = "onboarding_saving"
+    const val onboarding_signed_in_as = "onboarding_signed_in_as"
+    const val onboarding_use_another_account = "onboarding_use_another_account"
     const val overview_screen = "overview_screen"
     const val overview_shortcut_symptoms = "overview_shortcut_symptoms"
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
@@ -325,6 +327,9 @@ object C {
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
+    // Caregiver mode: a section the patient doesn't share
+    const val not_shared = "not_shared"
 
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"

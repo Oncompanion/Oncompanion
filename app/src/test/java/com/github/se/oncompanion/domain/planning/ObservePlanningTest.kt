@@ -53,7 +53,9 @@ class ObservePlanningTest {
       )
 
   /** A source that always gives [items], whatever the range. */
-  private fun source(vararg items: PlanningItem) = PlanningRepository { flowOf(items.toList()) }
+  private fun source(vararg items: PlanningItem) = PlanningRepository { _, _ ->
+    flowOf(items.toList())
+  }
 
   private val PlanningItem.id: String
     get() =
@@ -69,7 +71,7 @@ class ObservePlanningTest {
         source(appointment("a-wed", monday.plusDays(2), 9), appointment("a-mon", monday, 14))
     val events = source(event("e-mon", monday, 10), event("e-wed", monday.plusDays(2), 18))
 
-    val items = ObservePlanning(appointments, events).observeItems(week).first()
+    val items = ObservePlanning(appointments, events).observeItems("alice", week).first()
 
     assertEquals(listOf("e-mon", "a-mon", "a-wed", "e-wed"), items.map { it.id })
   }
@@ -78,7 +80,7 @@ class ObservePlanningTest {
   fun withinADay_entriesWithoutATimeComeFirst() = runTest {
     val items =
         ObservePlanning(source(appointment("a", monday, 8)), source(medication("m", monday)))
-            .observeItems(week)
+            .observeItems("alice", week)
             .first()
 
     assertEquals(listOf("m", "a"), items.map { it.id })
@@ -92,8 +94,8 @@ class ObservePlanningTest {
         ObservePlanning(source(appointment("y", monday, 10)), source(event("x", monday, 10)))
 
     assertEquals(
-        first.observeItems(week).first().map { it.key },
-        swapped.observeItems(week).first().map { it.key },
+        first.observeItems("alice", week).first().map { it.key },
+        swapped.observeItems("alice", week).first().map { it.key },
     )
   }
 
@@ -108,7 +110,7 @@ class ObservePlanningTest {
                 ),
                 source(medication("next-week", monday.plusWeeks(1))),
             )
-            .observeItems(week)
+            .observeItems("alice", week)
             .first()
 
     assertEquals(listOf("inside"), items.map { it.id })
@@ -116,22 +118,22 @@ class ObservePlanningTest {
 
   @Test
   fun noSources_givesAnEmptyList() = runTest {
-    assertTrue(ObservePlanning(emptyList()).observeItems(week).first().isEmpty())
+    assertTrue(ObservePlanning(emptyList()).observeItems("alice", week).first().isEmpty())
   }
 
   @Test
   fun emptySources_giveAnEmptyList() = runTest {
-    assertTrue(ObservePlanning(source(), source()).observeItems(week).first().isEmpty())
+    assertTrue(ObservePlanning(source(), source()).observeItems("alice", week).first().isEmpty())
   }
 
   @Test
   fun aSourceChanging_updatesTheList() = runTest {
     val events = MutableStateFlow(listOf(event("e1", monday, 10)))
     val planning =
-        ObservePlanning(source(appointment("a", monday, 9)), PlanningRepository { events })
+        ObservePlanning(source(appointment("a", monday, 9)), PlanningRepository { _, _ -> events })
     val emissions = mutableListOf<List<String>>()
     backgroundScope.launch {
-      planning.observeItems(week).collect { emissions += it.map { i -> i.id } }
+      planning.observeItems("alice", week).collect { emissions += it.map { i -> i.id } }
     }
     runCurrent()
 
@@ -143,8 +145,10 @@ class ObservePlanningTest {
 
   @Test(expected = IllegalStateException::class)
   fun aFailingSource_failsTheList() = runTest {
-    val failing = PlanningRepository { flow { error("Events couldn't be read") } }
+    val failing = PlanningRepository { _, _ -> flow { error("Events couldn't be read") } }
 
-    ObservePlanning(source(appointment("a", monday, 9)), failing).observeItems(week).first()
+    ObservePlanning(source(appointment("a", monday, 9)), failing)
+        .observeItems("alice", week)
+        .first()
   }
 }
