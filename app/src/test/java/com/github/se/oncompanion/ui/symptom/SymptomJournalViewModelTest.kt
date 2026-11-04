@@ -212,13 +212,14 @@ class SymptomJournalViewModelTest {
   }
 
   @Test
-  fun loadError_showsTheError() {
+  fun loadError_showsTheError_andThePatientCanStillAdd() {
     repository.observeError = IllegalStateException("no cache")
 
     val state = viewModel().uiState.value
 
     assertTrue(state.hasError)
     assertFalse(state.isLoading)
+    assertTrue(state.canAdd)
   }
 
   @Test

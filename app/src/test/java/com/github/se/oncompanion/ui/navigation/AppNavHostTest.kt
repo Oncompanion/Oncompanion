@@ -1349,7 +1349,7 @@ class AppNavHostTest {
 
   @Test
   fun symptomJournalAddButton_opensTheAddScreen_andCloseReturns() {
-    setNavHost(Route.SYMPTOMS)
+    setNavHost(Route.SYMPTOMS, authRepository = signedInPatient())
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()

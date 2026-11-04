@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -92,6 +93,13 @@ class SymptomJournalViewModel(
     observation = viewModelScope.launch {
       // In a flow, so that even an auth that throws right away shows the error state
       flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
+          // Whose journal it is is known before its entries: adding doesn't wait for them, and
+          // still works if they can't be read
+          .onEach { access ->
+            if (access is SectionAccess.Readable) {
+              _uiState.update { it.copy(isNotShared = false, canAdd = access.canEdit) }
+            }
+          }
           .flatMapLatest(::journalOf)
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom journal", e)
@@ -118,13 +126,7 @@ class SymptomJournalViewModel(
         is SectionAccess.Readable ->
             symptomRepository.observeSymptoms(access.ownerUid).map { entries ->
               { state: SymptomJournalUiState ->
-                state.copy(
-                    days = daysOf(entries),
-                    isLoading = false,
-                    hasError = false,
-                    isNotShared = false,
-                    canAdd = access.canEdit,
-                )
+                state.copy(days = daysOf(entries), isLoading = false, hasError = false)
               }
             }
       }
