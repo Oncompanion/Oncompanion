@@ -480,4 +480,39 @@ class PrescriptionDetailScreenTest {
           .fetchSemanticsNode()
           .positionInRoot
           .y
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: PrescriptionDetailUiState) {
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState = state,
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsPrescription_withoutEditOrDelete() {
+    setCaregiverContent(shown.copy(isOwn = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_prescriptionsNotShared_saysSo_insteadOfNotFound() {
+    setCaregiverContent(
+        PrescriptionDetailUiState(isLoading = false, isNotShared = true, isOwn = false)
+    )
+
+    composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
+  }
 }

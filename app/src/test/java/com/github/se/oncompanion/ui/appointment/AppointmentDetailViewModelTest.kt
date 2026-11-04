@@ -1,8 +1,11 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.appointment.*
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Instant
 import kotlinx.coroutines.*
@@ -305,5 +308,41 @@ class AppointmentDetailViewModelTest {
         assertEquals(listOf(appointment), repository.appointments("uid-patient"))
         assertFalse(vm.uiState.value.delete.hasError)
         assertFalse(vm.canLeaveAfterDeletion())
+      }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      AppointmentDetailViewModel(
+          "visit",
+          repository,
+          auth,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_planningShared_showsThePatientsAppointment_readOnly() =
+      runTest(dispatcher) {
+        repository.seed("patient", appointment)
+
+        val vm = caregiverViewModel(CarePermission.PLANNING)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as AppointmentDetailUiState.Loaded
+        assertEquals(appointment, state.appointment)
+        assertFalse(state.isOwn)
+        assertFalse(state.canDelete)
+      }
+
+  @Test
+  fun caregiver_planningNotShared_isNotShared() =
+      runTest(dispatcher) {
+        repository.seed("patient", appointment)
+
+        val vm = caregiverViewModel(CarePermission.SYMPTOMS)
+        advanceUntilIdle()
+
+        assertEquals(AppointmentDetailUiState.NotShared, vm.uiState.value)
       }
 }

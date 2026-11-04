@@ -45,8 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -62,6 +64,7 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * @param onAdd opens the prescription form
  * @param onScan starts scanning a prescription
  * @param onOpen opens the detail of the prescription with the given ID
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @Composable
 fun PrescriptionsScreen(
@@ -71,6 +74,7 @@ fun PrescriptionsScreen(
     onScan: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Keeps "This month" right while the list is on screen: refreshes when it comes back, then at
@@ -87,6 +91,7 @@ fun PrescriptionsScreen(
       onRetry = viewModel::load,
       onOpen = onOpen,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -97,6 +102,7 @@ fun PrescriptionsScreen(
  * @param onScan starts scanning a prescription
  * @param onRetry reloads the prescriptions after an error
  * @param onOpen opens the detail of the prescription with the given ID
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,6 +114,7 @@ fun PrescriptionsContent(
     onRetry: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.prescriptions_screen),
@@ -127,8 +134,9 @@ fun PrescriptionsContent(
             },
         )
       },
-      // In every state: saving a prescription works whatever the list could load
-      floatingActionButton = { AddButtons(onAdd = onAdd, onScan = onScan) },
+      // In every state: saving a prescription works whatever the list could load. Only the patient
+      // adds their prescriptions
+      floatingActionButton = { if (uiState.canAdd) AddButtons(onAdd = onAdd, onScan = onScan) },
       floatingActionButtonPosition = FabPosition.Center,
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -138,6 +146,13 @@ fun PrescriptionsContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
         uiState.hasError -> ErrorState(onRetry)
+        // The patient a caregiver follows doesn't share their prescriptions
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(
+                caregiverOf,
+                CarePermission.PRESCRIPTIONS,
+                Modifier.align(Alignment.Center),
+            )
         uiState.prescriptions.isEmpty() -> EmptyState()
         else -> PrescriptionList(uiState.thisMonth, uiState.earlier, onOpen)
       }

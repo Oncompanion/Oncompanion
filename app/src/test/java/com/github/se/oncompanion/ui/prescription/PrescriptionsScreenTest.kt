@@ -35,6 +35,8 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -45,6 +47,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionsScreenTest {
@@ -86,7 +89,8 @@ class PrescriptionsScreenTest {
   private val nausea =
       prescription("nausea", "2026-08-20", "Metoclopramide 10 mg", prescribedBy = "Dr. Dubois")
 
-  private val loading = PrescriptionsUiState(today = today)
+  /** The patient's own list: they can add to it. */
+  private val loading = PrescriptionsUiState(today = today, canAdd = true)
   private val loaded = loading.copy(isLoading = false)
 
   /** Two prescriptions of this month, one of the month before. */
@@ -534,5 +538,45 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: PrescriptionsUiState) {
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsPrescriptions_withoutScanOrAdd() {
+    setCaregiverContent(filled.copy(canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_list).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_prescriptionsNotShared_saysSo_insteadOfAnEmptyList() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_prescriptionsNotShared_isFullyVisibleInLandscape() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
   }
 }

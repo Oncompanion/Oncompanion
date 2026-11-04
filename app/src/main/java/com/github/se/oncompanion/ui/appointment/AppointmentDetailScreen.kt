@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -23,12 +24,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -40,6 +43,7 @@ fun AppointmentDetailScreen(
     onBack: () -> Unit,
     onEdit: (() -> Unit)? = null,
     onDeleted: () -> Unit = onBack,
+    caregiverOf: String? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -60,10 +64,15 @@ fun AppointmentDetailScreen(
       onDelete = viewModel::requestDelete,
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,
+      caregiverOf = caregiverOf,
   )
 }
 
-/** Figma entry details adapted to recorded fields, without inferred end times or reminders. */
+/**
+ * Figma entry details adapted to recorded fields, without inferred end times or reminders.
+ *
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentDetailContent(
@@ -75,6 +84,7 @@ fun AppointmentDetailContent(
     onDelete: (() -> Unit)? = null,
     onConfirmDelete: () -> Unit = {},
     onCancelDelete: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = Modifier.testTag(C.Tag.appointment_detail_screen),
@@ -123,6 +133,9 @@ fun AppointmentDetailContent(
                   )
               AppointmentDetailUiState.Unavailable ->
                   DetailFeedback(R.string.appointment_unavailable, onRetry)
+              // The patient a caregiver follows doesn't share their planning (anymore)
+              AppointmentDetailUiState.NotShared ->
+                  NotSharedMessage(caregiverOf.orEmpty(), CarePermission.PLANNING)
               else -> DetailFeedback(R.string.appointment_detail_failed, onRetry)
             }
           }

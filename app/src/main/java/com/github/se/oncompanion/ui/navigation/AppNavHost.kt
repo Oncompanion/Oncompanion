@@ -265,7 +265,10 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
-        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        // In caregiver mode, the chosen patient's appointment, read-only
+        val detail: AppointmentDetailViewModel = viewModel {
+          AppointmentDetailViewModel(id, patientUid = chosenPatient?.uid)
+        }
         AppointmentDetailScreen(
             detail,
             onBack = dropUnlessResumed { navigationActions.goBack() },
@@ -274,6 +277,7 @@ private fun SessionNavHost(
               // A completion may only pop the detail entry that initiated this deletion.
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -393,12 +397,15 @@ private fun SessionNavHost(
     navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
       composable(Screen.PRESCRIPTIONS) {
         PrescriptionsScreen(
-            viewModel = viewModel { PrescriptionsViewModel() },
+            // In caregiver mode, the chosen patient's prescriptions, read-only, when they share
+            // them
+            viewModel = viewModel { PrescriptionsViewModel(patientUid = chosenPatient?.uid) },
             onBack = navigationActions::goBack,
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -408,11 +415,15 @@ private fun SessionNavHost(
         val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
         PrescriptionDetailScreen(
             // Scoped to this back stack entry, so each opened prescription has its own ViewModel
-            viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
+            viewModel =
+                viewModel {
+                  PrescriptionDetailViewModel(prescriptionId, patientUid = chosenPatient?.uid)
+                },
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.prescriptionEdit(prescriptionId)) },
             // Back to the list, which no longer shows it
             onDeleted = navigationActions::goBack,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(

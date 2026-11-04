@@ -83,6 +83,7 @@ enum class OverviewShortcut(
       R.string.prescriptions_title,
       R.drawable.ic_prescriptions,
       C.Tag.overview_shortcut_prescriptions,
+      CarePermission.PRESCRIPTIONS,
   ),
   CARE_CIRCLE(
       Route.CARE_CIRCLE,
@@ -112,8 +113,8 @@ private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.E
  * to each section.
  *
  * A caregiver sees it in caregiver mode (US-20): "Anne's care ▾" opens "Whose care?" to switch
- * patient, and the shortcuts are only those of the sections the patient shares (Symptoms for now,
- * Prescriptions next in #240).
+ * patient, and the shortcuts are only those of the sections the patient shares (Symptoms and
+ * Prescriptions).
  *
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
@@ -222,8 +223,7 @@ fun OverviewContent(
               uiState.nextAppointment,
               uiState.now.toLocalDate(),
               onOpenPlanning,
-              // A caregiver can't open an appointment's page yet: its Planning day instead
-              if (caregiverOf == null) onOpenAppointment else { _ -> onOpenPlanning() },
+              onOpenAppointment,
               canAdd = caregiverOf == null,
           )
           TodaySection(uiState.todayEntries, onOpenPlanning)
