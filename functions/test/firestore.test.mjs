@@ -402,7 +402,7 @@ test("release retries recover transient failures and ambiguous acknowledgements 
       await service.search("geneva", "a".repeat(64));
       assert.equal(attempts, 2);
       assert.equal(calls, 1);
-      assert.deepEqual(logs, [["hospital_search_storage_failure"]]);
+      assert.deepEqual(logs, [["hospital_search_storage_failure", undefined]]);
       assert.equal(await secondStore.acquire("too-soon"), false);
       await ageCooldown();
       await new HospitalSearchService(secondStore, {

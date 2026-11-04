@@ -188,7 +188,10 @@ A persistent release error leaves the lock held or cooldown committed, never sil
 Storage failures emit structured `hospital_search_storage_failure` events without exception
 contents, queries, UIDs or credentials. Exhausted release retries additionally emit
 `hospital_search_release_failed`. Upstream failures and handler 503/capacity failures have separate
-fixed events; see the operations runbook for alert filters and their detection limits.
+fixed events with optional allowlisted public error codes or numeric storage statuses. Capacity
+exhaustion is WARNING; the other failure events are ERROR. Unknown codes and exception messages,
+stacks, details and metadata are omitted. See the operations runbook for alert filters and their
+detection limits.
 Alert on these markers and investigate held control state before rollout.
 Corrupt control state fails closed.
 

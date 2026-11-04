@@ -114,7 +114,13 @@ jsonPayload.event="hospital_search_release_failed"
 ```
 
 Use the same scope with the following event filters. Events use Firebase's structured logger
-with `jsonPayload.event`, `message` and ERROR severity. There are no request-derived labels.
+with `jsonPayload.event` and `message`. Capacity exhaustion uses WARNING because it can reflect
+normal contention/cooldown; all other listed events use ERROR. Optional `jsonPayload.code` contains
+only an allowlisted public `SearchError` code (for example `contact_not_configured`) or, at storage
+failure sites, a numeric gRPC error status from 1 to 16 (for example 14 = UNAVAILABLE). Unknown,
+uncoded or invalid values are omitted. Messages, stacks, details and metadata are never included.
+A code narrows the cause; it does not identify the storage operation or prove the lock is held.
+Alert filters continue to match event names regardless of severity/code. There are no request-derived labels.
 Build user-defined **counter** log-based metrics with no custom labels, then metric threshold
 alerts. For counts, use a five-minute alignment window with SUM and SUM across revision/instance
 series; compare the total to the threshold with no additional retest duration. Do not average
