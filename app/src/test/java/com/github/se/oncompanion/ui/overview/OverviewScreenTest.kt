@@ -618,7 +618,8 @@ class OverviewScreenTest {
 
   @Test
   fun caregiver_getsTheSymptomsTile_onlyWhenShared() {
-    setCaregiverContent(loaded.copy(sharedSections = setOf(CarePermission.SYMPTOMS)))
+    // Even with everything shared, only the tiles that have a caregiver view show
+    setCaregiverContent(loaded.copy(sharedSections = CarePermission.entries.toSet()))
 
     composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertDoesNotExist()

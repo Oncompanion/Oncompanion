@@ -6,8 +6,8 @@ package com.github.se.oncompanion.ui.overview
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
+import com.github.se.oncompanion.domain.carecircle.CareAccess
+import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.planning.CarePlanning
 import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
@@ -122,7 +122,7 @@ data class OverviewUiState(
  * @param clock the current time
  * @param zoneId the time zone the day is shown in
  * @param patientUid in caregiver mode, the patient whose day is shown; null for the user's own
- * @param resolveSection whether the patient shares the sections behind the shortcuts
+ * @param resolveAccess which sections the patient shares, for the shortcuts
  */
 class OverviewViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -131,7 +131,8 @@ class OverviewViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val patientUid: String? = null,
-    private val resolveSection: ResolveSectionAccess = ResolveSectionAccess(),
+    private val resolveAccess: ResolveCareCircleAccess =
+        ResolveCareCircleAccess(auth = authRepository),
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(OverviewUiState(now = now()))
@@ -139,27 +140,32 @@ class OverviewViewModel(
 
   private var dayObservation: Job? = null
 
+  /** Follows which sections the patient shares, in caregiver mode. */
+  private var sharedObservation: Job? = null
+
   /** The planning entries as the repository gave them; what they show depends on the time. */
   private var items: List<PlanningItem> = emptyList()
 
   init {
     loadFirstName()
     loadDay()
-    if (patientUid != null) followSharedSymptoms(patientUid)
   }
 
-  /** In caregiver mode, whether the patient shares their symptoms, for the Symptoms shortcut. */
-  private fun followSharedSymptoms(patientUid: String) {
-    viewModelScope.launch {
-      flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
-          .catch { e -> Log.w(TAG, "Couldn't check the shared symptoms", e) }
+  /**
+   * In caregiver mode, the sections the patient shares, for the shortcuts: all of them from one
+   * access, so the tiles always agree. If it can't be read, no tile shows until Retry.
+   */
+  private fun followSharedSections(patientUid: String) {
+    sharedObservation?.cancel()
+    sharedObservation = viewModelScope.launch {
+      flow { emitAll(resolveAccess(patientUid)) }
+          .catch { e ->
+            Log.w(TAG, "Couldn't check the shared sections", e)
+            emit(CareAccess.Unconfirmed)
+          }
           .collect { access ->
             _uiState.update {
-              it.copy(
-                  sharedSections =
-                      if (access is SectionAccess.Readable) setOf(CarePermission.SYMPTOMS)
-                      else emptySet()
-              )
+              it.copy(sharedSections = (access as? CareAccess.Granted)?.sections.orEmpty())
             }
           }
     }
@@ -168,9 +174,11 @@ class OverviewViewModel(
   /**
    * Starts (or, after an error, restarts) observing the planning data from today to [LOOKAHEAD]
    * later, so the next appointment is found even months ahead, as between two oncology check-ups.
+   * In caregiver mode, it also (re)starts following the shared sections.
    */
   fun loadDay() {
     dayObservation?.cancel()
+    if (patientUid != null) followSharedSections(patientUid)
     val now = now()
     _uiState.update { it.copy(now = now, isLoading = true, hasError = false) }
     val today = now.toLocalDate()

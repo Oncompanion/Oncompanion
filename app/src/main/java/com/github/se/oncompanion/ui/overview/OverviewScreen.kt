@@ -58,18 +58,25 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** A section the patient can open from the Overview with a single tap. */
+/**
+ * A section the patient can open from the Overview with a single tap.
+ *
+ * @property section the section a caregiver needs shared to get this tile, or `null` if they never
+ *   get it
+ */
 enum class OverviewShortcut(
     val route: String,
     @StringRes val label: Int,
     @DrawableRes val icon: Int,
     val testTag: String,
+    val section: CarePermission? = null,
 ) {
   SYMPTOMS(
       Route.SYMPTOMS,
       R.string.symptoms_title,
       R.drawable.ic_symptoms,
       C.Tag.overview_shortcut_symptoms,
+      CarePermission.SYMPTOMS,
   ),
   PRESCRIPTIONS(
       Route.PRESCRIPTIONS,
@@ -95,13 +102,6 @@ enum class OverviewShortcut(
 /** The tiles under "How do you feel today?", in display order. */
 private val tileShortcuts =
     listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
-
-/** The tiles a caregiver may get, each with the section the patient must share. */
-private val caregiverShortcuts = listOf(OverviewShortcut.SYMPTOMS)
-
-/** The section a caregiver needs shared to get this tile, or `null` if they never get it. */
-private val OverviewShortcut.section: CarePermission?
-  get() = if (this == OverviewShortcut.SYMPTOMS) CarePermission.SYMPTOMS else null
 
 /** "Saturday 3 October", as in the mockup. The app's UI is in English. */
 private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
@@ -233,7 +233,7 @@ fun OverviewContent(
       // sections the patient shares, never the care circle, which only the patient manages
       val tiles =
           if (caregiverOf == null) tileShortcuts
-          else caregiverShortcuts.filter { it.section in uiState.sharedSections }
+          else tileShortcuts.filter { it.section != null && it.section in uiState.sharedSections }
       if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles)
     }
   }

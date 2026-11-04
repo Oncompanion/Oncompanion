@@ -4,7 +4,7 @@
 package com.github.se.oncompanion.ui.overview
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
 import com.github.se.oncompanion.domain.planning.ObservePlanning
 import com.github.se.oncompanion.domain.planning.followedPlanning
@@ -510,27 +510,49 @@ class OverviewViewModelTest {
   // ----- Caregiver mode (US-20) -----
 
   private fun caregiverViewModel(planning: FakePlanningRepository, vararg shared: CarePermission) =
+      caregiverViewModel(planning, FollowedPatient(*shared), shared.toSet())
+
+  /** The Overview of the patient a caregiver follows, with [patient] deciding the tiles. */
+  private fun caregiverViewModel(
+      planning: FakePlanningRepository,
+      patient: FollowedPatient,
+      planningShared: Set<CarePermission> = setOf(CarePermission.PLANNING),
+  ) =
       OverviewViewModel(
-          observePlanning = followedPlanning(planning, shared.toSet()),
+          authRepository = patient.auth,
+          observePlanning = followedPlanning(planning, planningShared),
           clock = TestClock(now),
           zoneId = zone,
           patientUid = "patient",
-          resolveSection = followedPatientAccess(*shared),
+          resolveAccess = patient.careAccess,
       )
 
   @Test
-  fun caregiver_sharedSections_holdSymptoms_onlyWhenShared() {
-    assertEquals(
-        setOf(CarePermission.SYMPTOMS),
-        caregiverViewModel(planning(), CarePermission.SYMPTOMS).uiState.value.sharedSections,
-    )
-    assertTrue(
-        caregiverViewModel(planning(), CarePermission.PLANNING)
-            .uiState
-            .value
-            .sharedSections
-            .isEmpty()
-    )
+  fun caregiver_sharedSections_areThoseThePatientShares() {
+    for (shared in listOf(setOf(CarePermission.SYMPTOMS), setOf(CarePermission.PLANNING))) {
+      assertEquals(
+          shared,
+          caregiverViewModel(planning(), *shared.toTypedArray()).uiState.value.sharedSections,
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_sharedSections_followThePatient_andComeBackAfterAnErrorOnRetry() {
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    patient.circle.observeError = IllegalStateException("offline")
+    val vm = caregiverViewModel(planning(), patient)
+    assertTrue(vm.uiState.value.sharedSections.isEmpty())
+
+    patient.circle.observeError = null
+    vm.loadDay()
+    ShadowLooper.idleMainLooper()
+    assertEquals(setOf(CarePermission.SYMPTOMS), vm.uiState.value.sharedSections)
+
+    // The patient stops sharing their symptoms
+    patient.shares(CarePermission.PLANNING)
+    ShadowLooper.idleMainLooper()
+    assertEquals(setOf(CarePermission.PLANNING), vm.uiState.value.sharedSections)
   }
 
   @Test
