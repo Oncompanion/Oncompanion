@@ -42,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.common.SavePhase
 
 /**
@@ -50,10 +52,17 @@ import com.github.se.oncompanion.ui.common.SavePhase
  *
  * @param onSaved called with the chosen role once the profile is saved: onboarding is done, and
  *   what comes next depends on the role
+ * @param onSignedOut called once signed out to use another account
  */
 @Composable
-fun InformationScreen(viewModel: OnboardingViewModel, onSaved: (Role) -> Unit) {
+fun InformationScreen(
+    viewModel: OnboardingViewModel,
+    onSaved: (Role) -> Unit,
+    onSignedOut: () -> Unit,
+    credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
+) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val useAnotherAccount = accountSwitch(uiState, viewModel, credentialProvider, onSignedOut)
 
   // Leaves onboarding once the profile is saved
   LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) onSaved(uiState.role) }
@@ -65,6 +74,7 @@ fun InformationScreen(viewModel: OnboardingViewModel, onSaved: (Role) -> Unit) {
       onCancerTypeChange = viewModel::onCancerTypeChange,
       onContinue = viewModel::saveProfile,
       onErrorShown = viewModel::clearError,
+      onUseAnotherAccount = useAnotherAccount,
   )
 }
 
@@ -82,6 +92,7 @@ fun InformationContent(
     onContinue: () -> Unit,
     onErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
+    onUseAnotherAccount: () -> Unit = {},
 ) {
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
@@ -192,6 +203,8 @@ fun InformationContent(
           Text(stringResource(R.string.onboarding_continue))
         }
       }
+      Spacer(Modifier.height(8.dp))
+      SignedInAs(uiState.email, uiState.canSwitchAccount, onUseAnotherAccount)
     }
   }
 }

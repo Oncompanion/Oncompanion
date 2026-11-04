@@ -120,6 +120,8 @@ fun PrescriptionFormScreen(
       onErrorShown = viewModel::clearError,
       onRetry = viewModel::load,
       modifier = modifier,
+      onKeepEditing = viewModel::keepEditing,
+      onSaveAnyway = viewModel::saveAnyway,
   )
 }
 
@@ -129,6 +131,8 @@ fun PrescriptionFormScreen(
  *
  * @param onErrorShown called once the error snackbar is gone
  * @param onRetry reads the saved prescription again after it couldn't be loaded
+ * @param onKeepEditing closes the "already saved" question without saving
+ * @param onSaveAnyway saves although the prescription is already saved
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,7 +153,12 @@ fun PrescriptionFormContent(
     onErrorShown: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onKeepEditing: () -> Unit = {},
+    onSaveAnyway: () -> Unit = {},
 ) {
+  // Asks before saving a prescription already saved (US-39)
+  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway) }
+
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
   val errorMessage = uiState.error?.let { stringResource(it.messageRes()) }
@@ -190,6 +199,8 @@ fun PrescriptionFormContent(
           modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
+        // Same medications as a saved prescription: most likely its renewal (US-39)
+        uiState.renewalOf?.let { RenewalNotice(it) }
         // A scanned prescription says what was read and what the patient should check
         if (uiState.isScanned) ReviewNotice(uiState)
 

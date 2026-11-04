@@ -15,6 +15,13 @@ interface EventRegistrationRepository {
   fun observeIsRegistered(uid: String, eventId: String): Flow<Boolean>
 
   /**
+   * Emits the ids of the events [uid] confirmed, now and on every change. Planning shows these
+   * events, including past ones: a confirmation is kept after its event, even when the event page
+   * no longer shows it.
+   */
+  fun observeRegisteredEventIds(uid: String): Flow<Set<String>>
+
+  /**
    * Saves that [uid] registered for [eventId]. Confirming again keeps a single confirmation. Only
    * events that haven't started can be confirmed: the backend rejects the others. Returns right
    * away, without waiting for the server, so it works offline.
