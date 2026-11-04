@@ -254,9 +254,9 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 
 ## Layout
 
-16 dp side margins, 12 dp between cards, 24 dp between form groups. Times sit in a fixed 52 dp column so titles align.
+16 dp side margins, 12 dp between cards, 24 dp between form groups. Times sit in a column at least 52 dp wide, growing with the text, so titles align.
 
-- **Main screens** (Overview, Planning, Events): Paper lake header (210 dp) with the title and date on the sky; the first card overlaps its lower edge; the main button is pinned above the navigation bar.
+- **Main screens** (Overview, Planning, Events): Paper lake header (at least 210 dp, growing with the title) with the title and date on the sky; in landscape or at a large font scale it shrinks to the 100 dp band; the first card overlaps its lower edge; the main button is pinned above the navigation bar.
 - **Other screens**: a 100 dp Paper lake band behind the top app bar (back arrow, or close for forms and flows), content below, actions pinned at the bottom (16 dp from the sides, 24 dp from the bottom).
 - Long screens scroll under the band; the top app bar and the pinned actions stay.
 
@@ -271,7 +271,7 @@ Small 8 (thumbnails), Medium 12 (fields, chips, snackbars), Large 20 (cards, lis
 ## Illustrations
 
 ### Paper lake
-Flat cut paper in the Horizon colours: sky, the Salève, the Jet d'eau, the sun or moon, and three bands of water. Three sizes: the header (210 dp), the band behind top app bars (100 dp) and the Sign in scene. The sky follows the time of day. Static when the system's Remove animations setting is on.
+Flat cut paper in the Horizon colours: sky, the Salève, the Jet d'eau, the sun or moon, and three bands of water. Three sizes: the header (at least 210 dp), the band behind top app bars (100 dp) and the Sign in scene. The sky follows the time of day. Static when the system's Remove animations setting is on.
 
 ### Empty lake
 A round medallion of the same lake with one small boat, for empty states (nothing planned, no prescriptions, no one in the circle).
@@ -320,7 +320,7 @@ Circular progress, 48 dp, centered where the content will appear; the small on-p
 ### Loading, empty, error, offline
 - **Loading**: the screen keeps its header and bars; a progress indicator replaces only the content.
 - **Empty**: the Empty lake, a title, one line saying what will appear, and the action that fills it.
-- **Error**: a Message state with Retry. Offline is not an error: the app shows what it saved on the phone, with a Waiting banner when it matters ("You're offline. This is the list saved on 2 Nov."). Never "check your connection" for a Firestore error.
+- **Error**: a Message state with Retry. Offline is not an error: the app shows what it saved on the phone, with a Waiting banner when it matters ("You're offline. This is the list saved on your phone."), shown when Firestore says the data came from its cache (`isFromCache`). Never "check your connection" for a Firestore error.
 - **Gone**: something deleted elsewhere says so ("This event doesn't exist anymore") with a way back.
 
 ### Drafted content
