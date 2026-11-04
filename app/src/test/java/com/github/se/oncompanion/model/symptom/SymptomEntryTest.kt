@@ -142,4 +142,16 @@ class SymptomEntryTest {
     assertTrue(other.copy(notes = "n".repeat(1000)).isValid())
     assertFalse(other.copy(notes = "n".repeat(1001)).isValid())
   }
+
+  @Test
+  fun caregiversEntry_needsTheirName_ofAtMostFiftyCharacters() {
+    val now = Instant.parse("2026-10-05T09:00:00Z")
+    val signed = valid.copy(addedBy = "caregiver", addedByName = "Sam")
+
+    assertTrue(signed.isValid(now))
+    for (name in listOf(null, "  ", "a".repeat(SymptomEntry.MAX_ADDED_BY_NAME_LENGTH + 1))) {
+      assertFalse(signed.copy(addedByName = name).isValid(now))
+    }
+    assertNull(valid.addedBy)
+  }
 }

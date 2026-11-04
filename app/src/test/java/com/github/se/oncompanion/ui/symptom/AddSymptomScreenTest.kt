@@ -745,4 +745,25 @@ class AddSymptomScreenTest {
         repository.symptoms("alice").single(),
     )
   }
+
+  @Test
+  fun caregiver_titleSaysWhoseJournalGetsTheSymptom() {
+    composeTestRule.setContent {
+      AddSymptomContent(
+          uiState = AddSymptomUiState(now = java.time.LocalDateTime.of(2026, 10, 5, 9, 0)),
+          onBack = {},
+          onToggleType = {},
+          onIntensityChange = {},
+          onClearIntensity = {},
+          onDateChange = {},
+          onTimeChange = {},
+          onNotesChange = {},
+          onSave = {},
+          onErrorShown = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    composeTestRule.onNodeWithText("Log symptoms for Anne").assertIsDisplayed()
+  }
 }

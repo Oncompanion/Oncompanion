@@ -356,4 +356,24 @@ class SymptomJournalViewModelTest {
     assertTrue(vm.uiState.value.hasError)
     assertFalse(vm.uiState.value.isNotShared)
   }
+
+  @Test
+  fun caregiver_allowedToAdd_getsTheAddButton() {
+    val state =
+        SymptomJournalViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection =
+                    followedPatientAccess(
+                        CarePermission.SYMPTOMS,
+                        canAdd = setOf(CarePermission.SYMPTOMS),
+                    ),
+            )
+            .uiState
+            .value
+
+    assertTrue(state.canAdd)
+  }
 }

@@ -48,5 +48,11 @@ data class CareCircleMemberDetails(
   companion object {
     /** Longest first or family name. Keep in sync with firestore.rules. */
     const val MAX_NAME_LENGTH = 50
+
+    /**
+     * The sections the patient can let a member add to: one per story that lets a caregiver write
+     * (US-22 for symptoms). The forms only offer these.
+     */
+    val ADDABLE_SECTIONS: Set<CarePermission> = setOf(CarePermission.SYMPTOMS)
   }
 }

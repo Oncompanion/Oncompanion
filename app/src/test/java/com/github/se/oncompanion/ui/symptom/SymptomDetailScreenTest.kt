@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -512,5 +513,12 @@ class SymptomDetailScreenTest {
 
     composeTestRule.onNodeWithText("Anne doesn't share Symptoms with you").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertDoesNotExist()
+  }
+
+  @Test
+  fun symptomAddedByACaregiver_saysWho() {
+    setContent(loaded.copy(entry = fatigue.copy(addedBy = "caregiver", addedByName = "Sam")))
+
+    composeTestRule.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
   }
 }

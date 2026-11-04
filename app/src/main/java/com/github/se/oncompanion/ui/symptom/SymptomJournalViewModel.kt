@@ -97,7 +97,7 @@ class SymptomJournalViewModel(
           // still works if they can't be read
           .onEach { access ->
             if (access is SectionAccess.Readable) {
-              _uiState.update { it.copy(isNotShared = false, canAdd = access.canEdit) }
+              _uiState.update { it.copy(isNotShared = false, canAdd = access.canAdd) }
             }
           }
           .flatMapLatest(::journalOf)

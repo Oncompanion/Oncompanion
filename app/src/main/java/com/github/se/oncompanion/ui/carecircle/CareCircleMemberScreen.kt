@@ -275,6 +275,9 @@ private fun MemberDetails(
       Subheader(stringResource(R.string.care_circle_member_can_see))
       CarePermission.entries.forEach { permission ->
         PermissionItem(permission = permission, granted = permission in member.permissions)
+        if (permission in CareCircleMemberDetails.ADDABLE_SECTIONS) {
+          CanAddItem(section = permission, allowed = permission in member.canAdd)
+        }
       }
     }
 
@@ -362,6 +365,20 @@ internal fun PermissionItem(permission: CarePermission, granted: Boolean) {
       modifier =
           Modifier.semantics(mergeDescendants = true) { toggleableState = ToggleableState(granted) }
               .testTag(C.Tag.careCircleMemberPermission(permission.name)),
+  )
+}
+
+/** Whether the member can also add to [section], read-only, indented under the section's row. */
+@Composable
+internal fun CanAddItem(section: CarePermission, allowed: Boolean) {
+  ListItem(
+      headlineContent = { Text(stringResource(R.string.permission_symptoms_add)) },
+      supportingContent = { Text(stringResource(R.string.permission_symptoms_add_description)) },
+      trailingContent = { Switch(checked = allowed, onCheckedChange = null) },
+      modifier =
+          Modifier.padding(start = 24.dp)
+              .semantics(mergeDescendants = true) { toggleableState = ToggleableState(allowed) }
+              .testTag(C.Tag.careCircleMemberCanAdd(section.name)),
   )
 }
 

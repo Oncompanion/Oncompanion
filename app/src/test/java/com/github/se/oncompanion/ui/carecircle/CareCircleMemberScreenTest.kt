@@ -388,4 +388,23 @@ class CareCircleMemberScreenTest {
       assertEquals(1, navigationActions.backCalls)
     }
   }
+
+  // ---- adding symptoms (US-22) ----
+
+  @Test
+  fun member_showsWhetherTheyCanAddSymptoms() {
+    setContent(
+        CareCircleMemberUiState.Member(
+            marc.copy(
+                permissions = setOf(CarePermission.SYMPTOMS),
+                canAdd = setOf(CarePermission.SYMPTOMS),
+            )
+        )
+    )
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleMemberCanAdd(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .assertIsOn()
+  }
 }

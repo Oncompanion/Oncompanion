@@ -18,9 +18,15 @@ sealed interface SectionAccess {
   /**
    * [ownerUid]'s data of the section may be read.
    *
-   * @property canEdit whether add, edit and delete may be offered: only for the user's own data
+   * @property canEdit whether edit and delete may be offered: only for the user's own data
+   * @property canAdd whether adding may be offered: for the user's own data, or when the patient
+   *   lets the caregiver add to this section (US-22)
    */
-  data class Readable(val ownerUid: String, val canEdit: Boolean) : SectionAccess
+  data class Readable(
+      val ownerUid: String,
+      val canEdit: Boolean,
+      val canAdd: Boolean = canEdit,
+  ) : SectionAccess
 
   /** The patient a caregiver follows doesn't share this section with them. */
   data object NotShared : SectionAccess
@@ -64,7 +70,11 @@ class ResolveSectionAccess(
                 CareAccess.Denied -> SectionAccess.NoAccess
                 is CareAccess.Granted ->
                     if (access.canSee(section))
-                        SectionAccess.Readable(access.ownerUid, access.canEdit)
+                        SectionAccess.Readable(
+                            access.ownerUid,
+                            access.canEdit,
+                            canAdd = access.canEdit || section in access.addable,
+                        )
                     else SectionAccess.NotShared
               }
             }

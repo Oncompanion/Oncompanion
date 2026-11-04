@@ -12,6 +12,8 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
+import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.Duration
@@ -134,14 +136,22 @@ data class AddSymptomUiState(
  * With [symptomId], it edits that symptom (US-09): the form starts from what was logged and every
  * field can be changed. Nothing is saved before the user taps Save.
  *
+ * In caregiver mode (US-22), it logs the symptom in the journal of [patientUid], signed with the
+ * caregiver's uid and first name; the rules only accept it if the patient lets them add symptoms.
+ *
  * @param clock the current time, and the time zone the day and time are chosen in
  * @param symptomId the symptom to edit, or `null` to log a new one
+ * @param patientUid in caregiver mode, the patient whose journal gets the symptom; null for the
+ *   user's own
+ * @param profileRepository the caregiver's profile, for the first name the symptom is signed with
  */
 class AddSymptomViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val symptomId: String? = null,
+    private val patientUid: String? = null,
+    private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState =
@@ -277,8 +287,14 @@ class AddSymptomViewModel(
     _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
-        if (symptomId == null) symptomRepository.addSymptom(uid, entry)
-        else symptomRepository.updateSymptom(uid, entry)
+        if (symptomId != null) symptomRepository.updateSymptom(uid, entry)
+        else if (patientUid == null) symptomRepository.addSymptom(uid, entry)
+        // A caregiver's symptom goes in the patient's journal, signed with who added it
+        else
+            symptomRepository.addSymptom(
+                patientUid,
+                entry.copy(addedBy = uid, addedByName = caregiverName(uid)),
+            )
         _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
         throw e
@@ -288,6 +304,18 @@ class AddSymptomViewModel(
       }
     }
   }
+
+  /**
+   * The caregiver's first name, from their profile (in the local cache, also offline), or else from
+   * their Google account.
+   */
+  private suspend fun caregiverName(uid: String): String =
+      runCatching { profileRepository.observeProfile(uid).first()?.firstName }
+          .getOrNull()
+          ?.takeIf { it.isNotBlank() }
+          ?.take(SymptomEntry.MAX_ADDED_BY_NAME_LENGTH)
+          ?: runCatching { authRepository.currentUser?.firstNameGuess() }.getOrNull()
+          ?: DEFAULT_CAREGIVER_NAME
 
   /** The error has been shown. */
   fun clearError() {
@@ -321,6 +349,12 @@ class AddSymptomViewModel(
 
   private companion object {
     const val TAG = "AddSymptomViewModel"
+
+    /**
+     * Stored as the name of a caregiver with neither a profile name nor a Google name, which
+     * onboarding prevents: the rules need a name, and the uid still says who it was.
+     */
+    const val DEFAULT_CAREGIVER_NAME = "Caregiver"
   }
 }
 

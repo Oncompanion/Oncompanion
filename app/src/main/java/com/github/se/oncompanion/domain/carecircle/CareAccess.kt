@@ -36,11 +36,13 @@ sealed interface CareAccess {
    * @property sections what may be shown: every section for the patient's own data, only the shared
    *   ones for a caregiver
    * @property isOwn true for the patient's own data, false when a caregiver looks at a patient's
+   * @property addable the sections a caregiver may also add to (`canAdd`, US-22), among [sections]
    */
   data class Granted(
       val ownerUid: String,
       val sections: Set<CarePermission>,
       val isOwn: Boolean,
+      val addable: Set<CarePermission> = emptySet(),
   ) : CareAccess {
 
     /** Whether [section] of [ownerUid]'s data may be shown. */

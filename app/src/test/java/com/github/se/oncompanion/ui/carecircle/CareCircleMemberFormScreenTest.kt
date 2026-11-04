@@ -96,6 +96,10 @@ class CareCircleMemberFormScreenTest {
           },
           onSave = { saves++ },
           onBack = { backs++ },
+          onCanAddChange = { section, allowed ->
+            state =
+                state.copy(canAdd = if (allowed) state.canAdd + section else state.canAdd - section)
+          },
       )
     }
   }
@@ -521,5 +525,33 @@ class CareCircleMemberFormScreenTest {
     }
     node(C.Tag.care_circle_form_back_button).performClick()
     compose.runOnIdle { assertEquals(1, backs) }
+  }
+
+  // ---- adding symptoms (US-22) ----
+
+  @Test
+  fun allowAddingSymptoms_isGreyedOut_untilSymptomsAreShared() {
+    content(complete)
+    val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(CarePermission.SYMPTOMS.name))
+
+    canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
+
+    compose
+        .onNodeWithTag(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .performClick()
+    canAdd.performScrollTo().assertIsEnabled().performClick()
+
+    canAdd.assertIsOn()
+    assertEquals(setOf(CarePermission.SYMPTOMS), state.canAdd)
+  }
+
+  @Test
+  fun allowAdding_isOnlyOfferedUnderSymptoms() {
+    content(complete)
+
+    for (section in CarePermission.entries - CarePermission.SYMPTOMS) {
+      compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name)).assertDoesNotExist()
+    }
   }
 }

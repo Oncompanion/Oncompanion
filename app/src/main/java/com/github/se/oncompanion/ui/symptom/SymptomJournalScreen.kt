@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.symptom
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.severity
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
@@ -205,8 +207,15 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(entry.title(), style = MaterialTheme.typography.titleMedium) },
         supportingContent =
-            summary?.let { text ->
-              { Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            if (summary == null && entry.addedByName == null) null
+            else {
+              {
+                Column {
+                  summary?.let { Text(text = it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                  // A symptom a caregiver logged for the patient says who did
+                  entry.addedByName?.let { AddedBy(it) }
+                }
+              }
             },
         trailingContent = {
           Text(
