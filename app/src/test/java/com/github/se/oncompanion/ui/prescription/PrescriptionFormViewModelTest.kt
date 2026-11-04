@@ -15,6 +15,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -33,6 +34,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -117,8 +119,7 @@ class PrescriptionFormViewModelTest {
     assertEquals(today, viewModel.state.draft.prescribedOn)
     assertEquals(listOf(MedicationDraft(startDate = today)), viewModel.medications)
     assertEquals(0, viewModel.state.openMedication)
-    assertFalse(viewModel.state.isSaving)
-    assertFalse(viewModel.state.isSaved)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -653,7 +654,7 @@ class PrescriptionFormViewModelTest {
 
     val saved = fakeMedications.prescriptionsOf(uid).single()
     assertEquals(listOf("Ondansetron", "Dexamethasone"), saved.medications.map { it.name })
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
   }
 
   @Test
@@ -672,8 +673,7 @@ class PrescriptionFormViewModelTest {
     assertEquals("Ondansetron 8 mg", saved.medications.single().name)
     assertEquals(today, saved.medications.single().startDate)
     assertEquals(5, saved.medications.single().durationDays)
-    assertTrue(viewModel.state.isSaved)
-    assertFalse(viewModel.state.isSaving)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -685,8 +685,7 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
-    assertFalse(viewModel.state.isSaved)
-    assertFalse(viewModel.state.isSaving)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -700,15 +699,13 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
 
-    assertTrue(viewModel.state.isSaving)
-    assertFalse(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVING, viewModel.state.save)
     assertFalse(viewModel.state.canSave)
 
     gate.complete(Unit)
     advanceUntilIdle()
 
-    assertFalse(viewModel.state.isSaving)
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
   }
 
   /** Every change the user can make to the form. */
@@ -751,7 +748,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
     val saved = viewModel.state
-    assertTrue(saved.isSaved)
+    assertEquals(SavePhase.SAVED, saved.save)
 
     viewModel.editEverything()
 
@@ -797,8 +794,7 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertEquals(PrescriptionFormError.NOT_SIGNED_IN, viewModel.state.error)
-    assertFalse(viewModel.state.isSaving)
-    assertFalse(viewModel.state.isSaved)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
   }
 
@@ -812,15 +808,14 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
-    assertFalse(viewModel.state.isSaving)
-    assertFalse(viewModel.state.isSaved)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertEquals("Ondansetron 8 mg", viewModel.medication.name)
 
     fakeMedications.writeError = null
     viewModel.save()
     advanceUntilIdle()
 
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
     assertEquals(1, fakeMedications.prescriptionsOf(uid).size)
   }
@@ -1115,7 +1110,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
 
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertEquals("Dr. House", fakeMedications.prescriptionsOf(uid).single().prescribedBy)
   }
 
@@ -1160,7 +1155,7 @@ class PrescriptionFormViewModelTest {
     assertEquals(0, viewModel.state.openMedication)
     assertTrue(viewModel.state.canSave)
     assertTrue(viewModel.state.invalidMedications.isEmpty())
-    assertFalse(viewModel.state.isSaved)
+    assertNotEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -1288,7 +1283,7 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
-    assertFalse(viewModel.state.isSaved)
+    assertNotEquals(SavePhase.SAVED, viewModel.state.save)
   }
 
   @Test
@@ -1309,8 +1304,7 @@ class PrescriptionFormViewModelTest {
                 listOf(saved.medications[0].copy(dosage = "2 tablets"), saved.medications[1]),
         )
     assertEquals(listOf(expected), fakeMedications.prescriptionsOf(uid))
-    assertTrue(viewModel.state.isSaved)
-    assertFalse(viewModel.state.isSaving)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -1343,8 +1337,7 @@ class PrescriptionFormViewModelTest {
 
     assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
     assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
-    assertFalse(viewModel.state.isSaving)
-    assertFalse(viewModel.state.isSaved)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertEquals("Dr. House", viewModel.state.draft.prescribedBy)
     assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
 
@@ -1352,7 +1345,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
 
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
     assertEquals(
         listOf(saved.copy(prescribedBy = "Dr. House")),
@@ -1369,7 +1362,7 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertEquals(PrescriptionFormError.NOT_SIGNED_IN, viewModel.state.error)
-    assertFalse(viewModel.state.isSaved)
+    assertNotEquals(SavePhase.SAVED, viewModel.state.save)
     assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
   }
 
@@ -1383,8 +1376,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
 
-    assertFalse(viewModel.state.isSaved)
-    assertFalse(viewModel.state.isSaving)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
     assertFalse(viewModel.state.canSave)
     assertNull(viewModel.state.error)
@@ -1402,7 +1394,7 @@ class PrescriptionFormViewModelTest {
 
     assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
     assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
-    assertFalse(viewModel.state.isSaved)
+    assertNotEquals(SavePhase.SAVED, viewModel.state.save)
     assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
   }
 
@@ -1435,7 +1427,7 @@ class PrescriptionFormViewModelTest {
 
     assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
     assertFalse(viewModel.state.canSave)
-    assertFalse(viewModel.state.isSaved)
+    assertNotEquals(SavePhase.SAVED, viewModel.state.save)
     assertNull(viewModel.state.error)
   }
 
@@ -1519,7 +1511,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
 
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
     assertEquals("Dr. House", viewModel.state.draft.prescribedBy)
   }
@@ -1531,7 +1523,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
     val done = viewModel.state
-    assertTrue(done.isSaved)
+    assertEquals(SavePhase.SAVED, done.save)
 
     fakeMedications.updatePrescription(uid, saved.copy(prescribedBy = "Dr. Leroy"))
     advanceUntilIdle()
@@ -1556,8 +1548,7 @@ class PrescriptionFormViewModelTest {
     gate.complete(Unit)
     advanceUntilIdle()
 
-    assertFalse(viewModel.state.isSaved)
-    assertFalse(viewModel.state.isSaving)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
     assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
     assertTrue(fakeMedications.prescriptionsOf(uid).isEmpty())
   }
@@ -1571,7 +1562,7 @@ class PrescriptionFormViewModelTest {
     viewModel.save()
     advanceUntilIdle()
     val saving = viewModel.state
-    assertTrue(saving.isSaving)
+    assertEquals(SavePhase.SAVING, saving.save)
 
     fakeMedications.updatePrescription(uid, saved.copy(prescribedBy = "Dr. Leroy"))
     advanceUntilIdle()
@@ -1582,7 +1573,7 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     // The last save wins: this one reached the repository after the other device's
-    assertTrue(viewModel.state.isSaved)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
     assertEquals("Dr. Martin", fakeMedications.prescriptionsOf(uid).single().prescribedBy)
   }
 

@@ -77,6 +77,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.roundToInt
@@ -118,7 +119,7 @@ fun AddSymptomScreen(
 
   // Leaves the screen once the symptom is saved
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) currentOnSaved() }
+  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
 
   // Keeps the time shown (and the check that the chosen time isn't later) current while the form
   // is on screen: refreshes when it comes back, then each time a new minute starts
@@ -172,7 +173,7 @@ fun AddSymptomContent(
 ) {
   // Not while saving or once saved: the screen then leaves by itself, and going back as well would
   // also leave the journal
-  BackHandler(enabled = uiState.isSaving || uiState.isSaved) {}
+  BackHandler(enabled = uiState.save != SavePhase.EDITING) {}
 
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
@@ -204,7 +205,7 @@ fun AddSymptomContent(
               // out would go back twice
               IconButton(
                   onClick = onBack,
-                  enabled = !uiState.isSaving && !uiState.isSaved,
+                  enabled = uiState.save == SavePhase.EDITING,
                   modifier = Modifier.testTag(C.Tag.symptom_add_close),
               ) {
                 Icon(Icons.Default.Close, stringResource(R.string.symptom_add_close))
@@ -223,7 +224,7 @@ fun AddSymptomContent(
                       else R.string.symptom_add_save
                   ),
               enabled = uiState.canSave,
-              isSaving = uiState.isSaving,
+              isSaving = uiState.save == SavePhase.SAVING,
               onClick = onSave,
               testTag = C.Tag.symptom_add_save,
               savingTestTag = C.Tag.symptom_add_saving,

@@ -39,9 +39,11 @@ import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -287,7 +289,7 @@ class InformationScreenTest {
 
   @Test
   fun content_saving_showsProgressInsteadOfText_andDisablesContinue() {
-    setContent(OnboardingUiState(firstName = "Alex", isSaving = true))
+    setContent(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVING))
     composeTestRule.onNodeWithTag(C.Tag.onboarding_saving, useUnmergedTree = true).assertExists()
     assertTextDoesNotExist(R.string.onboarding_continue)
     continueButton().assertIsNotEnabled()
@@ -298,10 +300,10 @@ class InformationScreenTest {
 
   @Test
   fun content_savingFinishedWithError_showsTextAgainWithoutProgress() {
-    setContent(OnboardingUiState(firstName = "Alex", isSaving = true))
+    setContent(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVING))
     composeTestRule.onNodeWithTag(C.Tag.onboarding_saving, useUnmergedTree = true).assertExists()
 
-    uiState = uiState.copy(isSaving = false)
+    uiState = uiState.copy(save = SavePhase.EDITING)
     composeTestRule
         .onNodeWithTag(C.Tag.onboarding_saving, useUnmergedTree = true)
         .assertDoesNotExist()
@@ -311,7 +313,7 @@ class InformationScreenTest {
 
   @Test
   fun content_saved_disablesContinue() {
-    setContent(OnboardingUiState(firstName = "Alex", isSaved = true))
+    setContent(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVED))
     continueButton().assertIsNotEnabled()
     composeTestRule
         .onNodeWithTag(C.Tag.onboarding_saving, useUnmergedTree = true)
@@ -345,7 +347,7 @@ class InformationScreenTest {
 
   @Test
   fun content_errorAppearingLater_showsTheSnackbar() {
-    setContent(OnboardingUiState(firstName = "Alex", isSaving = true))
+    setContent(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVING))
     assertTextDoesNotExist(R.string.onboarding_error_save_failed)
 
     uiState = OnboardingUiState(firstName = "Alex", error = OnboardingError.SAVE_FAILED)
@@ -486,7 +488,7 @@ class InformationScreenTest {
     composeTestRule.waitForIdle()
     composeTestRule.runOnIdle {
       assertEquals(1, savedCalls)
-      assertTrue(viewModel.uiState.value.isSaved)
+      assertEquals(SavePhase.SAVED, viewModel.uiState.value.save)
       val saved = profiles.profiles["uid-1"]!!
       assertEquals(Role.PATIENT, saved.role)
       assertEquals("Sam", saved.firstName)
@@ -546,7 +548,7 @@ class InformationScreenTest {
     composeTestRule.runOnIdle {
       assertEquals(0, savedCalls)
       assertTrue(profiles.profiles.isEmpty())
-      assertTrue(!viewModel.uiState.value.isSaved)
+      assertNotEquals(SavePhase.SAVED, viewModel.uiState.value.save)
     }
     // The user can try again
     continueButton().assertIsEnabled()
@@ -562,7 +564,7 @@ class InformationScreenTest {
     composeTestRule.runOnIdle {
       assertEquals(0, savedCalls)
       assertTrue(profiles.profiles.isEmpty())
-      assertTrue(!viewModel.uiState.value.isSaved)
+      assertNotEquals(SavePhase.SAVED, viewModel.uiState.value.save)
     }
   }
 

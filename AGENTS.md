@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 # AGENTS.md
 
 Rules for coding agents (Claude Code, Codex, Copilot, etc.) working on Oncompanion.
@@ -37,6 +38,7 @@ com.github.se.oncompanion/
 - **Model**: plain data classes. Repositories hide Firebase behind an interface (e.g. `SymptomRepository` / `SymptomRepositoryFirestore`) so ViewModels can be tested with a fake.
   - Repositories access Firebase **lazily** (`by lazy`), never in their constructor: each provider builds its repository once, the first time it is used (e.g. by a ViewModel default), and Firebase isn't initialized in Robolectric tests.
 - **ViewModel**: exposes UI state as one `StateFlow<XUiState>`, takes its repositories in the constructor, no Android `Context` and no Compose imports.
+  - A form tracks its save with one `SavePhase` (`ui/common`): `EDITING`, `SAVING`, then `SAVED`. Never two `isSaving` / `isSaved` Booleans, which could both be true.
 - **View**: each screen is split in two:
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.

@@ -19,6 +19,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
@@ -69,8 +70,7 @@ enum class PrescriptionFormLoad {
  *   start date. Until then it follows the date of the prescription.
  * @property nameTouched for each medication of the draft, in order: whether the user edited its
  *   name or left it for another medication. A missing name is only flagged from then on.
- * @property isSaving the prescription is being saved
- * @property isSaved the prescription is saved: the form is done
+ * @property save where saving the prescription is; once [SavePhase.SAVED], the form is done
  * @property error why the last save failed, until it has been shown
  * @property isEditing the form corrects a saved prescription instead of adding a new one
  * @property load whether the form can be filled in. Until it is [PrescriptionFormLoad.READY],
@@ -85,8 +85,7 @@ data class PrescriptionFormUiState(
     val openMedication: Int = 0,
     val startDateChosen: List<Boolean> = draft.medications.map { true },
     val nameTouched: List<Boolean> = draft.medications.map { true },
-    val isSaving: Boolean = false,
-    val isSaved: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val error: PrescriptionFormError? = null,
     val isEditing: Boolean = false,
     val load: PrescriptionFormLoad = PrescriptionFormLoad.READY,
@@ -115,7 +114,7 @@ data class PrescriptionFormUiState(
    * being saved.
    */
   val canSave: Boolean
-    get() = load == PrescriptionFormLoad.READY && draft.isValid() && !isSaving && !isSaved
+    get() = load == PrescriptionFormLoad.READY && draft.isValid() && save == SavePhase.EDITING
 }
 
 /**
@@ -234,13 +233,13 @@ class PrescriptionFormViewModel(
   private fun show(saved: Prescription?) {
     val state = _uiState.value
     // Once saved, the form is done: what arrives next is its own save
-    if (state.isSaved) return
+    if (state.save == SavePhase.SAVED) return
     if (saved == null) {
       _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
       return
     }
     // While saving, the form keeps showing what is being saved
-    if (state.isSaving) return
+    if (state.save == SavePhase.SAVING) return
     val draft = saved.toDraft().cutToLimits()
     // A form in use is left alone if the user changed it, and also if the same content arrives
     // again (e.g. the server confirmed it), which would close the medication they opened
@@ -415,7 +414,7 @@ class PrescriptionFormViewModel(
       _uiState.update { it.copy(error = PrescriptionFormError.NOT_SIGNED_IN) }
       return
     }
-    _uiState.update { it.copy(isSaving = true, error = null) }
+    _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
         val stillExists =
@@ -427,14 +426,16 @@ class PrescriptionFormViewModel(
           // Deleted since the form was opened, or while saving (the repository then writes
           // nothing): there is nothing left to correct
           if (stillExists && it.load != PrescriptionFormLoad.NOT_FOUND) {
-            it.copy(isSaving = false, isSaved = true)
-          } else it.copy(isSaving = false, load = PrescriptionFormLoad.NOT_FOUND)
+            it.copy(save = SavePhase.SAVED)
+          } else it.copy(save = SavePhase.EDITING, load = PrescriptionFormLoad.NOT_FOUND)
         }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         Log.e(TAG, "Failed to save the prescription", e)
-        _uiState.update { it.copy(isSaving = false, error = PrescriptionFormError.SAVE_FAILED) }
+        _uiState.update {
+          it.copy(save = SavePhase.EDITING, error = PrescriptionFormError.SAVE_FAILED)
+        }
       }
     }
   }
@@ -451,7 +452,7 @@ class PrescriptionFormViewModel(
    */
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
     _uiState.update { state ->
-      val locked = state.load != PrescriptionFormLoad.READY || state.isSaving || state.isSaved
+      val locked = state.load != PrescriptionFormLoad.READY || state.save != SavePhase.EDITING
       if (locked) state else transform(state)
     }
   }

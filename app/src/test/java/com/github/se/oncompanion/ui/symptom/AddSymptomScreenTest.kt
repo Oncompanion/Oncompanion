@@ -38,6 +38,7 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
@@ -230,7 +231,7 @@ class AddSymptomScreenTest {
 
   @Test
   fun saving_showsTheSpinner_andDisablesSaveAndClose() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
 
     node(C.Tag.symptom_add_saving).assertIsDisplayed()
     node(C.Tag.symptom_add_save).assertIsNotEnabled()
@@ -239,7 +240,7 @@ class AddSymptomScreenTest {
 
   @Test
   fun saved_disablesClose() {
-    setContent(filled.copy(isSaved = true))
+    setContent(filled.copy(save = SavePhase.SAVED))
 
     node(C.Tag.symptom_add_close).assertIsNotEnabled()
   }
@@ -275,10 +276,10 @@ class AddSymptomScreenTest {
 
   @Test
   fun systemBack_isIgnored_whileSavingAndOnceSaved() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
     composeTestRule.runOnIdle { backDispatcher.onBackPressed() }
 
-    uiState = filled.copy(isSaved = true)
+    uiState = filled.copy(save = SavePhase.SAVED)
     composeTestRule.runOnIdle { backDispatcher.onBackPressed() }
 
     assertTrue(events.isEmpty())

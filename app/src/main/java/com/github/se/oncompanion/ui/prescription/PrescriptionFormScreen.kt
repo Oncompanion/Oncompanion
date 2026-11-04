@@ -70,6 +70,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -100,7 +101,7 @@ fun PrescriptionFormScreen(
 
   // Leaves the form once the prescription is saved
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) currentOnSaved() }
+  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
 
   PrescriptionFormContent(
       uiState = uiState,
@@ -287,7 +288,7 @@ private fun FormTopBar(
         // out would go back twice
         IconButton(
             onClick = onClose,
-            enabled = !uiState.isSaving && !uiState.isSaved,
+            enabled = uiState.save == SavePhase.EDITING,
             modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
         ) {
           Icon(
@@ -617,7 +618,7 @@ private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit)
   SaveButton(
       text = stringResource(R.string.prescription_form_save),
       enabled = uiState.canSave,
-      isSaving = uiState.isSaving,
+      isSaving = uiState.save == SavePhase.SAVING,
       onClick = onSave,
       testTag = C.Tag.prescription_form_save_button,
       savingTestTag = C.Tag.prescription_form_saving,

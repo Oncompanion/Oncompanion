@@ -43,6 +43,7 @@ import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
 import java.time.Clock
 import java.time.LocalDate
@@ -482,7 +483,7 @@ class PrescriptionFormScreenTest {
 
   @Test
   fun savingShowsASpinnerAndDisablesSave() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
 
     node(C.Tag.prescription_form_saving).assertExists()
     node(C.Tag.prescription_form_save_button).assertIsNotEnabled()
@@ -490,14 +491,14 @@ class PrescriptionFormScreenTest {
 
   @Test
   fun closeIsDisabledWhileSaving() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
 
     node(C.Tag.prescription_form_close_button).assertIsNotEnabled()
   }
 
   @Test
   fun closeIsDisabledOnceSaved() {
-    setContent(filled.copy(isSaved = true))
+    setContent(filled.copy(save = SavePhase.SAVED))
 
     node(C.Tag.prescription_form_close_button).assertIsNotEnabled()
   }
