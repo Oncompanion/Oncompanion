@@ -9,15 +9,23 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
 import com.github.se.oncompanion.ui.navigation.NavigationActions
+import com.github.se.oncompanion.ui.profile.ProfileScreen
+import com.github.se.oncompanion.ui.profile.ProfileViewModel
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -63,5 +71,38 @@ class LandscapeRotationTest {
     show()
     compose.onNodeWithTag(C.Tag.planningDay(day.plusWeeks(1).toString())).assertIsSelected()
     compose.runOnIdle { assertEquals(day.plusWeeks(1), vm.uiState.value.selectedDate) }
+  }
+
+  /** Rotation does not dismiss sign-out confirmation or prematurely navigate out of Profile. */
+  @Test
+  fun profileRetainsSignOutConfirmationAcrossActivityRecreation() {
+    val auth = FakeAuthRepository { AuthUser(it) }
+    runTest { auth.signInWithGoogle("patient") }
+    val profiles =
+        FakeUserProfileRepository().apply { seed(UserProfile("patient", Role.PATIENT, "Alex")) }
+    val vm = ProfileViewModel(auth, profiles)
+    var signedOut = 0
+    fun show() = compose.runOnUiThread {
+      compose.activity.setContent {
+        OncompanionTheme {
+          ProfileScreen(
+              {},
+              { signedOut++ },
+              {},
+              viewModel = vm,
+              credentialProvider = FakeGoogleCredentialProvider(),
+          )
+        }
+      }
+    }
+    show()
+    compose.onNodeWithTag(C.Tag.profile_sign_out).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_dialog).assertIsDisplayed()
+    compose.activityRule.scenario.recreate()
+    show()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_dialog).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_cancel).performClick()
+    compose.onNodeWithTag(C.Tag.profile_sign_out_dialog).assertDoesNotExist()
+    assertEquals(0, signedOut)
   }
 }
