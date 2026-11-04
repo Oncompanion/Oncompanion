@@ -9,7 +9,7 @@ android
 ## Users
 
 - **Patients in active cancer therapy** (primary). Often exhausted, cognitively overloaded ("chemo brain"), sometimes nauseous or in pain. They use the app at home, in waiting rooms and at appointments, often on their worst days. Their job: record how they feel with the least possible effort, keep track of medications and appointments, and prepare for consultations.
-- **Relatives in the patient's care circle.** Join through an invite code and follow the patient's care, read-only, for the sections the patient chose to share. If the patient allows it, they can log a symptom in the patient's journal (signed with their name); they never edit or delete anything.
+- **Relatives in the patient's care circle.** Join through an invite code and follow the patient's care in the sections the patient chose to share (planning, events, symptoms, prescriptions). In a section where the patient also allows it, they can add entries (e.g. log a symptom), each signed with their name; they never edit or delete anything.
 - Ligue genevoise staff are **not** users of the app. They keep the events and the directory of contacts and support programs up to date outside the app.
 
 ## Product Purpose

@@ -330,7 +330,7 @@ Anything the app drafts (a scanned prescription, what voice picked up) lands in 
 Camera, microphone and notifications are asked for when first needed. When refused, the screen explains it in one sentence, offers **Open settings**, and always a way without it (Enter manually, Type instead).
 
 ### Caregiver mode
-The same screens, read-only. The Overview title is "Alex's care ▾" (tap to switch person). No add, edit or delete actions, except logging a symptom when the patient allows it. A section the patient doesn't share says so ("Alex doesn't share Planning with you"), never an empty screen.
+The same screens, read-only by default. The Overview title is "Alex's care ▾" (tap to switch person). No edit or delete actions; the add action shows only in a section where the patient allows it (e.g. logging a symptom), and what a caregiver adds is marked "Added by" with their name. A section the patient doesn't share says so ("Alex doesn't share Planning with you"), never an empty screen.
 
 ### Voice
 "Speak instead" at the top of Log symptoms opens *Speak your symptoms*: the microphone floats on the Paper lake with ripples while listening, the words appear as they are said, and what was picked up shows as dawn chips. Done returns to the form, filled and marked to check.
