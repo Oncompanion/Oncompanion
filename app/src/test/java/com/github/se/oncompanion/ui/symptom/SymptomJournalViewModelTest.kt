@@ -3,9 +3,11 @@
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -261,5 +263,41 @@ class SymptomJournalViewModelTest {
       AuthRepositoryProvider.repository = auth
       SymptomRepositoryProvider.repository = symptoms
     }
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      SymptomJournalViewModel(
+          signedIn("caregiver"),
+          repository,
+          clock,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_symptomsShared_showsThePatientsJournal_withoutAdding() {
+    repository.seed("patient", entry("p1", clock.instant().toString()))
+    repository.seed("caregiver", entry("own", clock.instant().toString()))
+
+    val state = caregiverViewModel(CarePermission.SYMPTOMS).uiState.value
+
+    assertEquals(listOf("p1"), state.days.flatMap { day -> day.entries.map { it.entry.id } })
+    assertFalse(state.canAdd)
+    assertFalse(state.isNotShared)
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_isNotShared_withNoEntries() {
+    repository.seed("patient", entry("p1", clock.instant().toString()))
+
+    val state = caregiverViewModel(CarePermission.PLANNING).uiState.value
+
+    assertTrue(state.isNotShared)
+    assertTrue(state.days.isEmpty())
+    assertFalse(state.isLoading)
+    assertFalse(state.hasError)
+    assertFalse(state.canAdd)
   }
 }

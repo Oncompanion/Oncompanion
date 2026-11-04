@@ -34,6 +34,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.planning.ownPlanning
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -613,5 +614,21 @@ class OverviewScreenTest {
     setCaregiverContent(loaded.copy(isNotShared = true))
 
     composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  fun caregiver_getsTheSymptomsTile_onlyWhenShared() {
+    setCaregiverContent(loaded.copy(sharedSections = setOf(CarePermission.SYMPTOMS)))
+
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_withNothingShared_hasNoShortcuts() {
+    setCaregiverContent(loaded)
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
   }
 }

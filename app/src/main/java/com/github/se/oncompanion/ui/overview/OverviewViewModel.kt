@@ -6,10 +6,13 @@ package com.github.se.oncompanion.ui.overview
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
+import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.domain.planning.CarePlanning
 import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -29,6 +32,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -93,6 +98,7 @@ data class TodayEntry(
  * @property isLoading true until the planning data arrives
  * @property hasError true if it couldn't be loaded
  * @property isNotShared in caregiver mode, the patient doesn't share their planning: no entries
+ * @property sharedSections in caregiver mode, the sections behind the shortcuts the patient shares
  */
 data class OverviewUiState(
     val now: LocalDateTime,
@@ -102,6 +108,7 @@ data class OverviewUiState(
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     val isNotShared: Boolean = false,
+    val sharedSections: Set<CarePermission> = emptySet(),
 )
 
 /**
@@ -115,6 +122,7 @@ data class OverviewUiState(
  * @param clock the current time
  * @param zoneId the time zone the day is shown in
  * @param patientUid in caregiver mode, the patient whose day is shown; null for the user's own
+ * @param resolveSection whether the patient shares the sections behind the shortcuts
  */
 class OverviewViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -123,6 +131,7 @@ class OverviewViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val patientUid: String? = null,
+    private val resolveSection: ResolveSectionAccess = ResolveSectionAccess(),
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(OverviewUiState(now = now()))
@@ -136,6 +145,24 @@ class OverviewViewModel(
   init {
     loadFirstName()
     loadDay()
+    if (patientUid != null) followSharedSymptoms(patientUid)
+  }
+
+  /** In caregiver mode, whether the patient shares their symptoms, for the Symptoms shortcut. */
+  private fun followSharedSymptoms(patientUid: String) {
+    viewModelScope.launch {
+      flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
+          .catch { e -> Log.w(TAG, "Couldn't check the shared symptoms", e) }
+          .collect { access ->
+            _uiState.update {
+              it.copy(
+                  sharedSections =
+                      if (access is SectionAccess.Readable) setOf(CarePermission.SYMPTOMS)
+                      else emptySet()
+              )
+            }
+          }
+    }
   }
 
   /**

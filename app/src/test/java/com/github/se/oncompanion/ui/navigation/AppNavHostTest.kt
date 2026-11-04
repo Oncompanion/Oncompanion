@@ -456,6 +456,45 @@ class AppNavHostTest {
   }
 
   @Test
+  fun caregiverMode_symptomsShared_opensThePatientsJournal_readOnly() {
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.SYMPTOMS))
+    val symptoms = FakeSymptomRepository()
+    symptoms.seed(
+        "p-anne",
+        SymptomEntry(
+            id = "anne-fatigue",
+            types = listOf(SymptomType.FATIGUE),
+            occurredAt = Instant.now().minus(1, ChronoUnit.HOURS),
+            notes = "Anne felt tired",
+        ),
+    )
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        symptomRepository = symptoms,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(OverviewShortcut.SYMPTOMS.testTag)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithText("Anne felt tired", substring = true)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+  }
+
+  @Test
   fun caregiverMode_planningNotShared_saysSoOnTheOverviewAndPlanning() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
     val planning = FakePlanningRepository()

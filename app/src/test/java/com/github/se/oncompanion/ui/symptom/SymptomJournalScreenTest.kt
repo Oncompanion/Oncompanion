@@ -15,6 +15,7 @@ import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
@@ -28,6 +29,8 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
@@ -39,6 +42,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class SymptomJournalScreenTest {
@@ -380,5 +384,44 @@ class SymptomJournalScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_retry).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).assertIsDisplayed()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: SymptomJournalUiState) {
+    composeTestRule.setContent {
+      SymptomJournalContent(
+          uiState = state,
+          onBack = {},
+          onEntryClick = {},
+          onAddClick = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsJournal_withoutTheAddButton() {
+    setCaregiverContent(filled.copy(canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_saysSo_insteadOfAnEmptyJournal() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Symptoms with you").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_empty).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_symptomsNotShared_isFullyVisibleInLandscape() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
   }
 }

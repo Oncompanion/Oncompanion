@@ -4,6 +4,7 @@
 package com.github.se.oncompanion.ui.overview
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.domain.planning.followedPlanning
 import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
@@ -455,7 +456,23 @@ class OverviewViewModelTest {
           clock = TestClock(now),
           zoneId = zone,
           patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
       )
+
+  @Test
+  fun caregiver_sharedSections_holdSymptoms_onlyWhenShared() {
+    assertEquals(
+        setOf(CarePermission.SYMPTOMS),
+        caregiverViewModel(planning(), CarePermission.SYMPTOMS).uiState.value.sharedSections,
+    )
+    assertTrue(
+        caregiverViewModel(planning(), CarePermission.PLANNING)
+            .uiState
+            .value
+            .sharedSections
+            .isEmpty()
+    )
+  }
 
   @Test
   fun caregiver_planningShared_showsThePatientsNextAppointment() {

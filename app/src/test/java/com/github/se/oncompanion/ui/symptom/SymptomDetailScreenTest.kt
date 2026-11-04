@@ -19,6 +19,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.navigation.NavHostController
@@ -477,5 +478,39 @@ class SymptomDetailScreenTest {
       assertEquals(listOf(fatigue), repository.symptoms("alice"))
       assertEquals(0, navigationActions.backCount)
     }
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: SymptomDetailUiState) {
+    composeTestRule.setContent {
+      SymptomDetailContent(
+          uiState = state,
+          onBack = {},
+          onRetry = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+          zone = ZoneOffset.UTC,
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsSymptom_withoutEditOrDelete() {
+    setCaregiverContent(loaded.copy(entry = fatigue, canEdit = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_saysSo_insteadOfNotFound() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canEdit = false))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Symptoms with you").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertDoesNotExist()
   }
 }
