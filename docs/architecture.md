@@ -115,10 +115,15 @@ This deliberately trades
 availability for compliance under paused instances and overlapping revisions. See the
 [backend runbook](../functions/README.md) for the guarantee, recovery procedure, tests and setup.
 
-The Android Search button remains disabled. Its response parser is compatible; its transport
-still needs Auth/App Check headers in a later PR before this endpoint can be wired into the app.
-The auth interface currently exposes identity but no Firebase ID-token accessor, and App Check is
-not integrated; add an injectable model/transport token boundary rather than Firebase calls in UI.
+The Android Search button remains disabled. `HospitalProxyClient` is an independent HTTP client
+with injectable token/transport boundaries and typed errors/retry hints. It reuses `Hospital` values
+but does not implement or replace `HospitalRepository`. The existing repository/provider and all UI
+remain unchanged. `FirebaseHospitalProxyTokens` lazily obtains Firebase ID and App Check tokens;
+debug/release source sets select debug attestation/Play Integrity when this client first needs it.
+No Firebase APIs are accessed during construction, and no production URL is supplied. Calls join
+`SessionAccess.operation` so sign-out cancels token waits and discards late HTTP results.
+See [Android proxy client setup](hospital-proxy-client.md) for registration and remaining integration.
+The planned repository-to-proxy arrows remain planned: no diagram topology changes in this step.
 The backend CI job runs type, format, unit and demo Firestore tests. `onCall` remains a team
 decision before Android integration: it improves token handling and URL privacy but requires a
 new Android SDK and transport contract. See the backend runbook for the comparison.
