@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -430,7 +431,7 @@ class InformationScreenTest {
   private fun setScreen(): OnboardingViewModel {
     val viewModel = OnboardingViewModel(auth, profiles)
     composeTestRule.setContent {
-      InformationScreen(viewModel = viewModel, onSaved = { savedCalls++ })
+      InformationScreen(viewModel = viewModel, onSaved = { savedCalls++ }, onSignedOut = {})
     }
     return viewModel
   }
@@ -520,7 +521,7 @@ class InformationScreenTest {
     val viewModel = OnboardingViewModel(auth, profiles)
     viewModel.selectRole(Role.CAREGIVER)
     composeTestRule.setContent {
-      InformationScreen(viewModel = viewModel, onSaved = { savedCalls++ })
+      InformationScreen(viewModel = viewModel, onSaved = { savedCalls++ }, onSignedOut = {})
     }
     cancerTypeField().assertDoesNotExist()
 
@@ -579,5 +580,55 @@ class InformationScreenTest {
 
     waitForNoText(string(R.string.onboarding_error_not_signed_in))
     composeTestRule.runOnIdle { assertNull(viewModel.uiState.value.error) }
+  }
+
+  @Test
+  fun useAnotherAccount_isBelowContinue_andAsksTheScreenToSwitch() {
+    var clicks = 0
+    composeTestRule.setContent {
+      InformationContent(
+          uiState = OnboardingUiState(email = "alex.martin@example.com"),
+          onFirstNameChange = {},
+          onFamilyNameChange = {},
+          onCancerTypeChange = {},
+          onContinue = {},
+          onErrorShown = {},
+          onUseAnotherAccount = { clicks++ },
+      )
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.onboarding_signed_in_as)
+        .performScrollTo()
+        .assertTextEquals(
+            context.getString(R.string.onboarding_signed_in_as, "alex.martin@example.com")
+        )
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_use_another_account).performClick()
+    composeTestRule.runOnIdle { assertEquals(1, clicks) }
+  }
+
+  @Test
+  fun useAnotherAccount_isDisabled_whileSavingOrOnceSavedOrSwitching() {
+    var uiState by mutableStateOf(OnboardingUiState())
+    composeTestRule.setContent {
+      InformationContent(
+          uiState = uiState,
+          onFirstNameChange = {},
+          onFamilyNameChange = {},
+          onCancerTypeChange = {},
+          onContinue = {},
+          onErrorShown = {},
+      )
+    }
+    val button = composeTestRule.onNodeWithTag(C.Tag.onboarding_use_another_account)
+    button.performScrollTo().assertIsEnabled()
+    for (busy in
+        listOf(
+            OnboardingUiState(isSaving = true),
+            OnboardingUiState(isSaved = true),
+            OnboardingUiState(accountSwitch = AccountSwitch.SIGNING_OUT),
+        )) {
+      uiState = busy
+      button.performScrollTo().assertIsNotEnabled()
+    }
   }
 }
