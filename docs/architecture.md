@@ -492,3 +492,12 @@ Care-circle members read a patient's data through rules that check `/users/{uid}
 It is read only: creating, editing and deleting stay with the patient in every collection. The profile (`/users/{uid}`) is never shared; the caregiver gets the patient's first name from their own `patients/{patientUid}` link. The rule reads the member doc on every request, so removing the member or turning a permission off stops the next server read and ends open listeners with `PERMISSION_DENIED`. Rules can't reach what is already cached on the caregiver's phone: the screens must stop showing a patient's section as soon as it is no longer shared or the caregiver is removed, and never fall back to the cache for it.
 
 A prescription is one document: the prescribing doctor and the date, stored once, and the list of its medications, each with its own ID, start date and duration. A prescription and its medications are always written together (one form, one use case), so keeping them in one document makes saving, replacing or deleting a prescription a single write. It can't be half saved, and its medications can't be partly known by a device that is offline, mixed when two devices edit at once, or left behind after a deletion. Planning, reminders and the appointment summary still work on single medications: the repository reads them out of the prescriptions, so they never deal with a prescription. Anything recorded per intake later (e.g. a medication marked as taken) would go in its own collection, not in the prescription.
+
+## Compact-height Profile and Planning (issue #260)
+
+Both screens reuse `isCompactHeight()` (window height below 480 dp). Planning puts its shared
+calendar header in the agenda's lazy list on compact windows; Profile lets its toolbar, details
+and actions share one scroll instead of pinning them around a small details viewport. Portrait
+keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
+use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
+feature diagrams document the layout behavior; the overview's core flows are unchanged.

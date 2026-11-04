@@ -1,3 +1,4 @@
+// Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +52,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignOutDialog
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -114,51 +118,44 @@ fun ProfileContent(
         onCancel = onCancelSignOut,
     )
   }
+  val compact = isCompactHeight()
+  val bodyModifier = if (compact) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
   Scaffold(
       modifier = modifier.testTag(C.Tag.profile_screen),
-      topBar = {
-        MediumTopAppBar(
-            title = { Text(stringResource(R.string.profile_screen_title)) },
-            navigationIcon = {
-              IconButton(
-                  onClick = onBack,
-                  enabled = !signingOut,
-                  modifier = Modifier.testTag(C.Tag.profile_back),
-              ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.profile_back),
-                )
-              }
-            },
-        )
-      },
+      topBar = { if (!compact) ProfileTopBar(onBack, signingOut) },
   ) { innerPadding ->
-    Column(Modifier.fillMaxSize().padding(innerPadding)) {
-      Box(Modifier.weight(1f)) {
+    // On short windows the toolbar, details and actions share one scroll, as in Edit Profile.
+    Column(
+        Modifier.fillMaxSize()
+            .padding(innerPadding)
+            .then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+    ) {
+      if (compact) ProfileTopBar(onBack, signingOut, WindowInsets(0))
+      Box(if (compact) Modifier.fillMaxWidth() else Modifier.weight(1f)) {
         when (profile) {
-          ProfileUiState.Loading -> ProfileLoading(modifier = Modifier.fillMaxSize())
+          ProfileUiState.Loading -> ProfileLoading(modifier = bodyModifier)
           ProfileUiState.SignedOut ->
               ProfileMessage(
                   message = stringResource(R.string.profile_signed_out),
                   testTag = C.Tag.profile_signed_out,
-                  modifier = Modifier.fillMaxSize(),
+                  modifier = bodyModifier,
               )
           ProfileUiState.MissingProfile ->
               ProfileMessage(
                   message = stringResource(R.string.profile_missing),
                   testTag = C.Tag.profile_missing,
-                  modifier = Modifier.fillMaxSize(),
+                  modifier = bodyModifier,
               )
           ProfileUiState.Error ->
               ProfileError(
-                  modifier = Modifier.fillMaxSize(),
+                  modifier = bodyModifier,
                   onRetry = onRetry,
               )
           is ProfileUiState.Loaded ->
               ProfileDetailsContent(
                   details = profile.details,
-                  modifier = Modifier.fillMaxSize(),
+                  scrollable = !compact,
+                  modifier = bodyModifier,
               )
           is ProfileUiState.ConfirmingSignOut,
           ProfileUiState.SignOutComplete -> Unit
@@ -187,15 +184,41 @@ fun ProfileContent(
   }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileTopBar(
+    onBack: () -> Unit,
+    signingOut: Boolean,
+    insets: WindowInsets = TopAppBarDefaults.windowInsets,
+) {
+  MediumTopAppBar(
+      windowInsets = insets,
+      title = { Text(stringResource(R.string.profile_screen_title)) },
+      navigationIcon = {
+        IconButton(
+            onClick = onBack,
+            enabled = !signingOut,
+            modifier = Modifier.testTag(C.Tag.profile_back),
+        ) {
+          Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = stringResource(R.string.profile_back),
+          )
+        }
+      },
+  )
+}
+
 @Composable
 private fun ProfileDetailsContent(
     details: ProfileDetails,
     modifier: Modifier = Modifier,
+    scrollable: Boolean = true,
 ) {
   Column(
       modifier =
           modifier
-              .verticalScroll(rememberScrollState())
+              .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
               .padding(horizontal = 16.dp, vertical = 24.dp),
       verticalArrangement = Arrangement.spacedBy(24.dp),
   ) {
