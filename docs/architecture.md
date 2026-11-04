@@ -6,7 +6,7 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows every part of the app in its layer. Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
