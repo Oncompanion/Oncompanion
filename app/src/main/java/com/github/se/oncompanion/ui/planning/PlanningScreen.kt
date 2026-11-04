@@ -366,8 +366,16 @@ internal fun PlanningAgenda(
       }
     }
     if (state.isNotShared && caregiverOf != null) {
-      // The patient doesn't share their planning: say so rather than show an empty day
-      NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+      // Keep calendar navigation available without showing the patient's unshared entries.
+      Column(
+          Modifier.fillMaxWidth()
+              .then(
+                  if (header != null) Modifier.verticalScroll(rememberScrollState()) else Modifier
+              )
+      ) {
+        header?.invoke()
+        NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+      }
     } else if (
         (state.untimedItems.isEmpty() && state.scheduledItems.isEmpty()) &&
             !state.isLoading &&

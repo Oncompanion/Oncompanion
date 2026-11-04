@@ -130,18 +130,27 @@ class PlanningLandscapeTest {
     compose.onNodeWithTag(C.Tag.planning_today).performScrollTo().assertIsFullyVisible()
   }
 
-  /** Revoked caregiver access replaces the compact agenda without leaving patient rows visible. */
+  /** Revoking access hides entries but keeps the calendar usable in landscape. */
+  @Test fun compactCaregiverAgendaFollowsSharingChanges() = checkCaregiverSharingChanges()
+
+  /** Calendar navigation also stays reachable on a smaller landscape phone. */
   @Test
   @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
-  fun compactCaregiverAgendaFollowsSharingChanges() {
+  fun smallCompactCaregiverAgendaFollowsSharingChanges() = checkCaregiverSharingChanges()
+
+  private fun checkCaregiverSharingChanges() {
     var current by mutableStateOf(state())
+    var previous = 0
+    var next = 0
+    var today = 0
+    var selected: LocalDate? = null
     compose.setContent {
       OncompanionTheme {
         PlanningContent(
             current,
             day,
             zone,
-            PlanningActions({}, {}, {}, {}, {}),
+            PlanningActions({ selected = it }, { previous++ }, { next++ }, { today++ }, {}),
             caregiverOf = "Anne",
         )
       }
@@ -151,9 +160,21 @@ class PlanningLandscapeTest {
         .performScrollToNode(hasTestTag(C.Tag.planningItem(entries.last().key)))
     compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertIsFullyVisible()
     compose.runOnIdle { current = current.copy(isNotShared = true) }
-    compose.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.not_shared).performScrollTo().assertIsFullyVisible()
     compose.onNodeWithTag(C.Tag.planning_list).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertDoesNotExist()
+    // Check the controls before restoring access: restoring first would hide this regression.
+    for (tag in listOf(C.Tag.planning_previous, C.Tag.planning_next, C.Tag.planning_today)) {
+      compose.onNodeWithTag(tag).performScrollTo().also { it.assertIsFullyVisible() }.performClick()
+    }
+    compose
+        .onNodeWithTag(C.Tag.planningDay(day.toString()))
+        .performScrollTo()
+        .also { it.assertIsFullyVisible() }
+        .performClick()
+    assertEquals(listOf(1, 1, 1), listOf(previous, next, today))
+    assertEquals(day, selected)
+    compose.onNodeWithTag(C.Tag.planning_list).assertDoesNotExist()
     compose.runOnIdle { current = current.copy(isNotShared = false) }
     compose.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.planning_list).performScrollToIndex(0)

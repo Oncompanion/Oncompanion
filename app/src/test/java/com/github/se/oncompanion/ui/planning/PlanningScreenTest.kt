@@ -422,6 +422,6 @@ class PlanningScreenTest {
   fun caregiver_planningNotShared_isFullyVisibleInLandscape() {
     renderCaregiver(state().copy(isNotShared = true))
 
-    compose.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.not_shared).performScrollTo().assertIsFullyVisible()
   }
 }
