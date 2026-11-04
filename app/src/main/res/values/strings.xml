@@ -177,6 +177,8 @@
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_signed_in_as">Signed in as %1$s</string>
+    <string name="onboarding_use_another_account">Use another account</string>
     <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>
     <string name="onboarding_required">*Required</string>
@@ -205,7 +207,7 @@
     <string name="event_detail_error">Couldn\'t load this event. Please try again.</string>
     <string name="events_refresh_error">Couldn\'t refresh the events.</string>
     <string name="event_detail_not_found_hint">It may have been cancelled by the organizer.</string>
-    <string name="event_detail_back_to_events">Back to events</string>
+    <string name="event_detail_go_back">Go back</string>
     <string name="event_detail_visit_website">Visit event website</string>
     <string name="event_detail_registered">I\'m registered</string>
     <string name="event_detail_registration_note">This only saves it in Oncompanion. It doesn\'t register you with the organizer.</string>
@@ -460,6 +462,19 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+    <string name="prescription_already_saved_title">Already in your prescriptions</string>
+    <plurals name="prescription_already_saved_by">
+        <item quantity="one">%1$s\'s prescription from %2$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="other">%1$s\'s prescription from %2$s, with the same %3$d medications, is already saved. Save it again only if you got it twice.</item>
+    </plurals>
+    <plurals name="prescription_already_saved">
+        <item quantity="one">Your prescription from %1$s, with the same medication, is already saved. Save it again only if you got it twice.</item>
+        <item quantity="other">Your prescription from %1$s, with the same %2$d medications, is already saved. Save it again only if you got it twice.</item>
+    </plurals>
+    <string name="prescription_already_saved_keep_editing">Keep editing</string>
+    <string name="prescription_already_saved_save_anyway">Save anyway</string>
+    <string name="prescription_renewal_by">Same medications as %2$s\'s prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
+    <string name="prescription_renewal">Same medications as your prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

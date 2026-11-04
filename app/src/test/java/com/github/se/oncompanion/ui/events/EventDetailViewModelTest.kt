@@ -79,6 +79,9 @@ class EventDetailViewModelTest {
 
     override fun getUpcomingEvents(): Flow<List<Event>> = flowOf(listOf(event))
 
+    override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+        flowOf(emptyList())
+
     override suspend fun getEvent(id: String): Event? {
       release.await()
       return event.takeIf { it.id == id }
@@ -90,6 +93,9 @@ class EventDetailViewModelTest {
     var calls = 0
 
     override fun getUpcomingEvents(): Flow<List<Event>> = flowOf(listOf(event))
+
+    override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+        flowOf(emptyList())
 
     override suspend fun getEvent(id: String): Event? {
       if (calls++ == 0) throw IllegalStateException("no network")

@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.auth.SignOut
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.session.FakeCleanupJournal
 import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
@@ -65,9 +66,12 @@ class SignOutNavigationTest {
     }
   }
 
-  private fun content() {
+  /** Starts at [start], signed in; [onboarded] users already have a profile. */
+  private fun content(start: String = Route.OVERVIEW, onboarded: Boolean = true) {
     val user = runBlocking { auth.signInWithGoogle("one") }
-    profiles.seed(UserProfile(user.uid, Role.PATIENT, "Alex", cancerType = "Private diagnosis"))
+    if (onboarded) {
+      profiles.seed(UserProfile(user.uid, Role.PATIENT, "Alex", cancerType = "Private diagnosis"))
+    }
     AuthRepositoryProvider.repository = auth
     UserProfileRepositoryProvider.repository = profiles
     SignOutProvider.signOut =
@@ -84,7 +88,7 @@ class SignOutNavigationTest {
         actions = remember(nav) { NavigationActions(nav) }
         AppNavHost(
             nav,
-            if (generation > 0) Route.AUTH else Route.OVERVIEW,
+            if (generation > 0) Route.AUTH else start,
             credentialProvider = credentials,
         )
       }
@@ -159,6 +163,30 @@ class SignOutNavigationTest {
             it.destination.route == Screen.PROFILE || it.destination.route == Screen.OVERVIEW
           }
       )
+    }
+  }
+
+  @Test
+  fun switchingAccountDuringOnboardingSavesNothingAndBackCannotRevealTheOldAccount() {
+    auth.onSignIn = { AuthUser(uid = "uid-$it", email = "first@example.com") }
+    content(start = Route.ONBOARDING, onboarded = false)
+    compose.onNodeWithTag(C.Tag.onboarding_role_patient).performClick()
+    compose.onNodeWithTag(C.Tag.onboarding_continue_button).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextReplacement("Alex")
+    compose.onNodeWithText("first@example.com", substring = true).assertExists()
+
+    compose.onNodeWithTag(C.Tag.onboarding_use_another_account).performScrollTo().performClick()
+
+    compose.onNodeWithTag(C.Tag.sign_in_screen).assertIsDisplayed()
+    compose.onNodeWithText("first@example.com", substring = true).assertDoesNotExist()
+    compose.runOnIdle {
+      assertNull(auth.currentUser)
+      assertEquals(1, credentials.clearRequests.size)
+      // Google sign-in made the Firebase account; onboarding must not add a profile to it
+      assertTrue(profiles.profiles.isEmpty())
+      assertNull(nav.previousBackStackEntry)
+      compose.activity.onBackPressedDispatcher.onBackPressed()
+      assertFalse(nav.backStack.any { it.destination.route?.startsWith("onboarding") == true })
     }
   }
 

@@ -2,9 +2,11 @@
 
 package com.github.se.oncompanion.model.event
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -14,10 +16,12 @@ import kotlinx.coroutines.flow.flowOf
  * never empty. The support group has no website link, so both cases are covered.
  *
  * @param now the current time, to leave out past events
+ * @param zone the time zone of the events' local times, to compare them with instants
  */
 class FakeEventRepository(
     private val events: List<Event> = sampleEvents(LocalDate.now()),
     private val now: () -> LocalDateTime = LocalDateTime::now,
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : EventRepository {
 
   override fun getUpcomingEvents(): Flow<List<Event>> {
@@ -25,6 +29,11 @@ class FakeEventRepository(
     return flowOf(
         events.filterNot { it.startDateTime.isBefore(from) }.sortedBy { it.startDateTime }
     )
+  }
+
+  override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> {
+    val inRange = events.filter { it.startDateTime.atZone(zone()).toInstant() in from..<until }
+    return flowOf(inRange.sortedBy { it.startDateTime })
   }
 
   override suspend fun getEvent(id: String): Event? = events.find { it.id == id }
