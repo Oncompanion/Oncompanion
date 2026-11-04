@@ -9,8 +9,10 @@ import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * [CareCircleRepository] backed by Cloud Firestore, documents at `/users/{ownerUid}/circle/{uid}`.
@@ -62,6 +64,42 @@ class CareCircleRepositoryFirestore(
               }
             }
         awaitClose { registration.remove() }
+      }
+
+  override fun observeMembership(
+      ownerUid: String,
+      memberUid: String,
+  ): Flow<CareCircleMembership> =
+      SessionAccess.snapshots {
+            // INCLUDE: the server confirming a missing document changes no document, only the
+            // metadata, and would otherwise never be delivered
+            val registration =
+                circle(ownerUid).document(memberUid).addSnapshotListener(MetadataChanges.INCLUDE) {
+                    snapshot,
+                    error ->
+                  if (error != null) {
+                    close(error)
+                  } else if (snapshot != null) {
+                    trySend(membershipOf(snapshot))
+                  }
+                }
+            awaitClose { registration.remove() }
+          }
+          // INCLUDE also fires on metadata-only changes that don't change the answer
+          .distinctUntilChanged()
+
+  /**
+   * The membership a member document gives: a missing document is only
+   * [CareCircleMembership.NotMember] once the server confirmed it; the device's cache alone can't
+   * tell "deleted" from "never fetched".
+   */
+  private fun membershipOf(snapshot: DocumentSnapshot): CareCircleMembership =
+      when {
+        snapshot.exists() ->
+            fromDocument(snapshot)?.let(CareCircleMembership::Member)
+                ?: CareCircleMembership.NotMember
+        snapshot.metadata.isFromCache -> CareCircleMembership.Unconfirmed
+        else -> CareCircleMembership.NotMember
       }
 
   override suspend fun updateMember(
