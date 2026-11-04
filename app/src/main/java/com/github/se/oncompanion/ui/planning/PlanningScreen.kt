@@ -30,10 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -56,7 +58,11 @@ data class PlanningActions(
     val canOpenItem: (PlanningItem) -> Boolean = { true },
 )
 
-/** The Planning tab, collecting calendar state and reusing the app's bottom navigation. */
+/**
+ * The Planning tab, collecting calendar state and reusing the app's bottom navigation.
+ *
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ */
 @Composable
 fun PlanningScreen(
     navigationActions: NavigationActions,
@@ -65,6 +71,7 @@ fun PlanningScreen(
     onAddAppointment: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (String) -> Unit,
     onOpenEvent: (String) -> Unit,
+    caregiverOf: String? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val openItem: (PlanningItem) -> Unit = { openPlanningItem(it, onOpenAppointment, onOpenEvent) }
@@ -87,12 +94,17 @@ fun PlanningScreen(
               viewModel::retry,
               onAddAppointment = onAddAppointment,
               onItemClick = openItem,
-              canOpenItem = { it.source !is PlanningSource.Medication },
+              // A caregiver can't open an appointment's page yet, only the Ligue's events
+              canOpenItem = {
+                it.source !is PlanningSource.Medication &&
+                    (caregiverOf == null || it.source !is PlanningSource.Appointment)
+              },
           ),
       modifier = modifier,
       bottomBar = {
         BottomNavigationBar(Tab.PLANNING, { navigationActions.navigateToTab(it.route) })
       },
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -109,7 +121,11 @@ internal fun openPlanningItem(
   }
 }
 
-/** Stateless calendar and agenda; unavailable appointment actions are omitted. */
+/**
+ * Stateless calendar and agenda; unavailable appointment actions are omitted.
+ *
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ */
 @Composable
 fun PlanningContent(
     state: PlanningUiState,
@@ -118,6 +134,7 @@ fun PlanningContent(
     actions: PlanningActions,
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   val locale = LocalConfiguration.current.locales[0]
   val compact = isCompactHeight()
@@ -140,6 +157,7 @@ fun PlanningContent(
                 if (compact) {
                   { PlanningHeader(state, today, locale, actions) }
                 } else null,
+            caregiverOf = caregiverOf,
         )
       }
       actions.onAddAppointment?.let { onAdd ->
@@ -322,6 +340,7 @@ internal fun PlanningAgenda(
     canAdd: Boolean = false,
     canOpenItem: (PlanningItem) -> Boolean = { true },
     header: (@Composable () -> Unit)? = null,
+    caregiverOf: String? = null,
 ) {
   // Save scrolling with the tab, but start at the top when a different day is selected.
   val listState =
@@ -346,7 +365,10 @@ internal fun PlanningAgenda(
         }
       }
     }
-    if (
+    if (state.isNotShared && caregiverOf != null) {
+      // The patient doesn't share their planning: say so rather than show an empty day
+      NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+    } else if (
         (state.untimedItems.isEmpty() && state.scheduledItems.isEmpty()) &&
             !state.isLoading &&
             !state.hasError

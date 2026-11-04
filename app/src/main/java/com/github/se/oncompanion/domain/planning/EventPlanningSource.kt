@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * Shows the Ligue's upcoming events in Planning, on their day, with their place below the title.
- * Events are the same for every user, so this source doesn't depend on who is signed in.
+ * Events are the same for every user, so this source ignores whose planning it is.
  *
  * [EventRepository] only gives upcoming events: past weeks show no events, and an event of today
  * leaves the calendar once it has started.
@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.map
 class EventPlanningSource(private val events: EventRepository) : PlanningRepository {
 
   /** The upcoming events that start within [range], as timed entries, updated live. */
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
       events.getUpcomingEvents().map { upcoming ->
         upcoming.map { it.toPlanningItem(range) }.filter { it.timing in range }
       }

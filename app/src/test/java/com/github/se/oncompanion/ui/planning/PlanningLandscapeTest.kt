@@ -130,6 +130,36 @@ class PlanningLandscapeTest {
     compose.onNodeWithTag(C.Tag.planning_today).performScrollTo().assertIsFullyVisible()
   }
 
+  /** Revoked caregiver access replaces the compact agenda without leaving patient rows visible. */
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun compactCaregiverAgendaFollowsSharingChanges() {
+    var current by mutableStateOf(state())
+    compose.setContent {
+      OncompanionTheme {
+        PlanningContent(
+            current,
+            day,
+            zone,
+            PlanningActions({}, {}, {}, {}, {}),
+            caregiverOf = "Anne",
+        )
+      }
+    }
+    compose
+        .onNodeWithTag(C.Tag.planning_list)
+        .performScrollToNode(hasTestTag(C.Tag.planningItem(entries.last().key)))
+    compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertIsFullyVisible()
+    compose.runOnIdle { current = current.copy(isNotShared = true) }
+    compose.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.planning_list).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planningItem(entries.last().key)).assertDoesNotExist()
+    compose.runOnIdle { current = current.copy(isNotShared = false) }
+    compose.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_list).performScrollToIndex(0)
+    compose.onNodeWithTag(C.Tag.planning_today).assertIsFullyVisible()
+  }
+
   /** Compact agenda position restores with the composition and resets for another selected day. */
   @Test
   fun compactScrollRestoresAndChangingDateReturnsToTheCalendar() {

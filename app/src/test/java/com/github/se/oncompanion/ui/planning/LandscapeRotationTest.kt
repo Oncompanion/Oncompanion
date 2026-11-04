@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
@@ -46,11 +47,10 @@ class LandscapeRotationTest {
     val zone = ZoneId.of("Europe/Zurich")
     val vm =
         PlanningViewModel(
-            FakePlanningRepository(),
+            ownPlanning(FakePlanningRepository()),
             Clock.fixed(day.atStartOfDay(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
-            FakeAuthRepository(),
         )
     fun show() = compose.runOnUiThread {
       compose.activity.setContent {

@@ -24,10 +24,12 @@ import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Tab
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.utils.EmulatorTestData
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -44,6 +46,7 @@ class PlanningNavigationTest {
   @After
   fun restoreProvider() {
     PlanningRepositoryProvider.repository = appPlanningRepository
+    EmulatorTestData.signOut()
   }
 
   @Test
@@ -86,6 +89,11 @@ class PlanningNavigationTest {
 
   @Test
   fun mixedAgendaIsReachableScrollableAndShowsMedicationFrequency() {
+    // Planning shows the signed-in patient's own entries
+    runBlocking {
+      EmulatorTestData.createUser("planner")
+      EmulatorTestData.createProfile("PATIENT")
+    }
     val day = LocalDate.now()
     val zone = ZoneId.systemDefault()
     val medication =
@@ -109,7 +117,7 @@ class PlanningNavigationTest {
             "Support workshop",
             "Ligue · Geneva",
         )
-    val source = PlanningRepository { flowOf(listOf(event, appointment, medication)) }
+    val source = PlanningRepository { _, _ -> flowOf(listOf(event, appointment, medication)) }
     PlanningRepositoryProvider.repository = source
     compose.setContent {
       CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {

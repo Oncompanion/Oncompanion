@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,11 +38,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -54,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.auth.SignOutDialog
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.ZoneId
@@ -105,10 +102,6 @@ fun ProfileContent(
     modifier: Modifier = Modifier,
 ) {
   val confirmation = uiState as? ProfileUiState.ConfirmingSignOut
-  val stayFocus = remember { FocusRequester() }
-  LaunchedEffect(confirmation?.pendingChanges) {
-    if (confirmation?.pendingChanges == true) stayFocus.requestFocus()
-  }
   val profile =
       if (confirmation?.isSigningOut == true) ProfileUiState.Loading
       else confirmation?.profile ?: uiState
@@ -117,56 +110,12 @@ fun ProfileContent(
   BackHandler(enabled = signingOut) {}
   // All dialog dismissals keep the session; completion is owned by the ViewModel.
   if (confirmation != null) {
-    AlertDialog(
-        onDismissRequest = { if (!signingOut) onCancelSignOut() },
-        modifier = Modifier.testTag(C.Tag.profile_sign_out_dialog),
-        title = { Text(stringResource(R.string.profile_sign_out_title)) },
-        text = {
-          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(
-                    if (confirmation.pendingChanges) R.string.profile_sign_out_unsynced
-                    else R.string.profile_sign_out_message
-                )
-            )
-            if (confirmation.failed) {
-              Text(
-                  stringResource(R.string.profile_sign_out_failed),
-                  color = MaterialTheme.colorScheme.error,
-                  modifier = Modifier.testTag(C.Tag.profile_sign_out_error),
-              )
-            }
-            if (signingOut) CircularProgressIndicator(Modifier.testTag(C.Tag.profile_signing_out))
-          }
-        },
-        confirmButton = {
-          TextButton(
-              onClick = onConfirmSignOut,
-              enabled = !signingOut,
-              modifier = Modifier.testTag(C.Tag.profile_sign_out_confirm),
-          ) {
-            Text(
-                stringResource(
-                    if (confirmation.pendingChanges) R.string.profile_sign_out_discard
-                    else R.string.profile_sign_out
-                )
-            )
-          }
-        },
-        dismissButton = {
-          TextButton(
-              onClick = onCancelSignOut,
-              enabled = !signingOut,
-              modifier = Modifier.testTag(C.Tag.profile_sign_out_cancel).focusRequester(stayFocus),
-          ) {
-            Text(
-                stringResource(
-                    if (confirmation.pendingChanges) R.string.profile_sign_out_stay
-                    else R.string.profile_sign_out_cancel
-                )
-            )
-          }
-        },
+    SignOutDialog(
+        pendingChanges = confirmation.pendingChanges,
+        failed = confirmation.failed,
+        signingOut = signingOut,
+        onConfirm = onConfirmSignOut,
+        onCancel = onCancelSignOut,
     )
   }
   val compact = isCompactHeight()

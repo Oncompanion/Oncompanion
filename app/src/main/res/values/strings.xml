@@ -177,6 +177,8 @@
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
     <string name="onboarding_role_caregiver_description">I support someone close to me during their treatment.</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_signed_in_as">Signed in as %1$s</string>
+    <string name="onboarding_use_another_account">Use another account</string>
     <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>
     <string name="onboarding_required">*Required</string>
@@ -345,6 +347,10 @@
     <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
+
+    <!-- Caregiver mode: a section the patient doesn\'t share, e.g. "Anne doesn\'t share Planning with you" (#240) -->
+    <string name="not_shared_title">%1$s doesn\'t share %2$s with you</string>
+    <string name="not_shared_body">Only they can choose what you see.</string>
 
     <!-- Care circle invite code (#150) -->
     <string name="care_circle_invite_title">Invitation</string>

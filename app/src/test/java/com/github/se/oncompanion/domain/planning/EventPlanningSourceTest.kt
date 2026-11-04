@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -16,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -46,7 +48,7 @@ class EventPlanningSourceTest {
       FakeEventRepository(events.toList(), now = { LocalDateTime.MIN })
 
   private suspend fun itemsOf(repository: EventRepository, range: PlanningRange = week) =
-      EventPlanningSource(repository).observeItems(range).first()
+      EventPlanningSource(repository).observeItems("alice", range).first()
 
   @Test
   fun anEvent_becomesATimedEntryOnItsDay() = runTest {
@@ -112,11 +114,14 @@ class EventPlanningSourceTest {
         object : EventRepository {
           override fun getUpcomingEvents(): Flow<List<Event>> = upcoming
 
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+              flowOf(emptyList())
+
           override suspend fun getEvent(id: String): Event? = null
         }
     val emissions = mutableListOf<Int>()
     backgroundScope.launch {
-      EventPlanningSource(repository).observeItems(week).collect { emissions += it.size }
+      EventPlanningSource(repository).observeItems("alice", week).collect { emissions += it.size }
     }
     runCurrent()
 

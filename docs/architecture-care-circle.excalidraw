@@ -212,11 +212,11 @@
       "width": 340,
       "height": 110,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -240,6 +240,10 @@
         {
           "type": "arrow",
           "id": "ar3"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_access_profile"
         }
       ],
       "updated": 1791100000000,
@@ -255,7 +259,7 @@
       "width": 320,
       "height": 75.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -418,6 +422,86 @@
       "link": null,
       "locked": false,
       "index": "a010"
+    },
+    {
+      "id": "profile",
+      "type": "rectangle",
+      "x": 340,
+      "y": 380,
+      "width": 260,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 857050179,
+      "version": 2,
+      "versionNonce": 179314789,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "profile_t"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_access_profile"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_profile_firestore"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a010"
+    },
+    {
+      "id": "profile_t",
+      "type": "text",
+      "x": 350,
+      "y": 405.0,
+      "width": 240,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1408320768,
+      "version": 2,
+      "versionNonce": 46992297,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a011",
+      "text": "UserProfile\nRepository",
+      "originalText": "UserProfile\nRepository",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "profile",
+      "lineHeight": 1.25,
+      "autoResize": true
     },
     {
       "id": "circle_t",
@@ -652,6 +736,10 @@
         {
           "type": "arrow",
           "id": "ar8"
+        },
+        {
+          "type": "arrow",
+          "id": "ar_profile_firestore"
         }
       ],
       "updated": 1791100000000,
@@ -686,8 +774,8 @@
       "link": null,
       "locked": false,
       "index": "a017",
-      "text": "Cloud Firestore\n/users/{uid}/circle \u00b7 /invites",
-      "originalText": "Cloud Firestore\n/users/{uid}/circle \u00b7 /invites",
+      "text": "Cloud Firestore\n/users/{uid} \u00b7 /users/{uid}/circle \u00b7 /invites",
+      "originalText": "Cloud Firestore\n/users/{uid} \u00b7 /users/{uid}/circle \u00b7 /invites",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -822,11 +910,11 @@
       "width": 140.0,
       "height": 58,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -881,11 +969,11 @@
       "width": 140.0,
       "height": 58,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1727,6 +1815,124 @@
         ]
       },
       "index": "a026V"
+    },
+    {
+      "id": "ar_access_profile",
+      "type": "arrow",
+      "x": 470,
+      "y": 316,
+      "width": 0,
+      "height": 58,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 539168989,
+      "version": 2,
+      "versionNonce": 1203590612,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a021",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          58
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "access",
+        "fixedPoint": [
+          0.8,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "profile",
+        "fixedPoint": [
+          0.2,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ar_profile_firestore",
+      "type": "arrow",
+      "x": 520,
+      "y": 486,
+      "width": 160,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1434592585,
+      "version": 2,
+      "versionNonce": 1213177786,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a025",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          160,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "profile",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "firestore",
+        "fixedPoint": [
+          0.2,
+          0
+        ]
+      }
     }
   ],
   "appState": {
