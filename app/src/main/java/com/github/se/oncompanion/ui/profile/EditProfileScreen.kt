@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,9 +43,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
+import com.github.se.oncompanion.ui.common.HospitalFieldViewModel
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
 
@@ -54,8 +57,22 @@ fun EditProfileScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
     viewModel: EditProfileViewModel = viewModel { EditProfileViewModel() },
+    hospitalViewModel: HospitalFieldViewModel = viewModel { HospitalFieldViewModel() },
+    hospitalSearchEnabled: Boolean = HospitalRepositoryProvider.isConfigured,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val hospitalState by hospitalViewModel.uiState.collectAsStateWithLifecycle()
+  // Keep the reusable field's stale-result cancellation when edits, saving or configuration change.
+  LaunchedEffect(
+      state.hospital,
+      state.canEdit,
+      state.isPatient,
+      hospitalSearchEnabled,
+      hospitalViewModel,
+  ) {
+    hospitalViewModel.clearSearch()
+  }
+  DisposableEffect(hospitalViewModel) { onDispose { hospitalViewModel.clearSearch() } }
   LaunchedEffect(state.isSaved) {
     if (state.isSaved) {
       viewModel.consumeSaved()
@@ -69,7 +86,13 @@ fun EditProfileScreen(
       onFirstNameChange = viewModel::onFirstNameChange,
       onFamilyNameChange = viewModel::onFamilyNameChange,
       onCancerTypeChange = viewModel::onCancerTypeChange,
-      onHospitalChange = viewModel::onHospitalChange,
+      onHospitalChange = {
+        hospitalViewModel.clearSearch()
+        viewModel.onHospitalChange(it)
+      },
+      hospitalSearchState = hospitalState,
+      onHospitalSearch = { hospitalViewModel.search(state.hospital) },
+      hospitalSearchEnabled = hospitalSearchEnabled,
       onSave = viewModel::saveProfile,
   )
 }
@@ -87,6 +110,9 @@ fun EditProfileContent(
     onSave: () -> Unit,
     onHospitalChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    hospitalSearchState: HospitalFieldUiState = HospitalFieldUiState.Idle,
+    onHospitalSearch: () -> Unit = {},
+    hospitalSearchEnabled: Boolean = false,
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
   BackHandler { if (!state.isSaving) onBack() }
@@ -150,16 +176,16 @@ fun EditProfileContent(
               enabled = state.canEdit,
               modifier = Modifier.fillMaxWidth(),
           )
-          // TODO: Enable Search once the centrally managed Nominatim proxy is available.
+          // The provider enables explicit search only after a trusted proxy endpoint is configured.
           if (state.isPatient) {
             HospitalFieldContent(
                 value = state.hospital,
                 onValueChange = onHospitalChange,
-                uiState = HospitalFieldUiState.Idle,
-                onSearch = {},
+                uiState = hospitalSearchState,
+                onSearch = onHospitalSearch,
                 onHospitalSelected = {},
                 enabled = state.canEdit,
-                searchEnabled = false,
+                searchEnabled = hospitalSearchEnabled,
             )
           }
           if (state.saveFailed) {

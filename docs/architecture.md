@@ -46,7 +46,7 @@ Hospital identities use OSM object type and ID rather than provider-specific pla
 
 `HospitalRepositoryProvider` follows #177's replaceable `@Volatile repository` convention.
 Deployment wiring can call `configure(searchEndpoint)` before creating field ViewModels to install
-one shared `HospitalRepositoryNominatim`, preserving its cache across consumers. There is no public
+one shared `HospitalRepositoryProxy`, preserving its cache and retry gate across consumers. There is no public
 service URL or placeholder URL by default: until configured, blank searches return an empty success
 and other searches return the existing service error without HTTP. Tests replace `repository` with
 `FakeHospitalRepository` and restore the original in `@After`. Configuring the provider does not
@@ -60,7 +60,8 @@ Every results view must display `© OpenStreetMap contributors`, linked to
 [the copyright and ODbL information](https://www.openstreetmap.org/copyright), including cached
 results. The repository exposes attribution constants for consumers; #142 adds no UI.
 
-The HTTP implementation identifies itself as `Oncompanion/1.0` with the project URL, sets
+The legacy `HospitalRepositoryNominatim` implementation, no longer selected by the provider,
+identifies itself as `Oncompanion/1.0` with the project URL, sets
 10-second connection/read timeouts, disables redirects and automatic retries, and bounds
 response size. All repository instances share a process-wide mutex with a conservative
 one-second gap after a request completes (including failures). Each instance caches the last
@@ -90,7 +91,7 @@ enforces ten initial shared-cache misses per rolling hour and fifty per rolling 
 server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
 deployable TTL policy; logical expiry remains enforced.
 The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
-The repository-to-proxy arrows remain planned until the authenticated transport is integrated.
+The repository-to-proxy client path is implemented and opt-in; the service remains undeployed.
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -106,15 +107,25 @@ This deliberately trades
 availability for compliance under paused instances and overlapping revisions. See the
 [backend runbook](../functions/README.md) for the guarantee, recovery procedure, tests and setup.
 
-The Android Search button remains disabled. `HospitalProxyClient` is an independent HTTP client
-with injectable token/transport boundaries and typed errors/retry hints. It reuses `Hospital` values
-but does not implement or replace `HospitalRepository`. The existing repository/provider and all UI
-remain unchanged. `FirebaseHospitalProxyTokens` lazily obtains Firebase ID and App Check tokens;
-debug/release source sets select debug attestation/Play Integrity when this client first needs it.
-No Firebase APIs are accessed during construction, and no production URL is supplied. Calls join
-`SessionAccess.operation` so sign-out cancels token waits and discards late HTTP results.
-See [Android proxy client setup](hospital-proxy-client.md) for registration and remaining integration.
-The planned repository-to-proxy arrows remain planned: no diagram topology changes in this step.
+`HospitalRepositoryProxy` adapts `HospitalProxyClient` to the existing `HospitalRepository`
+contract. It shares the last 50 trimmed successful queries (including empty results), deduplicates
+OSM identities, coalesces identical concurrent searches and returns cached public results offline.
+Uncached requests use only the authenticated proxy, with no direct-provider fallback. Typed client
+network/timeout, invalid-response and rate-limit failures map to the matching existing repository
+errors; authentication, App Check, configuration and other server failures map to SERVICE and the
+existing manual-entry feedback. HTTP/JSON/token handling remains entirely in the client.
+
+A monotonic retry gate blocks all uncached queries in the shared adapter for the full parsed
+Retry-After delay; cache hits remain available. No timer sends another request. BeyondLimit retains
+the block for that adapter's lifetime instead of shortening the provider wait. Configure the provider
+once before creating field ViewModels; endpoint changes/disable require recreating existing consumers.
+The prior local HTTP repository remains legacy code for its tests, not an integrated search path.
+
+`FirebaseHospitalProxyTokens` still obtains Auth/App Check tokens lazily; production has no endpoint
+configured by this change. Profile Search is enabled only for an installed proxy adapter. The existing
+HospitalFieldViewModel owns explicit Search actions and stale-result cancellation, while edits,
+selection, saving and leaving Profile clear obsolete feedback. Calls join `SessionAccess.operation`.
+See [Android proxy setup](hospital-proxy-client.md) for registration and the opt-in configuration API.
 The backend CI job runs type, format, unit and demo Firestore tests. `onCall` remains a team
 decision before Android integration: it improves token handling and URL privacy but requires a
 new Android SDK and transport contract. See the backend runbook for the comparison.
@@ -138,13 +149,13 @@ checks connectivity before searching, so repository cache hits remain available 
 Editing, external text changes, disabling or removing the field cancels obsolete requests and
 clears feedback. A generation check discards late responses. Successful lookups show linked
 OpenStreetMap attribution, including empty and cached results. The field has no screen-specific
-navigation, patient data or persistence. Profile (#144) uses its stateless content for manual entry;
+navigation, patient data or persistence. Profile uses its stateless content with an optional proxy-backed search state;
 Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
 The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Edit Profile now uses the manual-only content; its search ViewModel connection and
-Add Appointment integration remain planned.
+HospitalFieldViewModel → HospitalRepository path. Edit Profile's search ViewModel connection is implemented behind provider configuration;
+Add Appointment integration remains planned.
 
 ## Optional profile hospital (issue #144)
 
@@ -160,15 +171,16 @@ saved hospital, track hospital edits separately from incoming snapshots, and all
 or clearing it. Empty hospital text never makes Save unavailable. Input is bounded by the shared
 model limit like the existing fields. Caregivers gain no hospital editor.
 
-For M1, Edit Profile reuses `HospitalFieldContent` with `searchEnabled = false`: the Search button
-is visible and disabled while text remains editable. It supplies idle feedback and no search action,
-so no hospital repository, endpoint or search ViewModel is constructed for this screen. The shared
-field's `searchEnabled` parameter defaults to true for other consumers; disabling it also clears
-obsolete results in `HospitalField`. Existing Nominatim behavior is unchanged. This integration does
-not depend on the pending hospital-provider PR, deploy a proxy or integrate Add Appointment.
+Edit Profile reuses `HospitalFieldContent` with search state and actions supplied by the existing
+HospitalFieldViewModel. `HospitalRepositoryProvider.isConfigured` enables Search only for the proxy
+adapter. With no configured endpoint, Search remains visible and disabled and manual text stays
+editable. Content defaults remain manual-only for standalone callers/tests. No endpoint, feature
+flag service or production resource is created here; deployment must call `configure(proxyUrl)`
+before ViewModels are built. Profile retains its existing validation, persistence and navigation.
 
-The Account diagram shows the built manual-entry connection and planned search connection. The
-overview identifies Profile hospital text and the reusable content alongside the search ViewModel.
+The Account, Appointments and overview diagrams identify the proxy adapter/client path. The Account
+search connection is implemented but conditional; backend deployment and Add Appointment wiring
+remain separate work.
 
 ## Feature diagrams
 

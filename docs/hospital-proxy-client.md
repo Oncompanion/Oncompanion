@@ -1,10 +1,11 @@
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 
-# Independent Android hospital proxy client
+# Android hospital proxy client and integration
 
-`HospitalProxyClient(endpoint, tokens)` is a transport client, not a `HospitalRepository`.
-The existing repository/provider and UI are unchanged; Search stays disabled. Deployment configuration
-must supply a trusted HTTPS URL without credentials, query or fragment. Never take it from search
+`HospitalProxyClient(endpoint, tokens)` remains a transport client. `HospitalRepositoryProxy`
+adapts it to `HospitalRepository`; the provider selects this adapter and Edit Profile uses its
+existing explicit search ViewModel when configured. Deployment configuration must supply a trusted
+HTTPS URL without credentials, query or fragment. Never take it from search
 text or point it at public Nominatim: credentials are sent to this configured endpoint.
 
 The implementation follows the existing [backend HTTP contract](../functions/README.md):
@@ -58,3 +59,32 @@ Before approved staging/release use:
   HTTP contract requested for PR 2; it does not resolve the prior callable recommendation or the
   [GET URL logging rollout blocker](../functions/OPERATIONS.md). It does not deploy resources,
   configure production enforcement, set an endpoint or make live proxy/Nominatim requests.
+
+## Opt-in repository and Profile integration
+
+After authorized deployment, App Check registration and rollout review, application setup may call
+`HospitalRepositoryProvider.configure(trustedProxyUrl)` **before** creating hospital field ViewModels.
+There is no default URL and no call in startup code in this PR, so shipped builds remain manual-only.
+`disable()` restores the unconfigured provider for new consumers. Configuration is a startup boundary,
+not a reactive remote flag: recreate existing field consumers after endpoint/configuration changes.
+The provider installs the shared proxy adapter, never the legacy Nominatim HTTP repository, and
+rejects the public Nominatim host. Invalid configuration leaves the current repository untouched.
+
+The adapter preserves the 50-query successful-result memory cache, including empty results and
+trimmed query keys, so cached public results remain available offline. A mutex shares completed
+identical work. New cache misses use the existing client's Auth/App Check, status mapping and parser.
+There is no second HTTP implementation or Retry-After parser and no fallback to direct Nominatim.
+Missing auth/App Check and other service failures retain generic search feedback and manual entry.
+Network/timeouts, invalid responses and 429 retain the existing repository error distinctions.
+
+Parsed retry hints block every uncached query in the shared adapter until a monotonic deadline;
+cache hits are still served. BeyondLimit blocks that adapter indefinitely; do not recreate adapters
+to evade a provider wait. No countdown or automatic retry is scheduled. The server remains the global
+rate-limit authority across devices, process restarts and revisions. Persistent locks require the
+operator recovery procedure, never an assumption that a client hint guarantees recovery.
+
+Edit Profile preserves free-text validation/100-character limits, explicit Search, result selection,
+OpenStreetMap attribution and navigation. Editing/saving/disposal cancels old searches; the existing
+ViewModel generation check prevents late responses replacing newer results. Onboarding and Add
+Appointment remain unchanged. New unit tests use the real adapter/client with fake tokens/HTTP and fake user
+repositories; they do not require or mutate shared Firebase emulator state.
