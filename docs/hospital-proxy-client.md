@@ -33,6 +33,9 @@ valid tokens and refresh expired ones. No separate token cache, Google sign-in t
 forced-refresh loop or retry after 401/403 exists. After an authentication error, a future caller must
 resolve session/attestation health and require another explicit submission. Missing/failed credentials
 return typed failures before HTTP. Coroutine cancellation propagates, including session cleanup.
+Cancellation disconnects an active platform connection immediately. Blocking reads run on IO workers;
+session cleanup does not wait for a late response, and cancelled callers cannot receive it. Streams
+and connections are also closed when the worker exits.
 
 App Check is not installed globally at startup in this step. Its variant-specific factory is lazily
 installed before this client's first App Check token request, on the existing default app. This keeps
