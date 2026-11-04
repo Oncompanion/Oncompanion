@@ -3,19 +3,8 @@
 
 package com.github.se.oncompanion.domain.planning
 
-import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
-import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
-import com.github.se.oncompanion.model.event.EventRepositoryProvider
-import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRepository
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.transformLatest
 
 /**
  * Holds the [PlanningRepository] the app uses, so ViewModels name the interface and never the
@@ -25,42 +14,13 @@ import kotlinx.coroutines.flow.transformLatest
  */
 object PlanningRepositoryProvider {
   /**
-   * By default, the signed-in patient's appointments, medications and the events they confirmed,
-   * merged by [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read,
-   * Planning still shows the appointments instead of an error. The providers are read on each
-   * observation, so replacing them also reaches Planning.
+   * By default, the signed-in patient's [SignedInPlanning]: their appointments, medications and the
+   * events they confirmed. It is built on each observation, so repository providers replaced later
+   * (e.g. by tests) also reach Planning.
    */
   @Volatile
-  @OptIn(ExperimentalCoroutinesApi::class)
   var repository: PlanningRepository = PlanningRepository { range ->
-    val auth = AuthRepositoryProvider.repository
-    // Cancel the entire combination on account changes so sources cannot mix two patients.
-    auth
-        .observeCurrentUser()
-        .map { it?.uid }
-        .distinctUntilChanged()
-        .transformLatest {
-          emit(emptyList())
-          emitAll(
-              ObservePlanning(
-                      AppointmentPlanningSource(
-                          AppointmentRepositoryProvider.repository,
-                          auth,
-                      ),
-                      MedicationPlanningSource(MedicationRepositoryProvider.repository, auth),
-                      // Events are nice to have: if they fail, the appointments still show
-                      OptionalPlanningSource(
-                          EventPlanningSource(
-                              EventRepositoryProvider.repository,
-                              EventRegistrationRepositoryProvider.repository,
-                              auth,
-                          )
-                      ),
-                  )
-                  .observeItems(range)
-          )
-        }
-        .buffer(0)
+    SignedInPlanning().observeItems(range)
   }
 
   /**

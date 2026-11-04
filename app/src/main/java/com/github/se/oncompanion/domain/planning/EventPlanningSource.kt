@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.domain.planning
 
-import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRegistrationRepository
 import com.github.se.oncompanion.model.event.EventRepository
@@ -15,26 +14,18 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
 /**
- * Shows in Planning the events the signed-in patient confirmed they registered for (US-30), on
- * their day, with their place below the title. Past weeks show the confirmed events that took place
- * then.
+ * Shows in Planning the events patient [uid] confirmed they registered for (US-30), on their day,
+ * with their place below the title. Past weeks show the confirmed events that took place then.
+ * [SignedInPlanning] gives it the signed-in patient's uid.
  */
 class EventPlanningSource(
     private val events: EventRepository,
     private val registrations: EventRegistrationRepository,
-    private val auth: AuthRepository,
+    private val uid: String,
 ) : PlanningRepository {
 
-  /**
-   * The confirmed events starting within [range], as timed entries, updated live. Empty when signed
-   * out; on an account change, the previous patient's events are cleared before the next patient's
-   * are read.
-   */
+  /** The confirmed events starting within [range], as timed entries, updated live. */
   override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
-      observeSignedInPatient(auth) { uid -> confirmedEvents(uid, range) }
-
-  /** [uid]'s confirmed events in [range]. */
-  private fun confirmedEvents(uid: String, range: PlanningRange): Flow<List<PlanningItem>> =
       combine(
           registrations.observeRegisteredEventIds(uid),
           events.observeEvents(range.startInclusive, range.endExclusive),

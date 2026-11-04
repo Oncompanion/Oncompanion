@@ -8,13 +8,13 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
-import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
-import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
-import com.github.se.oncompanion.domain.planning.ObservePlanning
+import com.github.se.oncompanion.domain.planning.SignedInPlanning
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
+import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
@@ -74,9 +74,12 @@ class PlanningScreenIntegrationTest {
     runTest { medications.addPrescription("patient", prescription) }
     val vm =
         PlanningViewModel(
-            ObservePlanning(
-                MedicationPlanningSource(medications, auth),
-                AppointmentPlanningSource(appointments, auth),
+            SignedInPlanning(
+                auth,
+                appointments,
+                medications,
+                FakeEventRepository(emptyList()),
+                FakeEventRegistrationRepository(),
             ),
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
@@ -279,7 +282,13 @@ class PlanningScreenIntegrationTest {
         FakeAppointmentRepository().apply { observeError = IllegalStateException("Read failed") }
     val vm =
         PlanningViewModel(
-            AppointmentPlanningSource(appointments, auth),
+            SignedInPlanning(
+                auth,
+                appointments,
+                FakeMedicationRepository(),
+                FakeEventRepository(emptyList()),
+                FakeEventRegistrationRepository(),
+            ),
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),

@@ -4,7 +4,6 @@
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
-import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -13,26 +12,27 @@ import com.github.se.oncompanion.model.planning.PlanningTiming
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Adapts the signed-in patient's cached appointments to the calendar's display contract. */
+/**
+ * Adapts patient [uid]'s cached appointments to the calendar's display contract. [SignedInPlanning]
+ * gives it the signed-in patient's uid.
+ */
 class AppointmentPlanningSource(
     private val appointments: AppointmentRepository,
-    private val auth: AuthRepository,
+    private val uid: String,
 ) : PlanningRepository {
-  /** Clears the previous patient's agenda on account changes; read failures reach the caller. */
+  /** The patient's appointments within [range], updated live; read failures reach the caller. */
   override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
-      observeSignedInPatient(auth) { uid ->
-        appointments.observeAppointments(uid).map { entries ->
-          // Filtering preserves the appointment repository's time and ID ordering.
-          entries
-              .filter { it.scheduledAt in range }
-              .map { appointment ->
-                PlanningItem(
-                    source = PlanningSource.Appointment(appointment.id),
-                    timing = PlanningTiming.Timed(appointment.scheduledAt),
-                    title = appointment.title,
-                    subtitle = appointment.location?.takeIf { it.isNotBlank() },
-                )
-              }
-        }
+      appointments.observeAppointments(uid).map { entries ->
+        // Filtering preserves the appointment repository's time and ID ordering.
+        entries
+            .filter { it.scheduledAt in range }
+            .map { appointment ->
+              PlanningItem(
+                  source = PlanningSource.Appointment(appointment.id),
+                  timing = PlanningTiming.Timed(appointment.scheduledAt),
+                  title = appointment.title,
+                  subtitle = appointment.location?.takeIf { it.isNotBlank() },
+              )
+            }
       }
 }

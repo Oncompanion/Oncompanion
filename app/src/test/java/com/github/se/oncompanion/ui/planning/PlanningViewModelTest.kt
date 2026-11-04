@@ -4,13 +4,18 @@
 package com.github.se.oncompanion.ui.planning
 
 import androidx.lifecycle.SavedStateHandle
-import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.domain.planning.SignedInPlanning
 import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
+import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
+import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -54,7 +59,7 @@ class PlanningViewModelTest {
         appointments.seed("b", Appointment("b", "Patient B", time, AppointmentType.CONSULTATION))
         val vm =
             PlanningViewModel(
-                AppointmentPlanningSource(appointments, auth),
+                signedInPlanning(auth, appointments),
                 clock,
                 zone,
                 SavedStateHandle(),
@@ -117,7 +122,7 @@ class PlanningViewModelTest {
             "b",
             Appointment("b", "Patient B", clock.instant(), AppointmentType.CONSULTATION),
         )
-        PlanningRepositoryProvider.repository = AppointmentPlanningSource(appointments, auth)
+        PlanningRepositoryProvider.repository = signedInPlanning(auth, appointments)
         AuthRepositoryProvider.repository = auth
         auth.signInWithGoogle("a")
         val vm =
@@ -637,4 +642,14 @@ class PlanningViewModelTest {
           com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository = oldAuth
         }
       }
+
+  /** Planning that follows [auth], as in production, showing only [appointments]. */
+  private fun signedInPlanning(auth: AuthRepository, appointments: AppointmentRepository) =
+      SignedInPlanning(
+          auth,
+          appointments,
+          FakeMedicationRepository(),
+          FakeEventRepository(emptyList()),
+          FakeEventRegistrationRepository(),
+      )
 }

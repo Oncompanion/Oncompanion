@@ -351,9 +351,9 @@
       "id": "observe_t",
       "type": "text",
       "x": 1310,
-      "y": 230.0,
+      "y": 217.5,
       "width": 260,
-      "height": 50,
+      "height": 75,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -374,8 +374,8 @@
       "link": null,
       "locked": false,
       "index": "a009",
-      "text": "ObservePlanning\nmerges all three sources",
-      "originalText": "ObservePlanning\nmerges all three sources",
+      "text": "SignedInPlanning\nfollows the account,\nmerges all three sources",
+      "originalText": "SignedInPlanning\nfollows the account,\nmerges all three sources",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1031,10 +1031,6 @@
         {
           "type": "arrow",
           "id": "source_appointments"
-        },
-        {
-          "type": "arrow",
-          "id": "source_auth_read"
         }
       ],
       "updated": 1791100000000,
@@ -2234,8 +2230,8 @@
       "link": null,
       "locked": false,
       "index": "a044",
-      "text": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning. A caregiver sees no entries until #240.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
-      "originalText": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning. A caregiver sees no entries until #240.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "text": "Planning and Overview share appointments, medications and the events the patient confirmed through SignedInPlanning, the only part that follows the signed-in account. A caregiver sees no entries until #240.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "originalText": "Planning and Overview share appointments, medications and the events the patient confirmed through SignedInPlanning, the only part that follows the signed-in account. A caregiver sees no entries until #240.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -2707,10 +2703,6 @@
         },
         {
           "type": "arrow",
-          "id": "source_auth_read"
-        },
-        {
-          "type": "arrow",
           "id": "source_auth_backend"
         },
         {
@@ -2750,8 +2742,8 @@
       "link": null,
       "locked": false,
       "index": "b0057",
-      "text": "AuthRepository\n(session + source)",
-      "originalText": "AuthRepository\n(session + source)",
+      "text": "AuthRepository\n(signed-in account)",
+      "originalText": "AuthRepository\n(signed-in account)",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2891,65 +2883,6 @@
         "elementId": "appointment",
         "fixedPoint": [
           0.4,
-          0
-        ]
-      }
-    },
-    {
-      "id": "source_auth_read",
-      "type": "arrow",
-      "x": 2264.0,
-      "y": 316,
-      "width": 226.0,
-      "height": 58,
-      "angle": 0,
-      "strokeColor": "#1e1e1e",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 77922514,
-      "version": 1,
-      "versionNonce": 749490765,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1791100000000,
-      "link": null,
-      "locked": false,
-      "index": "b0061",
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          226.0,
-          58
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "mode": "orbit",
-        "elementId": "planningrepo",
-        "fixedPoint": [
-          0.9,
-          1
-        ]
-      },
-      "endBinding": {
-        "mode": "orbit",
-        "elementId": "source_auth",
-        "fixedPoint": [
-          0.5,
           0
         ]
       }
@@ -3131,9 +3064,9 @@
       "id": "eventsource_t",
       "type": "text",
       "x": 1630,
-      "y": 205.0,
+      "y": 230.0,
       "width": 240,
-      "height": 100,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -3154,8 +3087,8 @@
       "link": null,
       "locked": false,
       "index": "a023V",
-      "text": "EventPlanningSource\n(PlanningRepository)\nevents confirmed by\nthe signed-in patient",
-      "originalText": "EventPlanningSource\n(PlanningRepository)\nevents confirmed by\nthe signed-in patient",
+      "text": "EventPlanningSource\n(PlanningRepository)",
+      "originalText": "EventPlanningSource\n(PlanningRepository)",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",

@@ -9,9 +9,7 @@ import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
-import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
-import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
@@ -20,20 +18,12 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
-import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,7 +32,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Checks what [PlanningRepositoryProvider] exposes by default and that it can be replaced. */
+/**
+ * Checks what [PlanningRepositoryProvider] exposes by default and that it can be replaced. How
+ * Planning follows the account is tested in [SignedInPlanningTest].
+ */
 class PlanningRepositoryProviderTest {
   private val original = PlanningRepositoryProvider.repository
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
@@ -136,99 +129,12 @@ class PlanningRepositoryProviderTest {
     assertEquals(emptyList<String>(), items.map { it.title })
   }
 
-  /** If the events can't be read, the default provider still shows the appointments. */
-  @Test
-  fun failingEvents_keepTheAppointmentsByDefault() = runTest {
-    val day = LocalDate.of(2026, 10, 25)
-    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
-    val auth = FakeAuthRepository { AuthUser(it) }
-    auth.signInWithGoogle("patient")
-    val appointments = FakeAppointmentRepository()
-    appointments.seed(
-        "patient",
-        Appointment(
-            "saved",
-            "Saved consultation",
-            range.startInclusive,
-            AppointmentType.CONSULTATION,
-        ),
-    )
-    AuthRepositoryProvider.repository = auth
-    AppointmentRepositoryProvider.repository = appointments
-    EventRepositoryProvider.repository =
-        object : EventRepository by FakeEventRepository(emptyList()) {
-          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> = flow {
-            error("Events couldn't be read")
-          }
-        }
-    medications.seed("patient", prescription(day))
-
-    val items = original.observeItems(range).first { it.size == 2 }
-
-    assertEquals(listOf("Medication", "Saved consultation"), items.map { it.title })
-  }
-
   private fun prescription(day: LocalDate, name: String = "Medication") =
       Prescription(
           "p",
           prescribedOn = day,
           medications = listOf(Medication("m", "p", name, startDate = day, durationDays = 1)),
       )
-
-  /** Every emission belongs to one account, including while both private sources restart. */
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Test
-  fun accountChangesNeverCombineTwoPatients() = runTest {
-    val day = LocalDate.of(2026, 10, 25)
-    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
-    val auth = FakeAuthRepository { AuthUser(it) }
-    val appointments = FakeAppointmentRepository()
-    for (uid in listOf("a", "b")) {
-      medications.seed(uid, prescription(day, "$uid medication"))
-      appointments.seed(
-          uid,
-          Appointment(uid, "$uid appointment", range.startInclusive, AppointmentType.CONSULTATION),
-      )
-    }
-    AuthRepositoryProvider.repository = auth
-    AppointmentRepositoryProvider.repository = appointments
-    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
-    auth.signInWithGoogle("a")
-    val emissions = mutableListOf<List<PlanningItem>>()
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      original.observeItems(range).collect { emissions += it }
-    }
-    runCurrent()
-    assertEquals(setOf("a medication", "a appointment"), emissions.last().map { it.title }.toSet())
-    emissions.clear()
-    auth.signInWithGoogle("b")
-    runCurrent()
-    assertTrue(emissions.first().isEmpty())
-    assertTrue(emissions.all { entries -> entries.none { it.title.startsWith("a ") } })
-    assertEquals(setOf("b medication", "b appointment"), emissions.last().map { it.title }.toSet())
-    auth.signOut()
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
-  }
-
-  /** Medication failures reach the caller instead of silently dropping essential entries. */
-  @Test
-  fun medicationFailureIsReported() = runTest {
-    val day = LocalDate.of(2026, 10, 25)
-    val auth = FakeAuthRepository { AuthUser(it) }
-    auth.signInWithGoogle("patient")
-    AuthRepositoryProvider.repository = auth
-    AppointmentRepositoryProvider.repository = FakeAppointmentRepository()
-    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
-    medications.readError = IllegalStateException("Medication read failed")
-    val failure = runCatching {
-      original
-          .observeItems(PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich")))
-          .collect {}
-    }
-        .exceptionOrNull()
-    assertEquals("Medication read failed", failure?.message)
-  }
 
   /** The caregiver placeholder cannot read a caregiver's own prescriptions as patient data. */
   @Test

@@ -1,30 +1,30 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.domain.planning
 
-import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.*
-import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/** Verifies saved prescriptions become bounded calendar occurrences without inferred doses. */
+/**
+ * Verifies saved prescriptions become bounded calendar occurrences without inferred doses.
+ * Following the signed-in account is [SignedInPlanning]'s job, tested in [SignedInPlanningTest].
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MedicationPlanningSourceTest {
   private val day = LocalDate.of(2026, 10, 25)
   private val range = PlanningRange(day, day.plusDays(7), ZoneId.of("Europe/Zurich"))
   private val medications = FakeMedicationRepository()
-  private val auth = FakeAuthRepository { AuthUser(it) }
-  private val source = MedicationPlanningSource(medications, auth)
+  private val source = MedicationPlanningSource(medications, "patient")
 
   private fun medication(start: LocalDate = day, duration: Int? = 3) =
       Medication(
@@ -47,7 +47,6 @@ class MedicationPlanningSourceTest {
   /** Includes exactly the active days intersecting the requested week. */
   @Test
   fun clipsFiniteAndOpenEndedDurationsToTheRequestedRange() = runTest {
-    auth.signInWithGoogle("patient")
     val cases =
         listOf(
             Triple(-2L, 2, emptyList<Long>()),
@@ -80,7 +79,6 @@ class MedicationPlanningSourceTest {
   /** Calendar dates survive DST, year changes and different display zones. */
   @Test
   fun calendarDatesDoNotShiftWithDisplayZoneOrOverflowAtTheDateLimit() = runTest {
-    auth.signInWithGoogle("patient")
     for (start in
         listOf(
             LocalDate.of(2026, 3, 28),
@@ -107,7 +105,6 @@ class MedicationPlanningSourceTest {
   /** The Overview's one-year range bounds even medications that began years earlier. */
   @Test
   fun openEndedMedicationExpandsOnlyInsideTheYearRequestedByOverview() = runTest {
-    auth.signInWithGoogle("patient")
     medications.seed("patient", prescription(medication(day.minusYears(10), null)))
     var latest = emptyList<PlanningItem>()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
@@ -125,7 +122,6 @@ class MedicationPlanningSourceTest {
   /** Edits replace occurrences, preserve stable IDs and never substitute dosage for frequency. */
   @Test
   fun savedEditsAndRemovalReplaceOccurrencesWithoutDuplicates() = runTest {
-    auth.signInWithGoogle("patient")
     val original = medication()
     medications.addPrescription("patient", prescription(original))
     var latest = emptyList<PlanningItem>()
@@ -168,7 +164,6 @@ class MedicationPlanningSourceTest {
   /** Removing one medication leaves its siblings, including after collecting again. */
   @Test
   fun removingOneMedicationAndReopeningDoesNotKeepOldOccurrences() = runTest {
-    auth.signInWithGoogle("patient")
     val a = medication(duration = 1)
     val b = a.copy(id = "b")
     medications.seed("patient", prescription(a, b))
@@ -190,86 +185,9 @@ class MedicationPlanningSourceTest {
     assertEquals(1, latest.size)
   }
 
-  /** Changing accounts clears first, cancels old delivery, and sign-out performs no reads. */
-  @Test
-  fun accountSwitchAndSignOutClearPrivateData() = runTest {
-    medications.seed("a", prescription(medication().copy(name = "A")))
-    medications.seed("b", prescription(medication().copy(name = "B")))
-    val emissions = mutableListOf<List<PlanningItem>>()
-    medications.readError = IllegalStateException("Must not read while signed out")
-    val job =
-        backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-          source.observeItems(range).collect { emissions += it }
-        }
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
-    medications.readError = null
-    auth.signInWithGoogle("a")
-    runCurrent()
-    assertEquals("A", emissions.last().first().title)
-    emissions.clear()
-    auth.signInWithGoogle("b")
-    runCurrent()
-    assertTrue(emissions.first().isEmpty())
-    assertEquals("B", emissions.last().first().title)
-    val count = emissions.size
-    medications.seed("a", prescription(medication().copy(name = "Late A")))
-    runCurrent()
-    assertEquals(count, emissions.size)
-    auth.signOut()
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
-    job.cancel()
-    auth.signInWithGoogle("a")
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
-  }
-
-  /** Profile changes for the same uid do not restart the medication read. */
-  @Test
-  fun repeatedUidKeepsTheExistingObservation() = runTest {
-    auth.signInWithGoogle("patient")
-    var latest = emptyList<PlanningItem>()
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range).collect { latest = it }
-    }
-    runCurrent()
-    medications.readError = IllegalStateException("Unexpected restart")
-    auth.onSignIn = { AuthUser("patient", displayName = "Changed") }
-    auth.signInWithGoogle("patient")
-    runCurrent()
-    medications.seed("patient", prescription(medication()))
-    runCurrent()
-    assertEquals(3, latest.size)
-  }
-
-  /** A new patient's immediate failure cannot leave the old patient's occurrences visible. */
-  @Test
-  fun newAccountReadFailureClearsBeforePropagating() = runTest {
-    auth.signInWithGoogle("a")
-    medications.seed("a", prescription(medication()))
-    var latest = emptyList<PlanningItem>()
-    var failure: Throwable? = null
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      try {
-        source.observeItems(range).collect { latest = it }
-      } catch (error: IllegalStateException) {
-        failure = error
-      }
-    }
-    runCurrent()
-    assertEquals(3, latest.size)
-    medications.readError = IllegalStateException("Read failed")
-    auth.signInWithGoogle("b")
-    runCurrent()
-    assertTrue(latest.isEmpty())
-    assertEquals("Read failed", failure?.message)
-  }
-
   /** Running read failures are reported instead of turning into an empty success. */
   @Test
   fun runningReadFailurePropagates() = runTest {
-    auth.signInWithGoogle("patient")
     var failure: Throwable? = null
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
       try {
@@ -282,22 +200,5 @@ class MedicationPlanningSourceTest {
     medications.failRunningReads(IllegalStateException("Live failure"))
     runCurrent()
     assertEquals("Live failure", failure?.message)
-  }
-
-  /** Cancellation is preserved and does not prevent a later account from being observed. */
-  @Test
-  fun cancelledReadAllowsTheNextAccountToLoad() = runTest {
-    auth.signInWithGoogle("a")
-    medications.readError = CancellationException("Cancelled")
-    var latest = emptyList<PlanningItem>()
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range).collect { latest = it }
-    }
-    runCurrent()
-    medications.readError = null
-    medications.seed("b", prescription(medication()))
-    auth.signInWithGoogle("b")
-    runCurrent()
-    assertEquals(3, latest.size)
   }
 }

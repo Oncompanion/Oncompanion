@@ -144,7 +144,7 @@ class OverviewViewModelTest {
       val vm =
           viewModel(
               auth = auth,
-              planning = ObservePlanning(MedicationPlanningSource(repository, auth)),
+              planning = ObservePlanning(MedicationPlanningSource(repository, "patient")),
           )
       runCurrent()
       val entry = vm.uiState.value.todayEntries.single()

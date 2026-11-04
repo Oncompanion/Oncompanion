@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.domain.planning
 
-import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
@@ -11,7 +10,6 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
-import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
@@ -33,8 +31,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [EventPlanningSource] shows in Planning only the events the signed-in patient confirmed
- * (US-30, #139), on their day, past weeks included.
+ * [EventPlanningSource] shows in Planning only the events a patient confirmed (US-30, #139), on
+ * their day, past weeks included. Following the signed-in account is [SignedInPlanning]'s job,
+ * tested in [SignedInPlanningTest].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventPlanningSourceTest {
@@ -43,7 +42,6 @@ class EventPlanningSourceTest {
   private val monday = LocalDate.of(2026, 10, 19)
   private val week = PlanningRange(monday, monday.plusWeeks(1), zone)
 
-  private val auth = FakeAuthRepository { AuthUser(it) }
   private val registrations = FakeEventRegistrationRepository()
 
   private fun event(id: String, start: LocalDateTime, place: String = "Ligue office") =
@@ -56,16 +54,15 @@ class EventPlanningSourceTest {
           description = "Description",
       )
 
-  /** The source over [events], whose local times are in Planning's zone. */
+  /** The patient's source over [events], whose local times are in Planning's zone. */
   private fun source(vararg events: Event, repository: EventRepository = fakeEvents(*events)) =
-      EventPlanningSource(repository, registrations, auth)
+      EventPlanningSource(repository, registrations, "patient")
 
   private fun fakeEvents(vararg events: Event) =
       FakeEventRepository(events.toList(), zone = { zone })
 
-  /** Signs [uid] in and confirms their registration for each of [eventIds]. */
-  private suspend fun signInAndConfirm(uid: String, vararg eventIds: String) {
-    auth.signInWithGoogle(uid)
+  /** Confirms [uid]'s registration for each of [eventIds]. */
+  private fun confirm(uid: String, vararg eventIds: String) {
     eventIds.forEach { registrations.confirm(uid, it) }
   }
 
@@ -87,7 +84,7 @@ class EventPlanningSourceTest {
   @Test
   fun aConfirmedEvent_becomesATimedEntryOnItsDay_withItsPlace() = runTest {
     val start = monday.plusDays(2).atTime(18, 30)
-    signInAndConfirm("patient", "walk")
+    confirm("patient", "walk")
 
     val item = latest(source(event("walk", start, place = "Parc des Bastions"))).single()
 
@@ -105,7 +102,7 @@ class EventPlanningSourceTest {
 
   @Test
   fun aBlankPlace_givesNoSubtitle() = runTest {
-    signInAndConfirm("patient", "yoga")
+    confirm("patient", "yoga")
 
     val item = latest(source(event("yoga", monday.atTime(10, 0), place = "  "))).single()
 
@@ -114,7 +111,7 @@ class EventPlanningSourceTest {
 
   @Test
   fun onlyTheConfirmedEvents_areShown() = runTest {
-    signInAndConfirm("patient", "yoga")
+    confirm("patient", "yoga")
 
     val items =
         latest(source(event("yoga", monday.atTime(10, 0)), event("walk", monday.atTime(14, 0))))
@@ -132,7 +129,7 @@ class EventPlanningSourceTest {
             Triple("sunday-last", monday.plusDays(6).atTime(23, 59), true),
             Triple("next-monday", monday.plusWeeks(1).atStartOfDay(), false),
         )
-    signInAndConfirm("patient", *cases.map { it.first }.toTypedArray())
+    confirm("patient", *cases.map { it.first }.toTypedArray())
     val events = cases.map { (id, start, _) -> event(id, start) }.toTypedArray()
 
     val items = latest(source(*events))
@@ -147,7 +144,7 @@ class EventPlanningSourceTest {
   fun aPastWeek_showsTheConfirmedEventsThatTookPlaceThen() = runTest {
     // The patient confirmed a workshop that took place three weeks before this week
     val pastMonday = monday.minusWeeks(3)
-    signInAndConfirm("patient", "workshop")
+    confirm("patient", "workshop")
 
     val items =
         latest(
@@ -162,7 +159,7 @@ class EventPlanningSourceTest {
   fun aWeekAcrossTheClockChange_keepsItsEventsOnTheirDay() = runTest {
     // Summer time ends on Sunday 25 October 2026 in Zurich
     val sunday = LocalDate.of(2026, 10, 25)
-    signInAndConfirm("patient", "late")
+    confirm("patient", "late")
 
     val item = latest(source(event("late", sunday.atTime(23, 30)))).single()
 
@@ -171,7 +168,6 @@ class EventPlanningSourceTest {
 
   @Test
   fun confirmingAndRemoving_updatesPlanningRightAway() = runTest {
-    signInAndConfirm("patient")
     val emissions = collect(source(event("yoga", monday.atTime(10, 0))))
     assertTrue(emissions.last().isEmpty())
 
@@ -186,7 +182,7 @@ class EventPlanningSourceTest {
 
   @Test
   fun confirmingTwice_showsTheEventOnce() = runTest {
-    signInAndConfirm("patient", "yoga", "yoga")
+    confirm("patient", "yoga", "yoga")
     val emissions = collect(source(event("yoga", monday.atTime(10, 0))))
 
     registrations.confirm("patient", "yoga")
@@ -206,7 +202,7 @@ class EventPlanningSourceTest {
                 events.filter { it.startDateTime.atZone(zone).toInstant() in from..<until }
               }
         }
-    signInAndConfirm("patient", "yoga")
+    confirm("patient", "yoga")
     val emissions = collect(source(repository = liveEvents))
 
     // Renamed
@@ -226,41 +222,8 @@ class EventPlanningSourceTest {
   }
 
   @Test
-  fun signedOut_showsNoEvents() = runTest {
-    registrations.confirm("patient", "yoga")
-
-    assertTrue(latest(source(event("yoga", monday.atTime(10, 0)))).isEmpty())
-  }
-
-  @Test
-  fun switchingAccounts_showsOnlyTheNewPatientsEvents_andSigningOutClearsThem() = runTest {
-    registrations.confirm("anne", "yoga")
-    registrations.confirm("bob", "walk")
-    auth.signInWithGoogle("anne")
-    val emissions =
-        collect(source(event("yoga", monday.atTime(10, 0)), event("walk", monday.atTime(14, 0))))
-    assertEquals(listOf(PlanningSource.Event("yoga")), emissions.last().map { it.source })
-
-    emissions.clear()
-    auth.signInWithGoogle("bob")
-    runCurrent()
-    // Anne's events are cleared before Bob's are shown
-    assertTrue(emissions.first().isEmpty())
-    assertEquals(listOf(PlanningSource.Event("walk")), emissions.last().map { it.source })
-
-    // Anne's later confirmations no longer reach the screen
-    registrations.confirm("anne", "walk")
-    runCurrent()
-    assertEquals(listOf(PlanningSource.Event("walk")), emissions.last().map { it.source })
-
-    auth.signOut()
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
-  }
-
-  @Test
   fun aFailingConfirmationsOrEventsRead_failsTheSource() = runTest {
-    signInAndConfirm("patient", "yoga")
+    confirm("patient", "yoga")
     val yoga = event("yoga", monday.atTime(10, 0))
     val failingEvents =
         object : EventRepository by fakeEvents(yoga) {
