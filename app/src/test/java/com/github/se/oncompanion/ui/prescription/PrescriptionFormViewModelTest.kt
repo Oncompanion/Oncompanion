@@ -1087,7 +1087,7 @@ class PrescriptionFormViewModelTest {
 
   @Test
   fun newFormIsReadyAndNotEditing() = runTest {
-    // Nothing is read for a new prescription, so a failing read changes nothing
+    // A new prescription only reads the saved ones to compare with: a failing read changes nothing
     fakeMedications.readError = IOException("unavailable")
 
     val viewModel = viewModel()
@@ -1761,5 +1761,140 @@ class PrescriptionFormViewModelTest {
 
     assertEquals(typed, viewModel.state)
     assertFalse(viewModel.state.isEditing)
+  }
+
+  // ---------- A prescription already saved (US-39) ----------
+
+  /** A new draft like [saved] (same prescriber and medications), dated [on]: new, so no IDs. */
+  private fun draftLikeSaved(on: LocalDate = saved.prescribedOn) =
+      saved.toDraft().let { draft ->
+        draft.copy(prescribedOn = on, medications = draft.medications.map { it.copy(id = null) })
+      }
+
+  /** A new form filled in like [saved], dated [on]. */
+  private fun TestScope.likeSaved(on: LocalDate = saved.prescribedOn): PrescriptionFormViewModel {
+    fakeMedications.seed(uid, saved)
+    return viewModel(draftLikeSaved(on)).also { advanceUntilIdle() }
+  }
+
+  @Test
+  fun savingAPrescriptionAlreadySaved_asksFirst_andKeepEditingSavesNothing() = runTest {
+    val viewModel = likeSaved()
+
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(saved, viewModel.state.alreadySaved)
+    assertFalse(viewModel.state.isSaving)
+
+    viewModel.keepEditing()
+    advanceUntilIdle()
+    assertNull(viewModel.state.alreadySaved)
+    assertFalse(viewModel.state.isSaved)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+  }
+
+  @Test
+  fun saveAnyway_savesItASecondTime() = runTest {
+    val viewModel = likeSaved()
+    viewModel.save()
+    advanceUntilIdle()
+
+    viewModel.saveAnyway()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.state.isSaved)
+    assertNull(viewModel.state.alreadySaved)
+    assertEquals(2, fakeMedications.prescriptionsOf(uid).size)
+  }
+
+  @Test
+  fun saveAnywayOrKeepEditing_doNothingUnlessAsked() = runTest {
+    val viewModel = likeSaved()
+    viewModel.saveAnyway()
+    viewModel.keepEditing()
+    advanceUntilIdle()
+    assertFalse(viewModel.state.isSaved)
+    assertEquals(listOf(saved), fakeMedications.prescriptionsOf(uid))
+  }
+
+  @Test
+  fun theSameMedicationsOnAnotherDate_lookLikeARenewal_andSaveWithoutAsking() = runTest {
+    val viewModel = likeSaved(on = today)
+    assertEquals(saved, viewModel.state.renewalOf)
+
+    viewModel.save()
+    advanceUntilIdle()
+    assertNull(viewModel.state.alreadySaved)
+    assertTrue(viewModel.state.isSaved)
+  }
+
+  @Test
+  fun theRenewalNoticeFollowsTheForm() = runTest {
+    val viewModel = likeSaved(on = today)
+    // Another medication: no longer the same ones
+    viewModel.openMedication(0)
+    viewModel.onMedicationNameChange("Paracétamol 500 mg")
+    assertNull(viewModel.state.renewalOf)
+    // Back to the saved one
+    viewModel.onMedicationNameChange("ondansetron 8mg")
+    assertEquals(saved, viewModel.state.renewalOf)
+    // Its date: the same prescription, which Save asks about instead
+    viewModel.onPrescribedOnChange(saved.prescribedOn)
+    assertNull(viewModel.state.renewalOf)
+  }
+
+  @Test
+  fun aPrescriptionSavedMeanwhile_isComparedToo() = runTest {
+    val viewModel = viewModel(draftLikeSaved())
+    advanceUntilIdle()
+    assertNull(viewModel.state.renewalOf)
+
+    // Saved from another device while the form is open
+    fakeMedications.seed(uid, saved.copy(prescribedOn = today.minusDays(30)))
+    advanceUntilIdle()
+
+    assertEquals(today.minusDays(30), viewModel.state.renewalOf?.prescribedOn)
+  }
+
+  @Test
+  fun theSamePrescriptionSavedMeanwhile_isAskedAboutToo() = runTest {
+    val viewModel = viewModel(draftLikeSaved())
+    advanceUntilIdle()
+
+    // Saved from another device while the form is open
+    fakeMedications.seed(uid, saved)
+    advanceUntilIdle()
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertEquals(saved, viewModel.state.alreadySaved)
+  }
+
+  @Test
+  fun correctingASavedPrescription_isNeverComparedWithIt() = runTest {
+    // Even with an identical copy saved too: corrections aren't compared
+    fakeMedications.seed(uid, saved.copy(id = "presc-2"))
+    val viewModel = loadedEditViewModel()
+    assertNull(viewModel.state.renewalOf)
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertNull(viewModel.state.alreadySaved)
+    assertTrue(viewModel.state.isSaved)
+  }
+
+  @Test
+  fun savedPrescriptionsThatCantBeRead_saveWithoutAsking() = runTest {
+    fakeMedications.seed(uid, saved)
+    fakeMedications.readError = IOException("unavailable")
+    val viewModel = viewModel(draftLikeSaved())
+    advanceUntilIdle()
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    assertNull(viewModel.state.alreadySaved)
+    assertTrue(viewModel.state.isSaved)
   }
 }

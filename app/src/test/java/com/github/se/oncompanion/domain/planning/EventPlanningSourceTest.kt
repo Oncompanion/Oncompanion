@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -16,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -111,6 +113,9 @@ class EventPlanningSourceTest {
     val repository =
         object : EventRepository {
           override fun getUpcomingEvents(): Flow<List<Event>> = upcoming
+
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> =
+              flowOf(emptyList())
 
           override suspend fun getEvent(id: String): Event? = null
         }

@@ -36,6 +36,14 @@ class FakeEventRegistrationRepository : EventRegistrationRepository {
     }
   }
 
+  override fun observeRegisteredEventIds(uid: String): Flow<Set<String>> {
+    requirePathSegment(uid)
+    return flow {
+      observeError?.let { throw it }
+      emitAll(store.map { it[uid].orEmpty() }.distinctUntilChanged())
+    }
+  }
+
   override fun confirm(uid: String, eventId: String) {
     requirePathSegment(uid)
     requirePathSegment(eventId)
