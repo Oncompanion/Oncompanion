@@ -6,7 +6,7 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows every part of the app in its layer. Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
@@ -347,7 +347,10 @@ Known limitations:
 
 ## Sign-out (issue #35)
 
-`ProfileViewModel` delegates to the process-scoped `SignOut` coordinator. Confirmation freezes
+`ProfileViewModel` delegates to the process-scoped `SignOut` coordinator, and so does
+`OnboardingViewModel` for **Use another account** (#281), which signs out before any profile is
+saved so the user can pick another Google account; both show the same `SignOutDialog`
+(`ui/auth/`) when changes may be discarded, and onboarding only follows a sign-out it started itself. Confirmation freezes
 repository entry points and cancels/drains their active child jobs, including operations that
 suspended before enqueueing a write. SDK transactions are tracked separately because cancelling
 `Task.await()` does not cancel the task. The coordinator waits for transactions, then calls

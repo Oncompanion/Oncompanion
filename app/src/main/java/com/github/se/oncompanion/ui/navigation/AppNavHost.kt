@@ -155,6 +155,8 @@ private fun SessionNavHost(
         RoleScreen(
             viewModel = onboardingViewModel(navController, entry),
             onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
+            onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
       composable(Screen.ONBOARDING_INFORMATION) { entry ->
@@ -166,6 +168,8 @@ private fun SessionNavHost(
                   if (role == Role.CAREGIVER) Route.JOIN_CIRCLE else Route.OVERVIEW
               )
             },
+            onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
     }
