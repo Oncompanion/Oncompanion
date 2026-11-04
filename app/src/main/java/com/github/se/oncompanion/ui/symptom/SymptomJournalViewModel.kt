@@ -46,7 +46,8 @@ data class JournalDay(val date: LocalDate, val entries: List<JournalEntry>)
  * @property today the current date, to call the days "Today" and "Yesterday"
  * @property isLoading true until the entries arrive
  * @property hasError true if they couldn't be loaded (or nobody is signed in)
- * @property canAdd whether a symptom can be added: only to the user's own journal
+ * @property canAdd whether a symptom can be added: only to the user's own journal, once it is known
+ *   to be theirs
  * @property isNotShared in caregiver mode, the patient doesn't share their symptoms: no entries
  */
 data class SymptomJournalUiState(
@@ -54,7 +55,7 @@ data class SymptomJournalUiState(
     val days: List<JournalDay> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
-    val canAdd: Boolean = true,
+    val canAdd: Boolean = false,
     val isNotShared: Boolean = false,
 )
 
@@ -94,25 +95,26 @@ class SymptomJournalViewModel(
           .flatMapLatest(::journalOf)
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom journal", e)
-            _uiState.update { it.copy(isLoading = false, hasError = true) }
+            // canAdd stays as it was: a patient can still log a symptom if their journal fails
+            _uiState.update { it.copy(isLoading = false, hasError = true, isNotShared = false) }
           }
           .collect { change -> _uiState.update(change) }
     }
   }
 
-  /** How the journal changes with [access]: the entries it may read, or why there are none. */
+  /**
+   * How the journal changes with [access]: the entries it may read, or why there are none. Each
+   * access sets every flag, so nothing from the previous one stays (e.g. an error after "not
+   * shared"), and only a journal the user may write to offers to add.
+   */
   private fun journalOf(
       access: SectionAccess
   ): Flow<(SymptomJournalUiState) -> SymptomJournalUiState> =
       when (access) {
-        SectionAccess.Loading -> flowOf { it.copy(days = emptyList(), isLoading = true) }
+        SectionAccess.Loading -> flowOf { it.withoutEntries(isLoading = true) }
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        SectionAccess.NoAccess ->
-            flowOf { it.copy(days = emptyList(), isLoading = false, hasError = true) }
-        SectionAccess.NotShared ->
-            flowOf {
-              it.copy(days = emptyList(), isLoading = false, isNotShared = true, canAdd = false)
-            }
+        SectionAccess.NoAccess -> flowOf { it.withoutEntries(hasError = true) }
+        SectionAccess.NotShared -> flowOf { it.withoutEntries(isNotShared = true) }
         is SectionAccess.Readable ->
             symptomRepository.observeSymptoms(access.ownerUid).map { entries ->
               { state: SymptomJournalUiState ->
@@ -126,6 +128,20 @@ class SymptomJournalViewModel(
               }
             }
       }
+
+  /** No entries and nothing to add, for one of the reasons given. */
+  private fun SymptomJournalUiState.withoutEntries(
+      isLoading: Boolean = false,
+      hasError: Boolean = false,
+      isNotShared: Boolean = false,
+  ) =
+      copy(
+          days = emptyList(),
+          isLoading = isLoading,
+          hasError = hasError,
+          isNotShared = isNotShared,
+          canAdd = false,
+      )
 
   /**
    * Keeps the current date right, so "Today" and "Yesterday" stay right while the journal is open:

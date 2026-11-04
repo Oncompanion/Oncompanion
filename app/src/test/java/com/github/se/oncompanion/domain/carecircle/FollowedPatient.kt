@@ -13,26 +13,48 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import kotlinx.coroutines.runBlocking
 
 /**
- * A [ResolveSectionAccess] for tests of caregiver mode: "caregiver" is signed in and follows
- * "patient", who shares the [shared] sections with them.
+ * For tests of caregiver mode: "caregiver" is signed in and follows "patient", who shares the
+ * [shared] sections with them. The test can change that while a screen shows the patient's data.
  */
-fun followedPatientAccess(vararg shared: CarePermission): ResolveSectionAccess {
+class FollowedPatient(vararg shared: CarePermission) {
   val auth = FakeAuthRepository {
     AuthUser(it)
   }
       .also { runBlocking { it.signInWithGoogle("caregiver") } }
-  val circle =
-      FakeCareCircleRepository().apply {
-        setMembers(
-            "patient",
-            listOf(
-                CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = shared.toSet())
-            ),
-        )
-      }
-  val profiles =
+  val circle = FakeCareCircleRepository()
+  private val profiles =
       FakeUserProfileRepository().apply {
         seed(UserProfile("caregiver", Role.CAREGIVER, firstName = "Sam"))
       }
-  return ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, profiles), auth)
+
+  /** Whose care the caregiver may see. */
+  val careAccess = ResolveCareCircleAccess(auth, circle, profiles)
+
+  /** What the caregiver may read of each section. */
+  val sectionAccess = ResolveSectionAccess(careAccess, auth)
+
+  init {
+    shares(*shared)
+  }
+
+  /** The patient now shares exactly [sections] with the caregiver. */
+  fun shares(vararg sections: CarePermission) =
+      circle.setMembers(
+          "patient",
+          listOf(
+              CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = sections.toSet())
+          ),
+      )
+
+  /** The patient removes the caregiver from their circle. */
+  fun removesTheCaregiver() = circle.setMembers("patient", emptyList())
+
+  /** The caregiver's membership isn't confirmed by the server yet (offline, nothing cached). */
+  fun isUnconfirmed() {
+    circle.unconfirmedMembers = setOf("patient" to "caregiver")
+  }
 }
+
+/** A [ResolveSectionAccess] where "caregiver" follows "patient", who shares [shared]. */
+fun followedPatientAccess(vararg shared: CarePermission): ResolveSectionAccess =
+    FollowedPatient(*shared).sectionAccess

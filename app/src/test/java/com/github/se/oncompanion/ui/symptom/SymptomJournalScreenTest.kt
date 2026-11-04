@@ -69,7 +69,7 @@ class SymptomJournalScreenTest {
   /** Monday 5 October 2026. */
   private val today = LocalDate.of(2026, 10, 5)
 
-  private val loaded = SymptomJournalUiState(today = today, isLoading = false)
+  private val loaded = SymptomJournalUiState(today = today, isLoading = false, canAdd = true)
 
   private fun day(date: LocalDate, vararg entries: Pair<SymptomEntry, String>) =
       JournalDay(date, entries.map { (entry, time) -> JournalEntry(entry, LocalTime.parse(time)) })
