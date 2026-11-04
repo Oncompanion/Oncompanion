@@ -138,7 +138,8 @@ class PlanningViewModel(
             week.plusWeeks(1),
             zoneId,
         )
-    // A retry keeps the displayed items until new ones arrive; a later account change clears them
+    // A retry keeps the displayed items until the first answer, whatever it is; after that, an
+    // account change clears them again
     var keepItems = preserveItems
     observation = viewModelScope.launch {
       try {
@@ -150,7 +151,7 @@ class PlanningViewModel(
             weekItems =
                 (planning as? CarePlanning.Shown)?.items?.filter { it.timing in range }.orEmpty()
           }
-          if (planning is CarePlanning.Shown) keepItems = false
+          if (planning !is CarePlanning.Loading) keepItems = false
           mutableState.value =
               mutableState.value.copy(
                   isLoading = planning is CarePlanning.Loading,

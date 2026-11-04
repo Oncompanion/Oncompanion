@@ -50,6 +50,38 @@ class PlanningViewModelTest {
   fun accountSwitchAfterReadFailureLoadsNewPatientAgenda() =
       checkAccountChangeAfterReadFailure(false)
 
+  /** A retry that fails again keeps the shown entries only until the account changes. */
+  @Test
+  fun failedRetryThenAccountSwitch_neverShowsThePreviousAccountsEntries() =
+      runTest(dispatcher) {
+        val auth = FakeAuthRepository { AuthUser(it) }
+        auth.signInWithGoogle("a")
+        val appointments = FakeAppointmentRepository()
+        val time = clock.instant()
+        appointments.seed("a", Appointment("a", "Patient A", time, AppointmentType.CONSULTATION))
+        val vm =
+            PlanningViewModel(
+                ownPlanning(AppointmentPlanningSource(appointments), auth),
+                clock,
+                zone,
+                SavedStateHandle(),
+            )
+        drain()
+        appointments.failActiveObservations(IllegalStateException("Read failed"))
+        drain()
+        // The retry fails too, keeping Patient A on screen while it lasts
+        appointments.observeError = IllegalStateException("Still failing")
+        vm.retry()
+        drain()
+        assertTrue(vm.uiState.value.hasError)
+        assertEquals("Patient A", vm.uiState.value.items.single().title)
+
+        auth.signInWithGoogle("b")
+        drain()
+
+        assertTrue(vm.uiState.value.items.none { it.title == "Patient A" })
+      }
+
   private fun checkAccountChangeAfterReadFailure(signOut: Boolean) =
       runTest(dispatcher) {
         val auth = FakeAuthRepository { AuthUser(it) }
