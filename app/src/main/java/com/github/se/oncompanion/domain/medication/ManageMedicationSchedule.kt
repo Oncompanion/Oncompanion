@@ -32,9 +32,9 @@ class ManageMedicationSchedule(
     // Adding a draft made from a saved prescription would leave two prescriptions sharing the
     // same medication IDs, the old one next to the new one
     require(draft.medications.all { it.id == null }) {
-      "A new prescription can't contain medications that are already saved: $draft"
+      "A new prescription can't contain medications that are already saved"
     }
-    require(draft.isValid()) { "Invalid prescription draft: $draft" }
+    require(draft.isValid()) { "Invalid prescription draft" }
     // The repository creates the IDs on the device, so this also works offline
     val prescription =
         draft.toPrescription(medicationRepository.newId(), medicationRepository::newId)
@@ -58,7 +58,7 @@ class ManageMedicationSchedule(
    * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid]
    */
   suspend fun update(uid: String, prescriptionId: String, draft: PrescriptionDraft): Boolean {
-    require(draft.isValid()) { "Invalid prescription draft: $draft" }
+    require(draft.isValid()) { "Invalid prescription draft" }
     // Without this read, the caller couldn't tell a saved correction from one that was dropped
     if (medicationRepository.observePrescription(uid, prescriptionId).first() == null) return false
     // Only the medications added in the form need an ID, the saved ones keep theirs
