@@ -1,9 +1,11 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -14,15 +16,17 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
  */
 object PlanningRepositoryProvider {
   /**
-   * By default, a patient's appointments and the Ligue's upcoming events, merged by
+   * By default, a patient's appointments and medications and the Ligue's upcoming events, merged by
    * [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read, Planning
    * still shows the appointments instead of an error. The providers are read on each observation,
-   * so replacing them also reaches Planning.
+   * so replacing them also reaches Planning. Whose planning it is, and restarting it on an account
+   * change, is decided by [ObserveCarePlanning].
    */
   @Volatile
   var repository: PlanningRepository = PlanningRepository { ownerUid, range ->
     ObservePlanning(
             AppointmentPlanningSource(AppointmentRepositoryProvider.repository),
+            MedicationPlanningSource(MedicationRepositoryProvider.repository),
             // Events are nice to have: if they fail, the appointments still show
             OptionalPlanningSource(EventPlanningSource(EventRepositoryProvider.repository)),
         )

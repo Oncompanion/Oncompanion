@@ -79,7 +79,7 @@
         },
         {
           "type": "arrow",
-          "id": "2Dx8jqZ77ys8azx2yVOG"
+          "id": "QA3L5jz3351AqPBll7ok"
         }
       ],
       "updated": 1791100000000,
@@ -155,7 +155,7 @@
         },
         {
           "type": "arrow",
-          "id": "8vJMBYi8a17YNflsFokq"
+          "id": "3sO71lSAhwNPK6zvPN2m"
         }
       ],
       "updated": 1791100000000,
@@ -231,7 +231,7 @@
         },
         {
           "type": "arrow",
-          "id": "dIdtK0CCu8WWJ3dwvdjd"
+          "id": "wCmqQdwZH3az62deMIxS"
         }
       ],
       "updated": 1791100000000,
@@ -288,7 +288,7 @@
       "backgroundColor": "#b2f2bb",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -319,7 +319,7 @@
         },
         {
           "type": "arrow",
-          "id": "5WUZQmx3FlLeKw8lEH8H"
+          "id": "nqnfJ0bsLoPxfzDOsiDs"
         }
       ],
       "updated": 1792000000000,
@@ -331,9 +331,9 @@
       "id": "observe_t",
       "type": "text",
       "x": 1310,
-      "y": 217.5,
+      "y": 230.0,
       "width": 260,
-      "height": 75.0,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -354,8 +354,8 @@
       "link": null,
       "locked": false,
       "index": "a009",
-      "text": "ObservePlanning\nmerges the sources\n(medications planned)",
-      "originalText": "ObservePlanning\nmerges the sources\n(medications planned)",
+      "text": "ObservePlanning\nmerges all three sources",
+      "originalText": "ObservePlanning\nmerges all three sources",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -548,7 +548,12 @@
       "version": 2,
       "versionNonce": 85344589,
       "isDeleted": true,
-      "boundElements": [],
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "overviewrepo_t"
+        }
+      ],
       "updated": 1792100000000,
       "link": null,
       "locked": false,
@@ -675,9 +680,9 @@
       "id": "medication",
       "type": "rectangle",
       "x": 1300,
-      "y": 380,
+      "y": 455,
       "width": 260,
-      "height": 100,
+      "height": 80,
       "angle": 0,
       "strokeColor": "#2f9e44",
       "backgroundColor": "#b2f2bb",
@@ -702,11 +707,11 @@
         },
         {
           "type": "arrow",
-          "id": "ar9"
+          "id": "ar14"
         },
         {
           "type": "arrow",
-          "id": "ar14"
+          "id": "source_medications"
         }
       ],
       "updated": 1791100000000,
@@ -718,9 +723,9 @@
       "id": "medication_t",
       "type": "text",
       "x": 1310,
-      "y": 405.0,
+      "y": 470,
       "width": 240,
-      "height": 50.0,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1317,7 +1322,7 @@
       "x": 848,
       "y": 126,
       "width": 446,
-      "height": 214,
+      "height": 204,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1347,15 +1352,11 @@
         ],
         [
           0,
-          214
+          204
         ],
         [
-          432,
-          214
-        ],
-        [
-          432,
-          156.5
+          422,
+          204
         ],
         [
           446,
@@ -1629,16 +1630,16 @@
     {
       "id": "ar9",
       "type": "arrow",
-      "x": 1412,
+      "x": 1430,
       "y": 316,
-      "width": 102.0,
-      "height": 58,
+      "width": 0,
+      "height": 28,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1661,8 +1662,8 @@
           0
         ],
         [
-          18,
-          58
+          0,
+          28
         ]
       ],
       "lastCommittedPoint": null,
@@ -1672,13 +1673,13 @@
         "mode": "orbit",
         "elementId": "observe",
         "fixedPoint": [
-          0.4,
+          0.4642857142857143,
           1
         ]
       },
       "endBinding": {
         "mode": "orbit",
-        "elementId": "medication",
+        "elementId": "medication_source",
         "fixedPoint": [
           0.5,
           0
@@ -1925,9 +1926,9 @@
       "id": "ar14",
       "type": "arrow",
       "x": 1430.0,
-      "y": 486,
+      "y": 541,
       "width": 119.79999999999995,
-      "height": 68,
+      "height": 13,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1957,7 +1958,7 @@
         ],
         [
           -119.79999999999995,
-          68
+          13
         ]
       ],
       "lastCommittedPoint": null,
@@ -2066,8 +2067,8 @@
       "link": null,
       "locked": false,
       "index": "a044",
-      "text": "Planning and Overview share appointments and events through ObservePlanning; medications are planned.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
-      "originalText": "Planning and Overview share appointments and events through ObservePlanning; medications are planned.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "text": "Planning and Overview share appointments, medications and events through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "originalText": "Planning and Overview share appointments, medications and events through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -3026,7 +3027,146 @@
       }
     },
     {
-      "id": "G2oG09vSDbZF0uZgTWhk",
+      "id": "medication_source",
+      "type": "rectangle",
+      "x": 1260,
+      "y": 350,
+      "width": 340,
+      "height": 70,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 512574198,
+      "version": 1,
+      "versionNonce": 570402825,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "medication_source_t"
+        },
+        {
+          "type": "arrow",
+          "id": "ar9"
+        },
+        {
+          "type": "arrow",
+          "id": "source_medications"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a022W"
+    },
+    {
+      "id": "medication_source_t",
+      "type": "text",
+      "x": 1270,
+      "y": 360.0,
+      "width": 320,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 849943643,
+      "version": 2,
+      "versionNonce": 281058974,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792000000000,
+      "link": null,
+      "locked": false,
+      "index": "a023W",
+      "text": "MedicationPlanningSource\n(PlanningRepository)",
+      "originalText": "MedicationPlanningSource\n(PlanningRepository)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "medication_source",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "source_medications",
+      "type": "arrow",
+      "x": 1430,
+      "y": 426,
+      "width": 0,
+      "height": 23,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 259691267,
+      "version": 1,
+      "versionNonce": 749490765,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a03aW",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          23
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "medication_source",
+        "fixedPoint": [
+          0.5,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "medication",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
+    },
+    {
+      "id": "tVcWJu1dSn9nIkNfP2G4",
       "type": "rectangle",
       "x": 620,
       "y": 200,
@@ -3052,23 +3192,23 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "4eqeXVQg4LB7X93WUdqS"
+          "id": "b9zKLvI8fISUYzX1alhn"
         },
         {
           "type": "arrow",
-          "id": "2Dx8jqZ77ys8azx2yVOG"
+          "id": "QA3L5jz3351AqPBll7ok"
         },
         {
           "type": "arrow",
-          "id": "8vJMBYi8a17YNflsFokq"
+          "id": "3sO71lSAhwNPK6zvPN2m"
         },
         {
           "type": "arrow",
-          "id": "dIdtK0CCu8WWJ3dwvdjd"
+          "id": "wCmqQdwZH3az62deMIxS"
         },
         {
           "type": "arrow",
-          "id": "5WUZQmx3FlLeKw8lEH8H"
+          "id": "nqnfJ0bsLoPxfzDOsiDs"
         }
       ],
       "updated": 1791100000000,
@@ -3077,7 +3217,7 @@
       "index": "a006"
     },
     {
-      "id": "4eqeXVQg4LB7X93WUdqS",
+      "id": "b9zKLvI8fISUYzX1alhn",
       "type": "text",
       "x": 630,
       "y": 217.5,
@@ -3109,12 +3249,12 @@
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "G2oG09vSDbZF0uZgTWhk",
+      "containerId": "tVcWJu1dSn9nIkNfP2G4",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "2Dx8jqZ77ys8azx2yVOG",
+      "id": "QA3L5jz3351AqPBll7ok",
       "type": "arrow",
       "x": 770,
       "y": 120,
@@ -3165,7 +3305,7 @@
       },
       "endBinding": {
         "mode": "orbit",
-        "elementId": "G2oG09vSDbZF0uZgTWhk",
+        "elementId": "tVcWJu1dSn9nIkNfP2G4",
         "fixedPoint": [
           0.5,
           0
@@ -3173,7 +3313,7 @@
       }
     },
     {
-      "id": "8vJMBYi8a17YNflsFokq",
+      "id": "3sO71lSAhwNPK6zvPN2m",
       "type": "arrow",
       "x": 1320,
       "y": 120,
@@ -3224,7 +3364,7 @@
       },
       "endBinding": {
         "mode": "orbit",
-        "elementId": "G2oG09vSDbZF0uZgTWhk",
+        "elementId": "tVcWJu1dSn9nIkNfP2G4",
         "fixedPoint": [
           0.5,
           0
@@ -3232,7 +3372,7 @@
       }
     },
     {
-      "id": "dIdtK0CCu8WWJ3dwvdjd",
+      "id": "wCmqQdwZH3az62deMIxS",
       "type": "arrow",
       "x": 920,
       "y": 255,
@@ -3275,7 +3415,7 @@
       "endArrowhead": "arrow",
       "startBinding": {
         "mode": "orbit",
-        "elementId": "G2oG09vSDbZF0uZgTWhk",
+        "elementId": "tVcWJu1dSn9nIkNfP2G4",
         "fixedPoint": [
           0.1,
           1
@@ -3291,12 +3431,12 @@
       }
     },
     {
-      "id": "5WUZQmx3FlLeKw8lEH8H",
+      "id": "nqnfJ0bsLoPxfzDOsiDs",
       "type": "arrow",
       "x": 770,
       "y": 310,
-      "width": 570,
-      "height": 35,
+      "width": 550,
+      "height": 20,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -3324,14 +3464,14 @@
         ],
         [
           0,
-          35
+          20
         ],
         [
-          570,
-          35
+          550,
+          20
         ],
         [
-          570,
+          550,
           0
         ]
       ],
@@ -3340,7 +3480,7 @@
       "endArrowhead": "arrow",
       "startBinding": {
         "mode": "orbit",
-        "elementId": "G2oG09vSDbZF0uZgTWhk",
+        "elementId": "tVcWJu1dSn9nIkNfP2G4",
         "fixedPoint": [
           0.1,
           1

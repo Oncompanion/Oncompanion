@@ -5,11 +5,16 @@ package com.github.se.oncompanion.ui.overview
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
+import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
+import com.github.se.oncompanion.domain.planning.ObservePlanning
 import com.github.se.oncompanion.domain.planning.followedPlanning
 import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -103,6 +108,60 @@ class OverviewViewModelTest {
       planning: PlanningRepository = FakePlanningRepository(),
       clock: Clock = TestClock(now),
   ) = OverviewViewModel(auth, profiles, ownPlanning(planning), clock, zone)
+
+  /** Saved medication days reach Overview without a time or a claim about intake status. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun savedMedicationSourceShowsOnlyTodaysRecordedInformation() = runTest {
+    Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    try {
+      val auth = FakeAuthRepository { AuthUser(it) }
+      auth.signInWithGoogle("patient")
+      val repository = FakeMedicationRepository()
+      val today = now.toLocalDate()
+      repository.addPrescription(
+          "patient",
+          Prescription(
+              "p",
+              prescribedOn = today,
+              medications =
+                  listOf(
+                      Medication(
+                          "active",
+                          "p",
+                          "Active medication",
+                          frequency = "As recorded",
+                          startDate = today,
+                          durationDays = 2,
+                      ),
+                      Medication("future", "p", "Future medication", startDate = today.plusDays(1)),
+                      Medication(
+                          "ended",
+                          "p",
+                          "Ended medication",
+                          startDate = today.minusDays(1),
+                          durationDays = 1,
+                      ),
+                  ),
+          ),
+      )
+      val vm =
+          viewModel(
+              auth = auth,
+              planning = ObservePlanning(MedicationPlanningSource(repository)),
+          )
+      runCurrent()
+      val entry = vm.uiState.value.todayEntries.single()
+      assertEquals("Active medication", entry.title)
+      assertEquals("As recorded", entry.subtitle)
+      assertEquals(TodayItemKind.MEDICATION, entry.kind)
+      assertNull(entry.time)
+      assertNull(entry.status)
+      assertNull(vm.uiState.value.nextAppointment)
+    } finally {
+      Dispatchers.resetMain()
+    }
+  }
 
   // ----- First name -----
 

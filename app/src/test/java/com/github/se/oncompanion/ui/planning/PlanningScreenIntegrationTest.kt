@@ -9,10 +9,16 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
+import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
+import com.github.se.oncompanion.domain.planning.ObservePlanning
 import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
+import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
@@ -39,6 +45,85 @@ class PlanningScreenIntegrationTest {
   @get:Rule val compose = createComposeRule()
   private val date = LocalDate.of(2026, 10, 2)
   private val zone = ZoneId.of("Europe/Zurich")
+
+  /** Saved medications flow through the actual source, week selection and live screen updates. */
+  @Test
+  fun savedMedicationsFollowDayAndWeekSelectionAndLocalEdits() {
+    val auth = FakeAuthRepository { AuthUser(it) }
+    runTest { auth.signInWithGoogle("patient") }
+    val medications = FakeMedicationRepository()
+    val medication =
+        Medication(
+            "m",
+            "p",
+            "Recorded medication",
+            frequency = "Mondays and Thursdays",
+            startDate = date,
+            durationDays = 8,
+        )
+    val prescription = Prescription("p", prescribedOn = date, medications = listOf(medication))
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        "patient",
+        Appointment(
+            "a",
+            "Consultation",
+            date.atTime(14, 0).atZone(zone).toInstant(),
+            AppointmentType.CONSULTATION,
+        ),
+    )
+    runTest { medications.addPrescription("patient", prescription) }
+    val vm =
+        PlanningViewModel(
+            ownPlanning(
+                ObservePlanning(
+                    MedicationPlanningSource(medications),
+                    AppointmentPlanningSource(appointments),
+                ),
+                auth,
+            ),
+            Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
+            zone,
+            SavedStateHandle(),
+        )
+    val navigation =
+        NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
+    compose.setContent {
+      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+    }
+    compose.onNodeWithText("Recorded medication").assertIsDisplayed()
+    compose.onNodeWithText("Frequency: Mondays and Thursdays").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_no_set_time).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    compose.runOnIdle { assertEquals(date.plusWeeks(1), vm.uiState.value.selectedDate) }
+    compose.onNodeWithText("Recorded medication").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planning_scheduled).assertDoesNotExist()
+    compose.runOnIdle {
+      runTest {
+        medications.updatePrescription(
+            "patient",
+            prescription.copy(
+                medications = listOf(medication.copy(name = "Updated medication", frequency = null))
+            ),
+        )
+      }
+    }
+    compose.onNodeWithText("Recorded medication").assertDoesNotExist()
+    compose.onNodeWithText("Updated medication").assertIsDisplayed()
+    compose.onNodeWithText("Frequency not specified").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planningDay(date.plusDays(8).toString())).performClick()
+    compose.onNodeWithText("Updated medication").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.planningDay(date.plusDays(7).toString())).performClick()
+    compose.onNodeWithText("Updated medication").assertIsDisplayed()
+    compose.runOnIdle { runTest { medications.deletePrescription("patient", "p") } }
+    compose.onNodeWithText("Updated medication").assertDoesNotExist()
+    compose.runOnIdle { runTest { medications.addPrescription("patient", prescription) } }
+    compose.onAllNodesWithText("Recorded medication").assertCountEquals(1)
+    compose.runOnIdle { runTest { auth.signOut() } }
+    compose.onNodeWithText("Recorded medication").assertDoesNotExist()
+  }
 
   @Test
   fun screenConnectsCalendarAndBottomBarWithoutUnavailableActions() {

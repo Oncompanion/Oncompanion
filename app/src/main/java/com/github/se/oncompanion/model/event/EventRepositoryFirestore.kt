@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.channels.awaitClose
@@ -43,19 +44,31 @@ class EventRepositoryFirestore(
   private val db: FirebaseFirestore
     get() = dbProvider()
 
-  override fun getUpcomingEvents(): Flow<List<Event>> = SessionAccess.snapshots {
-    // Filtering and sorting on the same field only needs Firestore's automatic index
+  override fun getUpcomingEvents(): Flow<List<Event>> = observe {
+    eventsByStart().whereGreaterThanOrEqualTo(FIELD_START_AT, Timestamp(clock.instant()))
+  }
+
+  override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> = observe {
+    eventsByStart()
+        .whereGreaterThanOrEqualTo(FIELD_START_AT, Timestamp(from))
+        .whereLessThan(FIELD_START_AT, Timestamp(until))
+  }
+
+  /** The events, soonest first. Filtering on the same field only needs the automatic index. */
+  private fun eventsByStart(): Query =
+      db.collection(COLLECTION).orderBy(FIELD_START_AT, Query.Direction.ASCENDING)
+
+  /**
+   * Emits the events [query] finds, and again when they change. The query is built when the flow is
+   * collected, so Firestore is reached (and "now" read) only then.
+   */
+  private fun observe(query: () -> Query): Flow<List<Event>> = SessionAccess.snapshots {
     val registration =
-        db.collection(COLLECTION)
-            .whereGreaterThanOrEqualTo(FIELD_START_AT, Timestamp(clock.instant()))
-            .orderBy(FIELD_START_AT, Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-              if (error != null) {
-                close(error)
-              } else if (snapshot != null) {
-                trySend(snapshot.documents.mapNotNull(::fromDocument))
-              }
-            }
+        query().addSnapshotListener { snapshot, error ->
+          // Firestore gives either a snapshot or an error
+          if (snapshot != null) trySend(snapshot.documents.mapNotNull(::fromDocument))
+          else close(error)
+        }
     awaitClose { registration.remove() }
   }
 

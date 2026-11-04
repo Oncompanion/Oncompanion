@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.domain.planning
 
@@ -12,6 +13,10 @@ import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -25,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Before
 import org.junit.Test
 
 /** Checks what [PlanningRepositoryProvider] exposes by default and that it can be replaced. */
@@ -33,6 +39,14 @@ class PlanningRepositoryProviderTest {
   private val appAppointmentRepository = AppointmentRepositoryProvider.repository
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
+  private val appMedicationRepository = MedicationRepositoryProvider.repository
+  private val medications = FakeMedicationRepository()
+
+  /** Prevents default wiring from reaching Firebase in unit tests. */
+  @Before
+  fun replaceMedicationProvider() {
+    MedicationRepositoryProvider.repository = medications
+  }
 
   @After
   fun restoreProviders() {
@@ -40,6 +54,7 @@ class PlanningRepositoryProviderTest {
     AppointmentRepositoryProvider.repository = appAppointmentRepository
     AuthRepositoryProvider.repository = appAuthRepository
     EventRepositoryProvider.repository = appEventRepository
+    MedicationRepositoryProvider.repository = appMedicationRepository
   }
 
   /**
@@ -75,10 +90,11 @@ class PlanningRepositoryProviderTest {
             )
     EventRepositoryProvider.repository =
         FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
+    medications.seed("patient", prescription(day))
 
-    val items = original.observeItems("patient", range).first { it.size == 2 }
+    val items = original.observeItems("patient", range).first { it.size == 3 }
 
-    assertEquals(listOf("Saved consultation", event.title), items.map { it.title })
+    assertEquals(listOf("Medication", "Saved consultation", event.title), items.map { it.title })
   }
 
   /** If the events can't be read, the default provider still shows the appointments. */
@@ -106,10 +122,58 @@ class PlanningRepositoryProviderTest {
             error("Events couldn't be read")
           }
         }
+    medications.seed("patient", prescription(day))
 
-    val items = original.observeItems("patient", range).first { it.isNotEmpty() }
+    val items = original.observeItems("patient", range).first { it.size == 2 }
 
-    assertEquals(listOf("Saved consultation"), items.map { it.title })
+    assertEquals(listOf("Medication", "Saved consultation"), items.map { it.title })
+  }
+
+  private fun prescription(day: LocalDate, name: String = "Medication") =
+      Prescription(
+          "p",
+          prescribedOn = day,
+          medications = listOf(Medication("m", "p", name, startDate = day, durationDays = 1)),
+      )
+
+  /** It reads the planning of the owner it is asked for, and never another account's. */
+  @Test
+  fun readsOnlyTheGivenOwnersPlanning() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
+    val appointments = FakeAppointmentRepository()
+    for (uid in listOf("a", "b")) {
+      medications.seed(uid, prescription(day, "$uid medication"))
+      appointments.seed(
+          uid,
+          Appointment(uid, "$uid appointment", range.startInclusive, AppointmentType.CONSULTATION),
+      )
+    }
+    AppointmentRepositoryProvider.repository = appointments
+    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
+
+    val items = original.observeItems("b", range).first { it.size == 2 }
+
+    assertEquals(setOf("b medication", "b appointment"), items.map { it.title }.toSet())
+  }
+
+  /** Medication failures reach the caller instead of silently dropping essential entries. */
+  @Test
+  fun medicationFailureIsReported() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val auth = FakeAuthRepository { AuthUser(it) }
+    auth.signInWithGoogle("patient")
+    AuthRepositoryProvider.repository = auth
+    AppointmentRepositoryProvider.repository = FakeAppointmentRepository()
+    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
+    medications.readError = IllegalStateException("Medication read failed")
+    val failure = runCatching {
+      original
+          .observeItems("patient", PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich")))
+          .collect {}
+    }
+        .exceptionOrNull()
+    assertEquals("Medication read failed", failure?.message)
   }
 
   /** The repository given to the provider is the one it hands out afterwards. */
