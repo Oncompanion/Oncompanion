@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Tab
@@ -117,67 +120,14 @@ fun PlanningContent(
     bottomBar: @Composable () -> Unit = {},
 ) {
   val locale = LocalConfiguration.current.locales[0]
-  val fullDate = PlanningDates.format(state.selectedDate)
+  val compact = isCompactHeight()
   Scaffold(
       modifier = modifier.fillMaxSize().testTag(C.Tag.planning_screen),
       bottomBar = bottomBar,
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       Column {
-        Text(
-            stringResource(R.string.planning_title),
-            Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp),
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-              state.selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale)),
-              Modifier.weight(1f),
-              style = MaterialTheme.typography.titleMedium,
-          )
-          val previousLabel = stringResource(R.string.planning_previous_week)
-          TextButton(
-              actions.onPreviousWeek,
-              Modifier.testTag(C.Tag.planning_previous).semantics {
-                contentDescription = previousLabel
-              },
-              enabled = state.canGoToPreviousWeek,
-          ) {
-            Text("‹")
-          }
-          val todayLabel = stringResource(R.string.planning_go_today)
-          TextButton(
-              actions.onToday,
-              Modifier.testTag(C.Tag.planning_today).semantics { contentDescription = todayLabel },
-          ) {
-            Text(stringResource(R.string.planning_today))
-          }
-          val nextLabel = stringResource(R.string.planning_next_week)
-          TextButton(
-              actions.onNextWeek,
-              Modifier.testTag(C.Tag.planning_next).semantics { contentDescription = nextLabel },
-              enabled = state.canGoToNextWeek,
-          ) {
-            Text("›")
-          }
-        }
-        WeekStrip(
-            state.weekStart,
-            state.selectedDate,
-            today,
-            locale,
-            actions.onDateSelected,
-        )
-        Text(
-            if (state.selectedDate == today) stringResource(R.string.planning_today_date, fullDate)
-            else fullDate,
-            Modifier.padding(16.dp).testTag(C.Tag.planning_heading),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (!compact) PlanningHeader(state, today, locale, actions)
         PlanningAgenda(
             state,
             zoneId,
@@ -186,6 +136,10 @@ fun PlanningContent(
             actions.onItemClick,
             Modifier.weight(1f),
             canOpenItem = actions.canOpenItem,
+            header =
+                if (compact) {
+                  { PlanningHeader(state, today, locale, actions) }
+                } else null,
         )
       }
       actions.onAddAppointment?.let { onAdd ->
@@ -202,6 +156,73 @@ fun PlanningContent(
         }
       }
     }
+  }
+}
+
+/** Shared calendar controls stay fixed in portrait and join the agenda on short windows. */
+@Composable
+private fun PlanningHeader(
+    state: PlanningUiState,
+    today: LocalDate,
+    locale: Locale,
+    actions: PlanningActions,
+) {
+  val fullDate = PlanningDates.format(state.selectedDate)
+  Column {
+    Text(
+        stringResource(R.string.planning_title),
+        Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp),
+        style = MaterialTheme.typography.headlineMedium,
+    )
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+          state.selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale)),
+          Modifier.weight(1f),
+          style = MaterialTheme.typography.titleMedium,
+      )
+      val previousLabel = stringResource(R.string.planning_previous_week)
+      TextButton(
+          actions.onPreviousWeek,
+          Modifier.testTag(C.Tag.planning_previous).semantics {
+            contentDescription = previousLabel
+          },
+          enabled = state.canGoToPreviousWeek,
+      ) {
+        Text("‹")
+      }
+      val todayLabel = stringResource(R.string.planning_go_today)
+      TextButton(
+          actions.onToday,
+          Modifier.testTag(C.Tag.planning_today).semantics { contentDescription = todayLabel },
+      ) {
+        Text(stringResource(R.string.planning_today))
+      }
+      val nextLabel = stringResource(R.string.planning_next_week)
+      TextButton(
+          actions.onNextWeek,
+          Modifier.testTag(C.Tag.planning_next).semantics { contentDescription = nextLabel },
+          enabled = state.canGoToNextWeek,
+      ) {
+        Text("›")
+      }
+    }
+    WeekStrip(
+        state.weekStart,
+        state.selectedDate,
+        today,
+        locale,
+        actions.onDateSelected,
+    )
+    Text(
+        if (state.selectedDate == today) stringResource(R.string.planning_today_date, fullDate)
+        else fullDate,
+        Modifier.padding(16.dp).testTag(C.Tag.planning_heading),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
@@ -300,6 +321,7 @@ internal fun PlanningAgenda(
     modifier: Modifier = Modifier,
     canAdd: Boolean = false,
     canOpenItem: (PlanningItem) -> Boolean = { true },
+    header: (@Composable () -> Unit)? = null,
 ) {
   // Save scrolling with the tab, but start at the top when a different day is selected.
   val listState =
@@ -330,17 +352,27 @@ internal fun PlanningAgenda(
             !state.hasError
     ) {
       Column(
-          Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.planning_empty),
-          verticalArrangement = Arrangement.Center,
+          Modifier.fillMaxSize()
+              .then(
+                  if (header != null) Modifier.verticalScroll(rememberScrollState()) else Modifier
+              )
+              .padding(bottom = if (header != null) 96.dp else 0.dp),
+          verticalArrangement = if (header == null) Arrangement.Center else Arrangement.Top,
           horizontalAlignment = Alignment.CenterHorizontally,
       ) {
-        Text(stringResource(R.string.planning_empty), style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(8.dp))
-        if (canAdd)
-            Text(
-                stringResource(R.string.planning_empty_hint),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        header?.invoke()
+        Column(
+            Modifier.padding(24.dp).testTag(C.Tag.planning_empty),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+          Text(stringResource(R.string.planning_empty), style = MaterialTheme.typography.titleLarge)
+          Spacer(Modifier.height(8.dp))
+          if (canAdd)
+              Text(
+                  stringResource(R.string.planning_empty_hint),
+                  style = MaterialTheme.typography.bodyMedium,
+              )
+        }
       }
     } else {
       LazyColumn(
@@ -348,6 +380,8 @@ internal fun PlanningAgenda(
           state = listState,
           contentPadding = PaddingValues(bottom = 96.dp),
       ) {
+        // Compact windows give the header and agenda one viewport, without nested lazy lists.
+        if (header != null) item(key = "calendar-header") { header() }
         // A single scrolling agenda keeps untimed medications before all timed entries.
         if (state.untimedItems.isNotEmpty()) {
           item(key = "section:no-time") {
