@@ -47,6 +47,9 @@ data class PlanningRange(
  * reported through the flow. Date-only medications describe recorded active days, not due doses.
  */
 fun interface PlanningRepository {
-  /** Observes entries within [range], including its zone for future timed-source adapters. */
-  fun observeItems(range: PlanningRange): Flow<List<PlanningItem>>
+  /**
+   * Observes [ownerUid]'s entries within [range], including its zone for future timed-source
+   * adapters. A source that is the same for everyone (the Ligue's events) ignores [ownerUid].
+   */
+  fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>>
 }

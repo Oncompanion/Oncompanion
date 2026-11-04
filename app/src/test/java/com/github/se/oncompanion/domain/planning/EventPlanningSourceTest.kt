@@ -48,7 +48,7 @@ class EventPlanningSourceTest {
       FakeEventRepository(events.toList(), now = { LocalDateTime.MIN })
 
   private suspend fun itemsOf(repository: EventRepository, range: PlanningRange = week) =
-      EventPlanningSource(repository).observeItems(range).first()
+      EventPlanningSource(repository).observeItems("alice", range).first()
 
   @Test
   fun anEvent_becomesATimedEntryOnItsDay() = runTest {
@@ -121,7 +121,7 @@ class EventPlanningSourceTest {
         }
     val emissions = mutableListOf<Int>()
     backgroundScope.launch {
-      EventPlanningSource(repository).observeItems(week).collect { emissions += it.size }
+      EventPlanningSource(repository).observeItems("alice", week).collect { emissions += it.size }
     }
     runCurrent()
 

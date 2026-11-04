@@ -10,10 +10,13 @@ import kotlinx.coroutines.flow.flow
 class FakePlanningRepository : PlanningRepository {
   val items = MutableStateFlow<List<PlanningItem>>(emptyList())
   val ranges = mutableListOf<PlanningRange>()
+  /** Whose planning each observation asked for, in order. */
+  val owners = mutableListOf<String>()
   var fail = false
   var observation: ((PlanningRange) -> Flow<List<PlanningItem>>)? = null
 
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> {
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> {
+    owners.add(ownerUid)
     ranges.add(range)
     return observation?.invoke(range)
         ?: if (fail) flow { throw IllegalStateException("Read failed") } else items

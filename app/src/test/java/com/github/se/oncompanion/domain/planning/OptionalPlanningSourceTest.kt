@@ -39,18 +39,18 @@ class OptionalPlanningSourceTest {
   private val chemo = item("Chemotherapy", PlanningSource.Appointment("chemo"), 9)
   private val yoga = item("Gentle yoga", PlanningSource.Event("yoga"), 14)
 
-  private fun failing() = PlanningRepository { flow { error("Events couldn't be read") } }
+  private fun failing() = PlanningRepository { _, _ -> flow { error("Events couldn't be read") } }
 
   @Test
   fun aWorkingSource_isLeftUnchanged() = runTest {
     val events = FakePlanningRepository().apply { items.value = listOf(yoga) }
 
-    assertEquals(listOf(yoga), OptionalPlanningSource(events).observeItems(week).first())
+    assertEquals(listOf(yoga), OptionalPlanningSource(events).observeItems("alice", week).first())
   }
 
   @Test
   fun aFailingSource_showsNoEntries_insteadOfFailing() = runTest {
-    assertTrue(OptionalPlanningSource(failing()).observeItems(week).first().isEmpty())
+    assertTrue(OptionalPlanningSource(failing()).observeItems("alice", week).first().isEmpty())
   }
 
   @Test
@@ -62,7 +62,7 @@ class OptionalPlanningSourceTest {
 
     assertEquals(
         listOf(listOf(yoga), emptyList()),
-        OptionalPlanningSource { events }.observeItems(week).toList(),
+        OptionalPlanningSource { _, _ -> events }.observeItems("alice", week).toList(),
     )
   }
 
@@ -71,7 +71,7 @@ class OptionalPlanningSourceTest {
     val appointments = FakePlanningRepository().apply { items.value = listOf(chemo) }
     val planning = ObservePlanning(appointments, OptionalPlanningSource(failing()))
 
-    assertEquals(listOf(chemo), planning.observeItems(week).first())
+    assertEquals(listOf(chemo), planning.observeItems("alice", week).first())
   }
 
   @Test
@@ -79,7 +79,7 @@ class OptionalPlanningSourceTest {
     val appointments = FakePlanningRepository()
     val planning = ObservePlanning(appointments, OptionalPlanningSource(failing()))
     val emissions = mutableListOf<List<PlanningItem>>()
-    backgroundScope.launch { planning.observeItems(week).collect { emissions += it } }
+    backgroundScope.launch { planning.observeItems("alice", week).collect { emissions += it } }
     runCurrent()
 
     appointments.items.value = listOf(chemo)

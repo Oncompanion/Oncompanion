@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,6 +35,7 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.domain.planning.signedInPatient
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
@@ -73,6 +75,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -85,6 +88,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -110,7 +115,6 @@ class AppNavHostTest {
 
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
-  private val appPublicEvents = PlanningRepositoryProvider.publicEvents
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
@@ -123,7 +127,6 @@ class AppNavHostTest {
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
-    PlanningRepositoryProvider.publicEvents = appPublicEvents
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
@@ -138,7 +141,6 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
-      publicEvents: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
@@ -148,7 +150,11 @@ class AppNavHostTest {
       credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
-    PlanningRepositoryProvider.publicEvents = publicEvents
+    // The Overview and Planning read the user's role: a test that sets no profiles gets a patient,
+    // or a caregiver for the "caregiver" account
+    if (UserProfileRepositoryProvider.repository === appUserProfileRepository) {
+      UserProfileRepositoryProvider.repository = rolesByUid()
+    }
     CareCircleRepositoryProvider.repository = careCircleRepository
     CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
@@ -315,16 +321,38 @@ class AppNavHostTest {
     }
   }
 
-  /** A signed-in caregiver following [patients] (uid to first name), for "Whose care?". */
+  /**
+   * Profiles of a patient for every uid but "caregiver"'s, without a name, so no greeting changes.
+   */
+  private fun rolesByUid() =
+      object : UserProfileRepository by FakeUserProfileRepository() {
+        override fun observeProfile(uid: String): Flow<UserProfile?> =
+            flowOf(
+                UserProfile(
+                    uid,
+                    if (uid == "caregiver") Role.CAREGIVER else Role.PATIENT,
+                    firstName = "",
+                )
+            )
+      }
+
+  /**
+   * A signed-in caregiver following [patients] (uid to first name), for "Whose care?", who sees the
+   * [shared] sections of each.
+   */
   private fun followingCaregiver(
-      vararg patients: Pair<String, String>
+      vararg patients: Pair<String, String>,
+      shared: Set<CarePermission> = emptySet(),
   ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository()
     val circles = FakeCareCircleRepository()
     for ((uid, _) in patients) {
-      circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
+      circles.setMembers(
+          uid,
+          listOf(CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = shared)),
+      )
     }
     invites.setJoinedCircles(
         "caregiver",
@@ -395,42 +423,62 @@ class AppNavHostTest {
   }
 
   @Test
-  fun caregiverMode_neverShowsTheCaregiversOwnAppointments() {
-    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
-    // The caregiver's own account has an appointment: it must not look like Anne's
-    val own = FakePlanningRepository()
-    own.items.value =
+  fun caregiverMode_showsThePatientsSharedPlanning_neverTheCaregiversOwn() {
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.PLANNING))
+    val planning = FakePlanningRepository()
+    planning.items.value =
         listOf(
             PlanningItem(
-                PlanningSource.Appointment("own"),
+                PlanningSource.Appointment("chemo"),
                 PlanningTiming.Timed(Instant.now().plus(1, ChronoUnit.HOURS)),
-                "Own dentist",
+                "Anne's chemotherapy",
             )
         )
-    val events = FakePlanningRepository()
     setNavHost(
         Route.WHOSE_CARE,
-        planningRepository = own,
-        publicEvents = events,
+        planningRepository = planning,
         careCircleRepository = circles,
         careCircleInviteRepository = invites,
         authRepository = auth,
     )
     composeTestRule.waitUntil(timeoutMillis = 5_000) {
-      composeTestRule
-          .onAllNodesWithTag(C.Tag.overview_whose_care)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+      composeTestRule.onAllNodesWithText("Anne's chemotherapy").fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
 
-    composeTestRule.onNodeWithText("Own dentist").assertDoesNotExist()
     composeTestRule.runOnIdle {
-      // The Overview and Planning only read the Ligue's events
-      assertTrue(own.ranges.isEmpty())
-      assertTrue(events.ranges.isNotEmpty())
+      // The Overview and Planning only read Anne's planning, never the caregiver's
+      assertTrue(planning.owners.isNotEmpty())
+      assertTrue(planning.owners.all { it == "p-anne" })
     }
+  }
+
+  @Test
+  fun caregiverMode_planningNotShared_saysSoOnTheOverviewAndPlanning() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val planning = FakePlanningRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        planningRepository = planning,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    val notShared =
+        context.getString(
+            R.string.not_shared_title,
+            "Anne",
+            context.getString(R.string.permission_planning),
+        )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithText(notShared).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithText(notShared).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertTrue(planning.owners.isEmpty()) }
   }
 
   @Test
@@ -1121,7 +1169,7 @@ class AppNavHostTest {
           )
         }
     repository.items.value = entries
-    setNavHost(Route.OVERVIEW, repository)
+    setNavHost(Route.OVERVIEW, repository, authRepository = signedInPatient())
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule
         .onNodeWithTag(C.Tag.planning_list)
@@ -1740,7 +1788,8 @@ class AppNavHostTest {
   fun planningEvent_opensItsPage_andBackArrowKeepsTheSelectedDay() {
     val event = eventNextWeek()
     setNavHost(
-        Route.PLANNING,
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
         planningRepository = planningWith(event),
         eventRepository = FakeEventRepository(listOf(event)),
     )
@@ -1768,7 +1817,8 @@ class AppNavHostTest {
   fun planningEvent_systemBackKeepsTheSelectedDay() {
     val event = eventNextWeek()
     setNavHost(
-        Route.PLANNING,
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
         planningRepository = planningWith(event),
         eventRepository = FakeEventRepository(listOf(event)),
     )
@@ -1783,7 +1833,8 @@ class AppNavHostTest {
   fun planningEvent_tappingBackTwiceStaysOnPlanning() {
     val event = eventNextWeek()
     setNavHost(
-        Route.OVERVIEW,
+        authRepository = signedInPatient(),
+        startRoute = Route.OVERVIEW,
         planningRepository = planningWith(event),
         eventRepository = FakeEventRepository(listOf(event)),
     )
@@ -1809,7 +1860,8 @@ class AppNavHostTest {
   fun planningEvent_thatNoLongerExists_explainsAndGoesBackToPlanning() {
     val event = eventNextWeek()
     setNavHost(
-        Route.PLANNING,
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
         planningRepository = planningWith(event),
         eventRepository = FakeEventRepository(emptyList()),
     )
@@ -1827,14 +1879,15 @@ class AppNavHostTest {
 
   @Test
   fun caregiver_opensAPlanningEvent_withoutRegistrationActions() {
-    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.PLANNING))
     val registrations = EventRegistrationRepositoryProvider.repository
     EventRegistrationRepositoryProvider.repository = FakeEventRegistrationRepository()
     try {
       val event = eventNextWeek()
       setNavHost(
           Route.WHOSE_CARE,
-          publicEvents = planningWith(event),
+          planningRepository = planningWith(event),
           careCircleRepository = circles,
           careCircleInviteRepository = invites,
           authRepository = auth,

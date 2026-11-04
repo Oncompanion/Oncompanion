@@ -18,24 +18,18 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
-import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -98,7 +92,7 @@ class PlanningRepositoryProviderTest {
         FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
     medications.seed("patient", prescription(day))
 
-    val items = original.observeItems(range).first { it.size == 3 }
+    val items = original.observeItems("patient", range).first { it.size == 3 }
 
     assertEquals(listOf("Medication", "Saved consultation", event.title), items.map { it.title })
   }
@@ -130,7 +124,7 @@ class PlanningRepositoryProviderTest {
         }
     medications.seed("patient", prescription(day))
 
-    val items = original.observeItems(range).first { it.size == 2 }
+    val items = original.observeItems("patient", range).first { it.size == 2 }
 
     assertEquals(listOf("Medication", "Saved consultation"), items.map { it.title })
   }
@@ -142,13 +136,11 @@ class PlanningRepositoryProviderTest {
           medications = listOf(Medication("m", "p", name, startDate = day, durationDays = 1)),
       )
 
-  /** Every emission belongs to one account, including while both private sources restart. */
-  @OptIn(ExperimentalCoroutinesApi::class)
+  /** It reads the planning of the owner it is asked for, and never another account's. */
   @Test
-  fun accountChangesNeverCombineTwoPatients() = runTest {
+  fun readsOnlyTheGivenOwnersPlanning() = runTest {
     val day = LocalDate.of(2026, 10, 25)
     val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
-    val auth = FakeAuthRepository { AuthUser(it) }
     val appointments = FakeAppointmentRepository()
     for (uid in listOf("a", "b")) {
       medications.seed(uid, prescription(day, "$uid medication"))
@@ -157,25 +149,12 @@ class PlanningRepositoryProviderTest {
           Appointment(uid, "$uid appointment", range.startInclusive, AppointmentType.CONSULTATION),
       )
     }
-    AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = appointments
     EventRepositoryProvider.repository = FakeEventRepository(emptyList())
-    auth.signInWithGoogle("a")
-    val emissions = mutableListOf<List<PlanningItem>>()
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      original.observeItems(range).collect { emissions += it }
-    }
-    runCurrent()
-    assertEquals(setOf("a medication", "a appointment"), emissions.last().map { it.title }.toSet())
-    emissions.clear()
-    auth.signInWithGoogle("b")
-    runCurrent()
-    assertTrue(emissions.first().isEmpty())
-    assertTrue(emissions.all { entries -> entries.none { it.title.startsWith("a ") } })
-    assertEquals(setOf("b medication", "b appointment"), emissions.last().map { it.title }.toSet())
-    auth.signOut()
-    runCurrent()
-    assertTrue(emissions.last().isEmpty())
+
+    val items = original.observeItems("b", range).first { it.size == 2 }
+
+    assertEquals(setOf("b medication", "b appointment"), items.map { it.title }.toSet())
   }
 
   /** Medication failures reach the caller instead of silently dropping essential entries. */
@@ -190,25 +169,11 @@ class PlanningRepositoryProviderTest {
     medications.readError = IllegalStateException("Medication read failed")
     val failure = runCatching {
       original
-          .observeItems(PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich")))
+          .observeItems("patient", PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich")))
           .collect {}
     }
         .exceptionOrNull()
     assertEquals("Medication read failed", failure?.message)
-  }
-
-  /** The caregiver fallback cannot read a caregiver's own prescriptions as patient data. */
-  @Test
-  fun publicEventsNeverReadsMedications() = runTest {
-    medications.readError = IllegalStateException("Must not read medications")
-    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
-    val day = LocalDate.of(2026, 10, 25)
-    assertTrue(
-        PlanningRepositoryProvider.publicEvents
-            .observeItems(PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich")))
-            .first()
-            .isEmpty()
-    )
   }
 
   /** The repository given to the provider is the one it hands out afterwards. */

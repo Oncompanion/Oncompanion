@@ -10,5 +10,6 @@ import kotlinx.coroutines.flow.flowOf
  * immediately without Firebase or sample appointments; Planning has no store of its own.
  */
 object EmptyPlanningRepository : PlanningRepository {
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> = flowOf(emptyList())
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+      flowOf(emptyList())
 }

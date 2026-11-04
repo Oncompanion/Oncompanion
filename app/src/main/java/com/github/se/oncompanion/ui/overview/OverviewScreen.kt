@@ -46,7 +46,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
@@ -205,12 +207,16 @@ fun OverviewContent(
       when {
         uiState.isLoading -> LoadingDay()
         uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
+        // The patient a caregiver follows doesn't share their planning, so there is no day to show
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(caregiverOf, CarePermission.PLANNING)
         else -> {
           NextAppointmentCard(
               uiState.nextAppointment,
               uiState.now.toLocalDate(),
               onOpenPlanning,
-              onOpenAppointment,
+              // A caregiver can't open an appointment's page yet: its Planning day instead
+              if (caregiverOf == null) onOpenAppointment else { _ -> onOpenPlanning() },
               canAdd = caregiverOf == null,
           )
           TodaySection(uiState.todayEntries, onOpenPlanning)

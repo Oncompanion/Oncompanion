@@ -11,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.se.oncompanion.domain.planning.AppointmentPlanningSource
 import com.github.se.oncompanion.domain.planning.MedicationPlanningSource
 import com.github.se.oncompanion.domain.planning.ObservePlanning
+import com.github.se.oncompanion.domain.planning.ownPlanning
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
@@ -74,14 +75,16 @@ class PlanningScreenIntegrationTest {
     runTest { medications.addPrescription("patient", prescription) }
     val vm =
         PlanningViewModel(
-            ObservePlanning(
-                MedicationPlanningSource(medications, auth),
-                AppointmentPlanningSource(appointments, auth),
+            ownPlanning(
+                ObservePlanning(
+                    MedicationPlanningSource(medications),
+                    AppointmentPlanningSource(appointments),
+                ),
+                auth,
             ),
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
-            auth,
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
@@ -126,11 +129,10 @@ class PlanningScreenIntegrationTest {
   fun screenConnectsCalendarAndBottomBarWithoutUnavailableActions() {
     val vm =
         PlanningViewModel(
-            FakePlanningRepository(),
+            ownPlanning(FakePlanningRepository()),
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
             SavedStateHandle(),
-            authRepository = FakeAuthRepository(),
         )
     var selectedRoute: String? = null
     val navigation =
@@ -175,11 +177,10 @@ class PlanningScreenIntegrationTest {
         FakePlanningRepository().apply { items.value = listOf(appointment, event, medication) }
     val vm =
         PlanningViewModel(
-            repository,
+            ownPlanning(repository),
             Clock.fixed(date.atTime(10, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
-            authRepository = FakeAuthRepository(),
         )
     val openedAppointments = mutableListOf<String>()
     val openedEvents = mutableListOf<String>()
@@ -211,11 +212,10 @@ class PlanningScreenIntegrationTest {
     val repository = FakePlanningRepository().apply { fail = true }
     val vm =
         PlanningViewModel(
-            repository,
+            ownPlanning(repository),
             Clock.fixed(Instant.parse("2026-10-02T10:00:00Z"), zone),
             zone,
             SavedStateHandle(),
-            authRepository = FakeAuthRepository(),
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
@@ -248,11 +248,10 @@ class PlanningScreenIntegrationTest {
     val repository = FakePlanningRepository().apply { items.value = listOf(event, medication) }
     val vm =
         PlanningViewModel(
-            repository,
+            ownPlanning(repository),
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
-            authRepository = FakeAuthRepository(),
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
@@ -279,11 +278,10 @@ class PlanningScreenIntegrationTest {
         FakeAppointmentRepository().apply { observeError = IllegalStateException("Read failed") }
     val vm =
         PlanningViewModel(
-            AppointmentPlanningSource(appointments, auth),
+            ownPlanning(AppointmentPlanningSource(appointments), auth),
             Clock.fixed(date.atTime(12, 0).atZone(zone).toInstant(), zone),
             zone,
             SavedStateHandle(),
-            auth,
         )
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))

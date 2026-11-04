@@ -348,6 +348,10 @@
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
 
+    <!-- Caregiver mode: a section the patient doesn\'t share, e.g. "Anne doesn\'t share Planning with you" (#240) -->
+    <string name="not_shared_title">%1$s doesn\'t share %2$s with you</string>
+    <string name="not_shared_body">Only they can choose what you see.</string>
+
     <!-- Care circle invite code (#150) -->
     <string name="care_circle_invite_title">Invitation</string>
     <string name="care_circle_invite_back">Back</string>
