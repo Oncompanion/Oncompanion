@@ -4,7 +4,13 @@ package com.github.se.oncompanion.model.symptom
 
 import kotlinx.coroutines.flow.Flow
 
-/** Reads and writes the symptom journal of a user. Use [SymptomRepositoryFirestore] in the app. */
+/**
+ * Reads and writes the symptom journal of a user. Use [SymptomRepositoryFirestore] in the app.
+ *
+ * Writes return once saved on the device, without waiting for the server. If the server later
+ * rejects one, the change is undone on the device and reported through
+ * [com.github.se.oncompanion.model.session.RejectedWrites], which tells the user.
+ */
 interface SymptomRepository {
 
   /**

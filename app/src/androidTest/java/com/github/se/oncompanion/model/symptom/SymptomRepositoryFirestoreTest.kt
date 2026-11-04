@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.DocumentReference
@@ -33,6 +34,7 @@ import org.junit.runner.RunWith
 class SymptomRepositoryFirestoreTest {
 
   private lateinit var repository: SymptomRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
 
   private val db
@@ -43,7 +45,8 @@ class SymptomRepositoryFirestoreTest {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
     aliceUid = EmulatorTestData.createUser("alice")
-    repository = SymptomRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = SymptomRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -75,6 +78,11 @@ class SymptomRepositoryFirestoreTest {
 
   private suspend fun awaitServerAck() {
     withTimeout(10_000) { db.waitForPendingWrites().await() }
+  }
+
+  /** Waits until the server's rejection of one write was reported, so the user is told. */
+  private suspend fun awaitRejectionReported() {
+    withTimeout(10_000) { rejectedWrites.unseen.first { it == 1 } }
   }
 
   private fun symptomsPath(uid: String) = "users/$uid/symptoms"
@@ -111,6 +119,7 @@ class SymptomRepositoryFirestoreTest {
     assertSameContent(fatigue(), stored)
     assertEquals(id, stored!!.id)
     assertNotNull("createdAt is set once the server confirms", stored.createdAt)
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -280,6 +289,7 @@ class SymptomRepositoryFirestoreTest {
     }
     assertTrue("updateSymptom took $elapsed ms", elapsed < 1_000)
     awaitServerAck()
+    awaitRejectionReported()
 
     EmulatorTestData.signIn("bob")
     val server =
@@ -384,6 +394,7 @@ class SymptomRepositoryFirestoreTest {
     assertTrue("addSymptom took $elapsed ms", elapsed < 1_000)
 
     awaitServerAck()
+    awaitRejectionReported()
     // The local write is rolled back
     val doc = db.collection(symptomsPath(bobUid)).document(id)
     withTimeout(10_000) { while (cachedExists(doc)) delay(100) }
@@ -403,6 +414,7 @@ class SymptomRepositoryFirestoreTest {
     val elapsed = timed { withTimeout(5_000) { repository.deleteSymptom(bobUid, id) } }
     assertTrue("deleteSymptom took $elapsed ms", elapsed < 1_000)
     awaitServerAck()
+    awaitRejectionReported()
 
     EmulatorTestData.signIn("bob")
     val server =
