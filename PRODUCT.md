@@ -23,7 +23,7 @@ Health tracking that adapts to the patient's energy level: minimal input, minima
 ## Operating Context
 
 - Used one-handed, tired, sometimes lying down, at home or in hospital waiting rooms.
-- Essential functions work fully offline (symptoms, medication schedule, emergency contacts); data syncs once back online.
+- Essential functions work fully offline (symptoms, medication schedule and prescription scanning, emergency contacts); data syncs once back online.
 - Before an appointment the patient can show or export a symptom summary for the doctor (doctors have no account).
 
 ## Capabilities and Constraints
