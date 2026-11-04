@@ -351,6 +351,21 @@ class SymptomDetailViewModelTest {
     assertFalse(state.isDeleteDialogShown)
   }
 
+  @Test
+  fun accessLostWhileConfirming_closesTheConfirmation_forGood() {
+    val auth = signedIn()
+    val vm = confirmingDelete(auth = auth)
+
+    // The access briefly goes away, then comes back with the symptom
+    auth.signOut()
+    shadowOf(Looper.getMainLooper()).idle()
+    runBlocking { auth.signInWithGoogle("token") }
+    shadowOf(Looper.getMainLooper()).idle()
+
+    assertEquals(fatigue, vm.uiState.value.entry)
+    assertFalse(vm.uiState.value.delete.isConfirming)
+  }
+
   // ----- Caregiver mode (US-20) -----
 
   private fun caregiverViewModel(vararg shared: CarePermission) =

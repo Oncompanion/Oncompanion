@@ -108,14 +108,18 @@ class SymptomDetailViewModel(
           .catch { e ->
             Log.e(TAG, "Failed to check the access to the symptom $symptomId", e)
             observation?.cancel()
-            _uiState.update { it.copy(isLoading = false, hasError = true) }
+            // Nothing to delete without the access: the confirmation is dropped
+            _uiState.update {
+              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
+            }
           }
           .collect { section ->
             if (section is SectionAccess.Readable) {
               _uiState.update { it.copy(canEdit = section.canEdit, isNotShared = false) }
               observe(section.ownerUid)
             } else {
-              // Nothing to read: not known yet, not shared, or nobody to read it for
+              // Nothing to read: not known yet, not shared, or nobody to read it for. The
+              // confirmation is dropped, so it doesn't reopen by itself once the access is back
               observation?.cancel()
               _uiState.update {
                 it.copy(
@@ -124,6 +128,7 @@ class SymptomDetailViewModel(
                     hasError = section == SectionAccess.NoAccess,
                     isNotShared = section == SectionAccess.NotShared,
                     canEdit = false,
+                    delete = it.delete.afterRead(false),
                 )
               }
             }
