@@ -4,10 +4,14 @@
 
 package com.github.se.oncompanion.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
@@ -47,6 +51,7 @@ import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
 import com.github.se.oncompanion.ui.carecircle.WhoseCareViewModel
+import com.github.se.oncompanion.ui.common.RejectedWriteSnackbar
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -103,12 +108,16 @@ fun AppNavHost(
           resolved
         } else if (afterCleanup) Route.AUTH else startRoute
     if (route != null) {
-      SessionNavHost(
-          navController ?: rememberNavController(),
-          route,
-          credentialProvider,
-          savedState,
-      )
+      // One snackbar over every screen tells the user when the server undid one of their changes
+      Box(Modifier.fillMaxSize()) {
+        SessionNavHost(
+            navController ?: rememberNavController(),
+            route,
+            credentialProvider,
+            savedState,
+        )
+        RejectedWriteSnackbar(Modifier.align(Alignment.BottomCenter))
+      }
     }
   }
 }
