@@ -137,18 +137,29 @@ fun SymptomJournalContent(
                 hint = stringResource(R.string.symptom_journal_empty_hint),
                 testTag = C.Tag.symptom_journal_empty,
             )
-        else -> JournalList(uiState.days, uiState.today, onEntryClick)
+        else -> JournalList(uiState.days, uiState.today, uiState.canAdd, onEntryClick)
       }
     }
   }
 }
 
 @Composable
-private fun JournalList(days: List<JournalDay>, today: LocalDate, onEntryClick: (String) -> Unit) {
+private fun JournalList(
+    days: List<JournalDay>,
+    today: LocalDate,
+    hasAddButton: Boolean,
+    onEntryClick: (String) -> Unit,
+) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.symptom_journal_list),
-      // The bottom padding keeps the last entry above the add button
-      contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
+      // The bottom padding keeps the last entry above the add button, when there is one
+      contentPadding =
+          PaddingValues(
+              start = 16.dp,
+              top = 8.dp,
+              end = 16.dp,
+              bottom = if (hasAddButton) 88.dp else 8.dp,
+          ),
       verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     days.forEach { day ->

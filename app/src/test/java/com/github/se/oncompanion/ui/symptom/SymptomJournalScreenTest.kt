@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -39,6 +41,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -423,5 +426,21 @@ class SymptomJournalScreenTest {
     setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
 
     composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_longJournal_endsWithoutTheAddButtonsSpace() {
+    // Enough entries to scroll in landscape, the newest first
+    val entries =
+        (0 until 12).map { i -> JournalEntry(fatigue.copy(id = "e$i"), LocalTime.of(20 - i, 0)) }
+    setCaregiverContent(loaded.copy(days = listOf(JournalDay(today, entries)), canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).performScrollToIndex(entries.size)
+
+    val list = composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).getBoundsInRoot()
+    val last = composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).getBoundsInRoot()
+    // Without the add button, no room is kept for it under the last entry
+    assertTrue("gap ${list.bottom - last.bottom}", list.bottom - last.bottom < 24.dp)
   }
 }
