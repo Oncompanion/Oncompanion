@@ -15,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -76,6 +77,24 @@ class CareCircleInviteLogsTest {
         }
         logs
       }
+
+  @Test
+  fun rejectedCreation_logsNoCode(): Unit = runBlocking {
+    // The rules only let alice create invites she owns
+    val invite = repository.createInvite("someone-else", "Alice", julie, null)
+
+    val logs = awaitLog("rejected the creation")
+    assertFalse(logs, logs.contains(invite.inviteCode))
+  }
+
+  @Test
+  fun failedRedeem_logsNoCode(): Unit = runBlocking {
+    val result = withTimeout(20_000) { repository.redeem(unknownCode, aliceUid, null) }
+
+    assertEquals(RedeemResult.InvalidOrUsed, result)
+    val logs = awaitLog("Redeeming an invite failed")
+    assertFalse(logs, logs.contains(unknownCode))
+  }
 
   @Test
   fun rejectedUpdate_logsNoCode(): Unit = runBlocking {
