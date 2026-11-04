@@ -202,6 +202,8 @@ overview identifies Profile hospital text and the reusable content alongside the
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
+**Rejected writes (#248).** Because writes return once saved on the device, the server can still reject one later (security rules, revoked access). Firestore then undoes it on the device: a deleted item comes back, an edit is reverted. The symptom, medication and appointment repositories report each rejection to `RejectedWrites` (`model/session/`, held by `RejectedWritesProvider`), a count of rejections the user hasn't been told about. `RejectedWriteSnackbar` (`ui/common/`), placed once over the navigation graph in `AppNavHost`, shows "A change couldn't be saved and was undone" while that count is above zero, then acknowledges what it showed. A count rather than an event stream means a rejection that arrives while the app is in the background, or while the message is showing, isn't lost. The count is cleared at sign-out, so the next account never sees it.
+
 ## Appointment form (issues #147 and #206)
 
 Planning's Add action opens `AppointmentFormScreen` on the selected day. The Screen collects one
@@ -269,8 +271,8 @@ for the displayed owner, stops the detail listener to avoid an unavailable-state
 its originating screen. Immediate failure retains the detail/dialog with retry and resumes its listener.
 Account/session guards suppress stale success and failure. Completion is delivered on resume only while
 this detail is current; Planning keeps its selected day and both calendars update through observations.
-A successful enqueue, also offline, does not confirm server acceptance; deferred rejection feedback is
-outside this flow (#248).
+A successful enqueue, also offline, does not confirm server acceptance; a later rejection is reported
+to the user by the app-wide snackbar (see "Rejected writes" under Offline mode).
 
 ## Appointment storage
 
@@ -279,7 +281,7 @@ Appointments are stored under `/users/{uid}/appointments/{id}` and observed thro
 `AppointmentRepository.updateAppointment` updates editable fields on an existing document without
 changing its ID or stored `createdAt`. It uses Firestore `update`, never an upsert: a missing document
 is not recreated. Writes are queued locally, including offline, without waiting for server acknowledgement.
-A later server rejection is logged and may roll back local changes. Owner
+A later server rejection rolls back local changes and is reported to `RejectedWrites`. Owner
 updates validate the resulting document and preserve creation metadata. `deleteAppointment` enqueues
 owner-only deletion, also offline; repeated deletion is harmless. Both operations flow through existing
 list/detail observations, with no second Planning write. Detail, editing and confirmed deletion are built.
