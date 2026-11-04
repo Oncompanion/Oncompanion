@@ -7,11 +7,14 @@ import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestor
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore.Companion.USERS_COLLECTION
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -196,6 +199,85 @@ class EventRegistrationRepositoryFirestoreTest {
     assertTrue(registrations().get(Source.SERVER).await().isEmpty)
   }
 
+  /** Waits until the ids of [uid]'s confirmed events are observed as [expected]. */
+  private suspend fun awaitRegisteredIds(expected: Set<String>) {
+    withTimeout(10_000) { repository.observeRegisteredEventIds(uid).first { it == expected } }
+  }
+
+  @Test
+  fun registeredEventIds_areEmpty_atFirst(): Unit = runBlocking {
+    assertEquals(
+        emptySet<String>(),
+        withTimeout(10_000) { repository.observeRegisteredEventIds(uid).first() },
+    )
+  }
+
+  /**
+   * Waits for the next value of one running collection that satisfies [predicate]. Unlike
+   * [awaitRegisteredIds], which starts a new listener each time, it follows a single listener
+   * through several changes.
+   */
+  private suspend fun <T> ReceiveChannel<T>.awaitNext(predicate: (T) -> Boolean): T =
+      withTimeout(10_000) {
+        var value = receive()
+        while (!predicate(value)) value = receive()
+        value
+      }
+
+  @Test
+  fun registeredEventIds_followConfirmAndRemove(): Unit = runBlocking {
+    // One collection follows every change, as Planning does while it stays open
+    val ids = repository.observeRegisteredEventIds(uid).produceIn(this)
+    ids.awaitNext { it.isEmpty() }
+
+    repository.confirm(uid, upcomingId)
+    repository.confirm(uid, otherUpcomingId)
+    ids.awaitNext { it == setOf(upcomingId, otherUpcomingId) }
+
+    repository.remove(uid, upcomingId)
+    ids.awaitNext { it == setOf(otherUpcomingId) }
+    ids.cancel()
+  }
+
+  @Test
+  fun registeredEventIds_offline_includeAConfirmationNotSyncedYet(): Unit = runBlocking {
+    db.disableNetwork().await()
+
+    repository.confirm(uid, upcomingId)
+
+    awaitRegisteredIds(setOf(upcomingId))
+  }
+
+  @Test
+  fun registeredEventIds_keepAConfirmation_afterItsEventIsOver(): Unit = runBlocking {
+    repository.confirm(uid, upcomingId)
+    awaitSynced()
+
+    // The event took place two days ago: the event page hides its confirmation, Planning doesn't
+    EmulatorTestData.replaceRawDocument(
+        "events",
+        upcomingId,
+        """{"title": {"stringValue": "Gentle yoga"}, """ +
+            """"startAt": {"timestampValue": "${Instant.now().minus(Duration.ofDays(2))}"}}""",
+    )
+
+    awaitRegisteredIds(setOf(upcomingId))
+  }
+
+  @Test
+  fun registeredEventIds_ofSomeoneWhoDoesNotShareThem_fail(): Unit = runBlocking {
+    // Not in that user's care circle: the rules deny the read, and the flow reports it
+    val error = runCatching {
+      withTimeout(10_000) { repository.observeRegisteredEventIds("not-shared-$runId").collect {} }
+    }
+        .exceptionOrNull()
+
+    assertEquals(
+        FirebaseFirestoreException.Code.PERMISSION_DENIED,
+        (error as? FirebaseFirestoreException)?.code,
+    )
+  }
+
   @Test
   fun defaultConstructor_usesTheSharedInstance(): Unit = runBlocking {
     val shared = EventRegistrationRepositoryFirestore()
@@ -210,5 +292,6 @@ class EventRegistrationRepositoryFirestoreTest {
     }
     assertThrows(IllegalArgumentException::class.java) { repository.confirm("", upcomingId) }
     assertThrows(IllegalArgumentException::class.java) { repository.remove(uid, " ") }
+    assertThrows(IllegalArgumentException::class.java) { repository.observeRegisteredEventIds("") }
   }
 }

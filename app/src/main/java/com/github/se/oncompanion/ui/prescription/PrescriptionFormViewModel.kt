@@ -8,9 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.SimilarPrescription
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.domain.medication.scan.ScannedPrescription
+import com.github.se.oncompanion.domain.medication.similarPrescription
 import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
@@ -79,6 +81,10 @@ enum class PrescriptionFormLoad {
  * @property toCheck the details read from the scan the patient should check, until they edit them
  * @property leftOut how many medications the scan read beyond what a prescription can hold
  * @property dateFound whether the scan read a date; if not, the date is today's
+ * @property renewalOf a saved prescription with the same medications on another date: this one
+ *   looks like its renewal (US-39), said above the form
+ * @property alreadySaved a saved prescription this one is the same as: Save asked first whether to
+ *   save it anyway (US-39)
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -94,6 +100,8 @@ data class PrescriptionFormUiState(
     val toCheck: Set<ScannedField> = emptySet(),
     val leftOut: Int = 0,
     val dateFound: Boolean = true,
+    val renewalOf: Prescription? = null,
+    val alreadySaved: Prescription? = null,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -177,12 +185,36 @@ class PrescriptionFormViewModel(
   // The draft the form last started from: while the form still shows it, the user changed nothing
   private var shownDraft: PrescriptionDraft? = null
 
+  // The prescriptions already saved, which a new one is compared with (US-39)
+  private var saved: List<Prescription> = emptyList()
+
   init {
     // A saved prescription has to be read before the form can show it
     if (prescriptionId != null) {
       _uiState.update { it.copy(isEditing = true, load = PrescriptionFormLoad.LOADING) }
-    }
+    } else observeSaved()
     load()
+  }
+
+  /**
+   * Follows the prescriptions already saved, from the device's cache when offline, so a new one can
+   * be compared with them. Comparing is only a warning: if they can't be read, the form works as
+   * before.
+   */
+  private fun observeSaved() {
+    val uid = authRepository.signedInUid(TAG) ?: return
+    viewModelScope.launch {
+      try {
+        medicationRepository.observePrescriptions(uid).collect { prescriptions ->
+          saved = prescriptions
+          _uiState.update { it.withRenewal() }
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.w(TAG, "Couldn't read the saved prescriptions to compare with", e)
+      }
+    }
   }
 
   /**
@@ -407,7 +439,25 @@ class PrescriptionFormViewModel(
    * server refuses the prescription later, the form isn't told: it has already reported the save as
    * done, and Firestore then undoes the write. Don't rely on it for server errors.
    */
-  fun save() {
+  fun save() = save(confirmed = false)
+
+  /** Saves the prescription although it is the same as [PrescriptionFormUiState.alreadySaved]. */
+  fun saveAnyway() {
+    if (_uiState.value.alreadySaved == null) return
+    _uiState.update { it.copy(alreadySaved = null) }
+    save(confirmed = true)
+  }
+
+  /** Goes back to the form without saving: the patient keeps editing it. */
+  fun keepEditing() {
+    _uiState.update { it.copy(alreadySaved = null) }
+  }
+
+  /**
+   * Saves, unless a new prescription is the same as a saved one and the patient hasn't [confirmed]
+   * it: [PrescriptionFormUiState.alreadySaved] then asks first (US-39).
+   */
+  private fun save(confirmed: Boolean) {
     val state = _uiState.value
     if (!state.canSave) return
     val uid = authRepository.signedInUid(TAG)
@@ -415,6 +465,7 @@ class PrescriptionFormViewModel(
       _uiState.update { it.copy(error = PrescriptionFormError.NOT_SIGNED_IN) }
       return
     }
+    if (!confirmed && asksAboutTheSame(state.draft)) return
     _uiState.update { it.copy(isSaving = true, error = null) }
     viewModelScope.launch {
       try {
@@ -439,6 +490,17 @@ class PrescriptionFormViewModel(
     }
   }
 
+  /**
+   * Whether a new [draft] is the same as a saved prescription:
+   * [PrescriptionFormUiState.alreadySaved] then asks the patient before saving it again.
+   */
+  private fun asksAboutTheSame(draft: PrescriptionDraft): Boolean {
+    if (prescriptionId != null) return false
+    val same = similarPrescription(draft, saved) as? SimilarPrescription.Same ?: return false
+    _uiState.update { it.copy(alreadySaved = same.prescription) }
+    return true
+  }
+
   /** The error has been shown. */
   fun clearError() {
     _uiState.update { it.copy(error = null) }
@@ -452,7 +514,7 @@ class PrescriptionFormViewModel(
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
     _uiState.update { state ->
       val locked = state.load != PrescriptionFormLoad.READY || state.isSaving || state.isSaved
-      if (locked) state else transform(state)
+      if (locked) state else transform(state).withRenewal()
     }
   }
 
@@ -462,6 +524,18 @@ class PrescriptionFormViewModel(
   ) {
     edit { it.withOpenMedication(transform).openChecked(detail) }
   }
+
+  /**
+   * Sets [PrescriptionFormUiState.renewalOf] to the saved prescription with the same medications on
+   * another date (US-39), or to null when there is none. A correction of a saved prescription is
+   * never compared, so its renewalOf stays null.
+   */
+  private fun PrescriptionFormUiState.withRenewal() =
+      copy(
+          renewalOf =
+              if (isEditing) null
+              else (similarPrescription(draft, saved) as? SimilarPrescription.Renewal)?.prescription
+      )
 
   /** The patient edited [field]: it is no longer to check. */
   private fun PrescriptionFormUiState.checked(field: ScannedField) = copy(toCheck = toCheck - field)

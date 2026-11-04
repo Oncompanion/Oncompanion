@@ -20,6 +20,8 @@ import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.medication.FakeMedicationRepository
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -49,6 +51,7 @@ class AppointmentNavigationTest {
   private val originalAppointments = AppointmentRepositoryProvider.repository
   private val originalProfile = UserProfileRepositoryProvider.repository
   private val originalPlanning = PlanningRepositoryProvider.repository
+  private val originalMedications = MedicationRepositoryProvider.repository
 
   /** Provider overrides never leak into another test. */
   @After
@@ -57,12 +60,14 @@ class AppointmentNavigationTest {
     AppointmentRepositoryProvider.repository = originalAppointments
     PlanningRepositoryProvider.repository = originalPlanning
     UserProfileRepositoryProvider.repository = originalProfile
+    MedicationRepositoryProvider.repository = originalMedications
   }
 
   private fun show(startRoute: String = Route.PLANNING) {
     UserProfileRepositoryProvider.repository = PatientProfiles
     AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = repository
+    MedicationRepositoryProvider.repository = FakeMedicationRepository()
     runTest { auth.signInWithGoogle("patient") }
     compose.setContent {
       val context = LocalContext.current

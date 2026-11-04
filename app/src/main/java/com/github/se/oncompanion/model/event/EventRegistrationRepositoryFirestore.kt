@@ -5,6 +5,7 @@ package com.github.se.oncompanion.model.event
 
 import android.util.Log
 import com.github.se.oncompanion.model.session.SessionAccess
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -48,6 +49,20 @@ class EventRegistrationRepositoryFirestore(
     }
   }
 
+  override fun observeRegisteredEventIds(uid: String): Flow<Set<String>> {
+    requirePathSegment(uid)
+    return SessionAccess.snapshots {
+      // Each document is named after the event it confirms, so its id is all that is needed
+      val registrations =
+          registrations(uid).addSnapshotListener { snapshot, error ->
+            // Firestore gives either a snapshot or an error
+            if (snapshot != null) trySend(snapshot.documents.map { it.id }.toSet())
+            else close(error)
+          }
+      awaitClose { registrations.remove() }
+    }
+  }
+
   override fun confirm(uid: String, eventId: String): Unit = SessionAccess.immediate {
     // The server sets the time, so the rules can check it against the event's start
     document(uid, eventId)
@@ -65,8 +80,11 @@ class EventRegistrationRepositoryFirestore(
     // Checked before `db` is first used, so a bad id fails the same way with or without Firebase
     requirePathSegment(uid)
     requirePathSegment(eventId)
-    return db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION).document(eventId)
+    return registrations(uid).document(eventId)
   }
+
+  private fun registrations(uid: String): CollectionReference =
+      db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
 
   /** Throws unless [value] can be a document id: Firestore would read a `/` as a deeper path. */
   private fun requirePathSegment(value: String) {
