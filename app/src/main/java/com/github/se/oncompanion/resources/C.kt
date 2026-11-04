@@ -408,6 +408,11 @@ object C {
     const val prescription_delete_cancel = "prescription_delete_cancel"
     const val prescription_delete_error = "prescription_delete_error"
 
+    const val prescription_already_saved_dialog = "prescription_already_saved_dialog"
+    const val prescription_already_saved_keep_editing = "prescription_already_saved_keep_editing"
+    const val prescription_already_saved_save_anyway = "prescription_already_saved_save_anyway"
+    const val prescription_renewal_notice = "prescription_renewal_notice"
+
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
