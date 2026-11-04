@@ -1,7 +1,10 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import java.time.Clock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -17,12 +20,16 @@ import kotlinx.coroutines.flow.update
 /**
  * Shared in-memory appointment storage for unit tests, separated by patient uid. It follows the
  * repository's validation, identity and ordering contract; it does not simulate disk persistence or
- * server acknowledgement.
+ * server acknowledgement. [serverRejectsWrites] and [rejectPendingWrites] simulate a server that
+ * rejects writes after they returned.
  *
  * @param clock deterministic creation time used in place of the server timestamp
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
-    AppointmentRepository {
+class FakeAppointmentRepository(
+    private val clock: Clock = Clock.systemUTC(),
+    rejectedWrites: RejectedWrites = RejectedWrites(),
+) : AppointmentRepository {
   private val store = MutableStateFlow<Map<String, Map<String, Appointment>>>(emptyMap())
   private var nextId = 1
   private val activeFailures = MutableSharedFlow<Exception>(extraBufferCapacity = 1)
@@ -46,6 +53,16 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
 
   /** Owner and appointment ID of each validated deletion request. */
   val deleteRequests = mutableListOf<Pair<String, String>>()
+
+  private val server = RejectingServer<Map<String, Map<String, Appointment>>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** Returns a snapshot of [uid]'s stored appointments, without imposing an order. */
   fun appointments(uid: String): List<Appointment> = store.value[uid].orEmpty().values.toList()
@@ -106,6 +123,7 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     do {
       id = "appointment-${nextId++}"
     } while (store.value.values.any { id in it })
+    server.saving(store.value)
     seed(uid, appointment.copy(id = id, createdAt = clock.instant()))
     return id
   }
@@ -117,7 +135,8 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     updateRequests += uid to appointment
     writeGate?.await()
     writeError?.let { throw it }
-    // An absent record stays absent; this fake does not simulate deferred server rejection.
+    server.saving(store.value)
+    // An absent record stays absent; serverRejectsWrites simulates the server rejecting the update
     store.update { current ->
       val existing = current[uid]?.get(appointment.id)
       if (existing == null) current
@@ -135,6 +154,7 @@ class FakeAppointmentRepository(private val clock: Clock = Clock.systemUTC()) :
     deleteRequests += uid to id
     writeGate?.await()
     writeError?.let { throw it }
+    server.saving(store.value)
     store.update { current ->
       val appointments = current[uid]
       if (appointments == null || id !in appointments) current

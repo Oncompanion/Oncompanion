@@ -1,8 +1,10 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.DocumentSnapshot
@@ -30,6 +32,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AppointmentRepositoryFirestoreTest {
   private lateinit var repository: AppointmentRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var uid: String
 
   private val db
@@ -40,7 +43,8 @@ class AppointmentRepositoryFirestoreTest {
   fun setUp(): Unit = runBlocking {
     db.enableNetwork().await()
     uid = EmulatorTestData.createUser("appointment-owner")
-    repository = AppointmentRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = AppointmentRepositoryFirestore(db, rejectedWrites)
   }
 
   /** Restores networking after offline tests and releases the authenticated session. */
@@ -107,6 +111,7 @@ class AppointmentRepositoryFirestoreTest {
     acknowledgeWrites()
     assertEquals(changed.copy(createdAt = original.createdAt), storedAppointment(id))
     assertEquals(1, withTimeout(10_000) { collection().get(Source.SERVER).await() }.size())
+    assertEquals("accepted writes are not reported", 0, rejectedWrites.unseen.value)
   }
 
   /** Local updates are visible offline and reach the server after reconnection. */
@@ -571,6 +576,8 @@ class AppointmentRepositoryFirestoreTest {
       db.enableNetwork().await()
     }
     acknowledgeWrites()
+    // The user is told that the change was undone
+    withTimeout(10_000) { rejectedWrites.unseen.first { it == 1 } }
     EmulatorTestData.signIn("other-appointment-owner")
     val document = db.collection("users").document(otherUid).collection("appointments").document(id)
     assertFalse(withTimeout(10_000) { document.get(Source.SERVER).await() }.exists())
