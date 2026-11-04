@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -273,7 +275,7 @@ class AddSymptomViewModelTest {
         viewModel.save()
         advanceUntilIdle()
 
-        assertTrue(viewModel.state.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
         assertEquals(at(today, 14, 5), savedEntry().occurredAt)
       }
 
@@ -315,12 +317,11 @@ class AddSymptomViewModelTest {
         viewModel.onNotesChange("  After the walk \n")
 
         viewModel.save()
-        assertTrue(viewModel.state.isSaving)
+        assertEquals(SavePhase.SAVING, viewModel.state.save)
         assertFalse(viewModel.state.canSave)
         advanceUntilIdle()
 
-        assertFalse(viewModel.state.isSaving)
-        assertTrue(viewModel.state.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
         val entry = savedEntry()
         assertEquals(listOf(SymptomType.FATIGUE, SymptomType.HEADACHE), entry.types)
         assertEquals(6, entry.intensity)
@@ -397,8 +398,7 @@ class AddSymptomViewModelTest {
         viewModel.save()
         advanceUntilIdle()
 
-        assertFalse(viewModel.state.isSaving)
-        assertFalse(viewModel.state.isSaved)
+        assertEquals(SavePhase.EDITING, viewModel.state.save)
         assertTrue(repository.symptoms(uid).isEmpty())
       }
 
@@ -413,7 +413,7 @@ class AddSymptomViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AddSymptomError.NOT_SIGNED_IN, viewModel.state.error)
-        assertFalse(viewModel.state.isSaved)
+        assertNotEquals(SavePhase.SAVED, viewModel.state.save)
         assertTrue(repository.symptoms(uid).isEmpty())
 
         viewModel.clearError()
@@ -431,8 +431,7 @@ class AddSymptomViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AddSymptomError.SAVE_FAILED, viewModel.state.error)
-        assertFalse(viewModel.state.isSaving)
-        assertFalse(viewModel.state.isSaved)
+        assertEquals(SavePhase.EDITING, viewModel.state.save)
         assertEquals(listOf(SymptomType.FATIGUE), viewModel.state.types)
 
         repository.writeError = null
@@ -440,7 +439,7 @@ class AddSymptomViewModelTest {
         advanceUntilIdle()
 
         assertNull(viewModel.state.error)
-        assertTrue(viewModel.state.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
         assertEquals(listOf(SymptomType.FATIGUE), savedEntry().types)
       }
 
@@ -464,7 +463,7 @@ class AddSymptomViewModelTest {
             AddSymptomUiState(
                 now = today.atTime(14, 0),
                 types = listOf(SymptomType.FATIGUE),
-                isSaved = true,
+                save = SavePhase.SAVED,
             ),
             viewModel.state,
         )
@@ -639,7 +638,7 @@ class AddSymptomViewModelTest {
         viewModel.save()
         advanceUntilIdle()
 
-        assertTrue(viewModel.state.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
         assertEquals(
             SymptomEntry(
                 id = "s1",
@@ -773,7 +772,7 @@ class AddSymptomViewModelTest {
         viewModel.save()
         advanceUntilIdle()
 
-        assertTrue(viewModel.state.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
         assertEquals(9, savedEntry().intensity)
       }
 
