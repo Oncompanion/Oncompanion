@@ -25,8 +25,10 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
@@ -335,15 +337,36 @@ class EventRepositoryFirestoreTest {
     assertEquals(inTheWeek, events.map { it.id })
   }
 
+  /**
+   * Waits for the next value of one running collection that satisfies [predicate]. Unlike
+   * [awaitWeek], which starts a new listener each time, it follows a single listener through
+   * several changes.
+   */
+  private suspend fun <T> ReceiveChannel<T>.awaitNext(predicate: (T) -> Boolean): T =
+      withTimeout(10_000) {
+        var value = receive()
+        while (!predicate(value)) value = receive()
+        value
+      }
+
   @Test
   fun eventsInARange_followEditsAndDeletions(): Unit = runBlocking {
     val tomorrow = now.plus(Duration.ofDays(1))
+    // One collection follows every change, as Planning does while it stays open
+    val titles =
+        repository
+            .observeEvents(weekStart, weekEnd)
+            .map { events -> events.filter { it.id == id("yoga") }.map { it.title } }
+            .produceIn(this)
+    titles.awaitNext { it.isEmpty() }
+
+    // Added in the console
     addEvent("yoga", startAt = tomorrow, title = "Gentle yoga")
-    awaitWeek { events -> events.map { it.title } == listOf("Gentle yoga") }
+    titles.awaitNext { it == listOf("Gentle yoga") }
 
     // Renamed in the console
     addEvent("yoga", startAt = tomorrow, title = "Chair yoga", replace = true)
-    awaitWeek { events -> events.map { it.title } == listOf("Chair yoga") }
+    titles.awaitNext { it == listOf("Chair yoga") }
 
     // Moved to another week, then back
     addEvent(
@@ -352,13 +375,14 @@ class EventRepositoryFirestoreTest {
         title = "Chair yoga",
         replace = true,
     )
-    awaitWeek { it.isEmpty() }
+    titles.awaitNext { it.isEmpty() }
     addEvent("yoga", startAt = tomorrow, title = "Chair yoga", replace = true)
-    awaitWeek { it.isNotEmpty() }
+    titles.awaitNext { it == listOf("Chair yoga") }
 
     // Deleted by the Ligue
     EmulatorTestData.deleteRawDocument("$COLLECTION/${id("yoga")}")
-    awaitWeek { it.isEmpty() }
+    titles.awaitNext { it.isEmpty() }
+    titles.cancel()
   }
 
   @Test

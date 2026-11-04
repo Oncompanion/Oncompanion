@@ -12,7 +12,9 @@ import com.google.firebase.firestore.Source
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -210,14 +212,31 @@ class EventRegistrationRepositoryFirestoreTest {
     )
   }
 
+  /**
+   * Waits for the next value of one running collection that satisfies [predicate]. Unlike
+   * [awaitRegisteredIds], which starts a new listener each time, it follows a single listener
+   * through several changes.
+   */
+  private suspend fun <T> ReceiveChannel<T>.awaitNext(predicate: (T) -> Boolean): T =
+      withTimeout(10_000) {
+        var value = receive()
+        while (!predicate(value)) value = receive()
+        value
+      }
+
   @Test
   fun registeredEventIds_followConfirmAndRemove(): Unit = runBlocking {
+    // One collection follows every change, as Planning does while it stays open
+    val ids = repository.observeRegisteredEventIds(uid).produceIn(this)
+    ids.awaitNext { it.isEmpty() }
+
     repository.confirm(uid, upcomingId)
     repository.confirm(uid, otherUpcomingId)
-    awaitRegisteredIds(setOf(upcomingId, otherUpcomingId))
+    ids.awaitNext { it == setOf(upcomingId, otherUpcomingId) }
 
     repository.remove(uid, upcomingId)
-    awaitRegisteredIds(setOf(otherUpcomingId))
+    ids.awaitNext { it == setOf(otherUpcomingId) }
+    ids.cancel()
   }
 
   @Test
