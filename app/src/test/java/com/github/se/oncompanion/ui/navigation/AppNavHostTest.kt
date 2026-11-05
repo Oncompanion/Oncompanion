@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -67,6 +68,8 @@ import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.*
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
@@ -2026,6 +2029,29 @@ class AppNavHostTest {
       composeTestRule.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
     } finally {
       EventRegistrationRepositoryProvider.repository = registrations
+    }
+  }
+
+  @Test
+  fun rejectedWrite_showsTheSnackbarAboveTheBottomBar() {
+    val appRejectedWrites = RejectedWritesProvider.rejectedWrites
+    val rejectedWrites = RejectedWrites()
+    RejectedWritesProvider.rejectedWrites = rejectedWrites
+    try {
+      setNavHost(Route.OVERVIEW)
+      val message = context.getString(R.string.rejected_write_message)
+      composeTestRule.onNodeWithText(message).assertDoesNotExist()
+
+      rejectedWrites.report()
+
+      composeTestRule.onNodeWithText(message).assertIsDisplayed()
+      // The tabs stay visible and usable under the message
+      val snackbar = composeTestRule.onNodeWithText(message).getUnclippedBoundsInRoot()
+      val bottomBar =
+          composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).getUnclippedBoundsInRoot()
+      assertTrue(snackbar.bottom <= bottomBar.top)
+    } finally {
+      RejectedWritesProvider.rejectedWrites = appRejectedWrites
     }
   }
 }

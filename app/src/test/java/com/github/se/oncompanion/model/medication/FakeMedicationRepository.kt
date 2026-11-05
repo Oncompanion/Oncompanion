@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.model.medication
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -30,11 +32,16 @@ import kotlinx.coroutines.flow.update
  * Test hooks: [readError], [failRunningReads] and [writeError] simulate unexpected failures,
  * [prescriptionsOf] exposes a snapshot of the stored data, [prescriptionObservers] counts the
  * running [observePrescription] collections, and [newId] returns "id-1", "id-2", ...
+ * [serverRejectsWrites] and [rejectPendingWrites] simulate a server that rejects writes after they
+ * returned.
  *
  * @param clock source of the `createdAt` timestamp set on creation (the "server time").
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) :
-    MedicationRepository {
+class FakeMedicationRepository(
+    private val clock: () -> Instant = Instant::now,
+    rejectedWrites: RejectedWrites = RejectedWrites(),
+) : MedicationRepository {
 
   // uid -> prescription ID -> prescription
   private val store = MutableStateFlow<Map<String, Map<String, Prescription>>>(emptyMap())
@@ -63,6 +70,16 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
 
   /** When non-null, every write throws it and stores nothing. */
   var writeError: Exception? = null
+
+  private val server = RejectingServer<Map<String, Map<String, Prescription>>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** Snapshot of the prescriptions stored for [uid], in the order of [observePrescriptions]. */
   fun prescriptionsOf(uid: String): List<Prescription> = sorted(store.value[uid])
@@ -96,6 +113,7 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     writeError?.let { throw it }
     require(prescription.isValid()) { "Invalid prescription: $prescription" }
+    server.saving(store.value)
     put(uid, prescription.copy(createdAt = clock()))
   }
 
@@ -103,11 +121,13 @@ class FakeMedicationRepository(private val clock: () -> Instant = Instant::now) 
     writeError?.let { throw it }
     require(prescription.isValid()) { "Invalid prescription: $prescription" }
     val existing = store.value[uid]?.get(prescription.id) ?: return
+    server.saving(store.value)
     put(uid, prescription.copy(createdAt = existing.createdAt))
   }
 
   override suspend fun deletePrescription(uid: String, id: String) {
     writeError?.let { throw it }
+    server.saving(store.value)
     store.update { all -> all + (uid to all[uid].orEmpty() - id) }
   }
 

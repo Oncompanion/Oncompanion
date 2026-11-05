@@ -3,8 +3,11 @@
 package com.github.se.oncompanion.ui.prescription
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
@@ -119,7 +122,11 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            PrescriptionsUiState(today = LocalDate.of(2026, 10, 12), isLoading = false),
+            PrescriptionsUiState(
+                today = LocalDate.of(2026, 10, 12),
+                isLoading = false,
+                canAdd = true,
+            ),
             viewModel.uiState.value,
         )
         assertEquals(emptyList<Prescription>(), viewModel.uiState.value.thisMonth)
@@ -160,11 +167,10 @@ class PrescriptionsViewModelTest {
         repository.seed(uid, prescription("p1", "2026-09-29", "Ondansetron 8 mg"))
 
         val viewModel = viewModel(FakeAuthRepository())
+        advanceUntilIdle()
 
-        // Known right away: there is nothing to wait for
         assertTrue(viewModel.uiState.value.hasError)
         assertFalse(viewModel.uiState.value.isLoading)
-        advanceUntilIdle()
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 
@@ -344,6 +350,107 @@ class PrescriptionsViewModelTest {
   fun defaultRepositories_canBeCreatedWithoutFirebase() =
       runTest(dispatcher) {
         // Like the app's NavHost does: without Firebase nobody is signed in
-        assertTrue(PrescriptionsViewModel().uiState.value.hasError)
+        val viewModel = PrescriptionsViewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hasError)
+      }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      PrescriptionsViewModel(
+          signedIn("caregiver"),
+          repository,
+          clock,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_prescriptionsShared_showsThePatients_withoutAdding() =
+      runTest(dispatcher) {
+        repository.seed("patient", prescription("p1", "2026-10-01", "Ondansetron 8 mg"))
+        repository.seed("caregiver", prescription("own", "2026-10-01", "Paracetamol 1 g"))
+
+        val viewModel = caregiverViewModel(CarePermission.PRESCRIPTIONS)
+        advanceUntilIdle()
+
+        assertEquals(listOf("p1"), viewModel.ids)
+        assertFalse(viewModel.uiState.value.canAdd)
+        assertFalse(viewModel.uiState.value.isNotShared)
+      }
+
+  @Test
+  fun caregiver_prescriptionsNotShared_isNotShared_withNone() =
+      runTest(dispatcher) {
+        repository.seed("patient", prescription("p1", "2026-10-01", "Ondansetron 8 mg"))
+
+        val viewModel = caregiverViewModel(CarePermission.SYMPTOMS)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isNotShared)
+        assertEquals(emptyList<String>(), viewModel.ids)
+        assertFalse(viewModel.uiState.value.hasError)
+        assertFalse(viewModel.uiState.value.canAdd)
+      }
+
+  private fun caregiverViewModel(patient: FollowedPatient) =
+      PrescriptionsViewModel(
+          patient.auth,
+          repository,
+          clock,
+          patientUid = "patient",
+          resolveSection = patient.sectionAccess,
+      )
+
+  @Test
+  fun caregiver_neverGetsTheAddButton_whateverTheAccess() =
+      runTest(dispatcher) {
+        // Each way a caregiver can be without the patient's prescriptions
+        val cases =
+            listOf<Pair<String, (FollowedPatient) -> Unit>>(
+                "not confirmed yet" to { it.isUnconfirmed() },
+                "removed from the circle" to { it.removesTheCaregiver() },
+                "prescriptions not shared" to { it.shares(CarePermission.SYMPTOMS) },
+                "circle unreadable" to
+                    {
+                      it.circle.observeError = IllegalStateException("offline")
+                    },
+            )
+        for ((case, setUp) in cases) {
+          val viewModel =
+              caregiverViewModel(FollowedPatient(CarePermission.PRESCRIPTIONS).also(setUp))
+          advanceUntilIdle()
+
+          assertFalse(case, viewModel.uiState.value.canAdd)
+        }
+      }
+
+  @Test
+  fun caregiver_noAccessThenNotShared_saysNotShared_insteadOfTheError() =
+      runTest(dispatcher) {
+        val patient = FollowedPatient().apply { removesTheCaregiver() }
+        val viewModel = caregiverViewModel(patient)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hasError)
+
+        // The patient adds the caregiver back, without their prescriptions
+        patient.shares(CarePermission.SYMPTOMS)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.hasError)
+        assertTrue(viewModel.uiState.value.isNotShared)
+      }
+
+  @Test
+  fun loadError_thePatientCanStillAdd() =
+      runTest(dispatcher) {
+        repository.readError = IllegalStateException("no cache")
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.hasError)
+        assertTrue(viewModel.uiState.value.canAdd)
       }
 }

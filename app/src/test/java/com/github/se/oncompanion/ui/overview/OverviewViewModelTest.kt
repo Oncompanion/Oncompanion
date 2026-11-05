@@ -578,4 +578,15 @@ class OverviewViewModelTest {
     assertTrue(state.todayEntries.isEmpty())
     assertTrue(planning.owners.isEmpty())
   }
+
+  @Test
+  fun caregiver_sharedSections_followEachSection() {
+    assertEquals(
+        setOf(CarePermission.SYMPTOMS, CarePermission.PRESCRIPTIONS),
+        caregiverViewModel(planning(), CarePermission.SYMPTOMS, CarePermission.PRESCRIPTIONS)
+            .uiState
+            .value
+            .sharedSections,
+    )
+  }
 }

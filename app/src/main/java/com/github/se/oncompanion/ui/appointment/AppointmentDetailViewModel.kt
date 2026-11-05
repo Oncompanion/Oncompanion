@@ -1,28 +1,38 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
+import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
+import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.common.HasDeleteState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 /** Exclusive states prevent old appointment content from remaining visible after a read failure. */
@@ -31,16 +41,24 @@ sealed interface AppointmentDetailUiState : HasDeleteState {
     get() = DeleteState()
 
   override val canDelete: Boolean
-    get() = this is Loaded && !delete.isDeleting && !delete.isDeleted
+    get() = this is Loaded && isOwn && !delete.isDeleting && !delete.isDeleted
 
   /** Waiting for this patient's locally available appointment. */
   data object Loading : AppointmentDetailUiState
 
-  /** All recorded patient fields are available for display. */
+  /**
+   * All recorded patient fields are available for display.
+   *
+   * @property isOwn whether it is the user's own appointment: a caregiver only reads the patient's
+   */
   data class Loaded(
       val appointment: Appointment,
       override val delete: DeleteState = DeleteState(),
+      val isOwn: Boolean = true,
   ) : AppointmentDetailUiState
+
+  /** In caregiver mode, the patient doesn't share their planning. */
+  data object NotShared : AppointmentDetailUiState
 
   /** No readable local appointment, which does not confirm server-side deletion. */
   data object Unavailable : AppointmentDetailUiState
@@ -49,11 +67,21 @@ sealed interface AppointmentDetailUiState : HasDeleteState {
   data object Error : AppointmentDetailUiState
 }
 
-/** Observes one appointment while ensuring account changes clear the previous patient's data. */
+/**
+ * Observes one appointment while ensuring account changes clear the previous patient's data. In
+ * caregiver mode (US-20), the appointment is the followed patient's, read-only, when they share
+ * their planning.
+ *
+ * @param patientUid in caregiver mode, the patient whose appointment is shown; null for the user's
+ *   own
+ */
 class AppointmentDetailViewModel(
     private val appointmentId: String,
     private val repository: AppointmentRepository = AppointmentRepositoryProvider.repository,
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val patientUid: String? = null,
+    private val resolveSection: ResolveSectionAccess =
+        ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
 ) : ViewModel() {
   private val state = MutableStateFlow<AppointmentDetailUiState>(AppointmentDetailUiState.Loading)
   /** Current read state, cleared when its owner changes. */
@@ -119,8 +147,40 @@ class AppointmentDetailViewModel(
   }
 
   init {
-    observeAuthentication()
+    if (patientUid == null) observeAuthentication() else followPatient(patientUid)
   }
+
+  /**
+   * In caregiver mode, reads the patient's appointment while they share their planning. Nothing can
+   * be deleted, so the session checks of the patient's own detail aren't needed: an account or
+   * access change restarts the read from [AppointmentDetailUiState.Loading].
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun followPatient(patientUid: String) {
+    authentication?.cancel()
+    authentication = viewModelScope.launch {
+      flow { emitAll(resolveSection(CarePermission.PLANNING, patientUid)) }
+          .flatMapLatest(::patientAppointment)
+          .catch { emit(AppointmentDetailUiState.Error) }
+          .collect { state.value = it }
+    }
+  }
+
+  /** What the caregiver sees with [access]: the patient's appointment, or why it isn't shown. */
+  private fun patientAppointment(access: SectionAccess): Flow<AppointmentDetailUiState> =
+      when (access) {
+        is SectionAccess.Readable ->
+            repository
+                .observeAppointment(access.ownerUid, appointmentId)
+                .map<Appointment?, AppointmentDetailUiState> { appointment ->
+                  appointment?.let { AppointmentDetailUiState.Loaded(it, isOwn = false) }
+                      ?: AppointmentDetailUiState.Unavailable
+                }
+                .onStart { emit(AppointmentDetailUiState.Loading) }
+        SectionAccess.NotShared -> flowOf(AppointmentDetailUiState.NotShared)
+        SectionAccess.Loading -> flowOf(AppointmentDetailUiState.Loading)
+        SectionAccess.NoAccess -> flowOf(AppointmentDetailUiState.Unavailable)
+      }
 
   private fun observeAuthentication() {
     authentication?.cancel()
@@ -141,6 +201,7 @@ class AppointmentDetailViewModel(
   /** Restarts a failed or unavailable observation without keeping duplicate listeners. */
   fun retry() {
     if (state.value.delete.isDeleting || state.value.delete.isDeleted) return
+    if (patientUid != null) return followPatient(patientUid)
     observe(runCatching { authRepository.currentUser?.uid }.getOrNull())
     observeAuthentication()
   }

@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.medication
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.Timestamp
@@ -35,6 +36,7 @@ import org.junit.runner.RunWith
 class MedicationRepositoryFirestoreTest {
 
   private lateinit var repository: MedicationRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
 
   private val db
@@ -50,7 +52,8 @@ class MedicationRepositoryFirestoreTest {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
     aliceUid = EmulatorTestData.createUser("alice")
-    repository = MedicationRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = MedicationRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -93,6 +96,11 @@ class MedicationRepositoryFirestoreTest {
   /** Waits until every pending write was acknowledged or rejected by the server. */
   private suspend fun awaitServerAck() {
     withTimeout(10.seconds) { db.waitForPendingWrites().await() }
+  }
+
+  /** Waits until the server's rejection of one write was reported, so the user is told. */
+  private suspend fun awaitRejectionReported() {
+    withTimeout(10.seconds) { rejectedWrites.unseen.first { it == 1 } }
   }
 
   private fun prescriptionDocument(id: String) =
@@ -199,6 +207,32 @@ class MedicationRepositoryFirestoreTest {
     val stored = repository.observePrescription(aliceUid, "presc-1").awaitFirst()
     assertSameContent(prescription(), stored)
     assertNotNull("createdAt is set once the server confirms", stored!!.createdAt)
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
+  }
+
+  @Test
+  fun deleteOfAnotherUsersPrescriptionReturnsButIsRejectedAndReported(): Unit = runBlocking {
+    val bobUid = EmulatorTestData.createUser("bob")
+    repository.addPrescription(bobUid, prescription())
+    awaitServerAck()
+    EmulatorTestData.signIn("alice")
+
+    // Returns once deleted on the device, before the server answers
+    withTimeout(5.seconds) { repository.deletePrescription(bobUid, "presc-1") }
+    awaitServerAck()
+    awaitRejectionReported()
+
+    EmulatorTestData.signIn("bob")
+    val server =
+        withTimeout(10.seconds) {
+          db.collection("users")
+              .document(bobUid)
+              .collection("prescriptions")
+              .document("presc-1")
+              .get(Source.SERVER)
+              .await()
+        }
+    assertTrue("the rejected deletion keeps the prescription on the server", server.exists())
   }
 
   @Test
@@ -1012,6 +1046,7 @@ class MedicationRepositoryFirestoreTest {
 
     db.enableNetwork().await()
     awaitServerAck()
+    awaitRejectionReported()
     assertFalse(serverPrescription("presc-1").exists())
     assertTrue(repository.observeMedications(aliceUid).awaitFirst { it.isEmpty() }.isEmpty())
   }

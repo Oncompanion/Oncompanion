@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
@@ -45,6 +46,7 @@ import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -72,6 +74,7 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  *
  * @param onEdit opens the prescription in the form, to correct it (US-12)
  * @param onDeleted called once the prescription is deleted, to leave the screen
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @Composable
 fun PrescriptionDetailScreen(
@@ -80,6 +83,7 @@ fun PrescriptionDetailScreen(
     onEdit: () -> Unit,
     onDeleted: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -96,6 +100,7 @@ fun PrescriptionDetailScreen(
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -107,6 +112,7 @@ fun PrescriptionDetailScreen(
  * @param onDelete asks to confirm the deletion
  * @param onConfirmDelete deletes the prescription, from the confirmation dialog
  * @param onCancelDelete closes the confirmation dialog and keeps the prescription
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,6 +125,7 @@ fun PrescriptionDetailContent(
     onConfirmDelete: () -> Unit,
     onCancelDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.prescription_detail_screen),
@@ -159,6 +166,13 @@ fun PrescriptionDetailContent(
                 Text(stringResource(R.string.prescription_detail_retry))
               }
             }
+        // The patient a caregiver follows doesn't share their prescriptions (anymore)
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(
+                caregiverOf,
+                CarePermission.PRESCRIPTIONS,
+                Modifier.align(Alignment.Center),
+            )
         // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
         prescription == null ->
             Message(

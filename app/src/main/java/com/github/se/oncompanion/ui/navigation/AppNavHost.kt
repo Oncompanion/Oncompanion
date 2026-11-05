@@ -4,10 +4,14 @@
 
 package com.github.se.oncompanion.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
@@ -46,6 +50,7 @@ import com.github.se.oncompanion.ui.carecircle.JoinCareCircleScreen
 import com.github.se.oncompanion.ui.carecircle.JoinCareCircleViewModel
 import com.github.se.oncompanion.ui.carecircle.WhoseCareScreen
 import com.github.se.oncompanion.ui.carecircle.WhoseCareViewModel
+import com.github.se.oncompanion.ui.common.RejectedWriteSnackbar
 import com.github.se.oncompanion.ui.events.EventDetailScreen
 import com.github.se.oncompanion.ui.events.EventDetailViewModel
 import com.github.se.oncompanion.ui.events.EventsScreen
@@ -103,12 +108,16 @@ fun AppNavHost(
           resolved
         } else if (afterCleanup) Route.AUTH else startRoute
     if (route != null) {
-      SessionNavHost(
-          navController ?: rememberNavController(),
-          route,
-          credentialProvider,
-          savedState,
-      )
+      // One snackbar over every screen tells the user when the server undid one of their changes
+      Box(Modifier.fillMaxSize()) {
+        SessionNavHost(
+            navController ?: rememberNavController(),
+            route,
+            credentialProvider,
+            savedState,
+        )
+        RejectedWriteSnackbar(Modifier.align(Alignment.BottomCenter))
+      }
     }
   }
 }
@@ -265,7 +274,10 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
-        val detail: AppointmentDetailViewModel = viewModel { AppointmentDetailViewModel(id) }
+        // In caregiver mode, the chosen patient's appointment, read-only
+        val detail: AppointmentDetailViewModel = viewModel {
+          AppointmentDetailViewModel(id, patientUid = chosenPatient?.uid)
+        }
         AppointmentDetailScreen(
             detail,
             onBack = dropUnlessResumed { navigationActions.goBack() },
@@ -274,6 +286,7 @@ private fun SessionNavHost(
               // A completion may only pop the detail entry that initiated this deletion.
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -393,12 +406,15 @@ private fun SessionNavHost(
     navigation(startDestination = Screen.PRESCRIPTIONS, route = Route.PRESCRIPTIONS) {
       composable(Screen.PRESCRIPTIONS) {
         PrescriptionsScreen(
-            viewModel = viewModel { PrescriptionsViewModel() },
+            // In caregiver mode, the chosen patient's prescriptions, read-only, when they share
+            // them
+            viewModel = viewModel { PrescriptionsViewModel(patientUid = chosenPatient?.uid) },
             onBack = navigationActions::goBack,
             // A second tap while the form is already opening is dropped, so it opens once
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -408,11 +424,15 @@ private fun SessionNavHost(
         val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
         PrescriptionDetailScreen(
             // Scoped to this back stack entry, so each opened prescription has its own ViewModel
-            viewModel = viewModel { PrescriptionDetailViewModel(prescriptionId) },
+            viewModel =
+                viewModel {
+                  PrescriptionDetailViewModel(prescriptionId, patientUid = chosenPatient?.uid)
+                },
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.prescriptionEdit(prescriptionId)) },
             // Back to the list, which no longer shows it
             onDeleted = navigationActions::goBack,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(

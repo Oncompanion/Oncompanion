@@ -158,6 +158,9 @@
     <string name="symptom_edit_error_title">Couldn\'t load this entry</string>
     <string name="symptom_detail_edit">Edit entry</string>
     <string name="symptom_edit_error_hint">Please try again.</string>
+    <!-- Caregiver mode (US-20): the journal of the patient they follow, e.g. "Couldn\'t load Anne\'s symptoms" -->
+    <string name="symptom_journal_error_title_for">Couldn\'t load %1$s\'s symptoms</string>
+    <string name="symptom_journal_empty_hint_for">The symptoms logged for %1$s will appear here, newest first.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -479,6 +482,10 @@
     <string name="prescription_already_saved_save_anyway">Save anyway</string>
     <string name="prescription_renewal_by">Same medications as %2$s\'s prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
     <string name="prescription_renewal">Same medications as your prescription from %1$s: this looks like a renewal. Saving adds it as a new prescription.</string>
+    <!-- Caregiver mode (US-20): the list of the patient they follow, e.g. "Anne\'s prescriptions" -->
+    <string name="prescriptions_list_title_for">%1$s\'s prescriptions</string>
+    <string name="prescriptions_empty_hint_for">When %1$s saves a prescription, it will appear here.</string>
+    <string name="prescriptions_error_title_for">Couldn\'t load %1$s\'s prescriptions</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -591,4 +598,7 @@
     <string name="appointment_edit">Edit appointment</string>
     <string name="appointment_save_changes">Save changes</string>
     <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
+
+    <!-- A change the server rejected and was undone, shown over every screen -->
+    <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>
 </resources>

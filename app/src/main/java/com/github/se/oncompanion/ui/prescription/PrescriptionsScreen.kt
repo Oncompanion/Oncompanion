@@ -41,12 +41,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -62,6 +65,7 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * @param onAdd opens the prescription form
  * @param onScan starts scanning a prescription
  * @param onOpen opens the detail of the prescription with the given ID
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @Composable
 fun PrescriptionsScreen(
@@ -71,6 +75,7 @@ fun PrescriptionsScreen(
     onScan: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Keeps "This month" right while the list is on screen: refreshes when it comes back, then at
@@ -87,6 +92,7 @@ fun PrescriptionsScreen(
       onRetry = viewModel::load,
       onOpen = onOpen,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -97,6 +103,7 @@ fun PrescriptionsScreen(
  * @param onScan starts scanning a prescription
  * @param onRetry reloads the prescriptions after an error
  * @param onOpen opens the detail of the prescription with the given ID
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,12 +115,18 @@ fun PrescriptionsContent(
     onRetry: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.prescriptions_screen),
       topBar = {
         TopAppBar(
-            title = { Text(stringResource(R.string.prescriptions_list_title)) },
+            title = {
+              Text(
+                  caregiverOf?.let { stringResource(R.string.prescriptions_list_title_for, it) }
+                      ?: stringResource(R.string.prescriptions_list_title)
+              )
+            },
             navigationIcon = {
               IconButton(
                   onClick = onBack,
@@ -127,19 +140,29 @@ fun PrescriptionsContent(
             },
         )
       },
-      // In every state: saving a prescription works whatever the list could load
-      floatingActionButton = { AddButtons(onAdd = onAdd, onScan = onScan) },
+      // In every state: saving a prescription works whatever the list could load. Only the patient
+      // adds their prescriptions
+      floatingActionButton = { if (uiState.canAdd) AddButtons(onAdd = onAdd, onScan = onScan) },
       floatingActionButtonPosition = FabPosition.Center,
   ) { innerPadding ->
+    // Room is kept at the bottom only for buttons that are shown
+    val buttonRoom = if (uiState.canAdd) BUTTON_ROOM else 0.dp
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       when {
         uiState.isLoading ->
             CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
-        uiState.hasError -> ErrorState(onRetry)
-        uiState.prescriptions.isEmpty() -> EmptyState()
-        else -> PrescriptionList(uiState.thisMonth, uiState.earlier, onOpen)
+        uiState.hasError -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        // The patient a caregiver follows doesn't share their prescriptions
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(
+                caregiverOf,
+                CarePermission.PRESCRIPTIONS,
+                Modifier.align(Alignment.Center),
+            )
+        uiState.prescriptions.isEmpty() -> EmptyState(caregiverOf, buttonRoom)
+        else -> PrescriptionList(uiState.thisMonth, uiState.earlier, buttonRoom, onOpen)
       }
     }
   }
@@ -200,12 +223,13 @@ private fun AddButton(
 private fun PrescriptionList(
     thisMonth: List<Prescription>,
     earlier: List<Prescription>,
+    buttonRoom: Dp,
     onOpen: (String) -> Unit,
 ) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.prescriptions_list),
       // Room for the buttons, so they never hide the last prescription
-      contentPadding = PaddingValues(bottom = BUTTON_ROOM),
+      contentPadding = PaddingValues(bottom = buttonRoom),
   ) {
     if (thisMonth.isNotEmpty()) {
       item(key = C.Tag.prescriptions_this_month_header) {
@@ -270,10 +294,13 @@ private fun PrescriptionItem(prescription: Prescription, onOpen: (String) -> Uni
   )
 }
 
-/** Figma: "US-11 / Prescription list – Empty". */
+/**
+ * Figma: "US-11 / Prescription list – Empty". A caregiver ([caregiverOf] set) can't add any, so
+ * they aren't told how to.
+ */
 @Composable
-private fun EmptyState() {
-  CenteredMessage(testTag = C.Tag.prescriptions_empty) {
+private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
+  CenteredMessage(testTag = C.Tag.prescriptions_empty, bottom = buttonRoom) {
     Icon(
         painter = painterResource(R.drawable.ic_prescriptions),
         contentDescription = null,
@@ -282,16 +309,21 @@ private fun EmptyState() {
     )
     MessageTexts(
         title = stringResource(R.string.prescriptions_empty_title),
-        hint = stringResource(R.string.prescriptions_empty_hint),
+        hint =
+            caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
+                ?: stringResource(R.string.prescriptions_empty_hint),
     )
   }
 }
 
+/** The list couldn't be loaded: whose it is, and a way to retry. */
 @Composable
-private fun ErrorState(onRetry: () -> Unit) {
-  CenteredMessage(testTag = C.Tag.prescriptions_error) {
+private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
+  CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
     MessageTexts(
-        title = stringResource(R.string.prescriptions_error_title),
+        title =
+            caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
+                ?: stringResource(R.string.prescriptions_error_title),
         hint = stringResource(R.string.prescriptions_error_hint),
     )
     Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.prescriptions_retry_button)) {
@@ -300,13 +332,13 @@ private fun ErrorState(onRetry: () -> Unit) {
   }
 }
 
-/** Centers [content] in the space above the buttons. */
+/** Centers [content] in the space above the buttons, [bottom] high. */
 @Composable
-private fun CenteredMessage(testTag: String, content: @Composable () -> Unit) {
+private fun CenteredMessage(testTag: String, bottom: Dp, content: @Composable () -> Unit) {
   Column(
       modifier =
           Modifier.fillMaxSize()
-              .padding(start = 32.dp, end = 32.dp, bottom = BUTTON_ROOM)
+              .padding(start = 32.dp, end = 32.dp, bottom = bottom)
               .testTag(testTag),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),

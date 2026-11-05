@@ -1,9 +1,12 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -15,14 +18,19 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Appointment storage at `/users/{uid}/appointments/{id}`, using Firestore's offline cache. Writes
- * are enqueued without awaiting server acknowledgement. A later server rejection is logged and
- * Firestore rolls back the local write; returned IDs do not confirm server acceptance.
+ * return once saved on the device, without awaiting server acknowledgement. A later server
+ * rejection makes Firestore roll back the local write, and is reported to [rejectedWrites] so the
+ * user is told; returned IDs do not confirm server acceptance.
  */
 class AppointmentRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : AppointmentRepository {
   /** Uses the supplied Firestore instance, allowing tests to connect to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Default ViewModel construction must also work before Firebase is initialized in unit tests.
   private val db: FirebaseFirestore
@@ -77,6 +85,7 @@ class AppointmentRepositoryFirestore(
                   "Appointment write ${document.id} was rejected; the local write was rolled back",
                   error,
               )
+              rejectedWrites.report()
             }
         return@operation document.id
       }
@@ -96,6 +105,7 @@ class AppointmentRepositoryFirestore(
                   "Appointment update ${appointment.id} was rejected; local changes rolled back",
                   error,
               )
+              rejectedWrites.report()
             }
       }
 
@@ -104,6 +114,7 @@ class AppointmentRepositoryFirestore(
     requirePathSegment(id)
     collection(uid).document(id).delete().addOnFailureListener { error ->
       Log.e(TAG, "Appointment deletion $id was rejected; the local removal was rolled back", error)
+      rejectedWrites.report()
     }
   }
 

@@ -572,13 +572,16 @@ class OverviewScreenTest {
 
   // ----- Caregiver mode (US-20) -----
 
-  private fun setCaregiverContent(state: OverviewUiState, onOpenPlanning: () -> Unit = {}) {
+  private fun setCaregiverContent(
+      state: OverviewUiState,
+      onOpenAppointment: (String) -> Unit = {},
+  ) {
     composeTestRule.setContent {
       OverviewContent(
           uiState = state,
           onShortcutClick = {},
-          onOpenPlanning = onOpenPlanning,
-          onOpenAppointment = { error("A caregiver can't open an appointment's page yet") },
+          onOpenPlanning = {},
+          onOpenAppointment = onOpenAppointment,
           onRetry = {},
           caregiverOf = "Anne",
       )
@@ -594,18 +597,18 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun caregiver_tappingTheNextAppointment_opensPlanning() {
-    var openedPlanning = false
+  fun caregiver_tappingTheNextAppointment_opensItsReadOnlyPage() {
+    var opened: String? = null
     setCaregiverContent(
         loaded.copy(
             nextAppointment = NextAppointment("chemo", "Chemotherapy", morning.plusDays(1))
         ),
-        onOpenPlanning = { openedPlanning = true },
+        onOpenAppointment = { opened = it },
     )
 
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
 
-    assertTrue(openedPlanning)
+    assertEquals("chemo", opened)
   }
 
   @Test
@@ -618,11 +621,28 @@ class OverviewScreenTest {
 
   @Test
   fun caregiver_getsTheSymptomsTile_onlyWhenShared() {
-    // Even with everything shared, only the tiles that have a caregiver view show
-    setCaregiverContent(loaded.copy(sharedSections = CarePermission.entries.toSet()))
+    setCaregiverContent(loaded.copy(sharedSections = setOf(CarePermission.SYMPTOMS)))
 
     composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_getsThePrescriptionsTile_onlyWhenShared() {
+    setCaregiverContent(loaded.copy(sharedSections = setOf(CarePermission.PRESCRIPTIONS)))
+
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_withEverythingShared_neverGetsTheCareCircleTile() {
+    setCaregiverContent(loaded.copy(sharedSections = CarePermission.entries.toSet()))
+
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).assertDoesNotExist()
   }
 

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -35,6 +37,8 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -45,6 +49,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionsScreenTest {
@@ -86,7 +91,8 @@ class PrescriptionsScreenTest {
   private val nausea =
       prescription("nausea", "2026-08-20", "Metoclopramide 10 mg", prescribedBy = "Dr. Dubois")
 
-  private val loading = PrescriptionsUiState(today = today)
+  /** The patient's own list: they can add to it. */
+  private val loading = PrescriptionsUiState(today = today, canAdd = true)
   private val loaded = loading.copy(isLoading = false)
 
   /** Two prescriptions of this month, one of the month before. */
@@ -534,5 +540,100 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: PrescriptionsUiState) {
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsPrescriptions_withoutScanOrAdd() {
+    setCaregiverContent(filled.copy(canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_list).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_scan_button).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_prescriptionsNotShared_saysSo_insteadOfAnEmptyList() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_prescriptionsNotShared_isFullyVisibleInLandscape() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  fun caregiver_isShownThePatientsList_neverTheirOwn() {
+    // Figma #240: "Anne's prescriptions", and nothing tells the caregiver to add one
+    val cases =
+        listOf(
+            filled.copy(canAdd = false) to null,
+            loaded.copy(canAdd = false) to "When Anne saves a prescription, it will appear here.",
+            loaded.copy(hasError = true, canAdd = false) to "Couldn't load Anne's prescriptions",
+        )
+    var state by mutableStateOf(cases.first().first)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    for ((next, message) in cases) {
+      composeTestRule.runOnIdle { state = next }
+      composeTestRule.onNodeWithText("Anne's prescriptions").assertIsDisplayed()
+      message?.let { composeTestRule.onNodeWithText(it).assertIsDisplayed() }
+      for (patientText in
+          listOf(
+              "My prescriptions",
+              "Scan a prescription or enter it manually to keep it here.",
+              "Couldn't load your prescriptions",
+          )) {
+        composeTestRule.onNodeWithText(patientText).assertDoesNotExist()
+      }
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_longList_endsWithoutTheButtonsSpace() {
+    val many =
+        (1..30).map { prescription("p$it", today.minusDays(it.toLong()).toString(), "Med $it") }
+    setCaregiverContent(loaded.copy(prescriptions = many, canAdd = false))
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptions_list)
+        .performScrollToNode(hasTestTag(C.Tag.prescriptionsItem("p30")))
+
+    // Without the buttons, no room is kept for them under the last prescription
+    val list = composeTestRule.onNodeWithTag(C.Tag.prescriptions_list).getBoundsInRoot()
+    val last = composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("p30")).getBoundsInRoot()
+    val gap = list.bottom - last.bottom
+    assertTrue("gap $gap", gap < 24.dp)
   }
 }
