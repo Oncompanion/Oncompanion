@@ -368,12 +368,17 @@ internal fun PermissionItem(permission: CarePermission, granted: Boolean) {
   )
 }
 
-/** Whether the member can also add to [section], read-only, indented under the section's row. */
+/**
+ * Whether the member can also add to [section], read-only, indented under the section's row.
+ * Nothing for a section nobody can add to.
+ */
 @Composable
 internal fun CanAddItem(section: CarePermission, allowed: Boolean) {
+  val label = section.addLabel ?: return
+  val description = section.addDescription ?: return
   ListItem(
-      headlineContent = { Text(stringResource(R.string.permission_symptoms_add)) },
-      supportingContent = { Text(stringResource(R.string.permission_symptoms_add_description)) },
+      headlineContent = { Text(stringResource(label)) },
+      supportingContent = { Text(stringResource(description)) },
       trailingContent = { Switch(checked = allowed, onCheckedChange = null) },
       modifier =
           Modifier.padding(start = 24.dp)

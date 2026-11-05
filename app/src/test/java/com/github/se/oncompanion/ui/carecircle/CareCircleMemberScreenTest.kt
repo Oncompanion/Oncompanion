@@ -28,6 +28,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
@@ -406,5 +407,14 @@ class CareCircleMemberScreenTest {
         .onNodeWithTag(C.Tag.careCircleMemberCanAdd(CarePermission.SYMPTOMS.name))
         .performScrollTo()
         .assertIsOn()
+  }
+
+  @Test
+  fun onlyTheAddableSections_haveACanAddText() {
+    for (section in CarePermission.entries) {
+      val addable = section in CareCircleMemberDetails.ADDABLE_SECTIONS
+      assertEquals(section.name, addable, section.addLabel != null)
+      assertEquals(section.name, addable, section.addDescription != null)
+    }
   }
 }

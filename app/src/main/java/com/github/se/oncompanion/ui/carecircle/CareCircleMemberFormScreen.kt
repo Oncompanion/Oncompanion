@@ -366,8 +366,9 @@ private fun PermissionSwitches(
 }
 
 /**
- * "Allow adding symptoms", indented under the section it depends on: only for someone who sees the
- * section, so it is greyed out while the section is off.
+ * Lets the member add to [section] (e.g. "Allow adding symptoms"), indented under the section it
+ * depends on: only for someone who sees the section, so it is greyed out while the section is off.
+ * Nothing for a section nobody can add to.
  */
 @Composable
 private fun CanAddSwitch(
@@ -376,11 +377,13 @@ private fun CanAddSwitch(
     sectionGranted: Boolean,
     onCanAddChange: (CarePermission, Boolean) -> Unit,
 ) {
+  val label = section.addLabel ?: return
+  val description = section.addDescription ?: return
   val allowed = section in uiState.canAdd
   val enabled = uiState.canEdit && sectionGranted
   ListItem(
-      headlineContent = { Text(stringResource(R.string.permission_symptoms_add)) },
-      supportingContent = { Text(stringResource(R.string.permission_symptoms_add_description)) },
+      headlineContent = { Text(stringResource(label)) },
+      supportingContent = { Text(stringResource(description)) },
       trailingContent = { Switch(checked = allowed, onCheckedChange = null, enabled = enabled) },
       modifier =
           Modifier.padding(start = 24.dp)
