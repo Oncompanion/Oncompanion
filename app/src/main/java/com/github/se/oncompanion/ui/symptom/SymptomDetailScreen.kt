@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
@@ -36,6 +37,7 @@ import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.ZoneId
@@ -66,6 +68,7 @@ fun SymptomDetailScreen(
     navigationActions: NavigationActions,
     viewModel: SymptomDetailViewModel,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -82,6 +85,7 @@ fun SymptomDetailScreen(
       onConfirmDelete = viewModel::confirmDelete,
       onCancelDelete = viewModel::cancelDelete,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -94,6 +98,7 @@ fun SymptomDetailScreen(
  * @param onConfirmDelete deletes the symptom, from the confirmation dialog
  * @param onCancelDelete closes the confirmation dialog and keeps the symptom
  * @param zone the time zone the date is shown in
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +112,7 @@ fun SymptomDetailContent(
     modifier: Modifier = Modifier,
     zone: ZoneId = ZoneId.systemDefault(),
     onEdit: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptom_detail_screen),
@@ -134,6 +140,9 @@ fun SymptomDetailContent(
                 onRetry = onRetry,
                 retryTestTag = C.Tag.symptom_detail_retry,
             )
+        // The patient a caregiver follows doesn't share their symptoms (anymore)
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(caregiverOf, CarePermission.SYMPTOMS, Modifier.align(Alignment.Center))
         entry == null ->
             SymptomMessage(
                 title = stringResource(R.string.symptom_detail_not_found_title),

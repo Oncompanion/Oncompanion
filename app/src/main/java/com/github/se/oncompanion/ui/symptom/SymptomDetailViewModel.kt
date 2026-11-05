@@ -5,9 +5,13 @@ package com.github.se.oncompanion.ui.symptom
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
+import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
+import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -19,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,36 +35,55 @@ import kotlinx.coroutines.launch
  * @property isLoading true until the symptom arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
  * @property delete where the deletion of the symptom is at
+ * @property canEdit whether the symptom can be edited or deleted: only in the user's own journal
+ * @property isNotShared in caregiver mode, the patient doesn't share their symptoms: no symptom
  */
 data class SymptomDetailUiState(
     val entry: SymptomEntry? = null,
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     override val delete: DeleteState = DeleteState(),
+    val canEdit: Boolean = true,
+    val isNotShared: Boolean = false,
 ) : HasDeleteState {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
-    get() = entry != null && !isLoading && !hasError && !delete.isDeleting && !delete.isDeleted
+    get() =
+        canEdit &&
+            entry != null &&
+            !isLoading &&
+            !hasError &&
+            !delete.isDeleting &&
+            !delete.isDeleted
 
   /** The symptom doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
-    get() = !isLoading && !hasError && entry == null
+    get() = !isLoading && !hasError && !isNotShared && entry == null
 }
 
 /**
  * Loads one symptom of the signed-in user's journal (US-8), keeps it up to date, and deletes it
- * once the user confirms (US-9).
+ * once the user confirms (US-9). In caregiver mode (US-20), the symptom is the followed patient's,
+ * read-only, when they share their symptoms.
+ *
+ * @param patientUid in caregiver mode, the patient whose symptom is shown; null for the user's own
  */
 class SymptomDetailViewModel(
     private val symptomId: String,
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
+    private val patientUid: String? = null,
+    private val resolveSection: ResolveSectionAccess =
+        ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(SymptomDetailUiState())
   val uiState: StateFlow<SymptomDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
+
+  /** Follows whose symptom may be read; [observation] reads it. */
+  private var access: Job? = null
 
   private val deletion =
       DeleteConfirmation(
@@ -76,13 +101,39 @@ class SymptomDetailViewModel(
   /** Starts (or, after an error, restarts) observing the symptom. */
   fun load() {
     _uiState.update { it.copy(isLoading = true, hasError = false) }
-    val uid = authRepository.signedInUid(TAG)
-    if (uid == null) {
-      observation?.cancel()
-      _uiState.update { it.copy(isLoading = false, hasError = true) }
-      return
+    access?.cancel()
+    access = viewModelScope.launch {
+      // In a flow, so that even an auth that throws right away shows the error state
+      flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
+          .catch { e ->
+            Log.e(TAG, "Failed to check the access to the symptom $symptomId", e)
+            observation?.cancel()
+            // Nothing to delete without the access: the confirmation is dropped
+            _uiState.update {
+              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
+            }
+          }
+          .collect { section ->
+            if (section is SectionAccess.Readable) {
+              _uiState.update { it.copy(canEdit = section.canEdit, isNotShared = false) }
+              observe(section.ownerUid)
+            } else {
+              // Nothing to read: not known yet, not shared, or nobody to read it for. The
+              // confirmation is dropped, so it doesn't reopen by itself once the access is back
+              observation?.cancel()
+              _uiState.update {
+                it.copy(
+                    entry = null,
+                    isLoading = section == SectionAccess.Loading,
+                    hasError = section == SectionAccess.NoAccess,
+                    isNotShared = section == SectionAccess.NotShared,
+                    canEdit = false,
+                    delete = it.delete.afterRead(false),
+                )
+              }
+            }
+          }
     }
-    observe(uid)
   }
 
   /** Observes the symptom of [uid] in place of the current observation, keeping what is shown. */

@@ -4,8 +4,10 @@ package com.github.se.oncompanion.ui.symptom
 
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
@@ -258,7 +260,9 @@ class SymptomDetailViewModelTest {
 
     vm.confirmDelete()
 
-    assertTrue(vm.uiState.value.delete.hasError)
+    // Signing out shows the error right away, and the symptom can't be deleted anymore
+    assertTrue(vm.uiState.value.hasError)
+    assertFalse(vm.uiState.value.canDelete)
     assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
@@ -345,5 +349,54 @@ class SymptomDetailViewModelTest {
     assertFalse(state.delete.isConfirming)
     assertFalse(state.delete.hasError)
     assertFalse(state.isDeleteDialogShown)
+  }
+
+  @Test
+  fun accessLostWhileConfirming_closesTheConfirmation_forGood() {
+    val auth = signedIn()
+    val vm = confirmingDelete(auth = auth)
+
+    // The access briefly goes away, then comes back with the symptom
+    auth.signOut()
+    shadowOf(Looper.getMainLooper()).idle()
+    runBlocking { auth.signInWithGoogle("token") }
+    shadowOf(Looper.getMainLooper()).idle()
+
+    assertEquals(fatigue, vm.uiState.value.entry)
+    assertFalse(vm.uiState.value.delete.isConfirming)
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      SymptomDetailViewModel(
+          "s1",
+          signedIn("caregiver"),
+          repository,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_symptomsShared_showsThePatientsSymptom_readOnly() {
+    repository.seed("patient", fatigue)
+
+    val state = caregiverViewModel(CarePermission.SYMPTOMS).uiState.value
+
+    assertEquals(fatigue, state.entry)
+    assertFalse(state.canEdit)
+    assertFalse(state.canDelete)
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_isNotShared_notNotFound() {
+    repository.seed("patient", fatigue)
+
+    val state = caregiverViewModel(CarePermission.PLANNING).uiState.value
+
+    assertTrue(state.isNotShared)
+    assertNull(state.entry)
+    assertFalse(state.isNotFound)
+    assertFalse(state.hasError)
   }
 }
