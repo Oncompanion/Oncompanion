@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -274,5 +275,34 @@ class AppointmentDetailScreenTest {
     compose.waitForIdle()
     assertEquals(1, leaves)
     compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.DESTROYED }
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  @Test
+  fun caregiver_seesThePatientsAppointment_withoutEditOrDelete() {
+    compose.setContent {
+      AppointmentDetailContent(
+          AppointmentDetailUiState.Loaded(appointment, isOwn = false),
+          {},
+          {},
+          onEdit = {},
+          onDelete = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    compose.onNodeWithTag(C.Tag.appointment_detail_content).assertExists()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_planningNotShared_saysSo() {
+    compose.setContent {
+      AppointmentDetailContent(AppointmentDetailUiState.NotShared, {}, {}, caregiverOf = "Anne")
+    }
+
+    compose.onNodeWithText("Anne doesn't share Planning with you").assertIsDisplayed()
   }
 }

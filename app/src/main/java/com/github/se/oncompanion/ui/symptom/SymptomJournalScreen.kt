@@ -122,7 +122,10 @@ fun SymptomJournalContent(
             )
         uiState.hasError ->
             SymptomMessage(
-                title = stringResource(R.string.symptom_journal_error_title),
+                title =
+                    caregiverOf?.let {
+                      stringResource(R.string.symptom_journal_error_title_for, it)
+                    } ?: stringResource(R.string.symptom_journal_error_title),
                 hint = stringResource(R.string.symptom_error_hint),
                 testTag = C.Tag.symptom_journal_error,
                 onRetry = onRetry,
@@ -134,7 +137,10 @@ fun SymptomJournalContent(
         uiState.days.isEmpty() ->
             SymptomMessage(
                 title = stringResource(R.string.symptom_journal_empty_title),
-                hint = stringResource(R.string.symptom_journal_empty_hint),
+                // A caregiver isn't told the symptoms are theirs to show their doctor
+                hint =
+                    caregiverOf?.let { stringResource(R.string.symptom_journal_empty_hint_for, it) }
+                        ?: stringResource(R.string.symptom_journal_empty_hint),
                 testTag = C.Tag.symptom_journal_empty,
             )
         else -> JournalList(uiState.days, uiState.today, uiState.canAdd, onEntryClick)

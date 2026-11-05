@@ -3,8 +3,10 @@
 package com.github.se.oncompanion.ui.prescription
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
@@ -237,7 +239,9 @@ class PrescriptionDetailViewModelTest {
 
   @Test
   fun defaultRepositories_canBeCreatedWithoutFirebase() {
-    assertTrue(PrescriptionDetailViewModel("chemo").uiState.value.hasError)
+    val viewModel = PrescriptionDetailViewModel("chemo")
+    dispatcher.scheduler.advanceUntilIdle()
+    assertTrue(viewModel.uiState.value.hasError)
   }
 
   // ----- Delete (US-12) -----
@@ -334,6 +338,21 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
+  fun accessLostWhileConfirming_closesTheConfirmation_forGood() = runTest {
+    val auth = signedIn()
+    val vm = confirmingDelete(auth = auth)
+
+    // The access briefly goes away, then comes back with the prescription
+    auth.signOut()
+    advanceUntilIdle()
+    auth.signInWithGoogle("token")
+    advanceUntilIdle()
+
+    assertEquals(chemo, vm.uiState.value.prescription)
+    assertFalse(vm.uiState.value.delete.isConfirming)
+  }
+
+  @Test
   fun requestDelete_isIgnoredWithoutAPrescription() = runTest {
     val vm = viewModel("missing")
     advanceUntilIdle()
@@ -386,7 +405,9 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.delete.hasError)
+    // Signing out shows the error, closes the confirmation and deletes nothing
+    assertTrue(vm.uiState.value.hasError)
+    assertFalse(vm.uiState.value.delete.isConfirming)
     assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
@@ -441,5 +462,40 @@ class PrescriptionDetailViewModelTest {
 
     assertTrue(vm.uiState.value.hasError)
     assertFalse(vm.uiState.value.isDeleteDialogShown)
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      PrescriptionDetailViewModel(
+          "chemo",
+          signedIn("caregiver"),
+          repository,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_prescriptionsShared_showsThePatients_readOnly() {
+    repository.seed("patient", chemo)
+
+    val viewModel = caregiverViewModel(CarePermission.PRESCRIPTIONS)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(chemo, viewModel.uiState.value.prescription)
+    assertFalse(viewModel.uiState.value.canEdit)
+    assertFalse(viewModel.uiState.value.canDelete)
+  }
+
+  @Test
+  fun caregiver_prescriptionsNotShared_isNotShared_notNotFound() {
+    repository.seed("patient", chemo)
+
+    val viewModel = caregiverViewModel(CarePermission.SYMPTOMS)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertTrue(viewModel.uiState.value.isNotShared)
+    assertFalse(viewModel.uiState.value.isNotFound)
+    assertFalse(viewModel.uiState.value.hasError)
   }
 }

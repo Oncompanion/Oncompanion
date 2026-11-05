@@ -94,11 +94,7 @@ fun PlanningScreen(
               viewModel::retry,
               onAddAppointment = onAddAppointment,
               onItemClick = openItem,
-              // A caregiver can't open an appointment's page yet, only the Ligue's events
-              canOpenItem = {
-                it.source !is PlanningSource.Medication &&
-                    (caregiverOf == null || it.source !is PlanningSource.Appointment)
-              },
+              canOpenItem = { it.source !is PlanningSource.Medication },
           ),
       modifier = modifier,
       bottomBar = {
