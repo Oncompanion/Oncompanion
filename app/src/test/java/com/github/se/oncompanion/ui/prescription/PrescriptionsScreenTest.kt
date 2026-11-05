@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -578,5 +580,60 @@ class PrescriptionsScreenTest {
     setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
 
     composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  fun caregiver_isShownThePatientsList_neverTheirOwn() {
+    // Figma #240: "Anne's prescriptions", and nothing tells the caregiver to add one
+    val cases =
+        listOf(
+            filled.copy(canAdd = false) to null,
+            loaded.copy(canAdd = false) to "When Anne saves a prescription, it will appear here.",
+            loaded.copy(hasError = true, canAdd = false) to "Couldn't load Anne's prescriptions",
+        )
+    var state by mutableStateOf(cases.first().first)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    for ((next, message) in cases) {
+      composeTestRule.runOnIdle { state = next }
+      composeTestRule.onNodeWithText("Anne's prescriptions").assertIsDisplayed()
+      message?.let { composeTestRule.onNodeWithText(it).assertIsDisplayed() }
+      for (patientText in
+          listOf(
+              "My prescriptions",
+              "Scan a prescription or enter it manually to keep it here.",
+              "Couldn't load your prescriptions",
+          )) {
+        composeTestRule.onNodeWithText(patientText).assertDoesNotExist()
+      }
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_longList_endsWithoutTheButtonsSpace() {
+    val many =
+        (1..30).map { prescription("p$it", today.minusDays(it.toLong()).toString(), "Med $it") }
+    setCaregiverContent(loaded.copy(prescriptions = many, canAdd = false))
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptions_list)
+        .performScrollToNode(hasTestTag(C.Tag.prescriptionsItem("p30")))
+
+    // Without the buttons, no room is kept for them under the last prescription
+    val list = composeTestRule.onNodeWithTag(C.Tag.prescriptions_list).getBoundsInRoot()
+    val last = composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("p30")).getBoundsInRoot()
+    val gap = list.bottom - last.bottom
+    assertTrue("gap $gap", gap < 24.dp)
   }
 }

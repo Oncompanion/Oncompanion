@@ -3,6 +3,9 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -426,6 +429,36 @@ class SymptomJournalScreenTest {
     setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
 
     composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  fun caregiver_emptyOrFailingJournal_namesThePatient() {
+    val cases =
+        listOf(
+            loaded.copy(canAdd = false) to
+                "The symptoms logged for Anne will appear here, newest first.",
+            loaded.copy(hasError = true, canAdd = false) to "Couldn't load Anne's symptoms",
+        )
+    var state by mutableStateOf(cases.first().first)
+    composeTestRule.setContent {
+      SymptomJournalContent(
+          uiState = state,
+          onBack = {},
+          onEntryClick = {},
+          onAddClick = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    for ((next, message) in cases) {
+      composeTestRule.runOnIdle { state = next }
+      composeTestRule.onNodeWithText(message).assertIsDisplayed()
+      composeTestRule.onNodeWithText("Couldn't load your symptoms").assertDoesNotExist()
+      composeTestRule
+          .onNodeWithText("show them to your doctor", substring = true)
+          .assertDoesNotExist()
+    }
   }
 
   @Test
