@@ -1,0 +1,14 @@
+# Fictional test sheet 09 (09-french-one-line), as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.85	603,528,955,576	Dr Nadia Benali
+0.83	619,546,1747,618	Oncologie et hématologie Avenue de la Gare5- 1003 Lausanne (fictif)
+0.88	591,720,1161,776	Lausanne, le 16 octobre 2026
+0.88	599,812,946,858	Pour: M. Hugo Perret
+0.81	578,940,1365,1000	-Ondansétron 4mg cp:1 cp x 2/j pdt 3j
+0.88	571,1045,1647,1114	- Prednisone 20 mg cp: 2 cp le matin pendant 5 jours
+0.89	579,1152,1943,1221	- Bain de bouche bicarbonate 1,4% :3 fois par jour pendant 10 jours
+0.89	564,1272,1597,1336	- Movicol sachets : 1 sachet par jour si constipation
+0.84	461,3376,2446,3425	SPÉCIMEN Ordonnance fictive créée pour tester l'application oncompanion Non valable Aucune personne ni
+0.80	459,3431,693,3474	clinique éelle

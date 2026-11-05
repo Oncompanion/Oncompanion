@@ -3,17 +3,19 @@
 package com.github.se.oncompanion.model.medication.scan
 
 /**
- * What ML Kit read on phone photos of the six fictional US-10 test prescriptions
+ * What ML Kit read on phone photos of the fictional test prescriptions
  * (`src/test/resources/scan/sheet-0N.txt`), so the prescription reading is tested on real
  * recognition output: lines in ML Kit's order, OCR mistakes, the edges of other sheets in the
  * background. Shared by the tests of the reading.
  *
  * Sheets: 01 typed English, 02 Swiss French with "1-0-1", 03 French written out, 04 two-column
- * letterhead and a table, 05 prescriber and family doctor, 06 rotated with a stamp.
+ * letterhead and a table, 05 prescriber and family doctor, 06 rotated with a stamp; made later to
+ * measure the reading: 07 Swiss German, 08 English hospital discharge, 09 French abbreviations on
+ * one line, 10 five medications and three other dates, 11 a drink label (not a prescription).
  */
 object ScannedSheets {
 
-  /** The reading of sheet [number] (1 to 6). */
+  /** The reading of sheet [number] (1 to 11). */
   fun sheet(number: Int): RecognizedText {
     val name = "scan/sheet-%02d.txt".format(number)
     val content =

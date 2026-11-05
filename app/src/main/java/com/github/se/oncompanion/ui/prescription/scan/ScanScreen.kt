@@ -255,7 +255,10 @@ fun ScanContent(
                     stringResource(
                         when {
                           uiState.isReading -> R.string.prescription_scan_reading_title
-                          uiState.nothingRead -> R.string.prescription_scan_nothing_read_title
+                          uiState.nothingRead == NothingRead.NO_TEXT ->
+                              R.string.prescription_scan_nothing_read_title
+                          uiState.nothingRead == NothingRead.NOT_A_PRESCRIPTION ->
+                              R.string.prescription_scan_not_a_prescription_title
                           uiState.photo != null -> R.string.prescription_scan_check_title
                           else -> R.string.prescription_scan_title
                         }
@@ -307,7 +310,8 @@ fun ScanContent(
             PhotoPreview(uiState.photo, photoDispatcher, content) {
               when {
                 uiState.isReading -> Reading()
-                uiState.nothingRead -> NothingRead(onEnterManually, onRetake)
+                uiState.nothingRead != null ->
+                    NothingRead(uiState.nothingRead, onEnterManually, onRetake)
                 else -> CheckPhoto(onUsePhoto, onRetake)
               }
             }
@@ -486,13 +490,20 @@ private fun Reading() {
 }
 
 /**
- * Below the photo when no prescription could be read on it (Figma "US-10 / Scan – Nothing read"):
- * entering it manually comes first, since a retake rarely helps with handwriting.
+ * Below the photo when no prescription could be read on it, saying [why] (Figma "US-10 / Scan –
+ * Nothing read" and "Not a prescription"): entering it manually comes first, since a retake rarely
+ * helps with handwriting.
  */
 @Composable
-private fun NothingRead(onEnterManually: () -> Unit, onRetake: () -> Unit) {
+private fun NothingRead(why: NothingRead, onEnterManually: () -> Unit, onRetake: () -> Unit) {
   Text(
-      text = stringResource(R.string.prescription_scan_nothing_read),
+      text =
+          stringResource(
+              when (why) {
+                NothingRead.NO_TEXT -> R.string.prescription_scan_nothing_read
+                NothingRead.NOT_A_PRESCRIPTION -> R.string.prescription_scan_not_a_prescription
+              }
+          ),
       style = MaterialTheme.typography.bodyMedium,
       textAlign = TextAlign.Center,
       modifier = Modifier.padding(horizontal = 16.dp).testTag(C.Tag.prescription_scan_nothing_read),

@@ -48,24 +48,24 @@ class ScannedMedicationsTest {
   fun swissSheetWithoutDosageAMonthDurationAndASplitName() {
     assertEquals(
         listOf(
-            // No quantity is written ("1-0-0" alone): never guessed, so the dosage is to check;
+            // "1-0-0" and "comprimés" say 1 comprimé, deduced so to check (phone test);
             // 6 months counted as 180 days, to check
             ScannedMedication(
                 Reading("Tamoxifène 20 mg", true),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-0-0", true),
                 Reading(180, false),
             ),
             ScannedMedication(
                 Reading("Pantoprazole 40 mg", true),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-0-0", true),
                 Reading(30, true),
             ),
             // Read with a space inside the name, and "au maximum" is not an exact duration
             ScannedMedication(
                 Reading("Métoclopram ide 10 mg", false),
-                Reading("", false),
+                Reading("1 comprimé", false),
                 Reading("1-1-1 si nausées", true),
                 Reading(5, false),
             ),
@@ -279,6 +279,153 @@ class ScannedMedicationsTest {
     assertTrue(medication.name.sure)
     assertFalse(medication.dosage.sure)
     assertFalse(medication.frequency.sure)
+  }
+
+  @Test
+  fun theBoxSizeAndTheRenewalsAreNotHowToTakeIt() {
+    val letrozole = listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null))
+    assertEquals(
+        letrozole,
+        medicationsOf(
+            linesOf("1. Létrozole 2,5 mg, 30 comprimés 1 comprimé par jour, renouvelable 3 fois")
+        ),
+    )
+    // The dose on the next line read
+    assertEquals(
+        letrozole,
+        medicationsOf(linesOf("1. Létrozole 2,5 mg, 30 comprimés", "1 comprimé par jour")),
+    )
+  }
+
+  @Test
+  fun aStrengthInBracketsStartsAMedication() {
+    val paracetamol = sure("Paracétamol (500 mg)", "1 comprimé", "par jour", null)
+    assertEquals(
+        listOf(paracetamol),
+        medicationsOf(linesOf("Paracétamol (500 mg) 1 comprimé par jour")),
+    )
+    // A closing bracket ML Kit didn't read isn't made up
+    assertEquals(
+        "Paracétamol (500 mg",
+        medicationsOf(linesOf("Paracétamol (500 mg 1 comprimé par jour")).single().name.value,
+    )
+    // Not the dosing of the medication above
+    assertEquals(
+        listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null), paracetamol),
+        medicationsOf(
+            linesOf(
+                "Létrozole 2,5 mg 1 comprimé par jour",
+                "Paracétamol (500 mg) 1 comprimé par jour",
+            )
+        ),
+    )
+  }
+
+  @Test
+  fun aTwoDigitQuantityWithoutAnotherDoseIsTheDosageToCheck() {
+    // It may be the box's size, so it is to check, but it isn't lost
+    assertEquals(
+        listOf(
+            ScannedMedication(
+                Reading("Paracétamol 500 mg", true),
+                Reading("10 gouttes", false),
+                Reading("3 fois par jour", true),
+                Reading(null, true),
+            )
+        ),
+        medicationsOf(linesOf("Paracétamol 500 mg 10 gouttes 3 fois par jour")),
+    )
+  }
+
+  @Test
+  fun aCombinationKeepsEveryStrengthInItsName() {
+    val names =
+        mapOf(
+            "Calcium 500 mg + vitamine D3 400 UI 1 comprimé matin et soir" to
+                "Calcium 500 mg + vitamine D3 400 UI",
+            "Amoxicilline 875 mg + acide clavulanique 125 mg 1 cp 2x/jour" to
+                "Amoxicilline 875 mg + acide clavulanique 125 mg",
+            // A "+" without a strength after it isn't part of the name
+            "Ondansetron 8 mg + 1 tablet if needed" to "Ondansetron 8 mg",
+        )
+    for ((line, name) in names) {
+      assertEquals(line, name, medicationsOf(linesOf(line)).single().name.value)
+    }
+  }
+
+  @Test
+  fun anIReadAsASmallLAtTheStartOfANameIsAnI() {
+    val names =
+        mapOf(
+            "lbuprofène 400 mg" to "Ibuprofène 400 mg",
+            "lmatinib 400 mg" to "Imatinib 400 mg",
+            // A small l before a vowel is a real one
+            "levothyroxine 50 µg" to "levothyroxine 50 µg",
+        )
+    for ((line, name) in names) {
+      assertEquals(line, name, medicationsOf(linesOf(line)).single().name.value)
+    }
+  }
+
+  @Test
+  fun aMaximumAfterTheDurationIsAMaximumToo() {
+    val medication =
+        medicationsOf(
+                linesOf("Ibuprofène 400 mg 1 comprimé 3 fois par jour, pendant 7 jours au maximum")
+            )
+            .single()
+    assertEquals("3 fois par jour", medication.frequency.value)
+    assertEquals(Reading<Int?>(7, false), medication.durationDays)
+  }
+
+  @Test
+  fun aListedMedicationWithoutAStrengthHasItsNameToCheck() {
+    val medications =
+        medicationsOf(
+            linesOf(
+                "- Bain de bouche bicarbonate 1,4% : 3 fois par jour pendant 10 jours",
+                "- Movicol sachets : 1 sachet par jour si constipation",
+            )
+        )
+    assertEquals(
+        listOf(
+            // "de" looks like a word ML Kit split: to check
+            ScannedMedication(
+                Reading("Bain de bouche bicarbonate 1,4%", false),
+                Reading("", false),
+                Reading("3 fois par jour", true),
+                Reading(10, true),
+            ),
+            // Without a strength, the name can't be told from its form: to check
+            ScannedMedication(
+                Reading("Movicol sachets", false),
+                Reading("1 sachet", true),
+                Reading("par jour si constipation", true),
+                Reading(null, true),
+            ),
+        ),
+        medications,
+    )
+  }
+
+  @Test
+  fun aSwissSchemeWithTheFormGivesTheDosageToCheck() {
+    val dosages =
+        mapOf(
+            listOf("Tamoxifène 20 mg, comprimés", "1-0-1, pendant 30 jours") to "1 comprimé",
+            listOf("Dexamethason 4 mg Tabl.", "2-0-0") to "2 Tabl",
+            listOf("Pantoprazole 40 mg gélules", "1-0-0-1") to "1 gélule",
+            // Not the same number each time, or no form written: never guessed
+            listOf("Prednisone 20 mg, comprimés", "1-0-2") to "",
+            listOf("Tamoxifène 20 mg", "1-0-0") to "",
+        )
+    for ((lines, dosage) in dosages) {
+      val medication = medicationsOf(linesOf(*lines.toTypedArray())).single()
+      assertEquals(lines.toString(), Reading(dosage, false), medication.dosage)
+    }
+    // A quantity written is read, and trusted
+    val written = medicationsOf(linesOf("Tamoxifène 20 mg, comprimés", "2 cp 1-0-1")).single()
+    assertEquals(Reading("2 cp", true), written.dosage)
   }
 
   @Test
