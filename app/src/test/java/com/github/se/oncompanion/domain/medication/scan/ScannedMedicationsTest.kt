@@ -283,11 +283,17 @@ class ScannedMedicationsTest {
 
   @Test
   fun theBoxSizeAndTheRenewalsAreNotHowToTakeIt() {
+    val letrozole = listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null))
     assertEquals(
-        listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null)),
+        letrozole,
         medicationsOf(
             linesOf("1. Létrozole 2,5 mg, 30 comprimés 1 comprimé par jour, renouvelable 3 fois")
         ),
+    )
+    // The dose on the next line read
+    assertEquals(
+        letrozole,
+        medicationsOf(linesOf("1. Létrozole 2,5 mg, 30 comprimés", "1 comprimé par jour")),
     )
   }
 
@@ -312,6 +318,22 @@ class ScannedMedicationsTest {
                 "Paracétamol (500 mg) 1 comprimé par jour",
             )
         ),
+    )
+  }
+
+  @Test
+  fun aTwoDigitQuantityWithoutAnotherDoseIsTheDosageToCheck() {
+    // It may be the box's size, so it is to check, but it isn't lost
+    assertEquals(
+        listOf(
+            ScannedMedication(
+                Reading("Paracétamol 500 mg", true),
+                Reading("10 gouttes", false),
+                Reading("3 fois par jour", true),
+                Reading(null, true),
+            )
+        ),
+        medicationsOf(linesOf("Paracétamol 500 mg 10 gouttes 3 fois par jour")),
     )
   }
 

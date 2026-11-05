@@ -65,10 +65,16 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
           // ML Kit reads the I starting a name as l ("lbuprofène"): no name starts with a small l
           .replace(MISREAD_I, "I")
   // After the strength, the box's size ("30 comprimés") and the words before the first dosing
-  // word describe the medication, not how to take it ("comprimés")
+  // word describe the medication, not how to take it ("comprimés"). A large quantity is the box's
+  // size only when the dose follows it, on this line or the next ones; alone, it is the dose
+  // ("10 gouttes"), to check
   val afterName = first.substring(nameEnd)
   val packSize = PrescriptionLexicon.packSizeIn(matchable(afterName))
-  val after = afterName.substring(packSize?.let { it.last + 1 } ?: 0)
+  val boxSize = packSize?.takeIf {
+    val rest = listOf(afterName.substring(it.last + 1)) + lines.drop(1).map { line -> line.text }
+    PrescriptionLexicon.doseQuantityIn(matchable(rest.joinToString(" "))) != null
+  }
+  val after = afterName.substring(boxSize?.let { it.last + 1 } ?: 0)
   val dosingStart = PrescriptionLexicon.dosingStartIn(matchable(after))
   val described = after.substring(0, dosingStart ?: after.length)
   val dosingAfter = dosingStart?.let(after::substring)
@@ -106,7 +112,7 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
       dosage =
           limited(
               quantity?.let(dosing::substring) ?: dosageFromScheme(frequency, described),
-              sure = linesSure && quantity != null,
+              sure = linesSure && quantity != null && (packSize == null || boxSize != null),
           ),
       frequency = limited(frequency, sure = linesSure && !unreadDuration),
       durationDays =
