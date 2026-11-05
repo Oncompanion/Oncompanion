@@ -12,6 +12,7 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -57,8 +58,7 @@ data class EditedSymptom(val entry: SymptomEntry, val date: LocalDate, val time:
  * @property time the time the user chose, or `null` for the current time
  * @property notes free text; required when [SymptomType.OTHER] is picked
  * @property isInFuture the chosen day and time are later than now, which can't be saved
- * @property isSaving the symptom is being saved
- * @property isSaved the symptom is saved: the form is done
+ * @property save where saving the symptom is; once [SavePhase.SAVED], the form is done
  * @property error why the last save failed, until the screen has shown it
  * @property isEditing the form edits a symptom already logged instead of logging a new one
  * @property edited the symptom being edited, once it is loaded
@@ -74,8 +74,7 @@ data class AddSymptomUiState(
     val time: LocalTime? = null,
     val notes: String = "",
     val isInFuture: Boolean = false,
-    val isSaving: Boolean = false,
-    val isSaved: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val error: AddSymptomError? = null,
     val isEditing: Boolean = false,
     val edited: EditedSymptom? = null,
@@ -125,8 +124,7 @@ data class AddSymptomUiState(
             types.isNotEmpty() &&
             !isMissingNotes &&
             !isInFuture &&
-            !isSaving &&
-            !isSaved &&
+            save == SavePhase.EDITING &&
             hasChanges
 }
 
@@ -276,17 +274,17 @@ class AddSymptomViewModel(
             intensity = state.intensity,
             notes = state.notes.trim().ifEmpty { null },
         )
-    _uiState.update { it.copy(isSaving = true, error = null) }
+    _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
         if (symptomId == null) symptomRepository.addSymptom(uid, entry)
         else symptomRepository.updateSymptom(uid, entry)
-        _uiState.update { it.copy(isSaving = false, isSaved = true) }
+        _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         Log.e(TAG, "Failed to save the symptom", e)
-        _uiState.update { it.copy(isSaving = false, error = AddSymptomError.SAVE_FAILED) }
+        _uiState.update { it.copy(save = SavePhase.EDITING, error = AddSymptomError.SAVE_FAILED) }
       }
     }
   }
@@ -303,7 +301,7 @@ class AddSymptomViewModel(
    */
   private fun edit(transform: (AddSymptomUiState) -> AddSymptomUiState) {
     _uiState.update { state ->
-      if (state.isSaving || state.isSaved || !state.isFormShown) state else transform(state)
+      if (state.save != SavePhase.EDITING || !state.isFormShown) state else transform(state)
     }
   }
 

@@ -26,6 +26,7 @@ import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.showKeyboard
@@ -124,7 +125,7 @@ class EditProfileScreenTest {
 
   @Test
   fun savingDisablesInputsSaveAndAllWaysBack() {
-    content(state.copy(isSaving = true))
+    content(state.copy(save = SavePhase.SAVING))
     node(C.Tag.edit_profile_first_name).assertIsNotEnabled()
     node(C.Tag.edit_profile_family_name).assertIsNotEnabled()
     node(C.Tag.cancer_type_field).assertIsNotEnabled()
@@ -134,6 +135,16 @@ class EditProfileScreenTest {
     node(C.Tag.edit_profile_cancel).performScrollTo().assertIsNotEnabled()
     compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
     compose.runOnIdle { assertEquals(0, backs) }
+  }
+
+  @Test
+  fun savedLocksInputsButKeepsTheWaysBack() {
+    content(state.copy(save = SavePhase.SAVED))
+    node(C.Tag.edit_profile_first_name).assertIsNotEnabled()
+    node(C.Tag.edit_profile_save).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.edit_profile_saving).assertDoesNotExist()
+    node(C.Tag.edit_profile_back).assertIsEnabled()
+    node(C.Tag.edit_profile_cancel).performScrollTo().assertIsEnabled()
   }
 
   @Test
@@ -213,7 +224,7 @@ class EditProfileScreenTest {
       assertEquals("Sam", profiles.profiles["uid-1"]!!.firstName)
       assertNull(profiles.profiles["uid-1"]!!.familyName)
       assertNull(profiles.profiles["uid-1"]!!.cancerType)
-      assertFalse(vm.uiState.value.isSaved)
+      assertNotEquals(SavePhase.SAVED, vm.uiState.value.save)
     }
     compose.waitForIdle()
     compose.runOnIdle { assertEquals(1, completions) }
@@ -367,10 +378,10 @@ class EditProfileScreenTest {
   /** Hospital follows the existing saving state and does not appear for caregivers. */
   @Test
   fun hospitalIsDisabledWhileSavingAndNotShownForCaregivers() {
-    content(state.copy(isSaving = true))
+    content(state.copy(save = SavePhase.SAVING))
     node(C.Tag.hospital_field).performScrollTo().assertIsNotEnabled()
     node(C.Tag.hospital_search).performScrollTo().assertIsNotEnabled()
-    compose.runOnIdle { state = state.copy(isSaving = false, isPatient = false) }
+    compose.runOnIdle { state = state.copy(save = SavePhase.EDITING, isPatient = false) }
     node(C.Tag.hospital_field).assertDoesNotExist()
     node(C.Tag.hospital_search).assertDoesNotExist()
   }

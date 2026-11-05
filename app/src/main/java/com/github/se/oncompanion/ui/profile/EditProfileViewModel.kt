@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,14 +36,13 @@ data class EditProfileUiState(
     val firstName: String = "",
     val familyName: String = "",
     val cancerType: String = "",
-    val isSaving: Boolean = false,
-    val isSaved: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val saveFailed: Boolean = false,
     val hospital: String = "",
     val isPatient: Boolean = true,
 ) {
   val canEdit: Boolean
-    get() = status == EditProfileStatus.READY && !isSaving && !isSaved
+    get() = status == EditProfileStatus.READY && save == SavePhase.EDITING
 
   val canSave: Boolean
     get() = canEdit && firstName.isNotBlank() && hospital.length <= UserProfile.MAX_HOSPITAL_LENGTH
@@ -168,19 +168,19 @@ class EditProfileViewModel(
       return
     }
     val attempt = generation
-    _uiState.value = state.copy(isSaving = true, saveFailed = false)
+    _uiState.value = state.copy(save = SavePhase.SAVING, saveFailed = false)
     saving = viewModelScope.launch {
       try {
         profileRepository.updateProfile(updatedProfile(original, state))
         if (attempt == generation && authRepository.currentUser?.uid == original.uid) {
-          _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
+          _uiState.value = _uiState.value.copy(save = SavePhase.SAVED)
         }
       } catch (e: CancellationException) {
-        if (attempt == generation) _uiState.value = _uiState.value.copy(isSaving = false)
+        if (attempt == generation) _uiState.value = _uiState.value.copy(save = SavePhase.EDITING)
         throw e
       } catch (e: Exception) {
         if (attempt == generation)
-            _uiState.value = _uiState.value.copy(isSaving = false, saveFailed = true)
+            _uiState.value = _uiState.value.copy(save = SavePhase.EDITING, saveFailed = true)
       }
     }
   }
@@ -197,7 +197,7 @@ class EditProfileViewModel(
 
   /** Navigation consumes completion once, so recomposition cannot pop another screen. */
   fun consumeSaved() {
-    _uiState.value = _uiState.value.copy(isSaved = false)
+    _uiState.value = _uiState.value.copy(save = SavePhase.EDITING)
   }
 
   private fun reset(status: EditProfileStatus) {

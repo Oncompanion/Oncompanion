@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -24,6 +25,7 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.*
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -306,7 +308,7 @@ fun AppointmentFormContent(
               if (state.isEditing) R.string.appointment_save_changes else R.string.appointment_save
           ),
           state.canSave,
-          state.isSaving,
+          state.save == SavePhase.SAVING,
           onSave,
           C.Tag.appointment_save,
           C.Tag.appointment_saving,

@@ -1,9 +1,11 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
 import java.time.*
 import kotlinx.coroutines.*
@@ -94,7 +96,7 @@ class AppointmentFormViewModelTest {
         vm.save()
         vm.save()
         vm.onTitleChange("Changed during save")
-        assertTrue(vm.uiState.value.isSaving)
+        assertEquals(SavePhase.SAVING, vm.uiState.value.save)
         advanceUntilIdle()
         vm.save()
         advanceUntilIdle()
@@ -105,6 +107,7 @@ class AppointmentFormViewModelTest {
         assertEquals(AppointmentType.CONSULTATION, saved.type)
         assertEquals(Instant.parse("2026-10-15T08:30:00Z"), saved.scheduledAt)
         assertEquals(saved.scheduledAt, vm.uiState.value.savedAt)
+        assertEquals(SavePhase.SAVED, vm.uiState.value.save)
       }
 
   /** Optional whitespace is omitted and immediate failures permit a deliberate retry. */
@@ -119,6 +122,7 @@ class AppointmentFormViewModelTest {
         vm.save()
         advanceUntilIdle()
         assertEquals(AppointmentFormError.SAVE_FAILED, vm.uiState.value.error)
+        assertEquals(SavePhase.EDITING, vm.uiState.value.save)
         assertEquals(" Consultation ", vm.uiState.value.title)
         assertTrue(vm.uiState.value.canSave)
         vm.clearError()

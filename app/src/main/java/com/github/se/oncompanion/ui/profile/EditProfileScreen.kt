@@ -45,6 +45,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
 
@@ -56,8 +57,8 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = viewModel { EditProfileViewModel() },
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  LaunchedEffect(state.isSaved) {
-    if (state.isSaved) {
+  LaunchedEffect(state.save) {
+    if (state.save == SavePhase.SAVED) {
       viewModel.consumeSaved()
       onSaved()
     }
@@ -89,7 +90,7 @@ fun EditProfileContent(
     modifier: Modifier = Modifier,
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
-  BackHandler { if (!state.isSaving) onBack() }
+  BackHandler { if (state.save != SavePhase.SAVING) onBack() }
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
   // keyboard open, a fixed one would leave no room for the field being typed
   val topBarScrolls = isCompactHeight() && state.status == EditProfileStatus.READY
@@ -174,13 +175,13 @@ fun EditProfileContent(
               enabled = state.canSave,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_save),
           ) {
-            if (state.isSaving)
+            if (state.save == SavePhase.SAVING)
                 CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.edit_profile_saving))
             else Text(stringResource(R.string.edit_profile_save))
           }
           TextButton(
               onClick = onBack,
-              enabled = !state.isSaving,
+              enabled = state.save != SavePhase.SAVING,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_cancel),
           ) {
             Text(stringResource(R.string.edit_profile_cancel))
@@ -235,7 +236,7 @@ private fun EditProfileTopBar(
       navigationIcon = {
         IconButton(
             onClick = onBack,
-            enabled = !state.isSaving,
+            enabled = state.save != SavePhase.SAVING,
             modifier = Modifier.testTag(C.Tag.edit_profile_back),
         ) {
           Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.profile_back))
