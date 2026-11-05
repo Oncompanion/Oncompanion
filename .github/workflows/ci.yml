@@ -108,7 +108,8 @@ jobs:
           ./gradlew testDebugUnitTest --build-cache
 
       # SonarCloud imports the lint issues, the unit test results and their coverage: the CI job
-      # downloads them before its analysis. Paths are kept under app/build/
+      # downloads them before its analysis. Paths are kept under app/build/. Kept 7 days, so
+      # "Re-run failed jobs" on the CI job alone still finds them a few days later
       - name: Upload reports for SonarCloud
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,7 +120,7 @@ jobs:
             app/build/test-results/testDebugUnitTest/
             app/build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec
           if-no-files-found: warn
-          retention-days: 1
+          retention-days: 7
 
       # The release APK is built on every run, so a PR that breaks R8 (a missing keep rule) fails
       # here; it's signed and uploaded on main only, since PRs never use it.
