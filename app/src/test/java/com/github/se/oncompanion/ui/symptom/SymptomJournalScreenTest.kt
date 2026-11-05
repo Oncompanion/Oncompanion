@@ -484,13 +484,17 @@ class SymptomJournalScreenTest {
         loaded.copy(
             days =
                 listOf(
-                    JournalDay(today, listOf(JournalEntry(signed, java.time.LocalTime.of(14, 30))))
+                    JournalDay(
+                        today,
+                        // The name shown differs from the stored one: the screen must show it
+                        listOf(JournalEntry(signed, java.time.LocalTime.of(14, 30), "Robert")),
+                    )
                 ),
             canAdd = true,
         )
     )
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
-    composeTestRule.onNodeWithText("Added by Sam", useUnmergedTree = true).assertExists()
+    composeTestRule.onNodeWithText("Added by Robert", useUnmergedTree = true).assertExists()
   }
 }

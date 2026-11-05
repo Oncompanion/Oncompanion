@@ -520,10 +520,11 @@ class SymptomDetailScreenTest {
     setContent(
         loaded.copy(
             entry = fatigue.copy(addedBy = "caregiver", addedByName = "Sam"),
-            addedByName = "Sam",
+            // The name the patient gave that member, not the one stored on the entry
+            addedByName = "Robert",
         )
     )
 
-    composeTestRule.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
+    composeTestRule.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Robert")
   }
 }
