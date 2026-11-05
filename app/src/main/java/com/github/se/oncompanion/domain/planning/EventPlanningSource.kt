@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistrationRepository
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
@@ -10,21 +11,30 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 /**
- * Shows the Ligue's upcoming events in Planning, on their day, with their place below the title.
- * Events are the same for every user, so this source ignores whose planning it is.
- *
- * [EventRepository] only gives upcoming events: past weeks show no events, and an event of today
- * leaves the calendar once it has started.
+ * Shows in Planning the events a patient confirmed they registered for (US-30), on their day, with
+ * their place below the title. Past weeks show the confirmed events that took place then. Whose
+ * events they are is decided by the caller ([ObserveCarePlanning]): the signed-in patient, or the
+ * patient a caregiver follows.
  */
-class EventPlanningSource(private val events: EventRepository) : PlanningRepository {
+class EventPlanningSource(
+    private val events: EventRepository,
+    private val registrations: EventRegistrationRepository,
+) : PlanningRepository {
 
-  /** The upcoming events that start within [range], as timed entries, updated live. */
+  /** [ownerUid]'s confirmed events starting within [range], as timed entries, updated live. */
   override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
-      events.getUpcomingEvents().map { upcoming ->
-        upcoming.map { it.toPlanningItem(range) }.filter { it.timing in range }
+      combine(
+          registrations.observeRegisteredEventIds(ownerUid),
+          events.observeEvents(range.startInclusive, range.endExclusive),
+      ) { confirmedIds, eventsInRange ->
+        eventsInRange
+            .filter { it.id in confirmedIds }
+            .map { it.toPlanningItem(range) }
+            // The repository's local times may be in another zone than Planning's
+            .filter { it.timing in range }
       }
 
   /** Event times are in the phone's time zone, the one Planning displays. */

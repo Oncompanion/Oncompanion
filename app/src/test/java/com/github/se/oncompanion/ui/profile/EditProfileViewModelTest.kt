@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -144,12 +145,12 @@ class EditProfileViewModelTest {
         original.copy(firstName = "Sam", familyName = "Moreau", cancerType = "Free text"),
         profiles.profiles[original.uid],
     )
-    assertTrue(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.SAVED, vm.uiState.value.save)
     assertFalse(vm.uiState.value.canSave)
     vm.saveProfile()
     assertEquals(1, writes.size)
     vm.consumeSaved()
-    assertFalse(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.EDITING, vm.uiState.value.save)
   }
 
   @Test
@@ -269,11 +270,11 @@ class EditProfileViewModelTest {
     vm.onFamilyNameChange("Edited")
     vm.saveProfile()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.SAVED, vm.uiState.value.save)
     profiles.seed(original)
     advanceUntilIdle()
     assertFalse(vm.uiState.value.saveFailed)
-    assertTrue(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.SAVED, vm.uiState.value.save)
   }
 
   @Test
@@ -284,7 +285,7 @@ class EditProfileViewModelTest {
     gate = CompletableDeferred()
     vm.saveProfile()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isSaving)
+    assertEquals(SavePhase.SAVING, vm.uiState.value.save)
     vm.saveProfile()
     vm.onFirstNameChange("Ignored")
     vm.onFamilyNameChange("Ignored")
@@ -295,7 +296,7 @@ class EditProfileViewModelTest {
     assertEquals(1, writes.size)
     gate!!.complete(Unit)
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.SAVED, vm.uiState.value.save)
   }
 
   @Test
@@ -308,7 +309,7 @@ class EditProfileViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     assertTrue(vm.uiState.value.saveFailed)
-    assertFalse(vm.uiState.value.isSaving)
+    assertNotEquals(SavePhase.SAVING, vm.uiState.value.save)
     assertEquals("Draft", vm.uiState.value.firstName)
     assertEquals(original, profiles.profiles[original.uid])
     vm.onFamilyNameChange("Changed")
@@ -320,7 +321,7 @@ class EditProfileViewModelTest {
     vm.saveProfile()
     assertFalse(vm.uiState.value.saveFailed)
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.isSaved)
+    assertEquals(SavePhase.SAVED, vm.uiState.value.save)
   }
 
   @Test
@@ -397,9 +398,9 @@ class EditProfileViewModelTest {
     assertEquals("Other", vm.uiState.value.firstName)
     gate!!.complete(Unit)
     advanceUntilIdle()
-    assertFalse(vm.uiState.value.isSaved)
+    assertNotEquals(SavePhase.SAVED, vm.uiState.value.save)
     assertFalse(vm.uiState.value.saveFailed)
-    assertFalse(vm.uiState.value.isSaving)
+    assertNotEquals(SavePhase.SAVING, vm.uiState.value.save)
     assertEquals("Other", vm.uiState.value.firstName)
   }
 
@@ -412,8 +413,7 @@ class EditProfileViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     assertFalse(vm.uiState.value.saveFailed)
-    assertFalse(vm.uiState.value.isSaved)
-    assertFalse(vm.uiState.value.isSaving)
+    assertEquals(SavePhase.EDITING, vm.uiState.value.save)
   }
 
   @Test

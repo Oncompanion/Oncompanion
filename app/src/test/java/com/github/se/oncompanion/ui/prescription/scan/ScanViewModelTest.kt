@@ -11,6 +11,7 @@ import com.github.se.oncompanion.domain.medication.scan.readPrescription
 import com.github.se.oncompanion.model.medication.scan.FakeTextRecognizer
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.medication.scan.ScannedSheets
+import com.github.se.oncompanion.model.medication.scan.ScannedSheets.sheet
 import java.io.File
 import java.io.IOException
 import java.time.Clock
@@ -347,7 +348,7 @@ class ScanViewModelTest {
         viewModel.usePhoto()
         advanceUntilIdle()
 
-        assertTrue(state.nothingRead)
+        assertEquals(NothingRead.NO_TEXT, state.nothingRead)
         assertFalse(state.isReading)
         assertNull(state.read)
         assertEquals(photo.absoluteFile, state.photo?.absoluteFile)
@@ -355,6 +356,22 @@ class ScanViewModelTest {
         viewModel.usePhoto()
         advanceUntilIdle()
         assertEquals(1, recognizer.photos.size)
+      }
+
+  @Test
+  fun textWithoutAMedication_isNotAPrescription() =
+      runTest(dispatcher) {
+        // A drink label (sheet 11): text read surely, but no medication
+        recognizer.result = sheet(11)
+        photoTaken()
+
+        viewModel.usePhoto()
+        advanceUntilIdle()
+
+        assertEquals(NothingRead.NOT_A_PRESCRIPTION, state.nothingRead)
+        assertNull(state.read)
+        viewModel.retake()
+        assertNull(state.nothingRead)
       }
 
   @Test
@@ -366,7 +383,7 @@ class ScanViewModelTest {
         viewModel.usePhoto()
         advanceUntilIdle()
 
-        assertTrue(state.nothingRead)
+        assertEquals(NothingRead.NO_TEXT, state.nothingRead)
         assertNull(state.read)
       }
 
@@ -381,7 +398,7 @@ class ScanViewModelTest {
         viewModel.retake()
 
         assertFalse(photo.exists())
-        assertFalse(state.nothingRead)
+        assertNull(state.nothingRead)
         assertTrue(state.canCapture)
       }
 
@@ -414,7 +431,7 @@ class ScanViewModelTest {
         recognizer.result = FakeTextRecognizer.NO_TEXT
         recognizer.reading!!.complete(Unit)
         advanceUntilIdle()
-        assertTrue(state.nothingRead)
+        assertEquals(NothingRead.NO_TEXT, state.nothingRead)
         assertFalse(state.canCapture)
       }
 

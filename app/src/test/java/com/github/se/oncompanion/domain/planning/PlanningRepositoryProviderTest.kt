@@ -10,8 +10,10 @@ import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -20,6 +22,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -40,12 +43,15 @@ class PlanningRepositoryProviderTest {
   private val appAuthRepository = AuthRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
   private val appMedicationRepository = MedicationRepositoryProvider.repository
+  private val appRegistrationRepository = EventRegistrationRepositoryProvider.repository
   private val medications = FakeMedicationRepository()
+  private val registrations = FakeEventRegistrationRepository()
 
   /** Prevents default wiring from reaching Firebase in unit tests. */
   @Before
-  fun replaceMedicationProvider() {
+  fun replacePrivateProviders() {
     MedicationRepositoryProvider.repository = medications
+    EventRegistrationRepositoryProvider.repository = registrations
   }
 
   @After
@@ -55,12 +61,13 @@ class PlanningRepositoryProviderTest {
     AuthRepositoryProvider.repository = appAuthRepository
     EventRepositoryProvider.repository = appEventRepository
     MedicationRepositoryProvider.repository = appMedicationRepository
+    EventRegistrationRepositoryProvider.repository = appRegistrationRepository
   }
 
   /**
-   * Planning shows the signed-in patient's appointments and the upcoming Ligue events from their
-   * providers, sorted by time, even when they were replaced after the planning provider was first
-   * used.
+   * Planning shows the patient's appointments, medications and the Ligue events they confirmed,
+   * from their providers, sorted by time, even when they were replaced after the planning provider
+   * was first used.
    */
   @Test
   fun showsTheAppointmentsAndTheEventsOfTheProvidersByDefault() = runTest {
@@ -80,21 +87,25 @@ class PlanningRepositoryProviderTest {
     )
     AuthRepositoryProvider.repository = auth
     AppointmentRepositoryProvider.repository = appointments
-    // An event two hours after the appointment; the fake's "now" is before the day starts
-    val event =
-        FakeEventRepository.sampleEvents(day)
-            .first()
-            .copy(
-                startDateTime =
-                    LocalDateTime.ofInstant(range.startInclusive, range.zoneId).plusHours(2)
-            )
+    // Two events two hours after the appointment: only the confirmed one is shown
+    val (confirmed, other) =
+        FakeEventRepository.sampleEvents(day).take(2).map {
+          it.copy(
+              startDateTime =
+                  LocalDateTime.ofInstant(range.startInclusive, range.zoneId).plusHours(2)
+          )
+        }
     EventRepositoryProvider.repository =
-        FakeEventRepository(listOf(event), now = { day.minusDays(1).atStartOfDay() })
+        FakeEventRepository(listOf(confirmed, other), zone = { range.zoneId })
+    registrations.confirm("patient", confirmed.id)
     medications.seed("patient", prescription(day))
 
-    val items = original.observeItems("patient", range).first { it.size == 3 }
+    val items = original.observeItems("patient", range).first { it.size >= 3 }
 
-    assertEquals(listOf("Medication", "Saved consultation", event.title), items.map { it.title })
+    assertEquals(
+        listOf("Medication", "Saved consultation", confirmed.title),
+        items.map { it.title },
+    )
   }
 
   /** If the events can't be read, the default provider still shows the appointments. */
@@ -118,7 +129,7 @@ class PlanningRepositoryProviderTest {
     AppointmentRepositoryProvider.repository = appointments
     EventRepositoryProvider.repository =
         object : EventRepository by FakeEventRepository(emptyList()) {
-          override fun getUpcomingEvents(): Flow<List<Event>> = flow {
+          override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> = flow {
             error("Events couldn't be read")
           }
         }

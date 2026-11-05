@@ -1,5 +1,10 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 import { createHash, randomUUID } from "node:crypto";
+import {
+  logFailure as emitFailure,
+  failureCode,
+  FailureLogger,
+} from "./logging.js";
 import { HospitalClient, SearchError, SearchStore } from "./contracts.js";
 
 const MAX_RELEASE_ATTEMPTS = 3;
@@ -10,9 +15,8 @@ export class HospitalSearchService {
   constructor(
     private readonly store: SearchStore,
     private readonly client: HospitalClient,
-    /** Logs a fixed storage-failure event; injectable to assert logging in tests without queries, UIDs or error details. */
-    private readonly logFailure: () => void = () =>
-      console.error("hospital_search_storage_failure"),
+    /** Accepts fixed events and bounded diagnostic codes, never request or exception data. */
+    private readonly logFailure: FailureLogger = emitFailure,
   ) {}
   /**
    * Returns shared results or makes one globally authorized upstream request.
@@ -38,7 +42,13 @@ export class HospitalSearchService {
       try {
         const rechecked = await this.store.cached(key);
         if (rechecked !== undefined) return rechecked;
-        const results = await this.client.search(query);
+        const results = await this.client.search(query).catch((error) => {
+          this.logFailure(
+            "hospital_search_upstream_failure",
+            failureCode(error),
+          );
+          throw error;
+        });
         await this.store.save(key, results);
         return results;
       } catch (error) {
@@ -49,7 +59,10 @@ export class HospitalSearchService {
           error.upstreamWaitExceedsLimit
         ) {
           upstreamPaused = true;
-          console.error("hospital_search_upstream_wait_exceeds_limit");
+          this.logFailure(
+            "hospital_search_upstream_wait_exceeds_limit",
+            failureCode(error),
+          );
         }
         // Back off all users after upstream failures; failures are never cached.
         cooldown =
@@ -68,14 +81,26 @@ export class HospitalSearchService {
             await this.store.release(owner, cooldown);
             break;
           } catch (error) {
-            this.logFailure();
-            if (attempt === MAX_RELEASE_ATTEMPTS) throw error;
+            this.logFailure(
+              "hospital_search_storage_failure",
+              failureCode(error, "storage"),
+            );
+            if (attempt === MAX_RELEASE_ATTEMPTS) {
+              this.logFailure(
+                "hospital_search_release_failed",
+                failureCode(error, "storage"),
+              );
+              throw error;
+            }
           }
         }
       }
     } catch (error) {
       if (error instanceof SearchError) throw error;
-      this.logFailure();
+      this.logFailure(
+        "hospital_search_storage_failure",
+        failureCode(error, "storage"),
+      );
       throw new SearchError(503, "storage_unavailable");
     }
   }

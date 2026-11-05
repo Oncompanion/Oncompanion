@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
+import com.github.se.oncompanion.domain.medication.scan.ScanOutcome
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -47,11 +48,19 @@ enum class CameraStatus {
  *   the camera is shown
  * @property captureFailed the last photo couldn't be taken (message to show once)
  * @property isReading the prescription on [photo] is being read
- * @property nothingRead no prescription could be read on [photo]: the user retakes it or enters the
- *   prescription manually
+ * @property nothingRead why no prescription could be read on [photo], if none was: the user retakes
+ *   it or enters the prescription manually
  * @property read the prescription just read, for the screen to open the form with; the photo is
  *   then its own, no longer this screen's
  */
+/** Why no prescription could be read on a photo, which says what to do about it. */
+enum class NothingRead {
+  /** No text: it may be handwritten, blurry or too dark. */
+  NO_TEXT,
+  /** Text but no medication: it may not be a prescription. */
+  NOT_A_PRESCRIPTION,
+}
+
 data class ScanUiState(
     val permission: CameraPermission = CameraPermission.UNKNOWN,
     val permissionRequested: Boolean = false,
@@ -60,7 +69,7 @@ data class ScanUiState(
     val photo: File? = null,
     val captureFailed: Boolean = false,
     val isReading: Boolean = false,
-    val nothingRead: Boolean = false,
+    val nothingRead: NothingRead? = null,
     val read: ReadScan? = null,
 ) {
   /**
@@ -177,20 +186,26 @@ class ScanViewModel(
   fun usePhoto() {
     val state = _uiState.value
     val photo = state.photo ?: return
-    if (state.isReading || state.nothingRead) return
+    if (state.isReading || state.nothingRead != null) return
     _uiState.update { it.copy(isReading = true) }
     viewModelScope.launch {
-      val prescription = draftFromScan(photo)
-      if (closed) {
-        // Closed while reading: the photo isn't needed any more
-        photoStore.delete(photo)
-        _uiState.update { it.copy(isReading = false, photo = null) }
-      } else if (prescription == null) {
-        _uiState.update { it.copy(isReading = false, nothingRead = true) }
-      } else {
+      val outcome = draftFromScan(photo)
+      when {
+        closed -> {
+          // Closed while reading: the photo isn't needed any more
+          photoStore.delete(photo)
+          _uiState.update { it.copy(isReading = false, photo = null) }
+        }
         // The photo goes with the prescription: this screen no longer deletes it
-        _uiState.update {
-          it.copy(isReading = false, photo = null, read = ReadScan(prescription, photo))
+        outcome is ScanOutcome.Read ->
+            _uiState.update {
+              it.copy(isReading = false, photo = null, read = ReadScan(outcome.prescription, photo))
+            }
+        else -> {
+          val why =
+              if (outcome == ScanOutcome.NotAPrescription) NothingRead.NOT_A_PRESCRIPTION
+              else NothingRead.NO_TEXT
+          _uiState.update { it.copy(isReading = false, nothingRead = why) }
         }
       }
     }
@@ -205,7 +220,7 @@ class ScanViewModel(
   fun retake() {
     if (_uiState.value.isReading) return
     deletePhoto()
-    _uiState.update { it.copy(nothingRead = false) }
+    _uiState.update { it.copy(nothingRead = null) }
   }
 
   /**

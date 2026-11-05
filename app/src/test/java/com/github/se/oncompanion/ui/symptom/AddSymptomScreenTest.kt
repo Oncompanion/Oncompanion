@@ -47,6 +47,7 @@ import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
 import java.time.Clock
 import java.time.LocalDate
@@ -241,7 +242,7 @@ class AddSymptomScreenTest {
 
   @Test
   fun saving_showsTheSpinner_andDisablesSaveAndClose() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
 
     node(C.Tag.symptom_add_saving).assertIsDisplayed()
     node(C.Tag.symptom_add_save).assertIsNotEnabled()
@@ -250,7 +251,7 @@ class AddSymptomScreenTest {
 
   @Test
   fun saved_disablesClose() {
-    setContent(filled.copy(isSaved = true))
+    setContent(filled.copy(save = SavePhase.SAVED))
 
     node(C.Tag.symptom_add_close).assertIsNotEnabled()
   }
@@ -286,10 +287,10 @@ class AddSymptomScreenTest {
 
   @Test
   fun systemBack_isIgnored_whileSavingAndOnceSaved() {
-    setContent(filled.copy(isSaving = true))
+    setContent(filled.copy(save = SavePhase.SAVING))
     composeTestRule.runOnIdle { backDispatcher.onBackPressed() }
 
-    uiState = filled.copy(isSaved = true)
+    uiState = filled.copy(save = SavePhase.SAVED)
     composeTestRule.runOnIdle { backDispatcher.onBackPressed() }
 
     assertTrue(events.isEmpty())

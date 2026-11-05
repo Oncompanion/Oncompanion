@@ -6,9 +6,9 @@ import java.time.DateTimeException
 import java.time.LocalDate
 
 /**
- * The words and patterns of a French or English prescription, in one place so a new format means a
- * new word here, not new logic. Every function takes text in [comparable] form (lowercase, no
- * accents), after [cleanedOcr].
+ * The words and patterns of a French, German or English prescription, in one place so a new format
+ * means a new word here, not new logic. Every function takes text in [comparable] form (lowercase,
+ * no accents), after [cleanedOcr].
  */
 internal object PrescriptionLexicon {
 
@@ -33,14 +33,23 @@ internal object PrescriptionLexicon {
   /** Whether [text] says a date is when someone was born ("née le", "date de naissance"). */
   fun hasBirthClue(text: String): Boolean = BIRTH.containsMatchIn(text)
 
+  /**
+   * Whether [text] is about something later than the prescription, whose date isn't the
+   * prescription's: until when it is valid, the next check-up ("Prochain contrôle le 05.11.2026").
+   */
+  fun isAboutLater(text: String): Boolean = LATER.containsMatchIn(text)
+
   /** Whether [text] names a doctor with their title ("Dr", "Dre", "Docteur", "Prof"). */
   fun hasDoctorTitle(text: String): Boolean = DOCTOR_TITLE.containsMatchIn(text)
+
+  /** Where the doctor's title starts in [text] ("Attending: Dr. Priya Shah"), if any. */
+  fun doctorTitleStartIn(text: String): Int? = DOCTOR_TITLE.find(text)?.range?.first
 
   /** Whether [text] is about the patient: "Patient", "Mme", an AVS or insurance number. */
   fun hasPatientClue(text: String): Boolean = PATIENT.containsMatchIn(text)
 
   /** Whether [text] has a medication's strength ("8 mg", "0,5 mg", "1 g", "30 MU"). */
-  fun hasStrength(text: String): Boolean = STRENGTH.containsMatchIn(text)
+  fun hasStrength(text: String): Boolean = strengthsIn(text).any()
 
   /** Whether [text] says how much to take each time ("1 comprimé", "2 cp", "1 injection"). */
   fun hasDoseQuantity(text: String): Boolean = DOSE_QUANTITY.containsMatchIn(text)
@@ -83,7 +92,16 @@ internal object PrescriptionLexicon {
   data class Duration(val days: Int, val exact: Boolean, val range: IntRange)
 
   /** Where the first strength is in [text] ("8 mg"), if any. */
-  fun strengthIn(text: String): IntRange? = STRENGTH.find(text)?.range
+  fun strengthIn(text: String): IntRange? = strengthsIn(text).firstOrNull()?.range
+
+  /**
+   * Where a box's size is at the start of [text], right after a strength ("2,5 mg, 30 comprimés"):
+   * how many come in the box, not how many to take.
+   */
+  fun packSizeIn(text: String): IntRange? = PACK_SIZE.find(text)?.range
+
+  /** Where the first form is in [text] ("comprimés", "Tabl."), if any. */
+  fun formIn(text: String): IntRange? = FORM_WORD.find(text)?.range
 
   /** Where the first dose quantity is in [text] ("1 comprimé"), if any. */
   fun doseQuantityIn(text: String): IntRange? = DOSE_QUANTITY.find(text)?.range
@@ -94,18 +112,23 @@ internal object PrescriptionLexicon {
     val (number, unit) = match.destructured
     val days =
         when {
-          unit.startsWith("sem") || unit.startsWith("week") -> DAYS_IN_A_WEEK
-          unit.startsWith("mois") || unit.startsWith("month") -> DAYS_IN_A_MONTH
+          unit.startsWith("sem") || unit.startsWith("week") || unit.startsWith("woche") ->
+              DAYS_IN_A_WEEK
+          unit.startsWith("mois") || unit.startsWith("month") || unit.startsWith("monat") ->
+              DAYS_IN_A_MONTH
           else -> 1
         }
     // The words before it that go with it: "pendant", and before that "au maximum"
     var start = match.range.first
     DURATION_FOR.find(text.substring(0, start))?.let { start = it.range.first }
     val maximum = DURATION_MAXIMUM.find(text.substring(0, start))?.also { start = it.range.first }
+    // Or "au maximum" after it: "pendant 7 jours au maximum"
+    val maximumAfter = DURATION_MAXIMUM_AFTER.find(text.substring(match.range.last + 1))
+    val end = match.range.last + (maximumAfter?.range?.last?.plus(1) ?: 0)
     return Duration(
         number.toInt() * days,
-        exact = days == 1 && maximum == null,
-        start..match.range.last,
+        exact = days == 1 && maximum == null && maximumAfter == null,
+        start..end,
     )
   }
 
@@ -142,21 +165,21 @@ internal object PrescriptionLexicon {
     }
   }
 
-  // The names of each month, January first, in French and English, full and abbreviated
+  // The names of each month, January first, in French, English and German, full and abbreviated
   private val MONTHS: Map<String, Int> =
       listOf(
-              "janvier janv jan january",
-              "fevrier fevr fev feb february",
-              "mars mar march",
+              "janvier janv jan january januar",
+              "fevrier fevr fev feb february februar",
+              "mars mar march marz",
               "avril avr apr april",
               "mai may",
-              "juin jun june",
-              "juillet juil jul july",
+              "juin jun june juni",
+              "juillet juil jul july juli",
               "aout aug august",
               "septembre sept sep september",
-              "octobre oct october",
+              "octobre oct october oktober okt",
               "novembre nov november",
-              "decembre dec december",
+              "decembre dec december dezember dez",
           )
           .flatMapIndexed { i, names -> names.split(" ").map { it to i + 1 } }
           .toMap()
@@ -175,22 +198,50 @@ internal object PrescriptionLexicon {
 
   private val BIRTH =
       Regex(
-          """\bnee?\s+le\b|\bne\(e\)|date de naissance|\bnaissance\b|date of birth|\bdob\b|\bborn\b"""
+          """\bnee?\s+le\b|\bne\(e\)|date de naissance|\bnaissance\b|date of birth|\bdob\b|\bborn\b""" +
+              """|\bgeb\.|\bgeboren\b|geburtsdatum"""
+      )
+  private val LATER =
+      Regex(
+          """\b(?:valable|valid|jusqu'au|until|prochaine?|next|controle|follow-up|rendez-vous|""" +
+              """appointment|gultig|bis zum|nachste)\b"""
       )
   private val DOCTOR_TITLE = Regex("""(?<![a-z])(?:dr|dre|docteur|doctoresse|prof)\.?\s+[a-z]""")
   private val PATIENT =
       Regex(
-          """\bpatiente?\b|^(?:mme|mlle|m\.|mr|mrs|ms|monsieur|madame)\s|\bavs\b|\bassurance\b|d'assure"""
+          """\bpatient(?:e|in)?\b|^(?:mme|mlle|m\.|mr|mrs|ms|monsieur|madame)\s|\bavs\b|\bassurance\b|d'assure"""
       )
   private val FAMILY_DOCTOR = Regex("""^(?:medecin traitant|medecin de famille|family doctor)\b""")
 
   private const val UNIT = """(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol|%)"""
-  // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them
-  private val STRENGTH = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s*$UNIT(?![a-z])""")
+  // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them.
+  // "%" can't start a word, so it may touch the next one ("2 %application"). Not a share in
+  // brackets ("orange juice (35%)") nor an amount per serving ("per 100 ml"), as on a food label;
+  // a strength in brackets ("Paracétamol (500 mg)") still is one
+  // A number with a word or "%" after it, kept when the word is a unit. In parts, so each pattern
+  // stays simple
+  private val NUMBER_AND_UNIT = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s*(%|[a-zµ]+)""")
+  private val UNITS = setOf("mg", "g", "µg", "mcg", "ug", "ml", "mu", "ui", "iu", "mmol")
+  private val PER_SERVING = Regex("""\b(?:per|pour|pro)\s$""")
+
+  private fun strengthsIn(text: String): Sequence<MatchResult> =
+      NUMBER_AND_UNIT.findAll(text).filter { match ->
+        val before = text.substring(0, match.range.first)
+        when (match.groupValues[1]) {
+          "%" -> !before.endsWith("(")
+          in UNITS -> !PER_SERVING.containsMatchIn(before)
+          else -> false
+        }
+      }
 
   private const val FORM =
       """(?:comprimes?|cp|gelules?|capsules?|tablets?|pills?|injections?|seringues?|ampoules?|""" +
-          """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?)"""
+          """gouttes?|drops?|sachets?|suppositoires?|patchs?|bouffees?|puffs?|doses?|""" +
+          """applications?|""" +
+          // German: "1 Tabl.", "2 Tabletten", "1 Beutel"
+          """filmtabl|tabl|tabletten?|kapseln?|beutel|tropfen|zapfchen|spritzen?)"""
+  private val FORM_WORD = Regex("""(?<![\p{L}])$FORM\b""")
+  private val PACK_SIZE = Regex("""^[\s,]*\d{2,}\s*$FORM\b""")
   // Starting a word, so the end of "prednisone tablets" isn't "one tablets"
   private val DOSE_QUANTITY =
       Regex("""(?<![\p{L}\d.,])(?:\d+(?:[.,]\d+)?|1/2|½|une?|deux|trois|one|two)\s*$FORM\b""")
@@ -199,26 +250,39 @@ internal object PrescriptionLexicon {
       listOf(
           Regex("""(?<![\d-])\d\s*-\s*\d\s*-\s*\d(?:\s*-\s*\d)?(?![\d-])"""),
           Regex("""\b\d+\s*(?:x|fois)\s*/?\s*(?:par\s+)?(?:jour|j|day|d|semaine|week)\b"""),
+          // Abbreviated: "x 2/j" or "2/j" (twice a day), "bid", "tid", "q8h"
+          Regex("""(?:\bx\s*)?\b\d+\s*/\s*(?:jour|j|day|d)\b"""),
+          Regex("""\b(?:bid|tid|qid|qd|q\d+h)\b"""),
           Regex("""\b(?:once|twice|three times|\d+ times)\s+(?:a|per)\s+(?:day|week)\b"""),
           // Also days and weeks: chemotherapy cycles ("tous les 21 jours", "toutes les 3 semaines")
           Regex(
               """\b(?:tous les|toutes les|every)\s+\d+\s*(?:h|heure|hour|jour|day|semaine|sem|week)s?\b"""
           ),
           Regex("""\b(?:matin|midi|soir|coucher|morning|noon|evening|night|bedtime)\b"""),
-          Regex("""\b(?:par jour|a day|per day|daily)\b"""),
+          Regex("""\b(?:par jour|a day|per day|daily|taglich|pro tag)\b"""),
+          Regex("""\b(?:morgens|mittags|abends|zur nacht|bei bedarf)\b"""),
           Regex(
               """\bsi (?:nausees|douleurs?|fievre|besoin|anxiete)\b|\bas needed\b|\bapres chaque\b"""
           ),
       )
 
-  private val DURATION = Regex("""(?<!\d)(\d+)\s*(jour|j|day|semaine|sem|week|mois|month)s?\b""")
+  private val DURATION =
+      Regex(
+          """(?<!\d)(\d+)\s*""" +
+              """(jour|j|day|semaine|sem|week|mois|month|tagen|tage|tag|wochen|woche|monaten|monate|monat)""" +
+              """s?\b"""
+      )
   // As whole words, so "le matin 3 jours" is a duration
-  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every)\s$""")
-  private val DURATION_FOR = Regex("""\b(?:pendant|durant|for|sur|x)\s+$""")
-  private val DURATION_MAXIMUM = Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to)\s+$""")
+  private val WHEN_OR_HOW_OFTEN = Regex("""\b(?:dans|in|tous les|toutes les|every|alle)\s$""")
+  private val DURATION_FOR = Regex("""\b(?:pendant|pdt|durant|for|sur|x|wahrend|fur)\s+$""")
+  private val DURATION_MAXIMUM_AFTER =
+      Regex("""^\s*(?:au maximum|maximum|max\.?|at most|maximal|hochstens)(?![a-z])""")
+  private val DURATION_MAXIMUM =
+      Regex("""\b(?:au maximum|maximum|max\.?|jusqu'a|up to|maximal|hochstens)\s+$""")
 
   private val PUNCTUATION = charArrayOf(' ', '/', ':', '.', '-', '·', '*')
-  private val LIST_STARTS = setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription")
+  private val LIST_STARTS =
+      setOf("rp", "rx", "ordonnance", "ordonnance medicale", "prescription", "rezept")
   private val TABLE_HEADINGS =
       setOf(
           "medicament",
@@ -232,6 +296,11 @@ internal object PrescriptionLexicon {
           "duration",
           "quantite",
           "quantity",
+          "medikament",
+          "medikamente",
+          "dosierung",
+          "dauer",
+          "menge",
       )
   private val LABELS =
       mapOf(

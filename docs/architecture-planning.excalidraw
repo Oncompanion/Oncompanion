@@ -194,8 +194,8 @@
       "link": null,
       "locked": false,
       "index": "a005",
-      "text": "PlanningScreen\n(+ ViewModel)",
-      "originalText": "PlanningScreen\n(+ ViewModel)",
+      "text": "PlanningScreen (+ ViewModel)\nCompact: calendar and agenda scroll together",
+      "originalText": "PlanningScreen (+ ViewModel)\nCompact: calendar and agenda scroll together",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -689,7 +689,7 @@
       "type": "rectangle",
       "x": 1300,
       "y": 455,
-      "width": 260,
+      "width": 150,
       "height": 80,
       "angle": 0,
       "strokeColor": "#2f9e44",
@@ -732,7 +732,7 @@
       "type": "text",
       "x": 1310,
       "y": 470,
-      "width": 240,
+      "width": 130,
       "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -767,9 +767,9 @@
     {
       "id": "event",
       "type": "rectangle",
-      "x": 1620,
+      "x": 1690,
       "y": 380,
-      "width": 260,
+      "width": 190,
       "height": 100,
       "angle": 0,
       "strokeColor": "#2f9e44",
@@ -810,10 +810,10 @@
     {
       "id": "event_t",
       "type": "text",
-      "x": 1630,
+      "x": 1700,
       "y": 392.5,
-      "width": 240,
-      "height": 75.0,
+      "width": 170,
+      "height": 75,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -843,6 +843,192 @@
       "containerId": "event",
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "registration",
+      "type": "rectangle",
+      "x": 1470,
+      "y": 380,
+      "width": 200,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 438643293,
+      "version": 2,
+      "versionNonce": 1438225589,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "registration_t",
+          "type": "text"
+        },
+        {
+          "id": "source_registrations",
+          "type": "arrow"
+        },
+        {
+          "id": "registration_backend",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a020X"
+    },
+    {
+      "id": "registration_t",
+      "type": "text",
+      "x": 1480,
+      "y": 392.5,
+      "width": 180,
+      "height": 75,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1538010183,
+      "version": 2,
+      "versionNonce": 674704725,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a021X",
+      "text": "EventRegistration\nRepository\n(+ Firestore)",
+      "originalText": "EventRegistration\nRepository\n(+ Firestore)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "registration",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "source_registrations",
+      "type": "arrow",
+      "x": 1650,
+      "y": 316,
+      "width": 0.0,
+      "height": 58,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 259691267,
+      "version": 1,
+      "versionNonce": 749490765,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a03aVX",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -80,
+          58
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "eventsource",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "registration",
+        "focus": 0,
+        "gap": 6
+      }
+    },
+    {
+      "id": "registration_backend",
+      "type": "arrow",
+      "x": 1570,
+      "y": 486,
+      "width": 28.0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 2120066861,
+      "version": 2,
+      "versionNonce": 1733233936,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791200000000,
+      "link": null,
+      "locked": false,
+      "index": "a043X",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "registration",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "firestore",
+        "focus": 0,
+        "gap": 6
+      }
     },
     {
       "id": "planningrepo",
@@ -1044,6 +1230,10 @@
         {
           "type": "arrow",
           "id": "ar15"
+        },
+        {
+          "type": "arrow",
+          "id": "registration_backend"
         }
       ],
       "updated": 1791100000000,
@@ -1646,10 +1836,10 @@
     {
       "id": "ar9",
       "type": "arrow",
-      "x": 1430,
+      "x": 1375,
       "y": 316,
       "width": 0,
-      "height": 28,
+      "height": 23,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1679,7 +1869,7 @@
         ],
         [
           0,
-          28
+          23
         ]
       ],
       "lastCommittedPoint": null,
@@ -1941,9 +2131,9 @@
     {
       "id": "ar14",
       "type": "arrow",
-      "x": 1430.0,
+      "x": 1375,
       "y": 541,
-      "width": 119.79999999999995,
+      "width": 0,
       "height": 13,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1973,7 +2163,7 @@
           0
         ],
         [
-          -119.79999999999995,
+          0,
           13
         ]
       ],
@@ -2000,7 +2190,7 @@
     {
       "id": "ar15",
       "type": "arrow",
-      "x": 1698.0,
+      "x": 1785,
       "y": 486,
       "width": 28.0,
       "height": 68,
@@ -2032,7 +2222,7 @@
           0
         ],
         [
-          28.0,
+          0,
           68
         ]
       ],
@@ -2083,8 +2273,8 @@
       "link": null,
       "locked": false,
       "index": "a044",
-      "text": "Planning and Overview share appointments, medications and events through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
-      "originalText": "Planning and Overview share appointments, medications and events through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "text": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
+      "originalText": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nAppointment rows and the next-appointment card open AppointmentDetailScreen, event rows in Planning open EventDetailScreen; Back returns to the origin.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "left",
@@ -2939,6 +3129,10 @@
         {
           "type": "arrow",
           "id": "source_events"
+        },
+        {
+          "type": "arrow",
+          "id": "source_registrations"
         }
       ],
       "updated": 1791100000000,
@@ -2986,7 +3180,7 @@
     {
       "id": "source_events",
       "type": "arrow",
-      "x": 1750,
+      "x": 1760,
       "y": 316,
       "width": 0.0,
       "height": 58,
@@ -3045,10 +3239,10 @@
     {
       "id": "medication_source",
       "type": "rectangle",
-      "x": 1260,
-      "y": 350,
-      "width": 340,
-      "height": 70,
+      "x": 1180,
+      "y": 345,
+      "width": 270,
+      "height": 75,
       "angle": 0,
       "strokeColor": "#2f9e44",
       "backgroundColor": "#b2f2bb",
@@ -3088,9 +3282,9 @@
     {
       "id": "medication_source_t",
       "type": "text",
-      "x": 1270,
-      "y": 360.0,
-      "width": 320,
+      "x": 1190,
+      "y": 357.5,
+      "width": 250,
       "height": 50,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -3125,7 +3319,7 @@
     {
       "id": "source_medications",
       "type": "arrow",
-      "x": 1430,
+      "x": 1375,
       "y": 426,
       "width": 0,
       "height": 23,

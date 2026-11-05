@@ -1,0 +1,25 @@
+# Fictional test sheet 10 (10-dense-validity), as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.85	581,609,937,651	Cabinet du Lac (fictif)
+0.89	579,639,1152,689	Quai du Mont-Blanc 2, 1201 Genève
+0.81	578,677,1198,725	Tél. 022 000 00 01 Fax 022 000 00 02
+0.84	576,710,1174,765	GLN 7601000000000 RCC A000000
+0.80	620,917,938,954	Assuré: Lina Moreau
+0.81	599,958,912,995	Né(e) le 30.01.1983
+0.85	597,988,1158,1034	N° carte : 80756000000000000000
+0.90	556,1126,819,1163	Ordonnance
+0.87	568,1197,1126,1243	1. Létrozole 2,5 mg, 30 comprimés
+0.86	1201,1187,1846,1235	1 comprimé par jour, renouvelable 3 fois
+0.84	562,1270,1219,1313	2. Calcium 500 mg + vitamine D3 400 UI
+0.84	1286,1262,1856,1305	1 comprimé à croquer matin et soir
+0.86	559,1331,2091,1386	3. lbuprofène 400 mg1 comprimé 3 fois par jour si douleurs, pendant 7 jours au maximum
+0.83	569,1412,1525,1458	4. Oméprazole 20 mg -1 gélule le matin, pendant 7 jours
+0.80	2146,867,2422,901	Dr Étienne Favre
+0.89	1932,906,2423,948	Médecine interne et oncologie
+0.85	2052,940,2424,983	Genève, le 22.10.2026
+0.89	564,1489,1467,1531	5. Lidocaine gel 2 %application locale 2 fois par jour
+0.86	534,1571,1550,1615	Valable jusqu'au 31.01.2027. Prochain contrôle le 05.11.2026.
+0.85	449,3523,2395,3584	SPECIMEN Ordonnance fictive créée pour tester l'application oncompanion Non valable Aucune personne ni
+0.81	447,3575,679,3613	clinique réelle
