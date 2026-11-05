@@ -11,12 +11,26 @@ object HospitalRepositoryProvider {
   @Volatile var repository: HospitalRepository = UnconfiguredHospitalRepository
 
   /**
-   * Installs one shared Nominatim repository for a configured HTTPS endpoint, retaining its cache
-   * across fields. Invalid endpoints leave the current repository unchanged. This does not make a
-   * request; the deployment remains responsible for the aggregate-rate-limited proxy.
+   * True only when the authenticated proxy adapter is installed; missing configuration stays
+   * manual-only.
+   */
+  val isConfigured: Boolean
+    get() = repository is HospitalRepositoryProxy
+
+  /**
+   * Restores manual-only behavior for new consumers without constructing Firebase or HTTP clients.
+   */
+  fun disable() {
+    repository = UnconfiguredHospitalRepository
+  }
+
+  /**
+   * Installs one shared authenticated proxy repository for a configured HTTPS endpoint, retaining
+   * its cache across fields. Invalid endpoints leave the current repository unchanged. This does
+   * not make a request; the deployment remains responsible for the aggregate-rate-limited proxy.
    */
   fun configure(searchEndpoint: String) {
-    repository = HospitalRepositoryNominatim(searchEndpoint)
+    repository = HospitalRepositoryProxy(searchEndpoint)
   }
 }
 

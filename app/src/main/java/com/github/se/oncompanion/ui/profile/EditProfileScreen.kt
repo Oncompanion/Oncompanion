@@ -42,9 +42,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.HospitalField
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
+import com.github.se.oncompanion.ui.common.HospitalFieldViewModel
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
@@ -55,6 +58,8 @@ fun EditProfileScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
     viewModel: EditProfileViewModel = viewModel { EditProfileViewModel() },
+    hospitalViewModel: HospitalFieldViewModel = viewModel { HospitalFieldViewModel() },
+    hospitalSearchEnabled: Boolean = HospitalRepositoryProvider.isConfigured,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   LaunchedEffect(state.save) {
@@ -71,6 +76,16 @@ fun EditProfileScreen(
       onFamilyNameChange = viewModel::onFamilyNameChange,
       onCancerTypeChange = viewModel::onCancerTypeChange,
       onHospitalChange = viewModel::onHospitalChange,
+      hospitalField = {
+        HospitalField(
+            value = state.hospital,
+            onValueChange = viewModel::onHospitalChange,
+            viewModel = hospitalViewModel,
+            onHospitalSelected = {},
+            enabled = state.canEdit,
+            searchEnabled = hospitalSearchEnabled,
+        )
+      },
       onSave = viewModel::saveProfile,
   )
 }
@@ -88,6 +103,17 @@ fun EditProfileContent(
     onSave: () -> Unit,
     onHospitalChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    hospitalField: @Composable () -> Unit = {
+      HospitalFieldContent(
+          value = state.hospital,
+          onValueChange = onHospitalChange,
+          uiState = HospitalFieldUiState.Idle,
+          onSearch = {},
+          onHospitalSelected = {},
+          enabled = state.canEdit,
+          searchEnabled = false,
+      )
+    },
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
   BackHandler { if (state.save != SavePhase.SAVING) onBack() }
@@ -151,17 +177,9 @@ fun EditProfileContent(
               enabled = state.canEdit,
               modifier = Modifier.fillMaxWidth(),
           )
-          // TODO: Enable Search once the centrally managed Nominatim proxy is available.
+          // The provider enables explicit search only after a trusted proxy endpoint is configured.
           if (state.isPatient) {
-            HospitalFieldContent(
-                value = state.hospital,
-                onValueChange = onHospitalChange,
-                uiState = HospitalFieldUiState.Idle,
-                onSearch = {},
-                onHospitalSelected = {},
-                enabled = state.canEdit,
-                searchEnabled = false,
-            )
+            hospitalField()
           }
           if (state.saveFailed) {
             Text(

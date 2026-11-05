@@ -22,7 +22,9 @@ class HospitalRepositoryProviderTest {
   /** An unconfigured provider supports blank input and reports unavailable search without HTTP. */
   @Test
   fun defaultDoesNotRequireAnEndpointOrNetwork() = runTest {
-    assertSame(original, HospitalRepositoryProvider.repository)
+    HospitalRepositoryProvider.disable()
+    assertFalse(HospitalRepositoryProvider.isConfigured)
+    val original = HospitalRepositoryProvider.repository
     assertEquals(HospitalSearchResult.Success(emptyList()), original.searchHospitals("  "))
     assertEquals(
         HospitalSearchResult.Error(HospitalSearchError.SERVICE),
@@ -43,7 +45,8 @@ class HospitalRepositoryProviderTest {
   fun configuredRepositoryIsSharedAcrossConsumers() = runTest {
     HospitalRepositoryProvider.configure("https://example.invalid/search")
     val configured = HospitalRepositoryProvider.repository
-    assertTrue(configured is HospitalRepositoryNominatim)
+    assertTrue(configured is HospitalRepositoryProxy)
+    assertTrue(HospitalRepositoryProvider.isConfigured)
     assertSame(configured, HospitalRepositoryProvider.repository)
     assertEquals(HospitalSearchResult.Success(emptyList()), configured.searchHospitals(""))
   }
@@ -53,11 +56,16 @@ class HospitalRepositoryProviderTest {
   fun invalidEndpointLeavesTheRepositoryUnchanged() {
     val fake = FakeHospitalRepository()
     HospitalRepositoryProvider.repository = fake
-    listOf("http://example.invalid/search", "https://example.invalid/search?q=test").forEach {
-      assertThrows(IllegalArgumentException::class.java) {
-        HospitalRepositoryProvider.configure(it)
-      }
-      assertSame(fake, HospitalRepositoryProvider.repository)
-    }
+    listOf(
+            "http://example.invalid/search",
+            "https://example.invalid/search?q=test",
+            "https://nominatim.openstreetmap.org/search",
+        )
+        .forEach {
+          assertThrows(IllegalArgumentException::class.java) {
+            HospitalRepositoryProvider.configure(it)
+          }
+          assertSame(fake, HospitalRepositoryProvider.repository)
+        }
   }
 }

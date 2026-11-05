@@ -550,7 +550,7 @@
     <string name="hospital_field_hint">Enter a hospital name or another location</string>
     <string name="hospital_search">Search</string>
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
-    <string name="hospital_search_error">Couldn\'t search. Keep typing or try again.</string>
+    <string name="hospital_search_error">Search is unavailable. Try again later or enter the hospital manually.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
     <!-- Appointment detail -->
     <string name="appointment_detail_retry">Retry</string>
