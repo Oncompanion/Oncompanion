@@ -32,8 +32,7 @@ import org.junit.Test
 
 /**
  * [EventPlanningSource] shows in Planning only the events a patient confirmed (US-30, #139), on
- * their day, past weeks included. Following the signed-in account is [SignedInPlanning]'s job,
- * tested in [SignedInPlanningTest].
+ * their day, past weeks included. Whose events they are is decided by [ObserveCarePlanning].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventPlanningSourceTest {
@@ -54,9 +53,9 @@ class EventPlanningSourceTest {
           description = "Description",
       )
 
-  /** The patient's source over [events], whose local times are in Planning's zone. */
+  /** The source over [events], whose local times are in Planning's zone. */
   private fun source(vararg events: Event, repository: EventRepository = fakeEvents(*events)) =
-      EventPlanningSource(repository, registrations, "patient")
+      EventPlanningSource(repository, registrations)
 
   private fun fakeEvents(vararg events: Event) =
       FakeEventRepository(events.toList(), zone = { zone })
@@ -72,7 +71,7 @@ class EventPlanningSourceTest {
       range: PlanningRange = week,
   ): MutableList<List<PlanningItem>> {
     val emissions = mutableListOf<List<PlanningItem>>()
-    backgroundScope.launch { source.observeItems(range).collect { emissions += it } }
+    backgroundScope.launch { source.observeItems("patient", range).collect { emissions += it } }
     runCurrent()
     return emissions
   }
@@ -117,6 +116,14 @@ class EventPlanningSourceTest {
         latest(source(event("yoga", monday.atTime(10, 0)), event("walk", monday.atTime(14, 0))))
 
     assertEquals(listOf(PlanningSource.Event("yoga")), items.map { it.source })
+  }
+
+  @Test
+  fun anotherPersonsConfirmations_areNotShown() = runTest {
+    // A caregiver's own confirmation, while reading their patient's planning
+    confirm("caregiver", "yoga")
+
+    assertTrue(latest(source(event("yoga", monday.atTime(10, 0)))).isEmpty())
   }
 
   @Test
@@ -248,7 +255,7 @@ class EventPlanningSourceTest {
 
     for ((read, failingSource) in cases) {
       val error = runCatching {
-        failingSource().observeItems(week).first { it.isNotEmpty() }
+        failingSource().observeItems("patient", week).first { it.isNotEmpty() }
       }
           .exceptionOrNull()
 

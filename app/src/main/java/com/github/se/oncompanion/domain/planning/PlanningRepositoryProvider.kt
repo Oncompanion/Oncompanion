@@ -3,7 +3,10 @@
 
 package com.github.se.oncompanion.domain.planning
 
-import com.github.se.oncompanion.model.planning.EmptyPlanningRepository
+import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
+import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -14,24 +17,25 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
  */
 object PlanningRepositoryProvider {
   /**
-   * By default, the signed-in patient's [SignedInPlanning]: their appointments, medications and the
-   * events they confirmed. It is built on each observation, so repository providers replaced later
-   * (e.g. by tests) also reach Planning.
+   * By default, a patient's appointments and medications and the Ligue events they confirmed,
+   * merged by [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read,
+   * Planning still shows the appointments instead of an error. The providers are read on each
+   * observation, so replacing them also reaches Planning. Whose planning it is, and restarting it
+   * on an account change, is decided by [ObserveCarePlanning].
    */
   @Volatile
-  var repository: PlanningRepository = PlanningRepository { range ->
-    SignedInPlanning().observeItems(range)
+  var repository: PlanningRepository = PlanningRepository { ownerUid, range ->
+    ObservePlanning(
+            AppointmentPlanningSource(AppointmentRepositoryProvider.repository),
+            MedicationPlanningSource(MedicationRepositoryProvider.repository),
+            // Events are nice to have: if they fail, the appointments still show
+            OptionalPlanningSource(
+                EventPlanningSource(
+                    EventRepositoryProvider.repository,
+                    EventRegistrationRepositoryProvider.repository,
+                )
+            ),
+        )
+        .observeItems(ownerUid, range)
   }
-
-  /**
-   * **Temporary, to replace in #240.** What a caregiver sees in Planning and the Overview: no
-   * entries at all. Until #240 reads the chosen patient's data, a caregiver must not see:
-   * - the signed-in caregiver's own appointments or event confirmations, which would look like the
-   *   patient's;
-   * - Ligue events the patient didn't confirm (US-30 shows only confirmed events).
-   *
-   * #240 should replace it with the chosen patient's planning, e.g. [EventPlanningSource] reading
-   * that patient's confirmations.
-   */
-  @Volatile var caregiverPlaceholder: PlanningRepository = EmptyPlanningRepository
 }

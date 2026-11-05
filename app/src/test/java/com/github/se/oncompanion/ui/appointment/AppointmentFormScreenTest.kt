@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -10,6 +11,7 @@ import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.*
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.*
 import kotlinx.coroutines.test.runTest
 import org.junit.*
@@ -76,10 +78,19 @@ class AppointmentFormScreenTest {
   /** Saving freezes input and displays progress instead of accepting another write. */
   @Test
   fun savingDisablesInputsAndShowsProgress() {
-    show(state().copy(title = "Visit", time = LocalTime.NOON, isSaving = true))
+    show(state().copy(title = "Visit", time = LocalTime.NOON, save = SavePhase.SAVING))
     compose.onNodeWithTag(C.Tag.appointment_title).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.appointment_saving).assertIsDisplayed()
+  }
+
+  /** Once saved, the form stays frozen without progress while the screen leaves. */
+  @Test
+  fun savedKeepsInputsDisabledWithoutProgress() {
+    show(state().copy(title = "Visit", time = LocalTime.NOON, save = SavePhase.SAVED))
+    compose.onNodeWithTag(C.Tag.appointment_title).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.appointment_saving).assertDoesNotExist()
   }
 
   /** Storage errors are distinguished from connectivity and leave the entered draft visible. */

@@ -13,16 +13,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Adapts patient [uid]'s cached appointments to the calendar's display contract. [SignedInPlanning]
- * gives it the signed-in patient's uid.
+ * Adapts a patient's cached appointments to the calendar's display contract. Whose appointments
+ * they are is decided by the caller ([ObserveCarePlanning]), which restarts the observation when it
+ * changes; read failures reach the caller.
  */
-class AppointmentPlanningSource(
-    private val appointments: AppointmentRepository,
-    private val uid: String,
-) : PlanningRepository {
-  /** The patient's appointments within [range], updated live; read failures reach the caller. */
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
-      appointments.observeAppointments(uid).map { entries ->
+class AppointmentPlanningSource(private val appointments: AppointmentRepository) :
+    PlanningRepository {
+
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+      appointments.observeAppointments(ownerUid).map { entries ->
         // Filtering preserves the appointment repository's time and ID ordering.
         entries
             .filter { it.scheduledAt in range }

@@ -60,6 +60,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 
@@ -79,8 +80,8 @@ fun CareCircleMemberFormScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Leaves once per save, even if the screen recomposes before it is gone
-  LaunchedEffect(uiState.isSaved) {
-    if (uiState.isSaved) {
+  LaunchedEffect(uiState.save) {
+    if (uiState.save == SavePhase.SAVED) {
       val inviteCode = uiState.savedInviteCode
       viewModel.consumeSaved()
       onSaved(inviteCode)
@@ -384,7 +385,7 @@ private fun SaveSection(uiState: CareCircleMemberFormUiState, onSave: () -> Unit
               else R.string.care_circle_form_send_invitation
           ),
       enabled = uiState.canSave,
-      isSaving = uiState.isSaving,
+      isSaving = uiState.save == SavePhase.SAVING,
       onClick = onSave,
       testTag = C.Tag.care_circle_form_save_button,
       savingTestTag = C.Tag.care_circle_form_saving,

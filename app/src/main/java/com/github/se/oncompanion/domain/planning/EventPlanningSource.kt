@@ -14,20 +14,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
 /**
- * Shows in Planning the events patient [uid] confirmed they registered for (US-30), on their day,
- * with their place below the title. Past weeks show the confirmed events that took place then.
- * [SignedInPlanning] gives it the signed-in patient's uid.
+ * Shows in Planning the events a patient confirmed they registered for (US-30), on their day, with
+ * their place below the title. Past weeks show the confirmed events that took place then. Whose
+ * events they are is decided by the caller ([ObserveCarePlanning]): the signed-in patient, or the
+ * patient a caregiver follows.
  */
 class EventPlanningSource(
     private val events: EventRepository,
     private val registrations: EventRegistrationRepository,
-    private val uid: String,
 ) : PlanningRepository {
 
-  /** The confirmed events starting within [range], as timed entries, updated live. */
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
+  /** [ownerUid]'s confirmed events starting within [range], as timed entries, updated live. */
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
       combine(
-          registrations.observeRegisteredEventIds(uid),
+          registrations.observeRegisteredEventIds(ownerUid),
           events.observeEvents(range.startInclusive, range.endExclusive),
       ) { confirmedIds, eventsInRange ->
         eventsInRange

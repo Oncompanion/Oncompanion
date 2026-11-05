@@ -22,7 +22,6 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.auth.SignOutProvider
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
@@ -124,12 +123,6 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
-  // Temporary until #240: a caregiver's Planning shows no entries, never their own (see
-  // PlanningRepositoryProvider.caregiverPlaceholder)
-  val planning = {
-    if (chosenPatient == null) PlanningRepositoryProvider.repository
-    else PlanningRepositoryProvider.caregiverPlaceholder
-  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -225,7 +218,8 @@ private fun SessionNavHost(
       composable(Screen.OVERVIEW) {
         OverviewScreen(
             navigationActions,
-            viewModel = viewModel { OverviewViewModel(planningRepository = planning()) },
+            // In caregiver mode, the chosen patient's day, when they share their planning
+            viewModel = viewModel { OverviewViewModel(patientUid = chosenPatient?.uid) },
             onOpenAppointment = appointmentOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
@@ -237,7 +231,10 @@ private fun SessionNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) { entry ->
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(repository = planning(), savedStateHandle = createSavedStateHandle())
+          PlanningViewModel(
+              savedStateHandle = createSavedStateHandle(),
+              patientUid = chosenPatient?.uid,
+          )
         }
         // Return to this calendar instance and reveal the saved day, including another week.
         val savedDate by
@@ -259,6 +256,7 @@ private fun SessionNavHost(
                 else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
             onOpenAppointment = appointmentOpener(navigationActions),
             onOpenEvent = eventOpener(navigationActions),
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(

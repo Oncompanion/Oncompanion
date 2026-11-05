@@ -1,17 +1,23 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.espresso.Espresso
@@ -27,6 +33,7 @@ import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -81,12 +88,14 @@ class M1EndToEndTest {
     signInAndOnboard(firstName = "Sam")
     addPrescription(doctor = "Dr Martin", medication = "Tamoxifen")
     addAppointmentTomorrow(title = "Oncology check-up")
+    checkPlanningLandscape(title = "Oncology check-up")
     seeNextAppointmentOnOverview(title = "Oncology check-up")
     confirmRegistrationForLigueEvent(title = "Gentle yoga", place = "Ligue, Geneva")
     seeConfirmedEventInPlanning(title = "Gentle yoga", appointment = "Oncology check-up")
     logSymptom()
     deleteSymptom()
     seeProfileAndAddHospital(firstName = "Sam", hospital = "HUG Geneva")
+    checkProfileLandscape()
     signOut()
     signInAgain(firstName = "Sam", nextAppointment = "Oncology check-up")
   }
@@ -100,6 +109,45 @@ class M1EndToEndTest {
   }
 
   // ---- steps ----
+
+  /** Rotation gives the agenda a full viewport without losing the selected appointment day. */
+  private fun checkPlanningLandscape(title: String) {
+    rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+    try {
+      tag(C.Tag.planning_list).performScrollToNode(hasText(title))
+      waitFor(hasText(title)).fullyVisible()
+      compose.onNodeWithTag(C.Tag.planning_week).assertIsNotDisplayed()
+      tag(C.Tag.bottom_navigation_tab_overview).fullyVisible()
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
+  }
+
+  /** Profile actions remain reachable after rotating the same signed-in patient's screen. */
+  private fun checkProfileLandscape() {
+    rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+    try {
+      tag(C.Tag.profile_sign_out).reveal().fullyVisible()
+      compose.onNodeWithTag(C.Tag.profile_back).assertIsNotDisplayed()
+      tag(C.Tag.profile_edit).reveal().fullyVisible()
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
+  }
+
+  private fun rotate(requested: Int, expected: Int) {
+    compose.runOnUiThread { compose.activity.requestedOrientation = requested }
+    compose.waitUntil(10_000) { compose.activity.resources.configuration.orientation == expected }
+    compose.waitForIdle()
+  }
+
+  private fun SemanticsNodeInteraction.fullyVisible() {
+    val node = fetchSemanticsNode()
+    assertTrue(
+        "The whole control must fit in the viewport",
+        node.boundsInRoot.height >= node.size.height,
+    )
+  }
 
   /** Google sign-in, then onboarding as a patient: the Overview greets them by first name. */
   private fun signInAndOnboard(firstName: String) {

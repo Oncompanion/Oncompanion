@@ -14,22 +14,20 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/**
- * Checks the calendar contract using the shared appointment fake. Following the signed-in account
- * is [SignedInPlanning]'s job, tested in [SignedInPlanningTest].
- */
+/** Checks the calendar contract using the shared appointment fake. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppointmentPlanningSourceTest {
   private val zone = ZoneId.of("Europe/Zurich")
   private val day = LocalDate.of(2026, 10, 25)
   private val range = PlanningRange(day, day.plusDays(1), zone)
   private val appointments = FakeAppointmentRepository()
-  private val source = AppointmentPlanningSource(appointments, "patient")
+  private val source = AppointmentPlanningSource(appointments)
 
   private fun appointment(id: String, time: Instant = range.startInclusive) =
       Appointment(id, "Consultation $id", time, AppointmentType.CONSULTATION, "HUG")
@@ -43,7 +41,7 @@ class AppointmentPlanningSourceTest {
     appointments.seed("patient", b, a, early)
     val emissions = mutableListOf<List<PlanningItem>>()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range).collect { emissions += it }
+      source.observeItems("patient", range).collect { emissions += it }
     }
     runCurrent()
     assertEquals(
@@ -74,7 +72,7 @@ class AppointmentPlanningSourceTest {
       var latest = emptyList<PlanningItem>()
       val observation =
           backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-            source.observeItems(requested).collect { latest = it }
+            source.observeItems("patient", requested).collect { latest = it }
           }
       runCurrent()
       assertEquals(
@@ -92,7 +90,7 @@ class AppointmentPlanningSourceTest {
     val requested = PlanningRange(day, day.plusDays(1), ZoneId.of("Pacific/Honolulu"))
     var latest = emptyList<PlanningItem>()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(requested).collect { latest = it }
+      source.observeItems("patient", requested).collect { latest = it }
     }
     runCurrent()
     assertTrue(latest.isEmpty())
@@ -101,5 +99,26 @@ class AppointmentPlanningSourceTest {
     runCurrent()
     assertEquals(PlanningSource.Appointment(id), latest.single().source)
     assertEquals(day, latest.single().timing.dateIn(requested.zoneId))
+  }
+
+  /** Reads only the appointments of the owner it is asked for. */
+  @Test
+  fun readsOnlyTheGivenOwnersAppointments() = runTest {
+    appointments.seed("a", appointment("a"))
+    appointments.seed("b", appointment("b"))
+
+    val items = source.observeItems("b", range).first()
+
+    assertEquals(PlanningSource.Appointment("b"), items.single().source)
+  }
+
+  /** A read failure reaches the caller instead of showing an empty day. */
+  @Test
+  fun readFailureReachesTheCaller() = runTest {
+    appointments.observeError = IllegalStateException("Read failed")
+
+    val failure = runCatching { source.observeItems("patient", range).first() }.exceptionOrNull()
+
+    assertEquals("Read failed", failure?.message)
   }
 }

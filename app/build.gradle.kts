@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -162,6 +163,9 @@ dependencies {
   globalTestImplementation(libs.androidx.espresso.core)
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.auth)
+  implementation(libs.firebase.appcheck)
+  debugImplementation(libs.firebase.appcheck.debug)
+  releaseImplementation(libs.firebase.appcheck.playintegrity)
   implementation(libs.firebase.firestore)
   // Kotlin coroutines: await() on Firebase tasks, and test utilities
   implementation(libs.kotlinx.coroutines.play.services)

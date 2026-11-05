@@ -14,19 +14,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Lists recorded active medication days from patient [uid]'s cached prescriptions.
- * [SignedInPlanning] gives it the signed-in patient's uid.
+ * Lists recorded active medication days from a patient's cached prescriptions. Whose they are is
+ * decided by the caller ([ObserveCarePlanning]), which restarts the observation when it changes;
+ * read errors reach the caller.
  */
-class MedicationPlanningSource(
-    private val medications: MedicationRepository,
-    private val uid: String,
-) : PlanningRepository {
-  /**
-   * The patient's active medication days within [range], updated live; read errors reach the
-   * caller.
-   */
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
-      medications.observeMedications(uid).map { entries ->
+class MedicationPlanningSource(private val medications: MedicationRepository) : PlanningRepository {
+
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+      medications.observeMedications(ownerUid).map { entries ->
         entries.flatMap { it.occurrences(range) }
       }
 

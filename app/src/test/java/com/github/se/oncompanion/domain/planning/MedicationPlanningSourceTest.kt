@@ -10,21 +10,19 @@ import com.github.se.oncompanion.model.planning.*
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/**
- * Verifies saved prescriptions become bounded calendar occurrences without inferred doses.
- * Following the signed-in account is [SignedInPlanning]'s job, tested in [SignedInPlanningTest].
- */
+/** Verifies saved prescriptions become bounded calendar occurrences without inferred doses. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MedicationPlanningSourceTest {
   private val day = LocalDate.of(2026, 10, 25)
   private val range = PlanningRange(day, day.plusDays(7), ZoneId.of("Europe/Zurich"))
   private val medications = FakeMedicationRepository()
-  private val source = MedicationPlanningSource(medications, "patient")
+  private val source = MedicationPlanningSource(medications)
 
   private fun medication(start: LocalDate = day, duration: Int? = 3) =
       Medication(
@@ -64,7 +62,7 @@ class MedicationPlanningSourceTest {
       var latest: List<PlanningItem>? = null
       val job =
           backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-            source.observeItems(range).collect { latest = it }
+            source.observeItems("patient", range).collect { latest = it }
           }
       runCurrent()
       assertEquals(
@@ -91,7 +89,7 @@ class MedicationPlanningSourceTest {
       var latest = emptyList<PlanningItem>()
       val job =
           backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-            source.observeItems(requested).collect { latest = it }
+            source.observeItems("patient", requested).collect { latest = it }
           }
       runCurrent()
       assertEquals(
@@ -108,7 +106,9 @@ class MedicationPlanningSourceTest {
     medications.seed("patient", prescription(medication(day.minusYears(10), null)))
     var latest = emptyList<PlanningItem>()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range.copy(endDateExclusive = day.plusYears(1))).collect { latest = it }
+      source.observeItems("patient", range.copy(endDateExclusive = day.plusYears(1))).collect {
+        latest = it
+      }
     }
     runCurrent()
     assertEquals(365, latest.size)
@@ -126,7 +126,7 @@ class MedicationPlanningSourceTest {
     medications.addPrescription("patient", prescription(original))
     var latest = emptyList<PlanningItem>()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range).collect { latest = it }
+      source.observeItems("patient", range).collect { latest = it }
     }
     runCurrent()
     val keys = latest.map { it.key }
@@ -170,7 +170,7 @@ class MedicationPlanningSourceTest {
     var latest = emptyList<PlanningItem>()
     val job =
         backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-          source.observeItems(range).collect { latest = it }
+          source.observeItems("patient", range).collect { latest = it }
         }
     runCurrent()
     assertEquals(2, latest.size)
@@ -179,26 +179,19 @@ class MedicationPlanningSourceTest {
     assertEquals(PlanningSource.Medication("p", "b"), latest.single().source)
     job.cancel()
     backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      source.observeItems(range).collect { latest = it }
+      source.observeItems("patient", range).collect { latest = it }
     }
     runCurrent()
     assertEquals(1, latest.size)
   }
 
-  /** Running read failures are reported instead of turning into an empty success. */
+  /** A read failure reaches the caller instead of showing an empty calendar. */
   @Test
-  fun runningReadFailurePropagates() = runTest {
-    var failure: Throwable? = null
-    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
-      try {
-        source.observeItems(range).collect {}
-      } catch (error: IllegalStateException) {
-        failure = error
-      }
-    }
-    runCurrent()
-    medications.failRunningReads(IllegalStateException("Live failure"))
-    runCurrent()
-    assertEquals("Live failure", failure?.message)
+  fun readFailureReachesTheCaller() = runTest {
+    medications.readError = IllegalStateException("Read failed")
+
+    val failure = runCatching { source.observeItems("patient", range).first() }.exceptionOrNull()
+
+    assertEquals("Read failed", failure?.message)
   }
 }

@@ -42,6 +42,7 @@ import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -272,7 +273,7 @@ class CareCircleMemberFormScreenTest {
 
   @Test
   fun saving_showsProgress_andLocksTheForm() {
-    content(complete.copy(isSaving = true))
+    content(complete.copy(save = SavePhase.SAVING))
     node(C.Tag.care_circle_form_saving).performScrollTo().assertIsDisplayed()
     node(C.Tag.care_circle_form_save_button).assertIsNotEnabled()
     node(C.Tag.care_circle_form_first_name).assertIsNotEnabled()
@@ -280,6 +281,14 @@ class CareCircleMemberFormScreenTest {
     node(C.Tag.careCircleFormPermission(CarePermission.PLANNING.name))
         .performScrollTo()
         .assertIsNotEnabled()
+  }
+
+  @Test
+  fun saved_locksTheForm_withoutProgress() {
+    content(complete.copy(save = SavePhase.SAVED))
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsNotEnabled()
+    node(C.Tag.care_circle_form_saving).assertDoesNotExist()
+    node(C.Tag.care_circle_form_first_name).assertIsNotEnabled()
   }
 
   @Test
