@@ -54,7 +54,7 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
   // check, rather than stopping the scan
   val strength = PrescriptionLexicon.strengthIn(matchable(first))
   val nameEnd =
-      strength?.let { combinationEnd(first, it.last + 1) }
+      strength?.let { closedBracketEnd(first, combinationEnd(first, it.last + 1)) }
           ?: PrescriptionLexicon.dosingStartIn(matchable(first))
           ?: first.length
   val name =
@@ -121,6 +121,16 @@ private fun medicationOf(lines: List<ClassifiedLine>): ScannedMedication {
 }
 
 /**
+ * [end], or after the ")" that follows it when the name before [end] opened a bracket: a strength
+ * in brackets ("Paracétamol (500 mg)") keeps its bracket closed.
+ */
+private fun closedBracketEnd(line: String, end: Int): Int {
+  val name = line.substring(0, end)
+  if (name.count { it == '(' } <= name.count { it == ')' }) return end
+  return CLOSING_BRACKET.matchAt(line, end)?.let { it.range.last + 1 } ?: end
+}
+
+/**
  * Where the name ends on [line] when its first strength ends at [strengthEnd]: after the last
  * strength of a combination ("Calcium 500 mg + vitamine D3 400 UI").
  */
@@ -172,6 +182,7 @@ private val SCHEME = Regex("""^(\d)\s*-\s*(\d)\s*-\s*(\d)(?:\s*-\s*(\d))?(?!\d)"
 private val TIMES_BEFORE = Regex("""^[xX]\s+(?=\d)""")
 private val MISREAD_I = Regex("""^l(?=[bcdfghjkmnpqrstvwxz])""")
 private val COMBINED_WITH = Regex("""^\s*\+\s*""")
+private val CLOSING_BRACKET = Regex("""\s*\)""")
 private val RENEWAL =
     Regex(
         """[,;]?\s*\b(?:renouvelable|renewable|erneuerbar)\b(?:\s*\d+\s*(?:fois|x|times|mal)\b)?""",

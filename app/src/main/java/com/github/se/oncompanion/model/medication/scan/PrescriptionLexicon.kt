@@ -216,18 +216,22 @@ internal object PrescriptionLexicon {
   private const val UNIT = """(?:mg|g|µg|mcg|ug|ml|mu|ui|iu|mmol|%)"""
   // Any spaces before the unit: the classifier sees them collapsed, the reader as ML Kit kept them.
   // "%" can't start a word, so it may touch the next one ("2 %application"). Not a share in
-  // brackets ("orange juice (35%)") nor an amount per serving ("per 100 ml"), as on a food label
+  // brackets ("orange juice (35%)") nor an amount per serving ("per 100 ml"), as on a food label;
+  // a strength in brackets ("Paracétamol (500 mg)") still is one
   // A number with a word or "%" after it, kept when the word is a unit. In parts, so each pattern
   // stays simple
-  private val NUMBER_AND_UNIT = Regex("""(?<![\d.,(])\d+(?:[.,]\d+)?\s*(%|[a-zµ]+)""")
+  private val NUMBER_AND_UNIT = Regex("""(?<![\d.,])\d+(?:[.,]\d+)?\s*(%|[a-zµ]+)""")
   private val UNITS = setOf("mg", "g", "µg", "mcg", "ug", "ml", "mu", "ui", "iu", "mmol")
   private val PER_SERVING = Regex("""\b(?:per|pour|pro)\s$""")
 
   private fun strengthsIn(text: String): Sequence<MatchResult> =
       NUMBER_AND_UNIT.findAll(text).filter { match ->
-        val unit = match.groupValues[1]
-        (unit == "%" || unit in UNITS) &&
-            !PER_SERVING.containsMatchIn(text.substring(0, match.range.first))
+        val before = text.substring(0, match.range.first)
+        when (match.groupValues[1]) {
+          "%" -> !before.endsWith("(")
+          in UNITS -> !PER_SERVING.containsMatchIn(before)
+          else -> false
+        }
       }
 
   private const val FORM =

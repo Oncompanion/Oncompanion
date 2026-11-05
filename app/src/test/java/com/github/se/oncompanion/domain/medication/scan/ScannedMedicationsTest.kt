@@ -292,6 +292,30 @@ class ScannedMedicationsTest {
   }
 
   @Test
+  fun aStrengthInBracketsStartsAMedication() {
+    val paracetamol = sure("Paracétamol (500 mg)", "1 comprimé", "par jour", null)
+    assertEquals(
+        listOf(paracetamol),
+        medicationsOf(linesOf("Paracétamol (500 mg) 1 comprimé par jour")),
+    )
+    // A closing bracket ML Kit didn't read isn't made up
+    assertEquals(
+        "Paracétamol (500 mg",
+        medicationsOf(linesOf("Paracétamol (500 mg 1 comprimé par jour")).single().name.value,
+    )
+    // Not the dosing of the medication above
+    assertEquals(
+        listOf(sure("Létrozole 2,5 mg", "1 comprimé", "par jour", null), paracetamol),
+        medicationsOf(
+            linesOf(
+                "Létrozole 2,5 mg 1 comprimé par jour",
+                "Paracétamol (500 mg) 1 comprimé par jour",
+            )
+        ),
+    )
+  }
+
+  @Test
   fun aCombinationKeepsEveryStrengthInItsName() {
     val names =
         mapOf(

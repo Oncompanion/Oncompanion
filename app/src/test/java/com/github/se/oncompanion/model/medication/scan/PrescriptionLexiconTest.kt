@@ -193,6 +193,8 @@ class PrescriptionLexiconTest {
         "Lidocaïne gel 2 %",
         // ML Kit ran the next word into "%"
         "Lidocaïne gel 2 %application locale",
+        // A strength in brackets: only a share in brackets is left out
+        "Paracétamol (500 mg) 1 comprimé par jour",
     )
     assertAll(
         PrescriptionLexicon::hasStrength,
