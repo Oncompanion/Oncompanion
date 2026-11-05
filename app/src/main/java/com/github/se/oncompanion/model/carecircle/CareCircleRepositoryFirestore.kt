@@ -145,12 +145,14 @@ class CareCircleRepositoryFirestore(
       return null
     }
     val permissions = (doc.get(FIELD_PERMISSIONS) as? List<*>).orEmpty().filterIsInstance<String>()
+    val canAdd = (doc.get(FIELD_CAN_ADD) as? List<*>).orEmpty().filterIsInstance<String>()
     return CareCircleMember(
         uid = doc.id,
         firstName = firstName,
         familyName = doc.getString(FIELD_FAMILY_NAME),
         relationship = Relationship.fromName(doc.getString(FIELD_RELATIONSHIP)),
         permissions = CarePermission.fromNames(permissions),
+        canAdd = CarePermission.fromNames(canAdd),
         // Read leniently: a field of the wrong type is treated as missing (and logged)
         email = doc.getLenient<String>(FIELD_EMAIL),
         addedAt = doc.getLenient<Timestamp>(FIELD_ADDED_AT)?.toInstant(),
@@ -178,6 +180,7 @@ class CareCircleRepositoryFirestore(
     const val FIELD_FAMILY_NAME = "familyName"
     const val FIELD_RELATIONSHIP = "relationship"
     const val FIELD_PERMISSIONS = "permissions"
+    const val FIELD_CAN_ADD = "canAdd"
     const val FIELD_EMAIL = "email"
     const val FIELD_ADDED_AT = "addedAt"
     const val FIELD_INVITE_CODE = "inviteCode"
@@ -189,9 +192,10 @@ class CareCircleRepositoryFirestore(
             FIELD_FIRST_NAME to details.firstName,
             FIELD_FAMILY_NAME to details.familyName,
             FIELD_RELATIONSHIP to details.relationship.name,
-            // In display order, so a member's list equals its invite's
+            // In display order, so a member's lists equal its invite's
             FIELD_PERMISSIONS to
                 CarePermission.entries.filter { it in details.permissions }.map { it.name },
+            FIELD_CAN_ADD to CarePermission.entries.filter { it in details.canAdd }.map { it.name },
         )
   }
 }

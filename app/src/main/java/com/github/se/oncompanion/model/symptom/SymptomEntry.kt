@@ -35,6 +35,9 @@ enum class SymptomType {
  *   later, see [isValid])
  * @property notes free text; required with [SymptomType.OTHER], to say which symptom it was
  * @property createdAt set by the server when the entry is saved; `null` before that
+ * @property addedBy the uid of the caregiver who logged it for the patient (US-22), or `null` when
+ *   the patient did
+ * @property addedByName that caregiver's first name, shown as "Added by Sam"
  */
 data class SymptomEntry(
     val id: String = "",
@@ -43,6 +46,8 @@ data class SymptomEntry(
     val intensity: Int? = null,
     val notes: String? = null,
     val createdAt: Instant? = null,
+    val addedBy: String? = null,
+    val addedByName: String? = null,
 ) {
   /**
    * Whether the entry satisfies the same constraints as the Firestore security rules at [now]. A
@@ -56,7 +61,10 @@ data class SymptomEntry(
           !occurredAt.isAfter(now.plus(MAX_CLOCK_DRIFT)) &&
           (notes == null || notes.length <= MAX_NOTES_LENGTH) &&
           // "Other" only says something was felt: the notes say what
-          (SymptomType.OTHER !in types || !notes.isNullOrBlank())
+          (SymptomType.OTHER !in types || !notes.isNullOrBlank()) &&
+          // A caregiver's entry says who added it
+          (addedBy == null ||
+              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
 
   companion object {
     /** Keep in sync with `firestore.rules`. */
@@ -65,6 +73,8 @@ data class SymptomEntry(
     const val MAX_INTENSITY = 10
     /** Keep in sync with `firestore.rules`. */
     const val MAX_NOTES_LENGTH = 1000
+    /** Keep in sync with `firestore.rules`. */
+    const val MAX_ADDED_BY_NAME_LENGTH = 50
     /**
      * How far [occurredAt] may be after the current time, for a phone clock slightly ahead of the
      * server's. Keep in sync with `firestore.rules`.

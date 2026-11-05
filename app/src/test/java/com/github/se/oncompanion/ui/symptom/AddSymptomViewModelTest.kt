@@ -8,6 +8,9 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.model.symptom.SymptomType
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -806,4 +809,66 @@ class AddSymptomViewModelTest {
         occurredAt(today.minusDays(1), LocalTime.of(8, 5), zonedNow),
     )
   }
+
+  // ----- Caregiver mode (US-22) -----
+
+  /** The form of the signed-in caregiver [uid], logging in "patient"'s journal. */
+  private fun caregiverViewModel(
+      profiles: FakeUserProfileRepository = FakeUserProfileRepository()
+  ) =
+      AddSymptomViewModel(
+          auth,
+          repository,
+          clock,
+          patientUid = "patient",
+          profileRepository = profiles,
+      )
+
+  @Test
+  fun caregiver_logsInThePatientsJournal_signedWithTheirUidAndFirstName() =
+      runTest(dispatcher) {
+        val profiles =
+            FakeUserProfileRepository().apply {
+              seed(UserProfile(uid, Role.CAREGIVER, firstName = "Sam"))
+            }
+        val viewModel = caregiverViewModel(profiles)
+        viewModel.toggleType(SymptomType.NAUSEA)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        assertTrue(repository.symptoms(uid).isEmpty())
+        val entry = repository.symptoms("patient").single()
+        assertEquals(listOf(SymptomType.NAUSEA), entry.types)
+        assertEquals(uid, entry.addedBy)
+        assertEquals("Sam", entry.addedByName)
+      }
+
+  @Test
+  fun caregiver_withoutAProfileName_signsWithTheirGoogleName() =
+      runTest(dispatcher) {
+        auth = FakeAuthRepository(onSignIn = { AuthUser(uid = uid, displayName = "Sam Martin") })
+        auth.signInWithGoogle("token")
+        val viewModel = caregiverViewModel()
+        viewModel.toggleType(SymptomType.NAUSEA)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals("Sam", repository.symptoms("patient").single().addedByName)
+      }
+
+  @Test
+  fun patient_ownSymptom_isNotSigned() =
+      runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.toggleType(SymptomType.NAUSEA)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertNull(savedEntry().addedBy)
+        assertNull(savedEntry().addedByName)
+      }
 }

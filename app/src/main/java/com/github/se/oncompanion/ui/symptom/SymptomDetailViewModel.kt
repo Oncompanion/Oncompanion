@@ -11,7 +11,11 @@ import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.addedByName
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -23,8 +27,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,6 +43,8 @@ import kotlinx.coroutines.launch
  * @property delete where the deletion of the symptom is at
  * @property canEdit whether the symptom can be edited or deleted: only in the user's own journal
  * @property isNotShared in caregiver mode, the patient doesn't share their symptoms: no symptom
+ * @property addedByName who added the symptom, if a caregiver did: for the patient, the name they
+ *   gave that member in their circle
  */
 data class SymptomDetailUiState(
     val entry: SymptomEntry? = null,
@@ -45,6 +53,7 @@ data class SymptomDetailUiState(
     override val delete: DeleteState = DeleteState(),
     val canEdit: Boolean = true,
     val isNotShared: Boolean = false,
+    val addedByName: String? = null,
 ) : HasDeleteState {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
@@ -75,6 +84,8 @@ class SymptomDetailViewModel(
     private val patientUid: String? = null,
     private val resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(SymptomDetailUiState())
@@ -124,6 +135,7 @@ class SymptomDetailViewModel(
               _uiState.update {
                 it.copy(
                     entry = null,
+                    addedByName = null,
                     isLoading = section == SectionAccess.Loading,
                     hasError = section == SectionAccess.NoAccess,
                     isNotShared = section == SectionAccess.NotShared,
@@ -140,8 +152,11 @@ class SymptomDetailViewModel(
   private fun observe(uid: String) {
     observation?.cancel()
     observation = viewModelScope.launch {
-      symptomRepository
-          .observeSymptom(uid, symptomId)
+      // The names the patient gave their circle; a caregiver sees the name stored with the symptom
+      val names =
+          if (patientUid == null) careCircleRepository.observeMemberNames(uid)
+          else flowOf(emptyMap())
+      combine(symptomRepository.observeSymptom(uid, symptomId), names, ::Pair)
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom $symptomId", e)
             // Nothing to delete without the symptom: the confirmation is dropped
@@ -149,11 +164,12 @@ class SymptomDetailViewModel(
               it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
             }
           }
-          .collect { entry ->
+          .collect { (entry, names) ->
             // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
             _uiState.update {
               it.copy(
                   entry = entry,
+                  addedByName = entry?.let { e -> addedByName(e.addedBy, e.addedByName, names) },
                   isLoading = false,
                   hasError = false,
                   delete = it.delete.afterRead(exists = entry != null),

@@ -119,6 +119,7 @@ fun AddSymptomScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -151,6 +152,7 @@ fun AddSymptomScreen(
       onErrorShown = viewModel::clearError,
       onRetry = viewModel::load,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -159,6 +161,8 @@ fun AddSymptomScreen(
  *
  * @param onErrorShown called once the error snackbar is gone
  * @param onRetry loads the symptom to edit again after an error
+ * @param caregiverOf in caregiver mode, the first name of the patient whose journal gets the
+ *   symptom, said in the title so the caregiver knows where it goes
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -175,6 +179,7 @@ fun AddSymptomContent(
     onErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   // Not while saving or once saved: the screen then leaves by itself, and going back as well would
   // also leave the journal
@@ -199,7 +204,9 @@ fun AddSymptomContent(
       // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
       modifier = modifier.testTag(C.Tag.symptom_add_screen).imePadding(),
       // Without the form there is no keyboard, so the top bar can stay fixed
-      topBar = { if (!scrollsEverything || !uiState.isFormShown) FormTopBar(uiState, onBack) },
+      topBar = {
+        if (!scrollsEverything || !uiState.isFormShown) FormTopBar(uiState, caregiverOf, onBack)
+      },
       snackbarHost = { SnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = {
@@ -242,6 +249,7 @@ fun AddSymptomContent(
               onTimeChange = onTimeChange,
               onNotesChange = onNotesChange,
               scrollsEverything = scrollsEverything,
+              caregiverOf = caregiverOf,
               onBack = onBack,
               onSave = onSave,
               modifier = Modifier.padding(innerPadding),
@@ -250,20 +258,27 @@ fun AddSymptomContent(
   }
 }
 
-/** The title and the button that leaves the form without saving. */
+/**
+ * The title and the button that leaves the form without saving. [caregiverOf] is the patient a
+ * caregiver logs the symptom for, `null` for the user's own journal.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormTopBar(
     uiState: AddSymptomUiState,
+    caregiverOf: String?,
     onBack: () -> Unit,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
   TopAppBar(
       title = {
         Text(
-            stringResource(
-                if (uiState.isEditing) R.string.symptom_edit_title else R.string.symptom_add_title
-            )
+            when {
+              uiState.isEditing -> stringResource(R.string.symptom_edit_title)
+              // A caregiver sees whose journal gets the symptom
+              caregiverOf != null -> stringResource(R.string.symptom_add_title_for, caregiverOf)
+              else -> stringResource(R.string.symptom_add_title)
+            }
         )
       },
       navigationIcon = {
@@ -311,13 +326,14 @@ private fun SymptomFields(
     onTimeChange: (LocalTime) -> Unit,
     onNotesChange: (String) -> Unit,
     scrollsEverything: Boolean,
+    caregiverOf: String?,
     onBack: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
     // The Scaffold already keeps the content clear of the status bar
-    if (scrollsEverything) FormTopBar(uiState, onBack, WindowInsets(0))
+    if (scrollsEverything) FormTopBar(uiState, caregiverOf, onBack, WindowInsets(0))
     Column(
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

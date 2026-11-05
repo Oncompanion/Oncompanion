@@ -72,7 +72,11 @@ class SymptomRepositoryFirestore(
         // The ID is generated on the device, so it is known right away, also offline
         val document = collection(uid).document()
         document
-            .set(fieldsOf(entry) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
+            .set(
+                fieldsOf(entry) +
+                    attributionOf(entry) +
+                    (FIELD_CREATED_AT to FieldValue.serverTimestamp())
+            )
             .addOnFailureListener { e ->
               Log.e(TAG, "The server rejected the symptom ${document.id}; it was rolled back", e)
               rejectedWrites.report()
@@ -105,6 +109,14 @@ class SymptomRepositoryFirestore(
     }
   }
 
+  /**
+   * Who added [entry], only for a caregiver's entry: the rules refuse these fields on the patient's
+   * own entries, and an update never changes them.
+   */
+  private fun attributionOf(entry: SymptomEntry): Map<String, Any?> =
+      if (entry.addedBy == null) emptyMap()
+      else mapOf(FIELD_ADDED_BY to entry.addedBy, FIELD_ADDED_BY_NAME to entry.addedByName)
+
   /** What the user entered, as stored in Firestore (everything except the ID and createdAt). */
   private fun fieldsOf(entry: SymptomEntry): Map<String, Any?> =
       mapOf(
@@ -129,6 +141,8 @@ class SymptomRepositoryFirestore(
           notes = doc.getString(FIELD_NOTES),
           // Pending server timestamps read as null until the write reaches the server
           createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.toInstant(),
+          addedBy = doc.getString(FIELD_ADDED_BY),
+          addedByName = doc.getString(FIELD_ADDED_BY_NAME),
       )
     } catch (e: Exception) {
       Log.e(TAG, "Malformed symptom document ${doc.id}", e)
@@ -144,6 +158,8 @@ class SymptomRepositoryFirestore(
     const val FIELD_OCCURRED_AT = "occurredAt"
     const val FIELD_NOTES = "notes"
     const val FIELD_CREATED_AT = "createdAt"
+    const val FIELD_ADDED_BY = "addedBy"
+    const val FIELD_ADDED_BY_NAME = "addedByName"
     private const val TAG = "SymptomRepository"
   }
 }

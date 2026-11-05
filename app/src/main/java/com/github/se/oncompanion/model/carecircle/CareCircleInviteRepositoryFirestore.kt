@@ -5,6 +5,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import android.util.Log
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_ADDED_AT
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_CAN_ADD
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_INVITE_CODE
@@ -319,6 +320,7 @@ class CareCircleInviteRepositoryFirestore(
       return null
     }
     val permissions = (doc.get(FIELD_PERMISSIONS) as? List<*>).orEmpty().filterIsInstance<String>()
+    val canAdd = (doc.get(FIELD_CAN_ADD) as? List<*>).orEmpty().filterIsInstance<String>()
     return CareCircleInvite(
         inviteCode = doc.id,
         ownerUid = ownerUid,
@@ -329,6 +331,7 @@ class CareCircleInviteRepositoryFirestore(
                 familyName = doc.get(FIELD_FAMILY_NAME) as? String,
                 relationship = Relationship.fromName(doc.get(FIELD_RELATIONSHIP) as? String),
                 permissions = CarePermission.fromNames(permissions),
+                canAdd = CarePermission.fromNames(canAdd),
             ),
         email = doc.get(FIELD_EMAIL) as? String,
         // Pending server timestamps read as null until the write reaches the server

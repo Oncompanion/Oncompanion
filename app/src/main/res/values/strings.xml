@@ -161,6 +161,10 @@
     <!-- Caregiver mode (US-20): the journal of the patient they follow, e.g. "Couldn\'t load Anne\'s symptoms" -->
     <string name="symptom_journal_error_title_for">Couldn\'t load %1$s\'s symptoms</string>
     <string name="symptom_journal_empty_hint_for">The symptoms logged for %1$s will appear here, newest first.</string>
+    <!-- A caregiver logs a symptom for the patient (US-22), e.g. "Log symptoms for Anne" -->
+    <string name="symptom_add_title_for">Log symptoms for %1$s</string>
+    <!-- Under a symptom a caregiver logged, e.g. "Added by Sam" -->
+    <string name="symptom_added_by">Added by %1$s</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -292,6 +296,9 @@
     <string name="permission_events_description">Activities you join</string>
     <string name="permission_symptoms_description">Your symptom log</string>
     <string name="permission_prescriptions_description">Your saved prescriptions</string>
+    <!-- Letting a member add to a section they see (US-22), under that section's switch -->
+    <string name="permission_symptoms_add">Allow adding symptoms</string>
+    <string name="permission_symptoms_add_description">They can log a symptom for you</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>

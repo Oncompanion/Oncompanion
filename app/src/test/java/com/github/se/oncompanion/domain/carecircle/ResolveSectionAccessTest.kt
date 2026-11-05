@@ -116,4 +116,29 @@ class ResolveSectionAccessTest {
     circle.unconfirmedMembers = setOf("alice" to "bob")
     assertEquals(SectionAccess.Loading, collect(CarePermission.SYMPTOMS, "alice").last())
   }
+
+  @Test
+  fun caregiver_canAdd_onlyWhereThePatientLetsThem() = runTest {
+    circle.setMembers(
+        "alice",
+        listOf(
+            CareCircleMember(
+                uid = "bob",
+                firstName = "Bob",
+                permissions = setOf(CarePermission.SYMPTOMS, CarePermission.PLANNING),
+                canAdd = setOf(CarePermission.SYMPTOMS),
+            )
+        ),
+    )
+    auth.signInWithGoogle("bob")
+
+    assertEquals(
+        SectionAccess.Readable("alice", canEdit = false, canAdd = true),
+        collect(CarePermission.SYMPTOMS, "alice").last(),
+    )
+    assertEquals(
+        SectionAccess.Readable("alice", canEdit = false, canAdd = false),
+        collect(CarePermission.PLANNING, "alice").last(),
+    )
+  }
 }

@@ -14,9 +14,13 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * For tests of caregiver mode: "caregiver" is signed in and follows "patient", who shares the
- * [shared] sections with them. The test can change that while a screen shows the patient's data.
+ * [shared] sections with them and lets them add to [canAdd]. The test can change that while a
+ * screen shows the patient's data.
  */
-class FollowedPatient(vararg shared: CarePermission) {
+class FollowedPatient(
+    vararg shared: CarePermission,
+    canAdd: Set<CarePermission> = emptySet(),
+) {
   val auth = FakeAuthRepository {
     AuthUser(it)
   }
@@ -34,15 +38,22 @@ class FollowedPatient(vararg shared: CarePermission) {
   val sectionAccess = ResolveSectionAccess(careAccess, auth)
 
   init {
-    shares(*shared)
+    shares(*shared, canAdd = canAdd)
   }
 
-  /** The patient now shares exactly [sections] with the caregiver. */
-  fun shares(vararg sections: CarePermission) =
+  /**
+   * The patient now shares exactly [sections] with the caregiver, and lets them add to [canAdd].
+   */
+  fun shares(vararg sections: CarePermission, canAdd: Set<CarePermission> = emptySet()) =
       circle.setMembers(
           "patient",
           listOf(
-              CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = sections.toSet())
+              CareCircleMember(
+                  uid = "caregiver",
+                  firstName = "Sam",
+                  permissions = sections.toSet(),
+                  canAdd = canAdd,
+              )
           ),
       )
 
@@ -55,6 +66,11 @@ class FollowedPatient(vararg shared: CarePermission) {
   }
 }
 
-/** A [ResolveSectionAccess] where "caregiver" follows "patient", who shares [shared]. */
-fun followedPatientAccess(vararg shared: CarePermission): ResolveSectionAccess =
-    FollowedPatient(*shared).sectionAccess
+/**
+ * A [ResolveSectionAccess] where "caregiver" follows "patient", who shares [shared] and lets them
+ * add to [canAdd].
+ */
+fun followedPatientAccess(
+    vararg shared: CarePermission,
+    canAdd: Set<CarePermission> = emptySet(),
+): ResolveSectionAccess = FollowedPatient(*shared, canAdd = canAdd).sectionAccess

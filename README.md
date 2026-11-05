@@ -9,7 +9,7 @@ The app uses Google Firebase. Firebase Authentication handles Google Sign-In. Cl
 ## ===== MULTI-USER SUPPORT =====
 Users sign in with Google Sign-In through Firebase Authentication. Security rules ensure each user only sees their own data, plus anything explicitly shared with them.
 
-- Care circle: a patient invites family or friends with an invite code and chooses which parts of their care each person can see. Access is read-only: members follow the patient's care but never edit or log anything. It can be changed or revoked at any time, and circle members get reminders.
+- Care circle: a patient invites family or friends with an invite code and chooses which parts of their care each person can see. Access is read-only, with one exception the patient chooses per member: they can let a member log symptoms for them, signed with that member's name. Members never edit or delete anything. It can be changed or revoked at any time, and circle members get reminders.
 - Ligue staff: staff accounts are granted by our team, never self-assigned. Staff keep the directory of contacts and support programs up to date and post events, which patients see in the app. Staff have no access to patients' health data. As a stretch feature, the staff could also create group chats between patients.
 - Doctors: no account needed. Before an appointment, the patient can generate a symptom summary to show on screen or export as a PDF, choosing what goes in it.
 

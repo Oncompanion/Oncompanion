@@ -90,7 +90,12 @@ class ResolveCareCircleAccess(
       circle.observeMembership(patientUid, me).map { membership ->
         when (membership) {
           is CareCircleMembership.Member ->
-              CareAccess.Granted(patientUid, membership.member.permissions, isOwn = false)
+              CareAccess.Granted(
+                  patientUid,
+                  membership.member.permissions,
+                  isOwn = false,
+                  addable = membership.member.canAdd intersect membership.member.permissions,
+              )
           CareCircleMembership.NotMember -> CareAccess.Denied
           CareCircleMembership.Unconfirmed -> CareAccess.Unconfirmed
         }

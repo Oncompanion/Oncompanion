@@ -58,8 +58,11 @@ class CareCircleRedeemSecurityRulesTest {
   private fun invite(inviteCode: String): DocumentReference =
       db.collection(CareCircleInviteRepositoryFirestore.COLLECTION).document(inviteCode)
 
-  /** Creates a valid invite as the signed-in user, waits for the server and returns its code. */
-  private suspend fun createInvite(): String {
+  /**
+   * Creates a valid invite as the signed-in user, with [extra] fields, waits for the server and
+   * returns its code.
+   */
+  private suspend fun createInvite(extra: Map<String, Any?> = emptyMap()): String {
     val inviteCode = CareCircleInvite.generateInviteCode()
     allowed(
         invite(inviteCode)
@@ -74,7 +77,7 @@ class CareCircleRedeemSecurityRulesTest {
                     "email" to "julie@example.com",
                     "createdAt" to FieldValue.serverTimestamp(),
                     "redeemerUid" to null,
-                )
+                ) + extra
             )
     )
     return inviteCode
@@ -277,6 +280,22 @@ class CareCircleRedeemSecurityRulesTest {
     denied(redeemBatch(inviteCode, member = memberFields(inviteCode, "firstName" to "Jules")))
     denied(redeemBatch(inviteCode, member = memberFields(inviteCode, "familyName" to null)))
     denied(redeemBatch(inviteCode, member = memberFields(inviteCode, "role" to "PATIENT")))
+    denied(
+        redeemBatch(inviteCode, member = memberFields(inviteCode, "canAdd" to listOf("SYMPTOMS")))
+    )
+  }
+
+  @Test
+  fun caregiverCopiesWhatTheyCanAddTo(): Unit = runBlocking {
+    val inviteCode = createInvite(mapOf("canAdd" to listOf("SYMPTOMS")))
+    EmulatorTestData.signIn("bob")
+    denied(redeemBatch(inviteCode))
+    denied(
+        redeemBatch(inviteCode, member = memberFields(inviteCode, "canAdd" to emptyList<String>()))
+    )
+    allowed(
+        redeemBatch(inviteCode, member = memberFields(inviteCode, "canAdd" to listOf("SYMPTOMS")))
+    )
   }
 
   @Test

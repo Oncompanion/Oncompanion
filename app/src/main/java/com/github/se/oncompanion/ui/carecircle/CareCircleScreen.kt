@@ -388,6 +388,31 @@ internal val CarePermission.label: Int
         CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions
       }
 
+/**
+ * The switch letting a member add to the section, e.g. "Allow adding symptoms", or null for a
+ * section nobody can add to ([CareCircleMemberDetails.ADDABLE_SECTIONS]).
+ */
+@get:StringRes
+internal val CarePermission.addLabel: Int?
+  get() =
+      when (this) {
+        CarePermission.SYMPTOMS -> R.string.permission_symptoms_add
+        CarePermission.PLANNING,
+        CarePermission.EVENTS,
+        CarePermission.PRESCRIPTIONS -> null
+      }
+
+/** What [addLabel] lets the member do, e.g. "They can log a symptom for you". */
+@get:StringRes
+internal val CarePermission.addDescription: Int?
+  get() =
+      when (this) {
+        CarePermission.SYMPTOMS -> R.string.permission_symptoms_add_description
+        CarePermission.PLANNING,
+        CarePermission.EVENTS,
+        CarePermission.PRESCRIPTIONS -> null
+      }
+
 /** The relationship as shown to the user, e.g. "Home nurse". */
 @get:StringRes
 internal val Relationship.label: Int

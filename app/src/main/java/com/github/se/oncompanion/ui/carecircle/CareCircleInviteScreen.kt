@@ -433,6 +433,9 @@ private fun InviteDetails(
     Subheader(stringResource(R.string.care_circle_member_can_see))
     CarePermission.entries.forEach { permission ->
       PermissionItem(permission = permission, granted = permission in invite.details.permissions)
+      if (permission in CareCircleMemberDetails.ADDABLE_SECTIONS) {
+        CanAddItem(section = permission, allowed = permission in invite.details.canAdd)
+      }
     }
 
     TextButton(

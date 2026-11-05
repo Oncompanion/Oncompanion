@@ -109,14 +109,22 @@ class PrescriptionsViewModel(
           // and still works if it can't be read
           .onEach { access ->
             if (access is SectionAccess.Readable) {
-              _uiState.update { it.copy(isNotShared = false, canAdd = access.canEdit) }
+              _uiState.update { it.copy(isNotShared = false, canAdd = access.canAdd) }
             }
           }
           .flatMapLatest(::prescriptionsOf)
           .catch { e ->
             Log.e(TAG, "Failed to load the prescriptions", e)
-            // canAdd stays as it was: a patient can still add one if their list fails
-            _uiState.update { it.copy(isLoading = false, hasError = true, isNotShared = false) }
+            // A patient can still add one if their list fails. A caregiver can't: their access
+            // may have been taken away, and nothing would tell them once it is back
+            _uiState.update {
+              it.copy(
+                  isLoading = false,
+                  hasError = true,
+                  isNotShared = false,
+                  canAdd = it.canAdd && patientUid == null,
+              )
+            }
           }
           .collect { change -> _uiState.update(change) }
     }

@@ -33,6 +33,22 @@ service cloud.firestore {
           && optionalString(data, 'hospital', 100)
           && data.createdAt is timestamp;
     }
+    // Who added an entry: nothing when the patient did, or the signed-in caregiver's uid and first
+    // name when a caregiver did (US-22), so nobody can add one in someone else's name.
+    // Keep in sync with SymptomEntry.MAX_ADDED_BY_NAME_LENGTH.
+    function isValidAttribution(ownerUid, data) {
+      return isOwner(ownerUid)
+          ? !data.keys().hasAny(['addedBy', 'addedByName'])
+          : data.get('addedBy', null) == request.auth.uid
+              && data.get('addedByName', null) is string
+              && data.addedByName.trim().size() > 0
+              && data.addedByName.size() <= 50;
+    }
+    // The attribution of an entry never changes, also when the patient corrects it
+    function keepsAttribution(data, previous) {
+      return data.get('addedBy', null) == previous.get('addedBy', null)
+          && data.get('addedByName', null) == previous.get('addedByName', null);
+    }
 
     // Keep the limits in sync with Prescription (MAX_PRESCRIBED_BY_LENGTH, MAX_MEDICATIONS).
     // The fields of each medication are not checked here: rules have no loops, and checking 20
@@ -52,7 +68,8 @@ service cloud.firestore {
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY, MAX_NOTES_LENGTH,
     // MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
-      return data.keys().hasOnly(['types', 'intensity', 'occurredAt', 'notes', 'createdAt'])
+      return data.keys().hasOnly(['types', 'intensity', 'occurredAt', 'notes', 'createdAt',
+                                  'addedBy', 'addedByName'])
           && data.keys().hasAll(['types', 'occurredAt', 'createdAt'])
           // One or more symptoms, each at most once
           && data.types is list
@@ -100,7 +117,9 @@ service cloud.firestore {
 
     // ---------- Care circle helpers ----------
     // What the patient decides about someone in their circle, on an invite and on a member.
-    // Keep in sync with CareCircleMemberDetails.MAX_NAME_LENGTH, Relationship and CarePermission.
+    // Keep in sync with CareCircleMemberDetails (MAX_NAME_LENGTH, canAdd), Relationship and
+    // CarePermission. canAdd is optional (missing on members saved before it existed) and only
+    // holds sections that are also in permissions.
     function isValidCareCircleMemberDetails(data) {
       return data.firstName is string
           && data.firstName.trim().size() > 0
@@ -110,11 +129,13 @@ service cloud.firestore {
                                    'SON', 'SISTER', 'BROTHER', 'FRIEND', 'HOME_NURSE', 'OTHER']
           && data.permissions is list
           && data.permissions.size() <= 4
-          && data.permissions.hasOnly(['PLANNING', 'EVENTS', 'SYMPTOMS', 'PRESCRIPTIONS']);
+          && data.permissions.hasOnly(['PLANNING', 'EVENTS', 'SYMPTOMS', 'PRESCRIPTIONS'])
+          && data.get('canAdd', []) is list
+          && data.permissions.hasAll(data.get('canAdd', []));
     }
     // What the patient can change on a member; an invite also has its email.
     function detailKeys() {
-      return ['firstName', 'familyName', 'relationship', 'permissions'];
+      return ['firstName', 'familyName', 'relationship', 'permissions', 'canAdd'];
     }
     function userPath(uid) {
       return /databases/$(database)/documents/users/$(uid);
@@ -141,7 +162,8 @@ service cloud.firestore {
       return member.firstName == invite.firstName
           && member.get('familyName', null) == invite.get('familyName', null)
           && member.relationship == invite.relationship
-          && member.permissions == invite.permissions;
+          && member.permissions == invite.permissions
+          && member.get('canAdd', []) == invite.get('canAdd', []);
     }
     // The signed-in user's member doc in ownerUid's circle: the one a caregiver already reads.
     function memberDoc(ownerUid) {
@@ -161,9 +183,19 @@ service cloud.firestore {
           && section in member.data.permissions;
     }
     // The owner, or a member the owner shares `section` with (a CarePermission). Read only:
-    // writes stay owner-only.
+    // writes stay owner-only, except adding where canAdd allows it.
     function canRead(ownerUid, section) {
       return isOwner(ownerUid) || sharesWith(ownerUid, section);
+    }
+    // The owner, or a member who sees `section` and whom the owner lets add to it (canAdd). Only
+    // for creating: a member never edits or deletes.
+    function canAddTo(ownerUid, section) {
+      return isOwner(ownerUid) || (signedIn() && memberAdds(get(memberDoc(ownerUid)), section));
+    }
+    function memberAdds(member, section) {
+      return memberShares(member, section)
+          && member.data.get('canAdd', null) is list
+          && section in member.data.canAdd;
     }
 
     match /users/{uid} {
@@ -198,11 +230,13 @@ service cloud.firestore {
       match /symptoms/{symptomId} {
         allow read: if canRead(uid, 'SYMPTOMS');
         allow delete: if isOwner(uid);
-        allow create: if isOwner(uid)
+        allow create: if canAddTo(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data)
                       && request.resource.data.createdAt == request.time;
         allow update: if isOwner(uid)
                       && isValidSymptom(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 

@@ -282,6 +282,10 @@ object C {
     fun careCircleMemberPermission(permissionName: String) =
         "care_circle_member_permission_$permissionName"
 
+    /** Whether the member can add to [permissionName], read-only, e.g. "SYMPTOMS". */
+    fun careCircleMemberCanAdd(permissionName: String) =
+        "care_circle_member_can_add_$permissionName"
+
     // Add a care circle member
     const val care_circle_form_screen = "care_circle_form_screen"
     const val care_circle_form_back_button = "care_circle_form_back_button"
@@ -305,6 +309,9 @@ object C {
     /** The switch giving access to [permissionName], e.g. "PLANNING". */
     fun careCircleFormPermission(permissionName: String) =
         "care_circle_form_permission_$permissionName"
+
+    /** The switch letting the member add to [permissionName], e.g. "SYMPTOMS". */
+    fun careCircleFormCanAdd(permissionName: String) = "care_circle_form_can_add_$permissionName"
 
     // Join a care circle
     const val join_circle_screen = "join_circle_screen"
@@ -330,6 +337,8 @@ object C {
 
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
+    // Caregiver mode: who added an entry for the patient
+    const val added_by = "added_by"
 
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"

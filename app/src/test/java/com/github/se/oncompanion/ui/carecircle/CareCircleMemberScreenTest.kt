@@ -28,6 +28,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
@@ -386,6 +387,34 @@ class CareCircleMemberScreenTest {
     composeTestRule.runOnIdle {
       assertEquals(listOf("marc"), repository.removed)
       assertEquals(1, navigationActions.backCalls)
+    }
+  }
+
+  // ---- adding symptoms (US-22) ----
+
+  @Test
+  fun member_showsWhetherTheyCanAddSymptoms() {
+    setContent(
+        CareCircleMemberUiState.Member(
+            marc.copy(
+                permissions = setOf(CarePermission.SYMPTOMS),
+                canAdd = setOf(CarePermission.SYMPTOMS),
+            )
+        )
+    )
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.careCircleMemberCanAdd(CarePermission.SYMPTOMS.name))
+        .performScrollTo()
+        .assertIsOn()
+  }
+
+  @Test
+  fun onlyTheAddableSections_haveACanAddText() {
+    for (section in CarePermission.entries) {
+      val addable = section in CareCircleMemberDetails.ADDABLE_SECTIONS
+      assertEquals(section.name, addable, section.addLabel != null)
+      assertEquals(section.name, addable, section.addDescription != null)
     }
   }
 }

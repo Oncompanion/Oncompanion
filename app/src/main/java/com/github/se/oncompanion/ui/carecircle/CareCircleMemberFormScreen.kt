@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
@@ -96,6 +97,7 @@ fun CareCircleMemberFormScreen(
       onPermissionChange = viewModel::onPermissionChange,
       onSave = viewModel::save,
       onBack = onBack,
+      onCanAddChange = viewModel::onCanAddChange,
   )
 }
 
@@ -112,6 +114,7 @@ fun CareCircleMemberFormContent(
     onSave: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onCanAddChange: (CarePermission, Boolean) -> Unit = { _, _ -> },
 ) {
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
   // keyboard open, a fixed one would leave no room for the field being typed. The loading and
@@ -140,7 +143,7 @@ fun CareCircleMemberFormContent(
         RelationshipField(uiState.relationship, uiState.canEdit, onRelationshipChange)
         EmailField(uiState, onEmailChange)
       }
-      PermissionSwitches(uiState, onPermissionChange)
+      PermissionSwitches(uiState, onPermissionChange, onCanAddChange)
       SaveSection(uiState, onSave)
     }
   }
@@ -326,6 +329,7 @@ private fun EmailField(uiState: CareCircleMemberFormUiState, onEmailChange: (Str
 private fun PermissionSwitches(
     uiState: CareCircleMemberFormUiState,
     onPermissionChange: (CarePermission, Boolean) -> Unit,
+    onCanAddChange: (CarePermission, Boolean) -> Unit,
 ) {
   val firstName = uiState.firstName.trim()
   Text(
@@ -355,7 +359,43 @@ private fun PermissionSwitches(
                 )
                 .testTag(C.Tag.careCircleFormPermission(permission.name)),
     )
+    if (permission in CareCircleMemberDetails.ADDABLE_SECTIONS) {
+      CanAddSwitch(permission, uiState, granted, onCanAddChange)
+    }
   }
+}
+
+/**
+ * Lets the member add to [section] (e.g. "Allow adding symptoms"), indented under the section it
+ * depends on: only for someone who sees the section, so it is greyed out while the section is off.
+ * Nothing for a section nobody can add to.
+ */
+@Composable
+private fun CanAddSwitch(
+    section: CarePermission,
+    uiState: CareCircleMemberFormUiState,
+    sectionGranted: Boolean,
+    onCanAddChange: (CarePermission, Boolean) -> Unit,
+) {
+  val label = section.addLabel ?: return
+  val description = section.addDescription ?: return
+  val allowed = section in uiState.canAdd
+  val enabled = uiState.canEdit && sectionGranted
+  ListItem(
+      headlineContent = { Text(stringResource(label)) },
+      supportingContent = { Text(stringResource(description)) },
+      trailingContent = { Switch(checked = allowed, onCheckedChange = null, enabled = enabled) },
+      modifier =
+          Modifier.padding(start = 24.dp)
+              .heightIn(min = 56.dp)
+              .toggleable(
+                  value = allowed,
+                  enabled = enabled,
+                  role = Role.Switch,
+                  onValueChange = { onCanAddChange(section, it) },
+              )
+              .testTag(C.Tag.careCircleFormCanAdd(section.name)),
+  )
 }
 
 /**

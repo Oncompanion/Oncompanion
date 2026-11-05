@@ -32,6 +32,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
@@ -164,7 +165,7 @@ fun SymptomDetailContent(
                   )
                 },
             ) {
-              EntryDetail(entry, zone)
+              EntryDetail(entry, zone, uiState.addedByName)
             }
       }
     }
@@ -187,7 +188,7 @@ fun SymptomDetailContent(
 }
 
 @Composable
-private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
+private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
   Column(
       modifier = Modifier.fillMaxWidth().padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -211,6 +212,8 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
         Text(text = notes, style = MaterialTheme.typography.bodyLarge)
       }
     }
+    // A symptom a caregiver logged for the patient says who did
+    addedByName?.let { AddedBy(it) }
   }
 }
 

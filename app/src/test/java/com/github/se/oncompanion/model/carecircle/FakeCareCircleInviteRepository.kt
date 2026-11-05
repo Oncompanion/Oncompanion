@@ -189,6 +189,7 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
               familyName = details.familyName,
               relationship = details.relationship,
               permissions = details.permissions,
+              canAdd = details.canAdd,
               email = caregiverEmail,
               addedAt = now,
               inviteCode = invite.inviteCode,

@@ -476,4 +476,25 @@ class SymptomJournalScreenTest {
     // Without the add button, no room is kept for it under the last entry
     assertTrue("gap ${list.bottom - last.bottom}", list.bottom - last.bottom < 24.dp)
   }
+
+  @Test
+  fun caregiver_allowedToAdd_seesTheAddButton_andWhoAddedEachEntry() {
+    val signed = fatigue.copy(addedBy = "caregiver", addedByName = "Sam")
+    setCaregiverContent(
+        loaded.copy(
+            days =
+                listOf(
+                    JournalDay(
+                        today,
+                        // The name shown differs from the stored one: the screen must show it
+                        listOf(JournalEntry(signed, java.time.LocalTime.of(14, 30), "Robert")),
+                    )
+                ),
+            canAdd = true,
+        )
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Added by Robert", useUnmergedTree = true).assertExists()
+  }
 }

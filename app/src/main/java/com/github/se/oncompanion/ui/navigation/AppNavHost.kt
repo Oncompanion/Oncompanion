@@ -384,10 +384,12 @@ private fun SessionNavHost(
       }
       composable(Screen.SYMPTOM_ADD) {
         // Saving returns to the journal, where the new entry is at the top
+        // In caregiver mode, the symptom goes in the chosen patient's journal (US-22)
         AddSymptomScreen(
-            viewModel = viewModel { AddSymptomViewModel() },
+            viewModel = viewModel { AddSymptomViewModel(patientUid = chosenPatient?.uid) },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(

@@ -346,6 +346,7 @@ class AppNavHostTest {
   private fun followingCaregiver(
       vararg patients: Pair<String, String>,
       shared: Set<CarePermission> = emptySet(),
+      canAdd: Set<CarePermission> = emptySet(),
   ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
@@ -354,7 +355,14 @@ class AppNavHostTest {
     for ((uid, _) in patients) {
       circles.setMembers(
           uid,
-          listOf(CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = shared)),
+          listOf(
+              CareCircleMember(
+                  uid = "caregiver",
+                  firstName = "Sam",
+                  permissions = shared,
+                  canAdd = canAdd,
+              )
+          ),
       )
     }
     invites.setJoinedCircles(
@@ -495,6 +503,52 @@ class AppNavHostTest {
           .isNotEmpty()
     }
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_allowedToAdd_logsTheSymptomInThePatientsJournal() {
+    val symptomsOnly = setOf(CarePermission.SYMPTOMS)
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = symptomsOnly, canAdd = symptomsOnly)
+    val symptoms = FakeSymptomRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        symptomRepository = symptoms,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(OverviewShortcut.SYMPTOMS.testTag)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.symptom_journal_add)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
+    // The form says whose journal the symptom goes in
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.symptom_add_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.FATIGUE.name))
+        .performScrollTo()
+        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_save).performClick()
+
+    // Back on Anne's journal: the symptom is hers, signed by the caregiver, and not in their own
+    composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals("caregiver", symptoms.symptoms("p-anne").single().addedBy)
+      assertTrue(symptoms.symptoms("caregiver").isEmpty())
+    }
   }
 
   @Test
