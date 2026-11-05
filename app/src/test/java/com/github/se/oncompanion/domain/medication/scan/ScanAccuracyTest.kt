@@ -11,9 +11,10 @@ import org.junit.Test
 
 /**
  * How well every test sheet is read, detail by detail, against [ScanAnswerKey]. The table is
- * printed in the test's output; the test fails if fewer details are read right than [READ_RIGHT],
- * or if more are wrong without being flagged than [WRONG_UNFLAGGED]. When the reading improves,
- * raise or lower those numbers in the same commit, so the score can only get better.
+ * printed in the test's output; the test fails if a sheet gets worse than its [BASELINE]: fewer
+ * details read right, more wrong without being flagged, or a medication missed or made up. Each
+ * sheet is checked on its own, so a gain on one can't hide a loss on another. When the reading
+ * improves, update the baseline in the same commit, so the score can only get better.
  */
 class ScanAccuracyTest {
   private val today = LocalDate.of(2026, 11, 20)
@@ -88,15 +89,21 @@ class ScanAccuracyTest {
     }
     printTable(scores)
 
-    val all = Score(scores.values.flatMap { it.outcomes }, scores.values.sumOf { it.extra })
-    assertTrue(
-        "Only ${all.count(Outcome.RIGHT)} details read right, expected at least $READ_RIGHT",
-        all.count(Outcome.RIGHT) >= READ_RIGHT,
-    )
-    assertTrue(
-        "${all.count(Outcome.WRONG)} details wrong without being flagged, at most $WRONG_UNFLAGGED",
-        all.count(Outcome.WRONG) <= WRONG_UNFLAGGED,
-    )
+    val worse = scores.mapNotNull { (n, score) ->
+      val baseline = BASELINE.getValue(n)
+      listOfNotNull(
+              "${score.count(Outcome.RIGHT)} right instead of ${baseline.right}"
+                  .takeIf { score.count(Outcome.RIGHT) < baseline.right },
+              "${score.count(Outcome.WRONG)} wrong without a flag instead of ${baseline.wrong}"
+                  .takeIf { score.count(Outcome.WRONG) > baseline.wrong },
+              "${score.count(Outcome.MISSED)} details of missed medications"
+                  .takeIf { score.count(Outcome.MISSED) > 0 },
+              "${score.extra} medications made up".takeIf { score.extra > 0 },
+          )
+          .takeIf { it.isNotEmpty() }
+          ?.joinToString(", ", prefix = "sheet %02d: ".format(n))
+    }
+    assertTrue("Read worse than before:\n${worse.joinToString("\n")}", worse.isEmpty())
   }
 
   private fun printTable(scores: Map<Int, Score>) {
@@ -109,11 +116,27 @@ class ScanAccuracyTest {
     }
   }
 
-  private companion object {
-    /** Details read right and not flagged, on all the sheets together. */
-    const val READ_RIGHT = 117
+  /** What a sheet must still reach: details [right] at least, [wrong] without a flag at most. */
+  private data class Baseline(val right: Int, val wrong: Int = 0)
 
-    /** Details wrong without being flagged: the ones the patient would trust. */
-    const val WRONG_UNFLAGGED = 1
+  private companion object {
+    /**
+     * Per sheet, the score of the last change. No sheet may miss or make up a medication: 11, the
+     * drink label, must give none.
+     */
+    val BASELINE =
+        mapOf(
+            1 to Baseline(right = 10),
+            2 to Baseline(right = 8),
+            3 to Baseline(right = 10),
+            4 to Baseline(right = 14),
+            5 to Baseline(right = 10),
+            6 to Baseline(right = 8),
+            7 to Baseline(right = 11),
+            8 to Baseline(right = 13),
+            9 to Baseline(right = 15),
+            10 to Baseline(right = 18, wrong = 1),
+            11 to Baseline(right = 0),
+        )
   }
 }
