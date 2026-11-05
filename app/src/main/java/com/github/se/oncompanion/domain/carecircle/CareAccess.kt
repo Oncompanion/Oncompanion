@@ -49,8 +49,8 @@ sealed interface CareAccess {
     fun canSee(section: CarePermission): Boolean = section in sections
 
     /**
-     * Whether add, edit and delete actions may be offered. Only the patient edits their own data:
-     * care circle access is always read-only.
+     * Whether edit and delete actions may be offered. Only the patient edits their own data; a
+     * member may at most add to the sections in [addable].
      */
     val canEdit: Boolean
       get() = isOwn
