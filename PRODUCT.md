@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 # Product
 
 <!-- impeccable:product-schema 1 -->

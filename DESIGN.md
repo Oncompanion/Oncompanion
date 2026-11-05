@@ -184,6 +184,7 @@ components:
     size: "48px / 40px"
     typography: "Figtree Bold 13 / 11"
 ---
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 
 # Design System: Oncompanion
 
