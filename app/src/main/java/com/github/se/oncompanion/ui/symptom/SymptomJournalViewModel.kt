@@ -120,8 +120,16 @@ class SymptomJournalViewModel(
           .flatMapLatest(::journalOf)
           .catch { e ->
             Log.e(TAG, "Failed to load the symptom journal", e)
-            // canAdd stays as it was: a patient can still log a symptom if their journal fails
-            _uiState.update { it.copy(isLoading = false, hasError = true, isNotShared = false) }
+            // A patient can still log a symptom if their journal fails. A caregiver can't: their
+            // access may have been taken away, and nothing would tell them once it is back
+            _uiState.update {
+              it.copy(
+                  isLoading = false,
+                  hasError = true,
+                  isNotShared = false,
+                  canAdd = it.canAdd && patientUid == null,
+              )
+            }
           }
           .collect { change -> _uiState.update(change) }
     }

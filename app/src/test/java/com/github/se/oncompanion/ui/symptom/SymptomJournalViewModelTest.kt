@@ -443,4 +443,26 @@ class SymptomJournalViewModelTest {
 
     assertEquals("Bob", vm.shownAddedBy())
   }
+
+  @Test
+  fun caregiver_readFails_losesTheAddButton() {
+    repository.observeError = IllegalStateException("denied")
+
+    val vm =
+        SymptomJournalViewModel(
+            signedIn("caregiver"),
+            repository,
+            clock,
+            patientUid = "patient",
+            resolveSection =
+                followedPatientAccess(
+                    CarePermission.SYMPTOMS,
+                    canAdd = setOf(CarePermission.SYMPTOMS),
+                ),
+        )
+    ShadowLooper.idleMainLooper()
+
+    assertTrue(vm.uiState.value.hasError)
+    assertFalse(vm.uiState.value.canAdd)
+  }
 }

@@ -453,4 +453,26 @@ class PrescriptionsViewModelTest {
         assertTrue(viewModel.uiState.value.hasError)
         assertTrue(viewModel.uiState.value.canAdd)
       }
+
+  @Test
+  fun caregiver_allowedToAdd_getsTheAddButton_untilTheListFails() =
+      runTest(dispatcher) {
+        val canAdd = setOf(CarePermission.PRESCRIPTIONS)
+        for (fails in listOf(false, true)) {
+          repository.readError = if (fails) IllegalStateException("denied") else null
+          val viewModel =
+              PrescriptionsViewModel(
+                  signedIn("caregiver"),
+                  repository,
+                  clock,
+                  patientUid = "patient",
+                  resolveSection =
+                      followedPatientAccess(CarePermission.PRESCRIPTIONS, canAdd = canAdd),
+              )
+          advanceUntilIdle()
+
+          // After a failed read, the access may have been taken away: no adding
+          assertEquals("fails=$fails", !fails, viewModel.uiState.value.canAdd)
+        }
+      }
 }
