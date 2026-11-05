@@ -1,0 +1,73 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
+package com.github.se.oncompanion.domain.carecircle
+
+import com.github.se.oncompanion.model.auth.AuthRepository
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+
+/** Whose data of one section a screen may read, and whether it may offer to change it. */
+sealed interface SectionAccess {
+
+  /** Not known yet: show none of the data. */
+  data object Loading : SectionAccess
+
+  /**
+   * [ownerUid]'s data of the section may be read.
+   *
+   * @property canEdit whether add, edit and delete may be offered: only for the user's own data
+   */
+  data class Readable(val ownerUid: String, val canEdit: Boolean) : SectionAccess
+
+  /** The patient a caregiver follows doesn't share this section with them. */
+  data object NotShared : SectionAccess
+
+  /** Nothing to read: nobody is signed in, or the caregiver isn't in the patient's circle. */
+  data object NoAccess : SectionAccess
+}
+
+/**
+ * Decides whose data of a [CarePermission] section a screen reads: the user's own, or that of the
+ * patient they follow when the patient shares the section (US-20). Every screen that shows a
+ * section asks it, so caregiver mode is the same code path everywhere.
+ *
+ * The user's own data needs no role, only to be signed in: anyone sees their own data, also offline
+ * before their profile is on the device. A followed patient's data goes through [resolveAccess].
+ */
+class ResolveSectionAccess(
+    private val resolveAccess: ResolveCareCircleAccess = ResolveCareCircleAccess(),
+    private val auth: AuthRepository = AuthRepositoryProvider.repository,
+) {
+
+  /**
+   * Emits the access to [section] of [patientUid]'s data (null for the user's own) now and every
+   * time it changes: sign-in or out, the patient sharing or hiding the section, or removing the
+   * caregiver. Fails like [resolveAccess].
+   */
+  operator fun invoke(section: CarePermission, patientUid: String?): Flow<SectionAccess> =
+      if (patientUid == null) {
+        auth
+            .observeCurrentUser()
+            .map { it?.uid }
+            .distinctUntilChanged()
+            .map { uid ->
+              uid?.let { SectionAccess.Readable(it, canEdit = true) } ?: SectionAccess.NoAccess
+            }
+      } else {
+        resolveAccess(patientUid)
+            .map { access ->
+              when (access) {
+                CareAccess.Unconfirmed -> SectionAccess.Loading
+                CareAccess.Denied -> SectionAccess.NoAccess
+                is CareAccess.Granted ->
+                    if (access.canSee(section))
+                        SectionAccess.Readable(access.ownerUid, access.canEdit)
+                    else SectionAccess.NotShared
+              }
+            }
+            .distinctUntilChanged()
+      }
+}

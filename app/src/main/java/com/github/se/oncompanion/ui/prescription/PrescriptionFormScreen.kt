@@ -70,6 +70,7 @@ import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -100,7 +101,7 @@ fun PrescriptionFormScreen(
 
   // Leaves the form once the prescription is saved
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) currentOnSaved() }
+  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
 
   PrescriptionFormContent(
       uiState = uiState,
@@ -119,6 +120,8 @@ fun PrescriptionFormScreen(
       onErrorShown = viewModel::clearError,
       onRetry = viewModel::load,
       modifier = modifier,
+      onKeepEditing = viewModel::keepEditing,
+      onSaveAnyway = viewModel::saveAnyway,
   )
 }
 
@@ -128,6 +131,8 @@ fun PrescriptionFormScreen(
  *
  * @param onErrorShown called once the error snackbar is gone
  * @param onRetry reads the saved prescription again after it couldn't be loaded
+ * @param onKeepEditing closes the "already saved" question without saving
+ * @param onSaveAnyway saves although the prescription is already saved
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,7 +153,12 @@ fun PrescriptionFormContent(
     onErrorShown: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onKeepEditing: () -> Unit = {},
+    onSaveAnyway: () -> Unit = {},
 ) {
+  // Asks before saving a prescription already saved (US-39)
+  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway) }
+
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
   val errorMessage = uiState.error?.let { stringResource(it.messageRes()) }
@@ -189,6 +199,8 @@ fun PrescriptionFormContent(
           modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
+        // Same medications as a saved prescription: most likely its renewal (US-39)
+        uiState.renewalOf?.let { RenewalNotice(it) }
         // A scanned prescription says what was read and what the patient should check
         if (uiState.isScanned) ReviewNotice(uiState)
 
@@ -287,7 +299,7 @@ private fun FormTopBar(
         // out would go back twice
         IconButton(
             onClick = onClose,
-            enabled = !uiState.isSaving && !uiState.isSaved,
+            enabled = uiState.save == SavePhase.EDITING,
             modifier = Modifier.testTag(C.Tag.prescription_form_close_button),
         ) {
           Icon(
@@ -617,7 +629,7 @@ private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit)
   SaveButton(
       text = stringResource(R.string.prescription_form_save),
       enabled = uiState.canSave,
-      isSaving = uiState.isSaving,
+      isSaving = uiState.save == SavePhase.SAVING,
       onClick = onSave,
       testTag = C.Tag.prescription_form_save_button,
       savingTestTag = C.Tag.prescription_form_saving,

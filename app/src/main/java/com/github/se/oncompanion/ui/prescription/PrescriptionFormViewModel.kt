@@ -8,9 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
+import com.github.se.oncompanion.domain.medication.SimilarPrescription
 import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.domain.medication.scan.ScannedPrescription
+import com.github.se.oncompanion.domain.medication.similarPrescription
 import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
@@ -19,6 +21,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
@@ -69,8 +72,7 @@ enum class PrescriptionFormLoad {
  *   start date. Until then it follows the date of the prescription.
  * @property nameTouched for each medication of the draft, in order: whether the user edited its
  *   name or left it for another medication. A missing name is only flagged from then on.
- * @property isSaving the prescription is being saved
- * @property isSaved the prescription is saved: the form is done
+ * @property save where saving the prescription is; once [SavePhase.SAVED], the form is done
  * @property error why the last save failed, until it has been shown
  * @property isEditing the form corrects a saved prescription instead of adding a new one
  * @property load whether the form can be filled in. Until it is [PrescriptionFormLoad.READY],
@@ -79,14 +81,17 @@ enum class PrescriptionFormLoad {
  * @property toCheck the details read from the scan the patient should check, until they edit them
  * @property leftOut how many medications the scan read beyond what a prescription can hold
  * @property dateFound whether the scan read a date; if not, the date is today's
+ * @property renewalOf a saved prescription with the same medications on another date: this one
+ *   looks like its renewal (US-39), said above the form
+ * @property alreadySaved a saved prescription this one is the same as: Save asked first whether to
+ *   save it anyway (US-39)
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
     val openMedication: Int = 0,
     val startDateChosen: List<Boolean> = draft.medications.map { true },
     val nameTouched: List<Boolean> = draft.medications.map { true },
-    val isSaving: Boolean = false,
-    val isSaved: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val error: PrescriptionFormError? = null,
     val isEditing: Boolean = false,
     val load: PrescriptionFormLoad = PrescriptionFormLoad.READY,
@@ -94,6 +99,8 @@ data class PrescriptionFormUiState(
     val toCheck: Set<ScannedField> = emptySet(),
     val leftOut: Int = 0,
     val dateFound: Boolean = true,
+    val renewalOf: Prescription? = null,
+    val alreadySaved: Prescription? = null,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -115,7 +122,7 @@ data class PrescriptionFormUiState(
    * being saved.
    */
   val canSave: Boolean
-    get() = load == PrescriptionFormLoad.READY && draft.isValid() && !isSaving && !isSaved
+    get() = load == PrescriptionFormLoad.READY && draft.isValid() && save == SavePhase.EDITING
 }
 
 /**
@@ -177,12 +184,36 @@ class PrescriptionFormViewModel(
   // The draft the form last started from: while the form still shows it, the user changed nothing
   private var shownDraft: PrescriptionDraft? = null
 
+  // The prescriptions already saved, which a new one is compared with (US-39)
+  private var saved: List<Prescription> = emptyList()
+
   init {
     // A saved prescription has to be read before the form can show it
     if (prescriptionId != null) {
       _uiState.update { it.copy(isEditing = true, load = PrescriptionFormLoad.LOADING) }
-    }
+    } else observeSaved()
     load()
+  }
+
+  /**
+   * Follows the prescriptions already saved, from the device's cache when offline, so a new one can
+   * be compared with them. Comparing is only a warning: if they can't be read, the form works as
+   * before.
+   */
+  private fun observeSaved() {
+    val uid = authRepository.signedInUid(TAG) ?: return
+    viewModelScope.launch {
+      try {
+        medicationRepository.observePrescriptions(uid).collect { prescriptions ->
+          saved = prescriptions
+          _uiState.update { it.withRenewal() }
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.w(TAG, "Couldn't read the saved prescriptions to compare with", e)
+      }
+    }
   }
 
   /**
@@ -234,13 +265,13 @@ class PrescriptionFormViewModel(
   private fun show(saved: Prescription?) {
     val state = _uiState.value
     // Once saved, the form is done: what arrives next is its own save
-    if (state.isSaved) return
+    if (state.save == SavePhase.SAVED) return
     if (saved == null) {
       _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
       return
     }
     // While saving, the form keeps showing what is being saved
-    if (state.isSaving) return
+    if (state.save == SavePhase.SAVING) return
     val draft = saved.toDraft().cutToLimits()
     // A form in use is left alone if the user changed it, and also if the same content arrives
     // again (e.g. the server confirmed it), which would close the medication they opened
@@ -407,7 +438,25 @@ class PrescriptionFormViewModel(
    * server refuses the prescription later, the form isn't told: it has already reported the save as
    * done, and Firestore then undoes the write. Don't rely on it for server errors.
    */
-  fun save() {
+  fun save() = save(confirmed = false)
+
+  /** Saves the prescription although it is the same as [PrescriptionFormUiState.alreadySaved]. */
+  fun saveAnyway() {
+    if (_uiState.value.alreadySaved == null) return
+    _uiState.update { it.copy(alreadySaved = null) }
+    save(confirmed = true)
+  }
+
+  /** Goes back to the form without saving: the patient keeps editing it. */
+  fun keepEditing() {
+    _uiState.update { it.copy(alreadySaved = null) }
+  }
+
+  /**
+   * Saves, unless a new prescription is the same as a saved one and the patient hasn't [confirmed]
+   * it: [PrescriptionFormUiState.alreadySaved] then asks first (US-39).
+   */
+  private fun save(confirmed: Boolean) {
     val state = _uiState.value
     if (!state.canSave) return
     val uid = authRepository.signedInUid(TAG)
@@ -415,7 +464,8 @@ class PrescriptionFormViewModel(
       _uiState.update { it.copy(error = PrescriptionFormError.NOT_SIGNED_IN) }
       return
     }
-    _uiState.update { it.copy(isSaving = true, error = null) }
+    if (!confirmed && asksAboutTheSame(state.draft)) return
+    _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
         val stillExists =
@@ -427,16 +477,29 @@ class PrescriptionFormViewModel(
           // Deleted since the form was opened, or while saving (the repository then writes
           // nothing): there is nothing left to correct
           if (stillExists && it.load != PrescriptionFormLoad.NOT_FOUND) {
-            it.copy(isSaving = false, isSaved = true)
-          } else it.copy(isSaving = false, load = PrescriptionFormLoad.NOT_FOUND)
+            it.copy(save = SavePhase.SAVED)
+          } else it.copy(save = SavePhase.EDITING, load = PrescriptionFormLoad.NOT_FOUND)
         }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         Log.e(TAG, "Failed to save the prescription", e)
-        _uiState.update { it.copy(isSaving = false, error = PrescriptionFormError.SAVE_FAILED) }
+        _uiState.update {
+          it.copy(save = SavePhase.EDITING, error = PrescriptionFormError.SAVE_FAILED)
+        }
       }
     }
+  }
+
+  /**
+   * Whether a new [draft] is the same as a saved prescription:
+   * [PrescriptionFormUiState.alreadySaved] then asks the patient before saving it again.
+   */
+  private fun asksAboutTheSame(draft: PrescriptionDraft): Boolean {
+    if (prescriptionId != null) return false
+    val same = similarPrescription(draft, saved) as? SimilarPrescription.Same ?: return false
+    _uiState.update { it.copy(alreadySaved = same.prescription) }
+    return true
   }
 
   /** The error has been shown. */
@@ -451,8 +514,8 @@ class PrescriptionFormViewModel(
    */
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
     _uiState.update { state ->
-      val locked = state.load != PrescriptionFormLoad.READY || state.isSaving || state.isSaved
-      if (locked) state else transform(state)
+      val locked = state.load != PrescriptionFormLoad.READY || state.save != SavePhase.EDITING
+      if (locked) state else transform(state).withRenewal()
     }
   }
 
@@ -462,6 +525,18 @@ class PrescriptionFormViewModel(
   ) {
     edit { it.withOpenMedication(transform).openChecked(detail) }
   }
+
+  /**
+   * Sets [PrescriptionFormUiState.renewalOf] to the saved prescription with the same medications on
+   * another date (US-39), or to null when there is none. A correction of a saved prescription is
+   * never compared, so its renewalOf stays null.
+   */
+  private fun PrescriptionFormUiState.withRenewal() =
+      copy(
+          renewalOf =
+              if (isEditing) null
+              else (similarPrescription(draft, saved) as? SimilarPrescription.Renewal)?.prescription
+      )
 
   /** The patient edited [field]: it is no longer to check. */
   private fun PrescriptionFormUiState.checked(field: ScannedField) = copy(toCheck = toCheck - field)

@@ -1,17 +1,23 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.espresso.Espresso
@@ -27,6 +33,7 @@ import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -36,8 +43,8 @@ import org.junit.runner.RunWith
  * The M1 end-to-end test: a new patient goes through the whole app like a real user, against the
  * Firebase emulators. It signs in, goes through onboarding, then uses every main feature, and
  * checks the links between them: an appointment added in Planning shows on the Overview, a Ligue
- * event shows in Planning and in Events, the first name given at onboarding shows on the Overview
- * and the profile, and signing in again finds everything where it was.
+ * event the patient confirms in Events shows in Planning, the first name given at onboarding shows
+ * on the Overview and the profile, and signing in again finds everything where it was.
  *
  * Only Google's account picker is replaced, as a test can't drive it: [EmulatorGoogleSignIn]
  * returns a token the Auth emulator accepts, for a new account on every run.
@@ -81,12 +88,14 @@ class M1EndToEndTest {
     signInAndOnboard(firstName = "Sam")
     addPrescription(doctor = "Dr Martin", medication = "Tamoxifen")
     addAppointmentTomorrow(title = "Oncology check-up")
-    seeLigueEventInPlanning(title = "Gentle yoga")
+    checkPlanningLandscape(title = "Oncology check-up")
     seeNextAppointmentOnOverview(title = "Oncology check-up")
-    seeLigueEventInEvents(title = "Gentle yoga", place = "Ligue, Geneva")
+    confirmRegistrationForLigueEvent(title = "Gentle yoga", place = "Ligue, Geneva")
+    seeConfirmedEventInPlanning(title = "Gentle yoga", appointment = "Oncology check-up")
     logSymptom()
     deleteSymptom()
     seeProfileAndAddHospital(firstName = "Sam", hospital = "HUG Geneva")
+    checkProfileLandscape()
     signOut()
     signInAgain(firstName = "Sam", nextAppointment = "Oncology check-up")
   }
@@ -100,6 +109,45 @@ class M1EndToEndTest {
   }
 
   // ---- steps ----
+
+  /** Rotation gives the agenda a full viewport without losing the selected appointment day. */
+  private fun checkPlanningLandscape(title: String) {
+    rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+    try {
+      tag(C.Tag.planning_list).performScrollToNode(hasText(title))
+      waitFor(hasText(title)).fullyVisible()
+      compose.onNodeWithTag(C.Tag.planning_week).assertIsNotDisplayed()
+      tag(C.Tag.bottom_navigation_tab_overview).fullyVisible()
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
+  }
+
+  /** Profile actions remain reachable after rotating the same signed-in patient's screen. */
+  private fun checkProfileLandscape() {
+    rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+    try {
+      tag(C.Tag.profile_sign_out).reveal().fullyVisible()
+      compose.onNodeWithTag(C.Tag.profile_back).assertIsNotDisplayed()
+      tag(C.Tag.profile_edit).reveal().fullyVisible()
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
+  }
+
+  private fun rotate(requested: Int, expected: Int) {
+    compose.runOnUiThread { compose.activity.requestedOrientation = requested }
+    compose.waitUntil(10_000) { compose.activity.resources.configuration.orientation == expected }
+    compose.waitForIdle()
+  }
+
+  private fun SemanticsNodeInteraction.fullyVisible() {
+    val node = fetchSemanticsNode()
+    assertTrue(
+        "The whole control must fit in the viewport",
+        node.boundsInRoot.height >= node.size.height,
+    )
+  }
 
   /** Google sign-in, then onboarding as a patient: the Overview greets them by first name. */
   private fun signInAndOnboard(firstName: String) {
@@ -137,10 +185,7 @@ class M1EndToEndTest {
     tag(C.Tag.bottom_navigation_tab_planning).performClick()
     waitFor(hasTestTag(C.Tag.planning_screen))
 
-    // Tomorrow can be in next week's calendar
-    val tomorrow = C.Tag.planningDay(LocalDate.now().plusDays(1).toString())
-    if (!exists(hasTestTag(tomorrow))) tag(C.Tag.planning_next).performClick()
-    waitFor(hasTestTag(tomorrow)).performClick()
+    selectTomorrowInPlanning()
 
     tag(C.Tag.planning_add).performClick()
     waitFor(hasTestTag(C.Tag.appointment_title)).typeText(title)
@@ -153,11 +198,6 @@ class M1EndToEndTest {
     waitFor(hasTestTag(C.Tag.planning_screen) and hasAnyDescendant(hasText(title)))
   }
 
-  /** The link between Events and Planning: the Ligue's event shows on its day, next to ours. */
-  private fun seeLigueEventInPlanning(title: String) {
-    waitFor(hasTestTag(C.Tag.planning_screen) and hasAnyDescendant(hasText(title)))
-  }
-
   /** The link between Planning and the Overview: the new appointment is the next one there. */
   private fun seeNextAppointmentOnOverview(title: String) {
     tag(C.Tag.bottom_navigation_tab_overview).performClick()
@@ -167,8 +207,11 @@ class M1EndToEndTest {
     )
   }
 
-  /** The Events tab lists the Ligue's event, whose detail says where it takes place. */
-  private fun seeLigueEventInEvents(title: String, place: String) {
+  /**
+   * The Events tab lists the Ligue's event, whose detail says where it takes place; the patient
+   * confirms there that they registered with the organizer (US-25).
+   */
+  private fun confirmRegistrationForLigueEvent(title: String, place: String) {
     tag(C.Tag.bottom_navigation_tab_events).performClick()
     // The list only composes the cards on screen: scroll to ours first, in case earlier events
     // (e.g. left by a crashed run) push it down
@@ -177,8 +220,25 @@ class M1EndToEndTest {
 
     waitFor(hasTestTag(C.Tag.event_detail_event_title) and hasText(title, substring = true))
     waitFor(hasTestTag(C.Tag.event_detail_location) and hasText(place, substring = true))
+    waitFor(hasTestTag(C.Tag.event_detail_confirm)).reveal().performClick()
+    waitFor(hasTestTag(C.Tag.event_detail_registration_confirmed))
     tag(C.Tag.event_detail_back).performClick()
+  }
 
+  /**
+   * The link between Events and Planning (US-30): the confirmed event shows on its day, next to the
+   * patient's appointment.
+   */
+  private fun seeConfirmedEventInPlanning(title: String, appointment: String) {
+    tag(C.Tag.bottom_navigation_tab_planning).performClick()
+    waitFor(hasTestTag(C.Tag.planning_screen))
+    selectTomorrowInPlanning()
+
+    waitFor(
+        hasTestTag(C.Tag.planning_screen) and
+            hasAnyDescendant(hasText(title)) and
+            hasAnyDescendant(hasText(appointment))
+    )
     tag(C.Tag.bottom_navigation_tab_overview).performClick()
     waitFor(hasTestTag(C.Tag.overview_greeting))
   }
@@ -281,6 +341,13 @@ class M1EndToEndTest {
   }
 
   // ---- helpers ----
+
+  /** In Planning, selects tomorrow, which can be in next week's calendar. */
+  private fun selectTomorrowInPlanning() {
+    val tomorrow = C.Tag.planningDay(LocalDate.now().plusDays(1).toString())
+    if (!exists(hasTestTag(tomorrow))) tag(C.Tag.planning_next).performClick()
+    waitFor(hasTestTag(tomorrow)).performClick()
+  }
 
   /** Writes a Ligue event for tomorrow at 15:00, as the Firebase console would. */
   private fun addLigueEventTomorrow(title: String) = runBlocking {

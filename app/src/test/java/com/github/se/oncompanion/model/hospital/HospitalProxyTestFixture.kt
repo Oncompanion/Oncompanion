@@ -33,7 +33,7 @@ internal class HospitalProxyTestFixture : HospitalProxyTokens, HospitalProxyTran
 
   override suspend fun appCheckToken(): String? = if (attested) "app-token" else null
 
-  override fun get(url: URL, headers: Map<String, String>): HospitalProxyResponse {
+  override suspend fun get(url: URL, headers: Map<String, String>): HospitalProxyResponse {
     requests += url to headers
     failure?.let { throw it }
     return HospitalProxyResponse(status, body, retryAfter)

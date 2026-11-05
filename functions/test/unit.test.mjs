@@ -847,26 +847,28 @@ test("operational storage events contain no request or exception data", async (t
         events,
         method === "release"
           ? [
-              ["hospital_search_storage_failure"],
-              ["hospital_search_storage_failure"],
-              ["hospital_search_storage_failure"],
-              ["hospital_search_release_failed"],
-              ["hospital_search_storage_failure"],
-              ["hospital_search_unavailable"],
+              ["hospital_search_storage_failure", undefined],
+              ["hospital_search_storage_failure", undefined],
+              ["hospital_search_storage_failure", undefined],
+              ["hospital_search_release_failed", undefined],
+              ["hospital_search_storage_failure", undefined],
+              ["hospital_search_unavailable", "storage_unavailable"],
             ]
           : [
-              ["hospital_search_storage_failure"],
-              ["hospital_search_unavailable"],
+              ["hospital_search_storage_failure", undefined],
+              ["hospital_search_unavailable", "storage_unavailable"],
             ],
       );
     });
   }
 });
 
-test("upstream failure remains observable when release also fails", async () => {
+test("oversized upstream wait logs its cause and keeps the lock without release", async () => {
   const store = fakeStore();
+  let releases = 0;
   store.release = async () => {
-    throw new Error("private release");
+    releases++;
+    throw new Error("Must retain the lock");
   };
   const events = [];
   const service = new HospitalSearchService(
@@ -886,9 +888,20 @@ test("upstream failure remains observable when release also fails", async () => 
     "hospital_search_upstream_failure",
     "hospital_search_upstream_wait_exceeds_limit",
   ]);
-  // The oversized wait intentionally skips release; test ordinary failure plus exhausted release separately.
-  const second = new HospitalSearchService(
-    fakeStoreWithFailedRelease(),
+  assert.equal(releases, 0);
+  assert.equal(store.locked, true);
+});
+
+test("upstream failure stays observable through all three failed release attempts", async () => {
+  const store = fakeStore();
+  let releases = 0;
+  store.release = async () => {
+    releases++;
+    throw new Error("private release");
+  };
+  const events = [];
+  const service = new HospitalSearchService(
+    store,
     {
       async search() {
         throw new SearchError(502, "upstream_failure");
@@ -897,33 +910,36 @@ test("upstream failure remains observable when release also fails", async () => 
     (event) => events.push(event),
   );
   await assert.rejects(
-    second.search("private-query", "a".repeat(64)),
+    service.search("private-query", "a".repeat(64)),
     failure(503),
   );
-  assert(events.includes("hospital_search_release_failed"));
-  assert.equal(
-    events.filter((e) => e === "hospital_search_upstream_failure").length,
-    2,
-  );
-  function fakeStoreWithFailedRelease() {
-    const value = fakeStore();
-    value.release = store.release;
-    return value;
-  }
+  assert.deepEqual(events, [
+    "hospital_search_upstream_failure",
+    "hospital_search_storage_failure",
+    "hospital_search_storage_failure",
+    "hospital_search_storage_failure",
+    "hospital_search_release_failed",
+    "hospital_search_storage_failure",
+  ]);
+  assert.equal(releases, 3);
+  assert.equal(store.locked, true);
 });
 
-test("HTTP logs only fixed failure events and stays quiet for successful/cache and quota requests", async () => {
+test("HTTP logs fixed events and safe codes while successful and quota requests stay quiet", async () => {
   for (const [error, expected, status] of [
     [undefined, [], 200],
     [new SearchError(429, "quota_exceeded"), [], 429],
     [
       new SearchError(429, "capacity_exhausted"),
-      ["hospital_search_capacity_exhausted"],
+      [["hospital_search_capacity_exhausted", "capacity_exhausted"]],
       429,
     ],
     [
       new Error("private-token private-patient"),
-      ["hospital_search_unexpected_failure", "hospital_search_unavailable"],
+      [
+        ["hospital_search_unexpected_failure"],
+        ["hospital_search_unavailable", "service_unavailable"],
+      ],
       503,
     ],
   ]) {
@@ -940,10 +956,7 @@ test("HTTP logs only fixed failure events and stays quiet for successful/cache a
       (...args) => events.push(args),
     )(request(), res);
     assert.equal(res.statusCode, status);
-    assert.deepEqual(
-      events,
-      expected.map((event) => [event]),
-    );
+    assert.deepEqual(events, expected);
   }
 });
 
@@ -963,4 +976,192 @@ test("default logger writes structured fixed events without exception fields", a
     message: "hospital_search_release_failed",
     event: "hospital_search_release_failed",
   });
+});
+
+test("diagnostic extraction accepts only known application codes and storage statuses", async () => {
+  const { failureCode } = await import("../lib/logging.js");
+  assert.equal(
+    failureCode(new SearchError(503, "contact_not_configured")),
+    "contact_not_configured",
+  );
+  assert.equal(
+    failureCode(new SearchError(502, "upstream_failure")),
+    "upstream_failure",
+  );
+  assert.equal(
+    failureCode(new SearchError(503, "private-query private-token")),
+    undefined,
+  );
+  assert.equal(failureCode({ code: "contact_not_configured" }), undefined);
+  assert.equal(failureCode({ code: 14 }), undefined);
+  for (let code = 1; code <= 16; code++) {
+    const error = Object.assign(new Error("private-message"), {
+      code,
+      details: "private-details",
+    });
+    assert.equal(failureCode(error, "storage"), code);
+  }
+  for (const code of [
+    undefined,
+    null,
+    "14",
+    "UNAVAILABLE",
+    "private-token",
+    0,
+    -1,
+    17,
+    1.5,
+    NaN,
+    Infinity,
+    {},
+    [],
+  ]) {
+    assert.equal(failureCode({ code }, "storage"), undefined);
+  }
+  for (const error of [
+    undefined,
+    null,
+    "private-query",
+    14,
+    {},
+    new Error("private-token"),
+  ]) {
+    assert.equal(failureCode(error, "storage"), undefined);
+  }
+  const getterError = Object.defineProperty({}, "code", {
+    get() {
+      assert.fail("Do not execute error getters");
+    },
+  });
+  assert.equal(failureCode(getterError, "storage"), undefined);
+});
+
+test("upstream and HTTP failure diagnostics preserve the original safe configuration code", async () => {
+  const events = [];
+  const log = (...args) => events.push(args);
+  const handler = createHandler(
+    new HospitalSearchService(
+      fakeStore(),
+      new NominatimClient("", () => assert.fail("No configured contact")),
+      log,
+    ),
+    async () => "a".repeat(64),
+    log,
+  );
+  const res = response();
+  await handler(request(), res);
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(events, [
+    ["hospital_search_upstream_failure", "contact_not_configured"],
+    ["hospital_search_unavailable", "contact_not_configured"],
+  ]);
+});
+
+test("storage diagnostics preserve numeric SDK statuses without messages or metadata", async (t) => {
+  for (const method of [
+    "cached",
+    "consumeQuota",
+    "acquire",
+    "save",
+    "release",
+  ]) {
+    await t.test(method, async () => {
+      const store = fakeStore();
+      store[method] = async () => {
+        throw Object.assign(new Error("private-query private-token"), {
+          code: 14,
+          details: "private-patient",
+          metadata: { token: "private-token" },
+        });
+      };
+      const events = [];
+      const log = (...args) => events.push(args);
+      const res = response();
+      await createHandler(
+        new HospitalSearchService(
+          store,
+          {
+            async search() {
+              return [];
+            },
+          },
+          log,
+        ),
+        async () => "a".repeat(64),
+        log,
+      )(request(), res);
+      assert.equal(res.statusCode, 503);
+      assert.deepEqual(
+        events,
+        method === "release"
+          ? [
+              ["hospital_search_storage_failure", 14],
+              ["hospital_search_storage_failure", 14],
+              ["hospital_search_storage_failure", 14],
+              ["hospital_search_release_failed", 14],
+              ["hospital_search_storage_failure", 14],
+              ["hospital_search_unavailable", "storage_unavailable"],
+            ]
+          : [
+              ["hospital_search_storage_failure", 14],
+              ["hospital_search_unavailable", "storage_unavailable"],
+            ],
+      );
+    });
+  }
+});
+
+test("structured logger uses warning only for capacity and emits only validated diagnostic codes", async () => {
+  const events = [
+    "hospital_search_storage_failure",
+    "hospital_search_release_failed",
+    "hospital_search_upstream_failure",
+    "hospital_search_upstream_wait_exceeds_limit",
+    "hospital_search_unexpected_failure",
+    "hospital_search_unavailable",
+    "hospital_search_capacity_exhausted",
+  ];
+  const script = `import { logFailure } from ${JSON.stringify(new URL("../lib/logging.js", import.meta.url).href)};
+    for (const event of ${JSON.stringify(events)}) logFailure(event);
+    logFailure("hospital_search_upstream_failure", "contact_not_configured");
+    logFailure("hospital_search_storage_failure", 14);
+    for (const code of ["private-token", "14", 0, 17, 1.5, NaN, Infinity, { toJSON() { throw new Error("Do not serialize private metadata"); } }])
+      logFailure("hospital_search_storage_failure", code);`;
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  const entries = result.stderr
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.deepEqual(entries, [
+    ...events.map((event) => ({
+      severity:
+        event === "hospital_search_capacity_exhausted" ? "WARNING" : "ERROR",
+      message: event,
+      event,
+    })),
+    {
+      severity: "ERROR",
+      message: "hospital_search_upstream_failure",
+      event: "hospital_search_upstream_failure",
+      code: "contact_not_configured",
+    },
+    {
+      severity: "ERROR",
+      message: "hospital_search_storage_failure",
+      event: "hospital_search_storage_failure",
+      code: 14,
+    },
+    ...Array.from({ length: 8 }, () => ({
+      severity: "ERROR",
+      message: "hospital_search_storage_failure",
+      event: "hospital_search_storage_failure",
+    })),
+  ]);
 });

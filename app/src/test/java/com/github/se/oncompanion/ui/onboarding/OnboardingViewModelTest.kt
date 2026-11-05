@@ -2,17 +2,25 @@
 
 package com.github.se.oncompanion.ui.onboarding
 
+import com.github.se.oncompanion.domain.auth.SignOut
+import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.FakeCleanupJournal
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
+import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -94,8 +102,8 @@ class OnboardingViewModelTest {
     assertFalse(OnboardingUiState().canSave)
     assertFalse(OnboardingUiState(firstName = "   ").canSave)
     assertTrue(OnboardingUiState(firstName = "Alex").canSave)
-    assertFalse(OnboardingUiState(firstName = "Alex", isSaving = true).canSave)
-    assertFalse(OnboardingUiState(firstName = "Alex", isSaved = true).canSave)
+    assertFalse(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVING).canSave)
+    assertFalse(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVED).canSave)
   }
 
   @Test
@@ -111,8 +119,7 @@ class OnboardingViewModelTest {
     assertEquals("", s.firstName)
     assertEquals("", s.familyName)
     assertEquals("", s.cancerType)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
     assertNull(s.error)
   }
 
@@ -251,8 +258,7 @@ class OnboardingViewModelTest {
     assertEquals(listOf(expected), profiles.created)
     assertEquals(expected, fakeProfiles.profiles[user.uid]?.copy(createdAt = null))
     val s = state(vm)
-    assertFalse(s.isSaving)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertNull(s.error)
     assertFalse(s.canSave)
   }
@@ -270,7 +276,7 @@ class OnboardingViewModelTest {
         listOf(UserProfile(uid = user.uid, role = Role.PATIENT, firstName = "Alexandra")),
         profiles.created,
     )
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -295,7 +301,7 @@ class OnboardingViewModelTest {
         ),
         profiles.created,
     )
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -304,7 +310,7 @@ class OnboardingViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     assertEquals("Alexandra", profiles.created.single().firstName)
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -333,8 +339,7 @@ class OnboardingViewModelTest {
     assertTrue(fakeProfiles.profiles.isEmpty())
     val s = state(vm)
     assertEquals(OnboardingError.NOT_SIGNED_IN, s.error)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
   }
 
   @Test
@@ -346,8 +351,7 @@ class OnboardingViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     var s = state(vm)
-    assertTrue(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.SAVING, s.save)
     assertNull(s.error)
     assertFalse(s.canSave)
 
@@ -358,8 +362,7 @@ class OnboardingViewModelTest {
     gate.complete(Unit)
     advanceUntilIdle()
     s = state(vm)
-    assertFalse(s.isSaving)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertEquals(1, profiles.created.size)
   }
 
@@ -383,8 +386,7 @@ class OnboardingViewModelTest {
 
     var s = state(vm)
     assertEquals(OnboardingError.SAVE_FAILED, s.error)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
     assertTrue(s.canSave)
     assertTrue(fakeProfiles.profiles.isEmpty())
 
@@ -394,7 +396,7 @@ class OnboardingViewModelTest {
 
     s = state(vm)
     assertNull(s.error)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertEquals(2, profiles.created.size)
     assertTrue(fakeProfiles.profiles.containsKey(user.uid))
   }
@@ -412,7 +414,7 @@ class OnboardingViewModelTest {
     profiles.gate = gate
     vm.saveProfile()
     advanceUntilIdle()
-    assertTrue(state(vm).isSaving)
+    assertEquals(SavePhase.SAVING, state(vm).save)
     assertNull(state(vm).error)
     gate.complete(Unit)
     advanceUntilIdle()
@@ -429,7 +431,7 @@ class OnboardingViewModelTest {
     advanceUntilIdle()
 
     assertEquals("late-uid", profiles.created.single().uid)
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   // --- clearError ---
@@ -456,5 +458,117 @@ class OnboardingViewModelTest {
     val before = state(vm)
     vm.clearError()
     assertEquals(before, state(vm))
+  }
+
+  // ---- Use another account (#281) ----
+
+  /** A view model whose sign-out runs on [local]; the signed-in user has an email. */
+  private fun switching(
+      local: FakeLocalSessionRepository = FakeLocalSessionRepository()
+  ): Pair<OnboardingViewModel, SignOut> {
+    val fakeAuth =
+        FakeAuthRepository().apply {
+          onSignIn = { AuthUser(uid = "uid-$it", email = "alex.martin@example.com") }
+        }
+    runBlocking { fakeAuth.signInWithGoogle("1") }
+    val signOut = SignOut(fakeAuth, local).apply { initialize(FakeCleanupJournal()) }
+    return OnboardingViewModel(fakeAuth, profiles, signOut) to signOut
+  }
+
+  @Test
+  fun theSignedInEmailIsShown_orNothingWhenUnknown() {
+    assertEquals("alex.martin@example.com", switching().first.uiState.value.email)
+    assertNull(OnboardingViewModel(auth, profiles).uiState.value.email)
+    auth.currentUserError = IllegalStateException("Firebase isn't initialized")
+    assertNull(OnboardingViewModel(auth, profiles).uiState.value.email)
+  }
+
+  @Test
+  fun useAnotherAccount_signsOut_withoutSavingAnything() = runTest {
+    val (vm, _) = switching()
+    advanceUntilIdle()
+    var cleared = 0
+
+    vm.useAnotherAccount { cleared++ }
+    assertEquals(AccountSwitch.SIGNING_OUT, state(vm).accountSwitch)
+    assertFalse(state(vm).canSwitchAccount)
+    // A second tap while signing out does nothing
+    vm.useAnotherAccount { cleared++ }
+    advanceUntilIdle()
+
+    assertEquals(AccountSwitch.DONE, state(vm).accountSwitch)
+    assertEquals(1, cleared)
+    assertTrue(profiles.created.isEmpty())
+  }
+
+  @Test
+  fun changesThatMayNotBeSaved_askFirst_thenStayOrDiscard() = runTest {
+    for (discard in listOf(false, true)) {
+      val local = FakeLocalSessionRepository().apply { synchronizeAction = { error("offline") } }
+      val (vm, signOut) = switching(local)
+      advanceUntilIdle()
+      vm.onFirstNameChange("Alex")
+
+      vm.useAnotherAccount {}
+      advanceUntilIdle()
+      assertEquals(AccountSwitch.CONFIRMING_DISCARD, state(vm).accountSwitch)
+
+      if (discard) {
+        vm.discardChangesAndSwitch {}
+        advanceUntilIdle()
+        assertEquals(AccountSwitch.DONE, state(vm).accountSwitch)
+        assertFalse(local.offlineChanges)
+      } else {
+        vm.stayOnThisAccount()
+        advanceUntilIdle()
+        assertNull(state(vm).accountSwitch)
+        assertTrue(state(vm).canSwitchAccount)
+        // What was typed is still there
+        assertEquals("Alex", state(vm).firstName)
+        assertTrue(local.offlineChanges)
+        assertEquals(SignOutState.IDLE, signOut.state.value)
+      }
+      SessionAccess.reopen()
+    }
+  }
+
+  @Test
+  fun discardOrStay_doNothingUnlessAsked() = runTest {
+    val (vm, signOut) = switching()
+    advanceUntilIdle()
+    vm.discardChangesAndSwitch {}
+    vm.stayOnThisAccount()
+    advanceUntilIdle()
+    assertNull(state(vm).accountSwitch)
+    assertEquals(SignOutState.IDLE, signOut.state.value)
+  }
+
+  @Test
+  fun noSwitch_whileSavingOrOnceSaved() = runTest {
+    val (vm, signOut) = switching()
+    vm.onFirstNameChange("Alex")
+    profiles.gate = CompletableDeferred()
+    vm.saveProfile()
+    assertFalse(state(vm).canSwitchAccount)
+    vm.useAnotherAccount {}
+    assertEquals(SignOutState.IDLE, signOut.state.value)
+
+    profiles.gate!!.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(SavePhase.SAVED, state(vm).save)
+    vm.useAnotherAccount {}
+    assertNull(state(vm).accountSwitch)
+    assertEquals(SignOutState.IDLE, signOut.state.value)
+  }
+
+  @Test
+  fun aSignOutStartedElsewhere_isntThisScreens() = runTest {
+    val (vm, signOut) = switching()
+    advanceUntilIdle()
+    signOut.begin {}
+    advanceUntilIdle()
+    assertEquals(SignOutState.COMPLETE, signOut.state.value)
+    assertNull(state(vm).accountSwitch)
+    SessionAccess.reopen()
   }
 }

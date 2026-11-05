@@ -20,7 +20,11 @@ internal enum class LineKind {
   PATIENT,
   /** Holds the prescription's date. */
   DATE,
-  /** Starts a medication: a name with its strength, maybe followed by how to take it. */
+  /**
+   * Starts a medication: a name with its strength, maybe followed by how to take it, or an item of
+   * a list with a name and how to take it but no strength ("- Movicol sachets : 1 sachet par
+   * jour").
+   */
   MEDICATION,
   /** How to take the medication above: how much, how often, for how long. */
   DOSING,
@@ -77,7 +81,12 @@ private fun kindOf(line: RecognizedLine, words: String, label: Label?, width: In
         // After the doctor and the patient, whose lines often end with an address
         isContactOrIdentifier(words) -> LineKind.NOISE
         hasStrength(words) && NAME.containsMatchIn(words) -> LineKind.MEDICATION
-        datesIn(words).isNotEmpty() -> LineKind.DATE
+        isListedWithoutStrength(words) -> LineKind.MEDICATION
+        // A note in the list ("- Merci de revenir ... 1 fois par semaine") isn't how to take the
+        // medication above, even with a frequency in it
+        isListedSentence(words) || FOOTNOTE.containsMatchIn(words) -> LineKind.OTHER
+        // A validity or next check-up date never is the prescription's
+        datesIn(words).isNotEmpty() -> if (isAboutLater(words)) LineKind.OTHER else LineKind.DATE
         hasDoseQuantity(words) || hasFrequency(words) || hasDuration(words) -> LineKind.DOSING
         words.length <= 2 || words.none { it.isLetter() } -> LineKind.NOISE
         else -> LineKind.OTHER
@@ -123,6 +132,38 @@ private fun labelAbove(labels: List<LabelledBlock>, line: RecognizedLine): Label
   block.bottom = maxOf(block.bottom, box.bottom)
   return block.label
 }
+
+/**
+ * Whether [words] is an item of a list ("- ", "• ", "2. ") with a short name before how to take it:
+ * a medication whose strength isn't written, as for a laxative or a mouthwash. Not a sentence, nor
+ * a footnote ("*of the reference intake ... within 3 days" on a food label).
+ */
+private fun isListedWithoutStrength(words: String): Boolean {
+  val name = listedBeforeDosing(words) ?: return false
+  return NAME.containsMatchIn(name) && wordCount(name) <= LISTED_NAME_WORDS
+}
+
+/** Whether [words] is an item of a list that is a sentence before any word about dosing. */
+private fun isListedSentence(words: String): Boolean =
+    listedBeforeDosing(words)?.let { wordCount(it) > LISTED_NAME_WORDS } == true
+
+/** What an item of a list says before how to take something, if [words] is one and says it. */
+private fun listedBeforeDosing(words: String): String? {
+  val item = LIST_ITEM.find(words) ?: return null
+  val rest = words.substring(item.range.last + 1)
+  val dosing = PrescriptionLexicon.dosingStartIn(rest) ?: return null
+  return rest.substring(0, dosing)
+}
+
+private fun wordCount(text: String) = text.split(" ").count { it.isNotBlank() }
+
+private val LIST_ITEM = Regex("""^\s*(?:[-•–]|\d{1,2}[.)])\s*(?=\p{L})""")
+
+/** A footnote: "*" right against its first word ("*of the reference intake"), unlike a bullet. */
+private val FOOTNOTE = Regex("""^\s*\*(?=\p{L})""")
+
+/** How many words a listed medication's name and form can have ("Bain de bouche bicarbonate"). */
+private const val LISTED_NAME_WORDS = 5
 
 /** A word of at least three letters: a medication's name next to its strength. */
 private val NAME = Regex("""[a-z]{3,}""")

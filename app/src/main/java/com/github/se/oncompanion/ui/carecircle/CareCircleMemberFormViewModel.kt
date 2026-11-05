@@ -18,6 +18,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,8 @@ import kotlinx.coroutines.launch
  * @property loadFailed in edit mode, the member couldn't be read
  * @property loadedDetails in edit mode, the member's details as filled in, to tell whether anything
  *   changed
- * @property savedInviteCode the invite code of the invitation just created, once [isSaved]
+ * @property savedInviteCode the invite code of the invitation just created, once [save] is
+ *   [SavePhase.SAVED]
  * @property saveFailed whether the last save failed; the draft is kept so the patient can retry
  */
 data class CareCircleMemberFormUiState(
@@ -53,9 +55,8 @@ data class CareCircleMemberFormUiState(
     val notFound: Boolean = false,
     val loadFailed: Boolean = false,
     val loadedDetails: CareCircleMemberDetails? = null,
-    val isSaving: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val savedInviteCode: String? = null,
-    val isSaved: Boolean = false,
     val saveFailed: Boolean = false,
 ) {
   /** Whether the first name, which is required, is still blank. */
@@ -79,7 +80,7 @@ data class CareCircleMemberFormUiState(
 
   /** Whether the fields can still change: not while saving, nor once saved. */
   val canEdit: Boolean
-    get() = showsForm && !isSaving && !isSaved
+    get() = showsForm && save == SavePhase.EDITING
 
   /**
    * What saving stores: the names trimmed, a blank last name left out. Null without relationship.
@@ -148,7 +149,7 @@ class CareCircleMemberFormViewModel(
         careCircleRepository.observeMember(ownerUid, memberUid).collect { member ->
           val state = _uiState.value
           // The member saved from this form comes back: the screen is leaving
-          if (state.isSaving || state.isSaved) return@collect
+          if (state.save != SavePhase.EDITING) return@collect
           _uiState.value =
               when {
                 member == null -> state.copy(isLoading = false, notFound = true)
@@ -226,7 +227,7 @@ class CareCircleMemberFormViewModel(
     val state = _uiState.value
     if (!state.canSave) return
     val details = state.details ?: return
-    _uiState.value = state.copy(isSaving = true, saveFailed = false)
+    _uiState.value = state.copy(save = SavePhase.SAVING, saveFailed = false)
     viewModelScope.launch {
       // The new invite code when adding, null when editing
       val saved: Result<String?> =
@@ -249,9 +250,9 @@ class CareCircleMemberFormViewModel(
       _uiState.value =
           saved.fold(
               onSuccess = { inviteCode ->
-                _uiState.value.copy(isSaving = false, isSaved = true, savedInviteCode = inviteCode)
+                _uiState.value.copy(save = SavePhase.SAVED, savedInviteCode = inviteCode)
               },
-              onFailure = { _uiState.value.copy(isSaving = false, saveFailed = true) },
+              onFailure = { _uiState.value.copy(save = SavePhase.EDITING, saveFailed = true) },
           )
     }
   }
@@ -279,7 +280,7 @@ class CareCircleMemberFormViewModel(
 
   /** Called once the screen has left after saving, so recomposition can't leave a second time. */
   fun consumeSaved() {
-    _uiState.value = _uiState.value.copy(isSaved = false, savedInviteCode = null)
+    _uiState.value = _uiState.value.copy(save = SavePhase.EDITING, savedInviteCode = null)
   }
 
   private companion object {

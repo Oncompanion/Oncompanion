@@ -190,6 +190,11 @@ class PrescriptionLexiconTest {
         "Vitamine D 1000 UI",
         "Salbutamol 100 µg",
         "Sirop 5 ml",
+        "Lidocaïne gel 2 %",
+        // ML Kit ran the next word into "%"
+        "Lidocaïne gel 2 %application locale",
+        // A strength in brackets: only a share in brackets is left out
+        "Paracétamol (500 mg) 1 comprimé par jour",
     )
     assertAll(
         PrescriptionLexicon::hasStrength,
@@ -199,6 +204,11 @@ class PrescriptionLexiconTest {
         "3 jours",
         "1 cp toutes les 12 heures",
         "1700 Fribourg",
+        // A food label: a share in brackets and an amount per serving aren't strengths
+        "orange juice from concentrate (35%",
+        "stabiliser pectin (0,5%), vitamin B6",
+        "Nutrition per 100 ml",
+        "Valeurs nutritives pour 100 ml",
     )
   }
 
@@ -257,6 +267,12 @@ class PrescriptionLexiconTest {
         "1 injection s.c. par jour",
         "après chaque selle liquide",
         "as needed",
+        // Abbreviations
+        "bid",
+        "1 tablet tid",
+        "q8h",
+        "1 cp x 2/j",
+        "2/j",
     )
     assertAll(
         PrescriptionLexicon::hasFrequency,
@@ -281,6 +297,7 @@ class PrescriptionLexiconTest {
         "for 2 weeks",
         "pendant 3 semaines",
         "10 j",
+        "1 cp x 2/j pdt 3j",
         // After a word ending in "in" or "dans" (a table row read as one line)
         "2 cp le matin 3 jours",
         "1 tablet each morning 5 days",
@@ -299,6 +316,62 @@ class PrescriptionLexiconTest {
         "1 cp toutes les 12 heures",
         "Ondansetron 8 mg",
     )
+  }
+
+  @Test
+  fun datesOfSomethingLaterAreRecognized() {
+    assertAll(
+        PrescriptionLexicon::isAboutLater,
+        true,
+        "Valable jusqu'au 31.01.2027. Prochain contrôle le 05.11.2026.",
+        "Follow-up: blood count on 03/11/2026.",
+        "Valid until 31.01.2027",
+        "Prochain rendez-vous le 12.11.2026",
+        "Gültig bis zum 31.01.2027",
+    )
+    assertAll(
+        PrescriptionLexicon::isAboutLater,
+        false,
+        "Genève, le 22.10.2026",
+        "Discharge date: Oct 27, 2026",
+        "Bern, 21.10.2026",
+    )
+  }
+
+  @Test
+  fun swissGermanPrescriptionsAreReadLikeFrenchOnes() {
+    assertAll(PrescriptionLexicon::hasBirthClue, true, "Patientin: Mia Keller, geb. 04.06.1959")
+    assertAll(PrescriptionLexicon::hasPatientClue, true, "Patientin: Mia Keller", "Patient: Max")
+    assertAll(PrescriptionLexicon::hasDoseQuantity, true, "1 Beutel", "2 Tabletten", "1 Tabl.")
+    assertAll(
+        PrescriptionLexicon::hasFrequency,
+        true,
+        "1 Beutel täglich bei Verstopfung",
+        "2x täglich",
+        "abends",
+        "bei Bedarf",
+    )
+    assertAll(PrescriptionLexicon::isListStart, true, "Rezept")
+    assertAll(PrescriptionLexicon::isTableHeading, true, "Medikament", "Dosierung", "Dauer")
+    assertEquals(
+        listOf(LocalDate.of(2026, 10, 21)),
+        PrescriptionLexicon.datesIn(c("Bern, 21. Oktober 2026")),
+    )
+    val durations =
+        mapOf(
+            "während 5 Tagen" to (5 to true),
+            "für 3 Tage" to (3 to true),
+            "2 Wochen" to (14 to false),
+            "1 Monat" to (30 to false),
+            "maximal 7 Tage" to (7 to false),
+            "pendant 7 jours au maximum" to (7 to false),
+        )
+    for ((text, expected) in durations) {
+      val duration = PrescriptionLexicon.durationIn(c(text))
+      assertEquals("\"$text\"", expected, duration?.let { it.days to it.exact })
+    }
+    // Every few days is how often, not for how long
+    assertAll(PrescriptionLexicon::hasDuration, false, "alle 3 Tage")
   }
 
   @Test

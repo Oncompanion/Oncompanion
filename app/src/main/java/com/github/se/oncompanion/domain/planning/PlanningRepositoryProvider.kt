@@ -1,10 +1,12 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -15,32 +17,25 @@ import com.github.se.oncompanion.model.planning.PlanningRepository
  */
 object PlanningRepositoryProvider {
   /**
-   * By default, the signed-in patient's appointments and the Ligue's upcoming events, merged by
-   * [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read, Planning
-   * still shows the appointments instead of an error. The providers are read on each observation,
-   * so replacing them also reaches Planning.
+   * By default, a patient's appointments and medications and the Ligue events they confirmed,
+   * merged by [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read,
+   * Planning still shows the appointments instead of an error. The providers are read on each
+   * observation, so replacing them also reaches Planning. Whose planning it is, and restarting it
+   * on an account change, is decided by [ObserveCarePlanning].
    */
   @Volatile
-  var repository: PlanningRepository = PlanningRepository { range ->
+  var repository: PlanningRepository = PlanningRepository { ownerUid, range ->
     ObservePlanning(
-            AppointmentPlanningSource(
-                AppointmentRepositoryProvider.repository,
-                AuthRepositoryProvider.repository,
-            ),
+            AppointmentPlanningSource(AppointmentRepositoryProvider.repository),
+            MedicationPlanningSource(MedicationRepositoryProvider.repository),
             // Events are nice to have: if they fail, the appointments still show
-            OptionalPlanningSource(EventPlanningSource(EventRepositoryProvider.repository)),
+            OptionalPlanningSource(
+                EventPlanningSource(
+                    EventRepositoryProvider.repository,
+                    EventRegistrationRepositoryProvider.repository,
+                )
+            ),
         )
-        .observeItems(range)
-  }
-
-  /**
-   * What a caregiver sees in Planning and the Overview until #240 reads the chosen patient's data:
-   * only the Ligue's events, the same for everyone. Never the signed-in caregiver's own
-   * appointments, which would look like the patient's.
-   */
-  @Volatile
-  var publicEvents: PlanningRepository = PlanningRepository { range ->
-    OptionalPlanningSource(EventPlanningSource(EventRepositoryProvider.repository))
-        .observeItems(range)
+        .observeItems(ownerUid, range)
   }
 }

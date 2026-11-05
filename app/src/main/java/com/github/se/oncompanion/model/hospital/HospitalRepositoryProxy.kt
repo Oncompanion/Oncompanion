@@ -33,15 +33,8 @@ internal constructor(
         if (query.isEmpty()) return@operation HospitalSearchResult.Success(emptyList())
         mutex.withLock {
           currentCoroutineContext().ensureActive()
-          // Recheck after in-flight work: repeated queries share success, including offline/empty
-          // results.
-          cache[query]?.let {
+          cachedOrCooldown(query)?.let {
             return@withLock it
-          }
-          cooldown?.let { failure ->
-            if (retryAt?.hasPassedNow() != true) return@withLock failure
-            cooldown = null
-            retryAt = null
           }
           val result = client.search(query)
           currentCoroutineContext().ensureActive()
@@ -53,34 +46,52 @@ internal constructor(
               success
             }
             is HospitalProxyResult.Failure -> {
-              val failure =
-                  HospitalSearchResult.Error(
-                      when (result.kind) {
-                        HospitalProxyError.NETWORK,
-                        HospitalProxyError.TIMEOUT -> HospitalSearchError.NETWORK
-                        HospitalProxyError.INVALID_RESPONSE -> HospitalSearchError.INVALID_RESPONSE
-                        HospitalProxyError.RATE_LIMITED -> HospitalSearchError.RATE_LIMITED
-                        else -> HospitalSearchError.SERVICE
-                      }
-                  )
-              // A response's cooldown covers all queries; only explicit actions after expiry can
-              // send again.
-              when (val retry = result.retryAfter) {
-                is HospitalProxyRetryAfter.Delay -> {
-                  retryAt = timeSource.markNow() + retry.duration.toKotlinDuration()
-                  cooldown = failure
-                }
-                HospitalProxyRetryAfter.BeyondLimit -> {
-                  retryAt = null
-                  cooldown = failure
-                }
-                null -> Unit
-              }
+              val failure = HospitalSearchResult.Error(result.kind.toSearchError())
+              rememberCooldown(result.retryAfter, failure)
               failure
             }
           }
         }
       }
+
+  // Cache hits remain usable even while uncached requests are blocked.
+  private fun cachedOrCooldown(query: String): HospitalSearchResult? {
+    cache[query]?.let {
+      return it
+    }
+    val failure = cooldown ?: return null
+    if (retryAt?.hasPassedNow() != true) return failure
+    cooldown = null
+    retryAt = null
+    return null
+  }
+
+  private fun HospitalProxyError.toSearchError(): HospitalSearchError =
+      when (this) {
+        HospitalProxyError.NETWORK,
+        HospitalProxyError.TIMEOUT -> HospitalSearchError.NETWORK
+        HospitalProxyError.INVALID_RESPONSE -> HospitalSearchError.INVALID_RESPONSE
+        HospitalProxyError.RATE_LIMITED -> HospitalSearchError.RATE_LIMITED
+        else -> HospitalSearchError.SERVICE
+      }
+
+  // Only a later explicit search can send again; no timer retries requests.
+  private fun rememberCooldown(
+      retry: HospitalProxyRetryAfter?,
+      failure: HospitalSearchResult.Error,
+  ) {
+    when (retry) {
+      is HospitalProxyRetryAfter.Delay -> {
+        retryAt = timeSource.markNow() + retry.duration.toKotlinDuration()
+        cooldown = failure
+      }
+      HospitalProxyRetryAfter.BeyondLimit -> {
+        retryAt = null
+        cooldown = failure
+      }
+      null -> Unit
+    }
+  }
 
   private companion object {
     fun proxyClient(endpoint: String): HospitalProxyClient {

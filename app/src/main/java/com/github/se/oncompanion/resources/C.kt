@@ -83,6 +83,8 @@ object C {
     const val onboarding_family_name_field = "onboarding_family_name_field"
     const val onboarding_save_button = "onboarding_save_button"
     const val onboarding_saving = "onboarding_saving"
+    const val onboarding_signed_in_as = "onboarding_signed_in_as"
+    const val onboarding_use_another_account = "onboarding_use_another_account"
     const val overview_screen = "overview_screen"
     const val overview_shortcut_symptoms = "overview_shortcut_symptoms"
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
@@ -129,7 +131,7 @@ object C {
 
     fun eventCard(eventId: String) = "event_card_$eventId"
 
-    const val event_detail_back_to_events = "event_detail_back_to_events"
+    const val event_detail_go_back = "event_detail_go_back"
     const val event_detail_visit_website = "event_detail_visit_website"
     const val event_detail_confirm = "event_detail_confirm"
     const val event_detail_registration_note = "event_detail_registration_note"
@@ -326,6 +328,9 @@ object C {
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
 
+    // Caregiver mode: a section the patient doesn't share
+    const val not_shared = "not_shared"
+
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"
     const val care_circle_invite_back_button = "care_circle_invite_back_button"
@@ -407,6 +412,11 @@ object C {
     const val prescription_delete_confirm = "prescription_delete_confirm"
     const val prescription_delete_cancel = "prescription_delete_cancel"
     const val prescription_delete_error = "prescription_delete_error"
+
+    const val prescription_already_saved_dialog = "prescription_already_saved_dialog"
+    const val prescription_already_saved_keep_editing = "prescription_already_saved_keep_editing"
+    const val prescription_already_saved_save_anyway = "prescription_already_saved_save_anyway"
+    const val prescription_renewal_notice = "prescription_renewal_notice"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =

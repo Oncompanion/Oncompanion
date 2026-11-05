@@ -22,8 +22,8 @@ import kotlinx.coroutines.flow.catch
 class OptionalPlanningSource(private val source: PlanningRepository) : PlanningRepository {
 
   /** The entries of [source] within [range], or none once it fails. */
-  override fun observeItems(range: PlanningRange): Flow<List<PlanningItem>> =
-      source.observeItems(range).catch { e ->
+  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+      source.observeItems(ownerUid, range).catch { e ->
         if (e is CancellationException) throw e
         Log.w(TAG, "An optional planning source failed; its entries are left out", e)
         emit(emptyList())

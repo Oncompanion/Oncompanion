@@ -1,6 +1,7 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.model.hospital
 
+import com.github.se.oncompanion.model.session.SessionAccess
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -8,12 +9,18 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLConnection
 import java.net.URLStreamHandler
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 
 class HospitalProxyTransportTest {
   @Test
-  fun attachesOnlyExpectedHeadersAndClosesUtf8Success() {
+  fun attachesOnlyExpectedHeadersAndClosesUtf8Success() = runTest {
     val connection = FakeConnection()
     connection.body = "[\"Hôpital\"]"
     val headers = mapOf("Authorization" to "Bearer test", "X-Firebase-AppCheck" to "test-app")
@@ -33,7 +40,7 @@ class HospitalProxyTransportTest {
   }
 
   @Test
-  fun doesNotReadErrorOrRedirectBodiesAndClosesTheErrorStream() {
+  fun doesNotReadErrorOrRedirectBodiesAndClosesTheErrorStream() = runTest {
     for (status in listOf(204, 301, 302, 401, 403, 429, 500, 503)) {
       val connection = FakeConnection()
       connection.status = status
@@ -48,26 +55,26 @@ class HospitalProxyTransportTest {
   }
 
   @Test
-  fun alwaysDisconnectsAfterNetworkTimeoutAndOversizedResponseFailures() {
+  fun alwaysDisconnectsAfterNetworkTimeoutAndOversizedResponseFailures() = runTest {
     for (failure in listOf(IOException("offline"), SocketTimeoutException("timeout"))) {
       val connection = FakeConnection()
       connection.failure = failure
       assertThrows(failure.javaClass) {
-        UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap())
+        runBlocking { UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap()) }
       }
       assertTrue(connection.disconnected)
     }
     val connection = FakeConnection()
     connection.body = "é".repeat(131073)
     assertThrows(IllegalArgumentException::class.java) {
-      UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap())
+      runBlocking { UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap()) }
     }
     assertTrue(connection.closed)
     assertTrue(connection.disconnected)
   }
 
   @Test
-  fun acceptsTheExactBackendByteLimitAndMissingRetryHeader() {
+  fun acceptsTheExactBackendByteLimitAndMissingRetryHeader() = runTest {
     val connection = FakeConnection()
     connection.body = "é".repeat(131072)
     connection.retry = null
@@ -80,14 +87,39 @@ class HospitalProxyTransportTest {
   }
 
   @Test
-  fun errorStreamCloseFailureStillDisconnects() {
+  fun errorStreamCloseFailureStillDisconnects() = runTest {
     val connection = FakeConnection()
     connection.status = 503
     connection.closeFailure = true
     assertThrows(IOException::class.java) {
-      UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap())
+      runBlocking { UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap()) }
     }
     assertTrue(connection.disconnected)
+  }
+
+  @Test
+  fun cancellationDisconnectsAnActiveReadAndClosesItsStream() = runTest {
+    for (freeze in listOf(false, true)) {
+      val connection = FakeConnection()
+      connection.blockRead = true
+      val pending = async {
+        SessionAccess.operation {
+          UrlConnectionHospitalProxyTransport().get(url(connection), emptyMap())
+        }
+      }
+      try {
+        connection.readStarted.await()
+        if (freeze) SessionAccess.freeze() else pending.cancel()
+        pending.join()
+        assertTrue(pending.isCancelled)
+        assertTrue(connection.disconnected)
+        connection.readClosed.await()
+        assertTrue(connection.closed)
+      } finally {
+        connection.releaseRead.countDown()
+        SessionAccess.resume()
+      }
+    }
   }
 
   private fun url(connection: FakeConnection): URL =
@@ -100,6 +132,10 @@ class HospitalProxyTransportTest {
       )
 
   private class FakeConnection : HttpURLConnection(URL("https://proxy.example.invalid/search")) {
+    var blockRead = false
+    val readStarted = CompletableDeferred<Unit>()
+    val readClosed = CompletableDeferred<Unit>()
+    val releaseRead = CountDownLatch(1)
     var status = 200
     var body = "[]"
     var retry: String? = "90"
@@ -120,8 +156,17 @@ class HospitalProxyTransportTest {
     override fun getInputStream(): ByteArrayInputStream {
       wasRead = true
       return object : ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)) {
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+          if (blockRead) {
+            readStarted.complete(Unit)
+            check(releaseRead.await(5, TimeUnit.SECONDS)) { "Read was not disconnected" }
+          }
+          return super.read(buffer, offset, length)
+        }
+
         override fun close() {
           closed = true
+          readClosed.complete(Unit)
           super.close()
         }
       }
@@ -138,6 +183,7 @@ class HospitalProxyTransportTest {
 
     override fun disconnect() {
       disconnected = true
+      releaseRead.countDown()
     }
 
     override fun connect() {}

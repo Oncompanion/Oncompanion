@@ -1,6 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 import type { Request, Response } from "firebase-functions/v2/https";
-import { logFailure, FailureEvent } from "./logging.js";
+import { logFailure, failureCode, FailureLogger } from "./logging.js";
 import { SearchError } from "./contracts.js";
 import { HospitalSearchService } from "./service.js";
 import { queryFromUrl } from "./validation.js";
@@ -9,7 +9,7 @@ import { queryFromUrl } from "./validation.js";
 export function createHandler(
   service: HospitalSearchService,
   authorize: (request: Request) => Promise<string>,
-  log: (event: FailureEvent) => void = logFailure,
+  log: FailureLogger = logFailure,
 ) {
   let active = false;
   return async (request: Request, response: Response): Promise<void> => {
@@ -43,9 +43,10 @@ export function createHandler(
         error instanceof SearchError
           ? error
           : new SearchError(503, "service_unavailable");
-      if (safe.status === 503) log("hospital_search_unavailable");
+      if (safe.status === 503)
+        log("hospital_search_unavailable", failureCode(safe));
       if (safe.code === "capacity_exhausted")
-        log("hospital_search_capacity_exhausted");
+        log("hospital_search_capacity_exhausted", failureCode(safe));
       if (safe.status === 429 || safe.status === 503)
         response.set(
           "Retry-After",

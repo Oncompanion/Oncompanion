@@ -6,12 +6,10 @@ package com.github.se.oncompanion.ui.planning
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
-import com.github.se.oncompanion.model.auth.AuthRepository
-import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.domain.planning.CarePlanning
+import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
-import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.ui.common.currentDay
 import java.text.Collator
@@ -25,11 +23,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** Selected calendar day and the agenda currently available for it. */
+/**
+ * Selected calendar day and the agenda currently available for it.
+ *
+ * @property isNotShared in caregiver mode, the patient doesn't share their planning: no entries
+ */
 data class PlanningUiState(
     val selectedDate: LocalDate,
     val weekStart: LocalDate,
@@ -38,6 +38,7 @@ data class PlanningUiState(
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     val today: LocalDate = selectedDate,
+    val isNotShared: Boolean = false,
 ) {
   /** The complete agenda in section order, derived from the two displayed sections. */
   val items: List<PlanningItem>
@@ -50,13 +51,17 @@ data class PlanningUiState(
     get() = PlanningDates.isSupported(selectedDate.plusWeeks(1))
 }
 
-/** Owns calendar selection; presentation and date labels belong to the view. */
+/**
+ * Owns calendar selection; presentation and date labels belong to the view.
+ *
+ * @param patientUid in caregiver mode, the patient whose planning is shown; null for the user's own
+ */
 class PlanningViewModel(
-    private val repository: PlanningRepository = PlanningRepositoryProvider.repository,
+    private val observePlanning: ObserveCarePlanning = ObserveCarePlanning(),
     private val clock: Clock = Clock.systemDefaultZone(),
     val zoneId: ZoneId = ZoneId.systemDefault(),
     private val savedStateHandle: SavedStateHandle,
-    private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
+    private val patientUid: String? = null,
 ) : ViewModel() {
   private val today = LocalDate.now(clock.withZone(zoneId))
   private val initialDate =
@@ -71,14 +76,8 @@ class PlanningViewModel(
 
   init {
     savedStateHandle[SELECTED_DATE] = initialDate.toString()
-    // Session observation must survive an agenda read failure to clear the previous patient.
-    viewModelScope.launch {
-      authRepository
-          .observeCurrentUser()
-          .map { it?.uid }
-          .distinctUntilChanged()
-          .collect { observeWeek() }
-    }
+    // The observation follows account and access changes itself
+    observeWeek()
   }
 
   /** Selects a day, observing a new week only when necessary. */
@@ -139,11 +138,26 @@ class PlanningViewModel(
             week.plusWeeks(1),
             zoneId,
         )
+    // A retry keeps the displayed items until the first answer, whatever it is; after that, an
+    // account change clears them again
+    var keepItems = preserveItems
     observation = viewModelScope.launch {
       try {
-        repository.observeItems(range).collect { items ->
-          weekItems = items.filter { it.timing in range }
-          mutableState.value = mutableState.value.copy(isLoading = false, hasError = false)
+        observePlanning(patientUid, range).collect { planning ->
+          // A failure keeps what is shown, like a retry until new entries arrive
+          if (
+              planning !is CarePlanning.Failed && (planning !is CarePlanning.Loading || !keepItems)
+          ) {
+            weekItems =
+                (planning as? CarePlanning.Shown)?.items?.filter { it.timing in range }.orEmpty()
+          }
+          if (planning !is CarePlanning.Loading) keepItems = false
+          mutableState.value =
+              mutableState.value.copy(
+                  isLoading = planning is CarePlanning.Loading,
+                  hasError = planning is CarePlanning.Failed,
+                  isNotShared = planning is CarePlanning.NotShared,
+              )
           publishItems()
         }
       } catch (cancelled: CancellationException) {

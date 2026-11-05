@@ -30,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -45,9 +44,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.HospitalField
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
 import com.github.se.oncompanion.ui.common.HospitalFieldViewModel
+import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
 
@@ -61,20 +62,8 @@ fun EditProfileScreen(
     hospitalSearchEnabled: Boolean = HospitalRepositoryProvider.isConfigured,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val hospitalState by hospitalViewModel.uiState.collectAsStateWithLifecycle()
-  // Keep the reusable field's stale-result cancellation when edits, saving or configuration change.
-  LaunchedEffect(
-      state.hospital,
-      state.canEdit,
-      state.isPatient,
-      hospitalSearchEnabled,
-      hospitalViewModel,
-  ) {
-    hospitalViewModel.clearSearch()
-  }
-  DisposableEffect(hospitalViewModel) { onDispose { hospitalViewModel.clearSearch() } }
-  LaunchedEffect(state.isSaved) {
-    if (state.isSaved) {
+  LaunchedEffect(state.save) {
+    if (state.save == SavePhase.SAVED) {
       viewModel.consumeSaved()
       onSaved()
     }
@@ -86,13 +75,17 @@ fun EditProfileScreen(
       onFirstNameChange = viewModel::onFirstNameChange,
       onFamilyNameChange = viewModel::onFamilyNameChange,
       onCancerTypeChange = viewModel::onCancerTypeChange,
-      onHospitalChange = {
-        hospitalViewModel.clearSearch()
-        viewModel.onHospitalChange(it)
+      onHospitalChange = viewModel::onHospitalChange,
+      hospitalField = {
+        HospitalField(
+            value = state.hospital,
+            onValueChange = viewModel::onHospitalChange,
+            viewModel = hospitalViewModel,
+            onHospitalSelected = {},
+            enabled = state.canEdit,
+            searchEnabled = hospitalSearchEnabled,
+        )
       },
-      hospitalSearchState = hospitalState,
-      onHospitalSearch = { hospitalViewModel.search(state.hospital) },
-      hospitalSearchEnabled = hospitalSearchEnabled,
       onSave = viewModel::saveProfile,
   )
 }
@@ -110,12 +103,20 @@ fun EditProfileContent(
     onSave: () -> Unit,
     onHospitalChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    hospitalSearchState: HospitalFieldUiState = HospitalFieldUiState.Idle,
-    onHospitalSearch: () -> Unit = {},
-    hospitalSearchEnabled: Boolean = false,
+    hospitalField: @Composable () -> Unit = {
+      HospitalFieldContent(
+          value = state.hospital,
+          onValueChange = onHospitalChange,
+          uiState = HospitalFieldUiState.Idle,
+          onSearch = {},
+          onHospitalSelected = {},
+          enabled = state.canEdit,
+          searchEnabled = false,
+      )
+    },
 ) {
   // Local writes finish immediately; keep toolbar, Cancel and system Back consistent in flight.
-  BackHandler { if (!state.isSaving) onBack() }
+  BackHandler { if (state.save != SavePhase.SAVING) onBack() }
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
   // keyboard open, a fixed one would leave no room for the field being typed
   val topBarScrolls = isCompactHeight() && state.status == EditProfileStatus.READY
@@ -178,15 +179,7 @@ fun EditProfileContent(
           )
           // The provider enables explicit search only after a trusted proxy endpoint is configured.
           if (state.isPatient) {
-            HospitalFieldContent(
-                value = state.hospital,
-                onValueChange = onHospitalChange,
-                uiState = hospitalSearchState,
-                onSearch = onHospitalSearch,
-                onHospitalSelected = {},
-                enabled = state.canEdit,
-                searchEnabled = hospitalSearchEnabled,
-            )
+            hospitalField()
           }
           if (state.saveFailed) {
             Text(
@@ -200,13 +193,13 @@ fun EditProfileContent(
               enabled = state.canSave,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_save),
           ) {
-            if (state.isSaving)
+            if (state.save == SavePhase.SAVING)
                 CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.edit_profile_saving))
             else Text(stringResource(R.string.edit_profile_save))
           }
           TextButton(
               onClick = onBack,
-              enabled = !state.isSaving,
+              enabled = state.save != SavePhase.SAVING,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_cancel),
           ) {
             Text(stringResource(R.string.edit_profile_cancel))
@@ -261,7 +254,7 @@ private fun EditProfileTopBar(
       navigationIcon = {
         IconButton(
             onClick = onBack,
-            enabled = !state.isSaving,
+            enabled = state.save != SavePhase.SAVING,
             modifier = Modifier.testTag(C.Tag.edit_profile_back),
         ) {
           Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.profile_back))

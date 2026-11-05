@@ -11,12 +11,15 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -421,6 +424,44 @@ class HospitalProxyClientTest {
     }
   }
 
+  @Test
+  fun activeHttpCancellationAndSessionFreezeDiscardLateSuccess() = runTest {
+    for (freeze in listOf(false, true)) {
+      val started = CompletableDeferred<Unit>()
+      val release = CompletableDeferred<Unit>()
+      var delivered = false
+      val lateTransport = HospitalProxyTransport { _, _ ->
+        started.complete(Unit)
+        // Model a transport which completes despite cancellation, including a valid late response.
+        withContext(NonCancellable) { release.await() }
+        HospitalProxyResponse(200, "[$hospital]")
+      }
+      val client =
+          HospitalProxyClient(
+              endpoint,
+              tokens,
+              lateTransport,
+              StandardTestDispatcher(testScheduler),
+              clock,
+          )
+      val pending = async { client.search("Genève").also { delivered = true } }
+      started.await()
+      try {
+        val stopping = async { if (freeze) SessionAccess.freeze() else pending.cancel() }
+        runCurrent()
+        assertFalse(delivered)
+        release.complete(Unit)
+        stopping.await()
+        pending.join()
+        assertTrue(pending.isCancelled)
+        assertFalse(delivered)
+      } finally {
+        release.complete(Unit)
+        SessionAccess.resume()
+      }
+    }
+  }
+
   private class FakeProxyTokens : HospitalProxyTokens {
     var id: String? = "id-token"
     var app: String? = "app-token"
@@ -447,7 +488,7 @@ class HospitalProxyClientTest {
     var response = HospitalProxyResponse(200, "[]")
     var failure: Exception? = null
 
-    override fun get(url: URL, headers: Map<String, String>): HospitalProxyResponse {
+    override suspend fun get(url: URL, headers: Map<String, String>): HospitalProxyResponse {
       requests += url to headers
       failure?.let { throw it }
       return response

@@ -46,7 +46,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
@@ -56,18 +58,25 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** A section the patient can open from the Overview with a single tap. */
+/**
+ * A section the patient can open from the Overview with a single tap.
+ *
+ * @property section the section a caregiver needs shared to get this tile, or `null` if they never
+ *   get it
+ */
 enum class OverviewShortcut(
     val route: String,
     @StringRes val label: Int,
     @DrawableRes val icon: Int,
     val testTag: String,
+    val section: CarePermission? = null,
 ) {
   SYMPTOMS(
       Route.SYMPTOMS,
       R.string.symptoms_title,
       R.drawable.ic_symptoms,
       C.Tag.overview_shortcut_symptoms,
+      CarePermission.SYMPTOMS,
   ),
   PRESCRIPTIONS(
       Route.PRESCRIPTIONS,
@@ -103,8 +112,8 @@ private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.E
  * to each section.
  *
  * A caregiver sees it in caregiver mode (US-20): "Anne's care ▾" opens "Whose care?" to switch
- * patient, and the shortcuts are hidden, as the sections behind them would show the caregiver's own
- * data until #240.
+ * patient, and the shortcuts are only those of the sections the patient shares (Symptoms for now,
+ * Prescriptions next in #240).
  *
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
@@ -205,20 +214,27 @@ fun OverviewContent(
       when {
         uiState.isLoading -> LoadingDay()
         uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
+        // The patient a caregiver follows doesn't share their planning, so there is no day to show
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(caregiverOf, CarePermission.PLANNING)
         else -> {
           NextAppointmentCard(
               uiState.nextAppointment,
               uiState.now.toLocalDate(),
               onOpenPlanning,
-              onOpenAppointment,
+              // A caregiver can't open an appointment's page yet: its Planning day instead
+              if (caregiverOf == null) onOpenAppointment else { _ -> onOpenPlanning() },
               canAdd = caregiverOf == null,
           )
           TodaySection(uiState.todayEntries, onOpenPlanning)
         }
       }
-      // The shortcuts stay available whatever happens to the day's data. A caregiver has none yet:
-      // only the patient manages their circle, and #240 brings back the sections they share
-      if (caregiverOf == null) Shortcuts(onShortcutClick)
+      // The shortcuts stay available whatever happens to the day's data. A caregiver only gets the
+      // sections the patient shares, never the care circle, which only the patient manages
+      val tiles =
+          if (caregiverOf == null) tileShortcuts
+          else tileShortcuts.filter { it.section != null && it.section in uiState.sharedSections }
+      if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles)
     }
   }
 }
@@ -328,7 +344,7 @@ private val tilePadding = 8.dp
  * a label wouldn't fit in a third of the width (small screen or large font).
  */
 @Composable
-private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
+private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit, tiles: List<OverviewShortcut>) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
         text = stringResource(R.string.overview_subtitle),
@@ -337,7 +353,7 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
     )
     BoxWithConstraints(Modifier.fillMaxWidth().testTag(C.Tag.overview_shortcuts)) {
       val labelStyle = MaterialTheme.typography.titleMedium
-      val labels = tileShortcuts.map { stringResource(it.label) }
+      val labels = tiles.map { stringResource(it.label) }
       val measurer = rememberTextMeasurer()
       val density = LocalDensity.current
       // Measured again only when the labels, their style or the font size change
@@ -349,13 +365,13 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit) {
       // Large tiles: easy to read and to tap on a low-energy day
       if (widestLabel <= labelSpaceInRow) {
         Row(horizontalArrangement = Arrangement.spacedBy(tileSpacing)) {
-          tileShortcuts.forEach { shortcut ->
+          tiles.forEach { shortcut ->
             ShortcutTile(shortcut, { onShortcutClick(shortcut) }, Modifier.weight(1f))
           }
         }
       } else {
         Column(verticalArrangement = Arrangement.spacedBy(tileSpacing)) {
-          tileShortcuts.forEach { shortcut ->
+          tiles.forEach { shortcut ->
             ShortcutTile(
                 shortcut,
                 { onShortcutClick(shortcut) },

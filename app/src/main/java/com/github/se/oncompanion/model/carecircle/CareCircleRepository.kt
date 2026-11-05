@@ -27,6 +27,15 @@ interface CareCircleRepository {
   fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?>
 
   /**
+   * Emits whether [memberUid] is in [ownerUid]'s care circle now and every time it changes,
+   * including when the server confirms what this device's cache said. A member document this device
+   * has no record of is [CareCircleMembership.Unconfirmed] until the server answers, never
+   * [CareCircleMembership.NotMember]. Never emits the same value twice in a row. The flow fails if
+   * the member can't be read (e.g. the security rules deny it).
+   */
+  fun observeMembership(ownerUid: String, memberUid: String): Flow<CareCircleMembership>
+
+  /**
    * Replaces what the patient decided about [memberUid] in [ownerUid]'s circle: name, relationship
    * and permissions. A member who is no longer in the circle (e.g. removed on another device) isn't
    * brought back. Returns once saved on the device, also offline.

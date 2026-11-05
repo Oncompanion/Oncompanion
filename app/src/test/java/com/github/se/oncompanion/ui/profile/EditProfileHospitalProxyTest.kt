@@ -2,6 +2,7 @@
 package com.github.se.oncompanion.ui.profile
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,6 +31,7 @@ class EditProfileHospitalProxyTest {
   private val previous = HospitalRepositoryProvider.repository
   private val fixture = HospitalProxyTestFixture()
   private val profiles = FakeUserProfileRepository()
+  private val visible = mutableStateOf(true)
 
   @After
   fun restoreProvider() {
@@ -46,7 +48,7 @@ class EditProfileHospitalProxyTest {
     else HospitalRepositoryProvider.disable()
     val model = EditProfileViewModel(auth, profiles)
     val hospitalModel = HospitalFieldViewModel()
-    compose.setContent { EditProfileScreen({}, {}, model, hospitalModel) }
+    compose.setContent { if (visible.value) EditProfileScreen({}, {}, model, hospitalModel) }
     compose.waitUntil(5000) { model.uiState.value.status == EditProfileStatus.READY }
     return model
   }
@@ -124,6 +126,20 @@ class EditProfileHospitalProxyTest {
     compose.runOnIdle {
       assertEquals("q=Bern&format=jsonv2&limit=10", fixture.requests.single().first.query)
     }
+  }
+
+  @Test
+  fun leavingProfileCancelsThePendingHospitalSearch() {
+    fixture.tokenGate = CompletableDeferred()
+    show()
+    field().performScrollTo().performTextReplacement("Genève")
+    search()
+    compose.onNodeWithTag(C.Tag.hospital_loading).performScrollTo().assertIsDisplayed()
+    compose.runOnIdle { visible.value = false }
+    compose.waitForIdle()
+    fixture.tokenGate!!.complete("id-token")
+    compose.waitForIdle()
+    compose.runOnIdle { assertTrue(fixture.requests.isEmpty()) }
   }
 
   @Test

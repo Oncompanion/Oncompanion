@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,6 +35,7 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
+import com.github.se.oncompanion.domain.planning.signedInPatient
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
@@ -53,8 +55,11 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
@@ -70,6 +75,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -82,6 +88,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -107,7 +115,6 @@ class AppNavHostTest {
 
   // The app's repositories, put back after each test
   private val appPlanningRepository = PlanningRepositoryProvider.repository
-  private val appPublicEvents = PlanningRepositoryProvider.publicEvents
   private val appCareCircleRepository = CareCircleRepositoryProvider.repository
   private val appCareCircleInviteRepository = CareCircleInviteRepositoryProvider.repository
   private val appEventRepository = EventRepositoryProvider.repository
@@ -120,7 +127,6 @@ class AppNavHostTest {
   @After
   fun restoreProviders() {
     PlanningRepositoryProvider.repository = appPlanningRepository
-    PlanningRepositoryProvider.publicEvents = appPublicEvents
     CareCircleRepositoryProvider.repository = appCareCircleRepository
     CareCircleInviteRepositoryProvider.repository = appCareCircleInviteRepository
     EventRepositoryProvider.repository = appEventRepository
@@ -135,7 +141,6 @@ class AppNavHostTest {
   private fun setNavHost(
       startRoute: String? = null,
       planningRepository: PlanningRepository = EmptyPlanningRepository,
-      publicEvents: PlanningRepository = EmptyPlanningRepository,
       careCircleRepository: CareCircleRepository = FakeCareCircleRepository(),
       eventRepository: EventRepository = FakeEventRepository(),
       careCircleInviteRepository: CareCircleInviteRepository = FakeCareCircleInviteRepository(),
@@ -145,7 +150,11 @@ class AppNavHostTest {
       credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
   ) {
     PlanningRepositoryProvider.repository = planningRepository
-    PlanningRepositoryProvider.publicEvents = publicEvents
+    // The Overview and Planning read the user's role: a test that sets no profiles gets a patient,
+    // or a caregiver for the "caregiver" account
+    if (UserProfileRepositoryProvider.repository === appUserProfileRepository) {
+      UserProfileRepositoryProvider.repository = rolesByUid()
+    }
     CareCircleRepositoryProvider.repository = careCircleRepository
     CareCircleInviteRepositoryProvider.repository = careCircleInviteRepository
     EventRepositoryProvider.repository = eventRepository
@@ -312,16 +321,38 @@ class AppNavHostTest {
     }
   }
 
-  /** A signed-in caregiver following [patients] (uid to first name), for "Whose care?". */
+  /**
+   * Profiles of a patient for every uid but "caregiver"'s, without a name, so no greeting changes.
+   */
+  private fun rolesByUid() =
+      object : UserProfileRepository by FakeUserProfileRepository() {
+        override fun observeProfile(uid: String): Flow<UserProfile?> =
+            flowOf(
+                UserProfile(
+                    uid,
+                    if (uid == "caregiver") Role.CAREGIVER else Role.PATIENT,
+                    firstName = "",
+                )
+            )
+      }
+
+  /**
+   * A signed-in caregiver following [patients] (uid to first name), for "Whose care?", who sees the
+   * [shared] sections of each.
+   */
   private fun followingCaregiver(
-      vararg patients: Pair<String, String>
+      vararg patients: Pair<String, String>,
+      shared: Set<CarePermission> = emptySet(),
   ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository()
     val circles = FakeCareCircleRepository()
     for ((uid, _) in patients) {
-      circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
+      circles.setMembers(
+          uid,
+          listOf(CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = shared)),
+      )
     }
     invites.setJoinedCircles(
         "caregiver",
@@ -392,42 +423,101 @@ class AppNavHostTest {
   }
 
   @Test
-  fun caregiverMode_neverShowsTheCaregiversOwnAppointments() {
-    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
-    // The caregiver's own account has an appointment: it must not look like Anne's
-    val own = FakePlanningRepository()
-    own.items.value =
+  fun caregiverMode_showsThePatientsSharedPlanning_neverTheCaregiversOwn() {
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.PLANNING))
+    val planning = FakePlanningRepository()
+    planning.items.value =
         listOf(
             PlanningItem(
-                PlanningSource.Appointment("own"),
+                PlanningSource.Appointment("chemo"),
                 PlanningTiming.Timed(Instant.now().plus(1, ChronoUnit.HOURS)),
-                "Own dentist",
+                "Anne's chemotherapy",
             )
         )
-    val events = FakePlanningRepository()
     setNavHost(
         Route.WHOSE_CARE,
-        planningRepository = own,
-        publicEvents = events,
+        planningRepository = planning,
         careCircleRepository = circles,
         careCircleInviteRepository = invites,
         authRepository = auth,
     )
     composeTestRule.waitUntil(timeoutMillis = 5_000) {
-      composeTestRule
-          .onAllNodesWithTag(C.Tag.overview_whose_care)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+      composeTestRule.onAllNodesWithText("Anne's chemotherapy").fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
 
-    composeTestRule.onNodeWithText("Own dentist").assertDoesNotExist()
     composeTestRule.runOnIdle {
-      // The Overview and Planning only read the Ligue's events
-      assertTrue(own.ranges.isEmpty())
-      assertTrue(events.ranges.isNotEmpty())
+      // The Overview and Planning only read Anne's planning, never the caregiver's
+      assertTrue(planning.owners.isNotEmpty())
+      assertTrue(planning.owners.all { it == "p-anne" })
     }
+  }
+
+  @Test
+  fun caregiverMode_symptomsShared_opensThePatientsJournal_readOnly() {
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.SYMPTOMS))
+    val symptoms = FakeSymptomRepository()
+    symptoms.seed(
+        "p-anne",
+        SymptomEntry(
+            id = "anne-fatigue",
+            types = listOf(SymptomType.FATIGUE),
+            occurredAt = Instant.now().minus(1, ChronoUnit.HOURS),
+            notes = "Anne felt tired",
+        ),
+    )
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        symptomRepository = symptoms,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(OverviewShortcut.SYMPTOMS.testTag)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithText("Anne felt tired", substring = true)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_planningNotShared_saysSoOnTheOverviewAndPlanning() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    val planning = FakePlanningRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        planningRepository = planning,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    val notShared =
+        context.getString(
+            R.string.not_shared_title,
+            "Anne",
+            context.getString(R.string.permission_planning),
+        )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithText(notShared).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithText(notShared).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertTrue(planning.owners.isEmpty()) }
   }
 
   @Test
@@ -1118,7 +1208,7 @@ class AppNavHostTest {
           )
         }
     repository.items.value = entries
-    setNavHost(Route.OVERVIEW, repository)
+    setNavHost(Route.OVERVIEW, repository, authRepository = signedInPatient())
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule
         .onNodeWithTag(C.Tag.planning_list)
@@ -1259,7 +1349,7 @@ class AppNavHostTest {
 
   @Test
   fun symptomJournalAddButton_opensTheAddScreen_andCloseReturns() {
-    setNavHost(Route.SYMPTOMS)
+    setNavHost(Route.SYMPTOMS, authRepository = signedInPatient())
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
@@ -1692,9 +1782,180 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.events_list).assertIsDisplayed()
   }
 
-  /** Verifies the default Planning source reads the appointment, auth and event providers. */
+  /** An event a week from now, on a different week of Planning than the one it opens on. */
+  private fun eventNextWeek() =
+      FakeEventRepository.sampleEvents(LocalDate.now())
+          .first()
+          .copy(startDateTime = LocalDate.now().plusWeeks(1).atTime(15, 0), endDateTime = null)
+
+  /** A Planning source listing [event], whatever the event repository says about it. */
+  private fun planningWith(event: Event) =
+      FakePlanningRepository().apply {
+        items.value =
+            listOf(
+                PlanningItem(
+                    PlanningSource.Event(event.id),
+                    PlanningTiming.Timed(
+                        event.startDateTime.atZone(ZoneId.systemDefault()).toInstant()
+                    ),
+                    event.title,
+                )
+            )
+      }
+
+  /** On Planning, moves to next week, opens [event] from there and returns the day's heading. */
+  private fun openEventFromNextWeek(event: Event): String {
+    composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+    val heading =
+        composeTestRule
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+            .single()
+            .text
+    composeTestRule.onNodeWithText(event.title).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_screen).assertIsDisplayed()
+    return heading
+  }
+
+  private fun assertBackOnPlanning(heading: String) {
+    composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.planning_heading).assertTextEquals(heading)
+  }
+
   @Test
-  fun defaultPlanningSourceShowsAppointmentsAndEvents() {
+  fun planningEvent_opensItsPage_andBackArrowKeepsTheSelectedDay() {
+    val event = eventNextWeek()
+    setNavHost(
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+
+    val heading = openEventFromNextWeek(event)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertTextEquals(event.title)
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_location)
+        .assertTextContains(
+            event.place,
+            substring = true,
+        )
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_date_time).assertExists()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_description)
+        .assertTextEquals(event.description)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_back).performClick()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_systemBackKeepsTheSelectedDay() {
+    val event = eventNextWeek()
+    setNavHost(
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+    val heading = openEventFromNextWeek(event)
+
+    Espresso.pressBack()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_tappingBackTwiceStaysOnPlanning() {
+    val event = eventNextWeek()
+    setNavHost(
+        authRepository = signedInPatient(),
+        startRoute = Route.OVERVIEW,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(listOf(event)),
+    )
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    val heading = openEventFromNextWeek(event)
+
+    // Both taps land before the event page has left the screen
+    val backClick =
+        composeTestRule
+            .onNodeWithTag(C.Tag.event_detail_back)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsActions.OnClick]
+            .action!!
+    composeTestRule.runOnUiThread {
+      backClick()
+      backClick()
+    }
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun planningEvent_thatNoLongerExists_explainsAndGoesBackToPlanning() {
+    val event = eventNextWeek()
+    setNavHost(
+        authRepository = signedInPatient(),
+        startRoute = Route.PLANNING,
+        planningRepository = planningWith(event),
+        eventRepository = FakeEventRepository(emptyList()),
+    )
+    val heading = openEventFromNextWeek(event)
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_not_found).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.event_detail_not_found))
+        .assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_go_back).performClick()
+
+    assertBackOnPlanning(heading)
+  }
+
+  @Test
+  fun caregiver_opensAPlanningEvent_withoutRegistrationActions() {
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = setOf(CarePermission.PLANNING))
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository = FakeEventRegistrationRepository()
+    try {
+      val event = eventNextWeek()
+      setNavHost(
+          Route.WHOSE_CARE,
+          planningRepository = planningWith(event),
+          careCircleRepository = circles,
+          careCircleInviteRepository = invites,
+          authRepository = auth,
+          eventRepository = FakeEventRepository(listOf(event)),
+      )
+      composeTestRule.waitUntil(timeoutMillis = 5_000) {
+        composeTestRule
+            .onAllNodesWithTag(C.Tag.overview_whose_care)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+
+      openEventFromNextWeek(event)
+
+      composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertTextEquals(event.title)
+      composeTestRule.waitForIdle()
+      composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertDoesNotExist()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
+  }
+
+  /**
+   * Verifies the default Planning source reads the appointment, auth, event and registration
+   * providers: it shows the appointments and only the events the patient confirmed (US-30).
+   */
+  @Test
+  fun defaultPlanningSourceShowsAppointmentsAndConfirmedEvents() {
     val auth = FakeAuthRepository()
     runTest { auth.signInWithGoogle("planning-owner") }
     val appointments = FakeAppointmentRepository()
@@ -1708,26 +1969,63 @@ class AppNavHostTest {
         ),
     )
     AppointmentRepositoryProvider.repository = appointments
-    // An event later today: the fake's "now" is midnight, so it counts as upcoming
+    // Two events later today: the patient confirmed only the first one
     val today = LocalDate.now()
-    val events =
-        FakeEventRepository(
-            listOf(
-                FakeEventRepository.sampleEvents(today)
-                    .first()
-                    .copy(startDateTime = today.atTime(15, 0))
-            ),
-            now = { today.atStartOfDay() },
-        )
-    // The planning provider keeps its default, so the entries can only come through it
-    setNavHost(
-        Route.PLANNING,
-        planningRepository = appPlanningRepository,
-        authRepository = auth,
-        eventRepository = events,
+    val (confirmed, other) =
+        FakeEventRepository.sampleEvents(today).take(2).map {
+          it.copy(startDateTime = today.atTime(15, 0))
+        }
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository =
+        FakeEventRegistrationRepository().apply { confirm(auth.currentUser!!.uid, confirmed.id) }
+    try {
+      // The planning provider keeps its default, so the entries can only come through it
+      setNavHost(
+          Route.PLANNING,
+          planningRepository = appPlanningRepository,
+          authRepository = auth,
+          eventRepository = FakeEventRepository(listOf(confirmed, other)),
+      )
+      composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+      composeTestRule.onNodeWithText(confirmed.title).assertIsDisplayed()
+      composeTestRule.onNodeWithText(other.title).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
+  }
+
+  /** Events are optional: if the confirmations can't be read, Planning still shows appointments. */
+  @Test
+  fun failingEventConfirmations_keepTheAppointments_withoutAnError() {
+    val auth = FakeAuthRepository()
+    runTest { auth.signInWithGoogle("planning-owner") }
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        auth.currentUser!!.uid,
+        Appointment(
+            id = "saved",
+            title = "Saved consultation",
+            scheduledAt = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            type = AppointmentType.CONSULTATION,
+        ),
     )
-    composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Gentle yoga for patients").assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.planning_add).assertIsDisplayed()
+    AppointmentRepositoryProvider.repository = appointments
+    val registrations = EventRegistrationRepositoryProvider.repository
+    EventRegistrationRepositoryProvider.repository =
+        FakeEventRegistrationRepository().apply {
+          observeError = IllegalStateException("Confirmations couldn't be read")
+        }
+    try {
+      setNavHost(
+          Route.PLANNING,
+          planningRepository = appPlanningRepository,
+          authRepository = auth,
+      )
+      composeTestRule.onNodeWithText("Saved consultation").assertIsDisplayed()
+      composeTestRule.onNodeWithTag(C.Tag.planning_error).assertDoesNotExist()
+    } finally {
+      EventRegistrationRepositoryProvider.repository = registrations
+    }
   }
 }

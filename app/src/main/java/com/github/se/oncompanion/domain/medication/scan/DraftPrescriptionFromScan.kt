@@ -10,6 +10,18 @@ import java.io.IOException
 import java.time.Clock
 import java.time.LocalDate
 
+/** What a scan found on its photo. */
+sealed interface ScanOutcome {
+  /** A prescription was read: the draft the form starts from. */
+  data class Read(val prescription: ScannedPrescription) : ScanOutcome
+
+  /** No text could be read: a blank, blurry, dark or handwritten photo, or reading failed. */
+  data object NoText : ScanOutcome
+
+  /** Text was read surely, but no medication: the photo isn't of a prescription (a label). */
+  data object NotAPrescription : ScanOutcome
+}
+
 /**
  * Reads the prescription on the photo of a scan (US-10): its text on the device, then the draft the
  * form starts from, with the details to check (see [readPrescription]). Nothing is saved: the
@@ -23,23 +35,30 @@ class DraftPrescriptionFromScan(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
   /**
-   * The draft read on [photo]. Doesn't delete [photo]: its owner does.
-   *
-   * @return `null` if nothing could be read, or if reading failed: either way, the patient enters
-   *   the prescription by hand or retakes the photo
+   * What is read on [photo]: the draft, or why there is none, so the patient is told whether to
+   * retake it or check it's a prescription. Doesn't delete [photo]: its owner does.
    */
-  suspend operator fun invoke(photo: File): ScannedPrescription? {
+  suspend operator fun invoke(photo: File): ScanOutcome {
     val text =
         try {
           recognizer.recognize(photo)
         } catch (e: IOException) {
           Log.w(TAG, "Couldn't read the photo of the prescription", e)
-          return null
+          return ScanOutcome.NoText
         }
-    return readPrescription(text, LocalDate.now(clock))
+    readPrescription(text, LocalDate.now(clock))?.let {
+      return ScanOutcome.Read(it)
+    }
+    // A handwritten prescription is read unsurely (0.57 on the test photo): it isn't told it's
+    // not a prescription, only that it couldn't be read
+    val sureLines = text.lines.count { it.confidence >= SURE }
+    return if (sureLines >= MIN_SURE_LINES) ScanOutcome.NotAPrescription else ScanOutcome.NoText
   }
 
   private companion object {
     const val TAG = "DraftPrescriptionFromScan"
+
+    /** Lines read surely for a photo without medications to be of something else, like a label. */
+    const val MIN_SURE_LINES = 3
   }
 }

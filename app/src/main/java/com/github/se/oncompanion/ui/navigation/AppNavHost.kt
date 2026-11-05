@@ -22,7 +22,6 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.auth.SignOutProvider
-import com.github.se.oncompanion.domain.planning.PlanningRepositoryProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
@@ -75,6 +74,7 @@ import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
+import com.github.se.oncompanion.ui.symptom.SymptomJournalViewModel
 import java.time.LocalDate
 
 /**
@@ -124,11 +124,6 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
-  // A caregiver sees only the Ligue's events until #240, never their own appointments
-  val planning = {
-    if (chosenPatient == null) PlanningRepositoryProvider.repository
-    else PlanningRepositoryProvider.publicEvents
-  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -161,6 +156,8 @@ private fun SessionNavHost(
         RoleScreen(
             viewModel = onboardingViewModel(navController, entry),
             onContinue = { navigationActions.navigateTo(Screen.ONBOARDING_INFORMATION) },
+            onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
       composable(Screen.ONBOARDING_INFORMATION) { entry ->
@@ -172,6 +169,8 @@ private fun SessionNavHost(
                   if (role == Role.CAREGIVER) Route.JOIN_CIRCLE else Route.OVERVIEW
               )
             },
+            onSignedOut = signOut,
+            credentialProvider = credentialProvider,
         )
       }
     }
@@ -220,7 +219,8 @@ private fun SessionNavHost(
       composable(Screen.OVERVIEW) {
         OverviewScreen(
             navigationActions,
-            viewModel = viewModel { OverviewViewModel(planningRepository = planning()) },
+            // In caregiver mode, the chosen patient's day, when they share their planning
+            viewModel = viewModel { OverviewViewModel(patientUid = chosenPatient?.uid) },
             onOpenAppointment = appointmentOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
@@ -232,7 +232,10 @@ private fun SessionNavHost(
     navigation(startDestination = Screen.PLANNING, route = Route.PLANNING) {
       composable(Screen.PLANNING) { entry ->
         val planningViewModel: PlanningViewModel = viewModel {
-          PlanningViewModel(repository = planning(), savedStateHandle = createSavedStateHandle())
+          PlanningViewModel(
+              savedStateHandle = createSavedStateHandle(),
+              patientUid = chosenPatient?.uid,
+          )
         }
         // Return to this calendar instance and reveal the saved day, including another week.
         val savedDate by
@@ -253,6 +256,8 @@ private fun SessionNavHost(
                 if (chosenPatient != null) null
                 else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
             onOpenAppointment = appointmentOpener(navigationActions),
+            onOpenEvent = eventOpener(navigationActions),
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -333,7 +338,8 @@ private fun SessionNavHost(
         val eventId = entry.arguments?.getString(Screen.EVENT_ID).orEmpty()
         EventDetailScreen(
             eventId = eventId,
-            onBack = navigationActions::goBack,
+            // A second tap during the exit animation must not pop the screen below as well
+            onBack = dropUnlessResumed { navigationActions.goBack() },
             viewModel = viewModel { EventDetailViewModel(eventId) },
             readOnly = chosenPatient != null,
         )
@@ -342,7 +348,14 @@ private fun SessionNavHost(
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
-      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
+      composable(Screen.SYMPTOMS) {
+        // In caregiver mode, the chosen patient's journal, read-only, when they share it
+        SymptomJournalScreen(
+            navigationActions,
+            viewModel = viewModel { SymptomJournalViewModel(patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
+        )
+      }
       composable(
           Screen.SYMPTOM_DETAIL,
           arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
@@ -351,7 +364,9 @@ private fun SessionNavHost(
         SymptomDetailScreen(
             navigationActions = navigationActions,
             // Scoped to this back stack entry, so each opened symptom has its own ViewModel
-            viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+            viewModel =
+                viewModel { SymptomDetailViewModel(symptomId, patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(Screen.SYMPTOM_ADD) {
@@ -577,11 +592,24 @@ private fun onboardingViewModel(
 
 /** Shares the resumed-only guard for appointment navigation from either bottom tab. */
 @Composable
-private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit {
+private fun appointmentOpener(navigationActions: NavigationActions): (String) -> Unit =
+    detailOpener(navigationActions, Screen::appointmentDetail)
+
+/** Opens an event's page from the current entry, with the same guard as [appointmentOpener]. */
+@Composable
+private fun eventOpener(navigationActions: NavigationActions): (String) -> Unit =
+    detailOpener(navigationActions, Screen::eventDetail)
+
+/** Opens the [route] of an id only while the current entry is resumed. */
+@Composable
+private fun detailOpener(
+    navigationActions: NavigationActions,
+    route: (String) -> String,
+): (String) -> Unit {
   val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
   return { id ->
     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-      navigationActions.navigateTo(Screen.appointmentDetail(id))
+      navigationActions.navigateTo(route(id))
     }
   }
 }
