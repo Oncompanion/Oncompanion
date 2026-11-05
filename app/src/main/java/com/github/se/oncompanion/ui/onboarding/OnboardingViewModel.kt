@@ -13,6 +13,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +43,7 @@ enum class AccountSwitch {
  * @property role the chosen role; patient by default
  * @property firstName required (see [canSave])
  * @property cancerType only asked to patients (see [asksCancerType])
- * @property isSaving the profile is being saved
- * @property isSaved the profile is saved: onboarding is done
+ * @property save where saving the profile is; once [SavePhase.SAVED], onboarding is done
  * @property email the signed-in account's email, so the user sees which account they picked
  * @property accountSwitch where switching to another account is, if the user chose to
  */
@@ -52,19 +52,18 @@ data class OnboardingUiState(
     val firstName: String = "",
     val familyName: String = "",
     val cancerType: String = "",
-    val isSaving: Boolean = false,
-    val isSaved: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val error: OnboardingError? = null,
     val email: String? = null,
     val accountSwitch: AccountSwitch? = null,
 ) {
   /** The user can switch to another account: nothing is being saved or switched yet. */
   val canSwitchAccount: Boolean
-    get() = accountSwitch == null && !isSaving && !isSaved
+    get() = accountSwitch == null && save == SavePhase.EDITING
 
   /** The profile can be saved: a first name is filled in and nothing is being saved. */
   val canSave: Boolean
-    get() = firstName.isNotBlank() && !isSaving && !isSaved
+    get() = firstName.isNotBlank() && save == SavePhase.EDITING
 
   /** Only a patient is asked for their cancer type: a caregiver isn't the one being treated. */
   val asksCancerType: Boolean
@@ -168,7 +167,7 @@ class OnboardingViewModel(
       _uiState.update { it.copy(error = OnboardingError.NOT_SIGNED_IN) }
       return
     }
-    _uiState.update { it.copy(isSaving = true, error = null) }
+    _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
         profileRepository.createProfile(
@@ -181,11 +180,11 @@ class OnboardingViewModel(
                     if (state.asksCancerType) state.cancerType.trim().ifEmpty { null } else null,
             )
         )
-        _uiState.update { it.copy(isSaving = false, isSaved = true) }
+        _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        _uiState.update { it.copy(isSaving = false, error = OnboardingError.SAVE_FAILED) }
+        _uiState.update { it.copy(save = SavePhase.EDITING, error = OnboardingError.SAVE_FAILED) }
       }
     }
   }

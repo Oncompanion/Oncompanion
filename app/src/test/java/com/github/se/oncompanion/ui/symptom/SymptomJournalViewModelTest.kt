@@ -3,9 +3,12 @@
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
+import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -34,6 +37,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLooper
 
 // Robolectric provides the main dispatcher used by viewModelScope
 @RunWith(AndroidJUnit4::class)
@@ -208,13 +212,14 @@ class SymptomJournalViewModelTest {
   }
 
   @Test
-  fun loadError_showsTheError() {
+  fun loadError_showsTheError_andThePatientCanStillAdd() {
     repository.observeError = IllegalStateException("no cache")
 
     val state = viewModel().uiState.value
 
     assertTrue(state.hasError)
     assertFalse(state.isLoading)
+    assertTrue(state.canAdd)
   }
 
   @Test
@@ -261,5 +266,94 @@ class SymptomJournalViewModelTest {
       AuthRepositoryProvider.repository = auth
       SymptomRepositoryProvider.repository = symptoms
     }
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun caregiverViewModel(vararg shared: CarePermission) =
+      SymptomJournalViewModel(
+          signedIn("caregiver"),
+          repository,
+          clock,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(*shared),
+      )
+
+  @Test
+  fun caregiver_symptomsShared_showsThePatientsJournal_withoutAdding() {
+    repository.seed("patient", entry("p1", clock.instant().toString()))
+    repository.seed("caregiver", entry("own", clock.instant().toString()))
+
+    val state = caregiverViewModel(CarePermission.SYMPTOMS).uiState.value
+
+    assertEquals(listOf("p1"), state.days.flatMap { day -> day.entries.map { it.entry.id } })
+    assertFalse(state.canAdd)
+    assertFalse(state.isNotShared)
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_isNotShared_withNoEntries() {
+    repository.seed("patient", entry("p1", clock.instant().toString()))
+
+    val state = caregiverViewModel(CarePermission.PLANNING).uiState.value
+
+    assertTrue(state.isNotShared)
+    assertTrue(state.days.isEmpty())
+    assertFalse(state.isLoading)
+    assertFalse(state.hasError)
+    assertFalse(state.canAdd)
+  }
+
+  private fun caregiverViewModel(patient: FollowedPatient) =
+      SymptomJournalViewModel(
+          patient.auth,
+          repository,
+          clock,
+          patientUid = "patient",
+          resolveSection = patient.sectionAccess,
+      )
+
+  @Test
+  fun caregiver_neverGetsTheAddButton_whateverTheAccess() {
+    // Each way a caregiver can be without the patient's symptoms, and what the journal shows
+    val cases =
+        listOf<Pair<String, (FollowedPatient) -> Unit>>(
+            "not confirmed yet" to { it.isUnconfirmed() },
+            "removed from the circle" to { it.removesTheCaregiver() },
+            "symptoms not shared" to { it.shares(CarePermission.PLANNING) },
+            "circle unreadable" to { it.circle.observeError = IllegalStateException("offline") },
+        )
+    for ((case, setUp) in cases) {
+      val patient = FollowedPatient(CarePermission.SYMPTOMS).also(setUp)
+
+      assertFalse(case, caregiverViewModel(patient).uiState.value.canAdd)
+    }
+  }
+
+  @Test
+  fun caregiver_noAccessThenNotShared_saysNotShared_insteadOfTheError() {
+    val patient = FollowedPatient().apply { removesTheCaregiver() }
+    val vm = caregiverViewModel(patient)
+    assertTrue(vm.uiState.value.hasError)
+
+    // The patient adds the caregiver back, without their symptoms
+    patient.shares(CarePermission.PLANNING)
+    ShadowLooper.idleMainLooper()
+
+    assertFalse(vm.uiState.value.hasError)
+    assertTrue(vm.uiState.value.isNotShared)
+  }
+
+  @Test
+  fun caregiver_notSharedThenRemoved_showsTheError_only() {
+    val patient = FollowedPatient(CarePermission.PLANNING)
+    val vm = caregiverViewModel(patient)
+    assertTrue(vm.uiState.value.isNotShared)
+
+    patient.removesTheCaregiver()
+    ShadowLooper.idleMainLooper()
+
+    assertTrue(vm.uiState.value.hasError)
+    assertFalse(vm.uiState.value.isNotShared)
   }
 }

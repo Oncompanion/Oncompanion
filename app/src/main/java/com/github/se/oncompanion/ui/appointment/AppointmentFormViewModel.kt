@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -10,6 +11,7 @@ import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -55,7 +57,7 @@ data class AppointmentFormUiState(
     val notes: String = "",
     val titleTouched: Boolean = false,
     val chosenOffset: ZoneOffset? = null,
-    val isSaving: Boolean = false,
+    val save: SavePhase = SavePhase.EDITING,
     val savedAt: Instant? = null,
     val completionHandled: Boolean = false,
     val error: AppointmentFormError? = null,
@@ -75,7 +77,7 @@ data class AppointmentFormUiState(
 
   /** Saving and completed forms cannot be edited or submitted again. */
   val editable: Boolean
-    get() = load == AppointmentFormLoad.READY && !isSaving && savedAt == null
+    get() = load == AppointmentFormLoad.READY && save == SavePhase.EDITING
 
   /** All patient input fits the existing appointment schema and resolves to a real time. */
   val canSave: Boolean
@@ -153,7 +155,7 @@ class AppointmentFormViewModel(
 
   /** Retries loading an existing appointment without replacing an edited draft. */
   fun load() {
-    if (appointmentId == null || state.value.isSaving || state.value.savedAt != null) return
+    if (appointmentId == null || state.value.save != SavePhase.EDITING) return
     state.update { it.copy(load = AppointmentFormLoad.LOADING) }
     observeAuthentication()
   }
@@ -177,12 +179,12 @@ class AppointmentFormViewModel(
 
   private fun show(saved: Appointment?) {
     val draft = state.value
-    if (draft.savedAt != null) return
+    if (draft.save == SavePhase.SAVED) return
     if (saved == null) {
       state.update { it.copy(load = AppointmentFormLoad.UNAVAILABLE) }
       return
     }
-    if (draft.isSaving) return
+    if (draft.save == SavePhase.SAVING) return
     if (original == null || draft.matches(requireNotNull(original))) {
       val local = saved.scheduledAt.atZone(zoneId)
       original = saved
@@ -257,7 +259,7 @@ class AppointmentFormViewModel(
     val uid = validatedOwner() ?: return
     val attempt = session
     val appointment = draft.toAppointment()
-    state.update { it.copy(isSaving = true, error = null) }
+    state.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch { writeAppointment(uid, appointment, attempt) }
   }
 
@@ -295,17 +297,20 @@ class AppointmentFormViewModel(
       else repository.updateAppointment(uid, appointment)
       if (isCurrentAttempt(uid, attempt))
           state.update {
+            // Done only if the form still shows its appointment (e.g. it wasn't deleted meanwhile)
+            val done = it.load == AppointmentFormLoad.READY
             it.copy(
-                isSaving = false,
-                savedAt =
-                    appointment.scheduledAt.takeIf { _ -> it.load == AppointmentFormLoad.READY },
+                save = if (done) SavePhase.SAVED else SavePhase.EDITING,
+                savedAt = appointment.scheduledAt.takeIf { done },
             )
           }
     } catch (cancelled: CancellationException) {
       throw cancelled
     } catch (_: Exception) {
       if (isCurrentAttempt(uid, attempt))
-          state.update { it.copy(isSaving = false, error = AppointmentFormError.SAVE_FAILED) }
+          state.update {
+            it.copy(save = SavePhase.EDITING, error = AppointmentFormError.SAVE_FAILED)
+          }
     }
   }
 

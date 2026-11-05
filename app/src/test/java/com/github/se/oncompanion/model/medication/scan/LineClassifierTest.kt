@@ -74,6 +74,58 @@ class LineClassifierTest {
   }
 
   @Test
+  fun aListedMedicationWithoutAStrengthStartsAMedication() {
+    assertKinds(
+        sheet(9),
+        mapOf(
+            "- Bain de bouche bicarbonate 1,4% :3 fois par jour pendant 10 jours" to MEDICATION,
+            "- Movicol sachets : 1 sachet par jour si constipation" to MEDICATION,
+        ),
+    )
+    val kinds =
+        kinds(
+            linesOf(
+                "- Contrôle sanguin dans 10 jours",
+                "*of the reference intake. Shake before use. Once opened, drink within 3 days",
+                "- Please take the tablets with a large glass of water every morning",
+                "2. Movicol: 1 sachet le matin",
+            )
+        )
+    assertEquals(OTHER, kinds["- Contrôle sanguin dans 10 jours"])
+    // A footnote, even with "3 days" in it
+    assertEquals(
+        OTHER,
+        kinds["*of the reference intake. Shake before use. Once opened, drink within 3 days"],
+    )
+    // A sentence in the list isn't how to take the medication above, even with "every morning"
+    assertEquals(
+        OTHER,
+        kinds["- Please take the tablets with a large glass of water every morning"],
+    )
+    assertEquals(MEDICATION, kinds["2. Movicol: 1 sachet le matin"])
+  }
+
+  @Test
+  fun aValidityOrCheckUpDateIsNotThePrescriptionsDate() {
+    assertKinds(
+        sheet(10),
+        mapOf(
+            "Né(e) le 30.01.1983" to PATIENT,
+            "Genève, le 22.10.2026" to DATE,
+            "Valable jusqu'au 31.01.2027. Prochain contrôle le 05.11.2026." to OTHER,
+        ),
+    )
+    assertKinds(
+        sheet(8),
+        mapOf(
+            "Discharge date: Oct 27, 2026" to DATE,
+            "Follow-up: blood count on 03/11/2026. Call 000 000 0000 if fever above 38 °C." to
+                OTHER,
+        ),
+    )
+  }
+
+  @Test
   fun aDateInWordsAndMedicationsWithTheirDosingOnOneLine() {
     assertKinds(
         sheet(3),

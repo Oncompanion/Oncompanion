@@ -14,7 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -130,23 +130,23 @@ class ScanFlowTest {
   }
 
   @Test
-  fun aSheetReadPartlyShowsWhatToCheckUntilItIsCorrected() {
-    // The Swiss sheet: its first medication's dosage isn't written ("1-0-0" only)
+  fun aScannedSheetShowsWhatToCheckUntilItIsCorrected() {
+    // The Swiss sheet: its first medication's dosage is deduced from "1-0-0" and "comprimés"
     scan(sheet(2))
 
     waitFor(hasTestTag(C.Tag.prescription_form_screen))
     compose
         .onNodeWithTag(C.Tag.prescription_review_notice)
-        .assertTextContains(string(R.string.prescription_review_partly_read), substring = true)
+        .assertTextContains(string(R.string.prescription_review_read), substring = true)
         .assertTextContains("6 details need checking", substring = true)
     reason(C.Tag.prescriptionReviewFieldCheck("dosage"))
         .performScrollTo()
-        .assertTextContains(string(R.string.prescription_review_not_found))
+        .assertTextContains(string(R.string.prescription_review_may_differ))
 
     compose
         .onNodeWithTag(C.Tag.prescription_form_dosage_field)
         .performScrollTo()
-        .performTextInput("1 comprimé")
+        .performTextReplacement("2 comprimés")
 
     waitFor(hasText("5 details need checking", substring = true))
     reason(C.Tag.prescriptionReviewFieldCheck("dosage")).assertDoesNotExist()

@@ -44,6 +44,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.SavePhase
 
 /**
  * Second onboarding step (Figma "US-01 / Onboarding – Information"): first name (required), family
@@ -64,7 +65,7 @@ fun InformationScreen(
   val useAnotherAccount = accountSwitch(uiState, viewModel, credentialProvider, onSignedOut)
 
   // Leaves onboarding once the profile is saved
-  LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) onSaved(uiState.role) }
+  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) onSaved(uiState.role) }
 
   InformationContent(
       uiState = uiState,
@@ -191,7 +192,7 @@ fun InformationContent(
               Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(C.Tag.onboarding_save_button),
       ) {
         // While saving: a spinner instead of the text, same button size
-        if (uiState.isSaving) {
+        if (uiState.save == SavePhase.SAVING) {
           Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
                 strokeWidth = 2.dp,

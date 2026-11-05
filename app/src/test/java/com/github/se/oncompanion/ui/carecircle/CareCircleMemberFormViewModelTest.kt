@@ -16,6 +16,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -28,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -169,9 +171,8 @@ class CareCircleMemberFormViewModelTest {
         )
         assertEquals("julie@example.com", invite.email)
         val state = viewModel.uiState.value
-        assertTrue(state.isSaved)
+        assertEquals(SavePhase.SAVED, state.save)
         assertEquals("K7M2PQ9XRT", state.savedInviteCode)
-        assertFalse(state.isSaving)
         assertFalse(state.saveFailed)
         assertFalse(state.canSave)
       }
@@ -198,7 +199,7 @@ class CareCircleMemberFormViewModelTest {
         viewModel.onFirstNameChange("Julie")
         saved(viewModel)
         assertTrue(invites.created.isEmpty())
-        assertFalse(viewModel.uiState.value.isSaving)
+        assertNotEquals(SavePhase.SAVING, viewModel.uiState.value.save)
       }
 
   @Test
@@ -207,7 +208,7 @@ class CareCircleMemberFormViewModelTest {
         val viewModel = viewModel()
         viewModel.fill()
         viewModel.save()
-        assertTrue(viewModel.uiState.value.isSaving)
+        assertEquals(SavePhase.SAVING, viewModel.uiState.value.save)
         viewModel.save()
         advanceUntilIdle()
         assertEquals(1, invites.created.size)
@@ -238,8 +239,7 @@ class CareCircleMemberFormViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state.saveFailed)
-        assertFalse(state.isSaving)
-        assertFalse(state.isSaved)
+        assertEquals(SavePhase.EDITING, state.save)
         assertEquals("Julie", state.firstName)
         assertEquals(Relationship.DAUGHTER, state.relationship)
         assertTrue(state.canSave)
@@ -260,7 +260,7 @@ class CareCircleMemberFormViewModelTest {
         saved(viewModel)
 
         assertEquals(1, invites.created.size)
-        assertTrue(viewModel.uiState.value.isSaved)
+        assertEquals(SavePhase.SAVED, viewModel.uiState.value.save)
       }
 
   @Test
@@ -325,7 +325,7 @@ class CareCircleMemberFormViewModelTest {
       }
 
   @Test
-  fun consumeSaved_clearsTheSavedState() =
+  fun consumeSaved_returnsToEditingAndClearsTheInviteCode() =
       runTest(dispatcher) {
         val viewModel = viewModel()
         viewModel.fill()
@@ -333,7 +333,7 @@ class CareCircleMemberFormViewModelTest {
 
         viewModel.consumeSaved()
 
-        assertFalse(viewModel.uiState.value.isSaved)
+        assertEquals(SavePhase.EDITING, viewModel.uiState.value.save)
         assertNull(viewModel.uiState.value.savedInviteCode)
       }
 
@@ -467,7 +467,7 @@ class CareCircleMemberFormViewModelTest {
         )
         assertTrue(invites.created.isEmpty())
         val state = viewModel.uiState.value
-        assertTrue(state.isSaved)
+        assertEquals(SavePhase.SAVED, state.save)
         assertNull(state.savedInviteCode)
         // The saved (trimmed) member coming back doesn't change the form that is leaving
         assertEquals(" Marco  ", state.firstName)
@@ -551,7 +551,7 @@ class CareCircleMemberFormViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state.saveFailed)
-        assertFalse(state.isSaved)
+        assertNotEquals(SavePhase.SAVED, state.save)
         assertTrue(CarePermission.SYMPTOMS in state.permissions)
         assertTrue(state.canSave)
       }

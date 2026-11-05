@@ -14,6 +14,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -101,8 +102,8 @@ class OnboardingViewModelTest {
     assertFalse(OnboardingUiState().canSave)
     assertFalse(OnboardingUiState(firstName = "   ").canSave)
     assertTrue(OnboardingUiState(firstName = "Alex").canSave)
-    assertFalse(OnboardingUiState(firstName = "Alex", isSaving = true).canSave)
-    assertFalse(OnboardingUiState(firstName = "Alex", isSaved = true).canSave)
+    assertFalse(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVING).canSave)
+    assertFalse(OnboardingUiState(firstName = "Alex", save = SavePhase.SAVED).canSave)
   }
 
   @Test
@@ -118,8 +119,7 @@ class OnboardingViewModelTest {
     assertEquals("", s.firstName)
     assertEquals("", s.familyName)
     assertEquals("", s.cancerType)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
     assertNull(s.error)
   }
 
@@ -258,8 +258,7 @@ class OnboardingViewModelTest {
     assertEquals(listOf(expected), profiles.created)
     assertEquals(expected, fakeProfiles.profiles[user.uid]?.copy(createdAt = null))
     val s = state(vm)
-    assertFalse(s.isSaving)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertNull(s.error)
     assertFalse(s.canSave)
   }
@@ -277,7 +276,7 @@ class OnboardingViewModelTest {
         listOf(UserProfile(uid = user.uid, role = Role.PATIENT, firstName = "Alexandra")),
         profiles.created,
     )
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -302,7 +301,7 @@ class OnboardingViewModelTest {
         ),
         profiles.created,
     )
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -311,7 +310,7 @@ class OnboardingViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     assertEquals("Alexandra", profiles.created.single().firstName)
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   @Test
@@ -340,8 +339,7 @@ class OnboardingViewModelTest {
     assertTrue(fakeProfiles.profiles.isEmpty())
     val s = state(vm)
     assertEquals(OnboardingError.NOT_SIGNED_IN, s.error)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
   }
 
   @Test
@@ -353,8 +351,7 @@ class OnboardingViewModelTest {
     vm.saveProfile()
     advanceUntilIdle()
     var s = state(vm)
-    assertTrue(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.SAVING, s.save)
     assertNull(s.error)
     assertFalse(s.canSave)
 
@@ -365,8 +362,7 @@ class OnboardingViewModelTest {
     gate.complete(Unit)
     advanceUntilIdle()
     s = state(vm)
-    assertFalse(s.isSaving)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertEquals(1, profiles.created.size)
   }
 
@@ -390,8 +386,7 @@ class OnboardingViewModelTest {
 
     var s = state(vm)
     assertEquals(OnboardingError.SAVE_FAILED, s.error)
-    assertFalse(s.isSaving)
-    assertFalse(s.isSaved)
+    assertEquals(SavePhase.EDITING, s.save)
     assertTrue(s.canSave)
     assertTrue(fakeProfiles.profiles.isEmpty())
 
@@ -401,7 +396,7 @@ class OnboardingViewModelTest {
 
     s = state(vm)
     assertNull(s.error)
-    assertTrue(s.isSaved)
+    assertEquals(SavePhase.SAVED, s.save)
     assertEquals(2, profiles.created.size)
     assertTrue(fakeProfiles.profiles.containsKey(user.uid))
   }
@@ -419,7 +414,7 @@ class OnboardingViewModelTest {
     profiles.gate = gate
     vm.saveProfile()
     advanceUntilIdle()
-    assertTrue(state(vm).isSaving)
+    assertEquals(SavePhase.SAVING, state(vm).save)
     assertNull(state(vm).error)
     gate.complete(Unit)
     advanceUntilIdle()
@@ -436,7 +431,7 @@ class OnboardingViewModelTest {
     advanceUntilIdle()
 
     assertEquals("late-uid", profiles.created.single().uid)
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
   }
 
   // --- clearError ---
@@ -560,7 +555,7 @@ class OnboardingViewModelTest {
 
     profiles.gate!!.complete(Unit)
     advanceUntilIdle()
-    assertTrue(state(vm).isSaved)
+    assertEquals(SavePhase.SAVED, state(vm).save)
     vm.useAnotherAccount {}
     assertNull(state(vm).accountSwitch)
     assertEquals(SignOutState.IDLE, signOut.state.value)

@@ -6,6 +6,7 @@ package com.github.se.oncompanion.ui.appointment
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
 import java.time.*
 import kotlinx.coroutines.*
@@ -253,7 +254,7 @@ class AppointmentEditViewModelTest {
         vm.onTitleChange("Correction")
         vm.save()
         advanceUntilIdle()
-        assertTrue(vm.uiState.value.isSaving)
+        assertEquals(SavePhase.SAVING, vm.uiState.value.save)
         auth.signOut()
         advanceUntilIdle()
         repository.writeGate!!.complete(Unit)
@@ -290,7 +291,7 @@ class AppointmentEditViewModelTest {
         vm.save()
         advanceUntilIdle()
         vm.load()
-        assertTrue(vm.uiState.value.isSaving)
+        assertEquals(SavePhase.SAVING, vm.uiState.value.save)
         val gate = requireNotNull(repository.writeGate)
         repository.writeGate = null
         repository.deleteAppointment("uid-patient", appointment.id)
@@ -299,7 +300,7 @@ class AppointmentEditViewModelTest {
         gate.complete(Unit)
         advanceUntilIdle()
         assertNull(vm.uiState.value.savedAt)
-        assertFalse(vm.uiState.value.isSaving)
+        assertNotEquals(SavePhase.SAVING, vm.uiState.value.save)
         assertFalse(vm.onCompletionHandled())
         assertTrue(repository.appointments("uid-patient").isEmpty())
       }

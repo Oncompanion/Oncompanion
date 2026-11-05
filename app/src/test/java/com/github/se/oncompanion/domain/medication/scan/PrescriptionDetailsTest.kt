@@ -53,6 +53,25 @@ class PrescriptionDetailsTest {
   }
 
   @Test
+  fun aLabelBeforeTheDoctorsTitleIsNotPartOfTheName() {
+    val names =
+        mapOf(
+            "Attending: Dr. Priya Shah, MD" to "Dr. Priya Shah, MD",
+            "Médecin prescripteur : Dre Léa Morel" to "Dre Léa Morel",
+            // Without a label, what comes before the title stays
+            "Oncology Dr. Anna Martin" to "Oncology Dr. Anna Martin",
+            "Dr J. Roux - Oncologie" to "Dr J. Roux - Oncologie",
+        )
+    for ((read, name) in names) {
+      assertEquals(
+          read,
+          Reading(name, sure = true),
+          prescriberIn(listOf(line(read, LineKind.DOCTOR))),
+      )
+    }
+  }
+
+  @Test
   fun aLineReadExactlyAsSureAsNeededIsTrusted() {
     assertTrue(prescriberIn(listOf(line("Dr A. Roux", LineKind.DOCTOR, confidence = SURE))).sure)
     assertFalse(prescriberIn(listOf(line("Dr A. Roux", LineKind.DOCTOR, confidence = 0.79f))).sure)

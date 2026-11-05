@@ -79,6 +79,7 @@ import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
 import com.github.se.oncompanion.ui.symptom.SymptomDetailViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomJournalScreen
+import com.github.se.oncompanion.ui.symptom.SymptomJournalViewModel
 import java.time.LocalDate
 
 /**
@@ -356,7 +357,14 @@ private fun SessionNavHost(
 
     // Features opened from the Overview shortcuts
     navigation(startDestination = Screen.SYMPTOMS, route = Route.SYMPTOMS) {
-      composable(Screen.SYMPTOMS) { SymptomJournalScreen(navigationActions) }
+      composable(Screen.SYMPTOMS) {
+        // In caregiver mode, the chosen patient's journal, read-only, when they share it
+        SymptomJournalScreen(
+            navigationActions,
+            viewModel = viewModel { SymptomJournalViewModel(patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
+        )
+      }
       composable(
           Screen.SYMPTOM_DETAIL,
           arguments = listOf(navArgument(Screen.SYMPTOM_DETAIL_ID) { type = NavType.StringType }),
@@ -365,7 +373,9 @@ private fun SessionNavHost(
         SymptomDetailScreen(
             navigationActions = navigationActions,
             // Scoped to this back stack entry, so each opened symptom has its own ViewModel
-            viewModel = viewModel { SymptomDetailViewModel(symptomId) },
+            viewModel =
+                viewModel { SymptomDetailViewModel(symptomId, patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(Screen.SYMPTOM_ADD) {

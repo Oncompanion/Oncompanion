@@ -1,0 +1,26 @@
+# Fictional test sheet 07 (07-swiss-german), as ML Kit read a phone photo of it (OnePlus 8T)
+# size <width> <height>, then one line per line read, in ML Kit's order:
+# <confidence> <left,top,right,bottom> <text>, tab-separated
+size	3000	4000
+0.89	597,609,1297,672	Onkologie Zentrum Aare (fiktiv)
+0.79	593,656,1317,709	Spitalaasse 40 3011 Bern Tel. 031 000 00 00
+0.77	590,691,1222,744	ZSR-Nr. ZO00000 GLN 7600000000000
+0.84	582,830,1250,881	Patientin: Mia Keller, geb. 04.06.1959
+0.90	579,878,976,928	Burgweg 3, 3000 Bern
+0.88	570,1029,759,1082	Rezept
+0.91	580,1180,816,1211	Medikament
+0.88	573,1268,1078,1311	Ondansetron 8 mg Filmtabl.
+0.89	567,1371,1048,1409	Dexamethason 4 mg Tabl.
+0.90	559,1468,957,1507	Macrogol 10 g Pulver
+0.90	518,1758,846,1794	Bern, 21.10.2026
+0.81	514,1851,850,1883	Dr. med. T. Huber
+0.91	1235,1168,1438,1204	Dosierung
+0.83	1235,1267,1322,1297	1-0-1
+0.88	1230,1368,1326,1397	2-0-0
+0.88	1248,1451,1827,1502	1 Beutel täglich bei Verstopfung
+0.82	2000,573,2381,612	Dr. med, Thomas Huber
+0.84	1933,610,2380,651	Facharzt FMH für Onkologie
+0.89	1993,1154,2112,1182	Dauer
+0.90	1993,1248,2324,1285	während 5 Tagen
+0.83	1995,1351,2187,1387	für 3 Tage
+0.86	409,3508,2292,3594	MUSTER Fiktives Rezept zum Testen der App oncompanion Nicht gültig Keine echte Person oder Klinik
