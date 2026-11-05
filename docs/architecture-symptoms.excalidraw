@@ -80,6 +80,10 @@
         {
           "type": "arrow",
           "id": "ar2"
+        },
+        {
+          "type": "arrow",
+          "id": "ar10"
         }
       ],
       "updated": 1791100000000,
@@ -1011,6 +1015,141 @@
       "endBinding": {
         "mode": "orbit",
         "elementId": "access",
+        "fixedPoint": [
+          0.3,
+          0
+        ]
+      }
+    },
+    {
+      "id": "names",
+      "type": "rectangle",
+      "x": 145,
+      "y": 200,
+      "width": 250,
+      "height": 110,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 148632748,
+      "version": 1,
+      "versionNonce": 2100205697,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "names_t"
+        },
+        {
+          "type": "arrow",
+          "id": "ar10"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a006"
+    },
+    {
+      "id": "names_t",
+      "type": "text",
+      "x": 155,
+      "y": 217,
+      "width": 230,
+      "height": 75,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1633380707,
+      "version": 1,
+      "versionNonce": 1143977780,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a007",
+      "text": "UserProfileRepository\nCareCircleRepository\n(sign · \"Added by\" name)",
+      "originalText": "UserProfileRepository\nCareCircleRepository\n(sign · \"Added by\" name)",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "names",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "ar10",
+      "type": "arrow",
+      "x": 270,
+      "y": 126,
+      "width": 0,
+      "height": 68,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 259854540,
+      "version": 1,
+      "versionNonce": 532373263,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a024",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          68
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "screens",
+        "fixedPoint": [
+          0.92,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "names",
         "fixedPoint": [
           0.3,
           0

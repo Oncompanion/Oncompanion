@@ -517,7 +517,12 @@ class SymptomDetailScreenTest {
 
   @Test
   fun symptomAddedByACaregiver_saysWho() {
-    setContent(loaded.copy(entry = fatigue.copy(addedBy = "caregiver", addedByName = "Sam")))
+    setContent(
+        loaded.copy(
+            entry = fatigue.copy(addedBy = "caregiver", addedByName = "Sam"),
+            addedByName = "Sam",
+        )
+    )
 
     composeTestRule.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
   }

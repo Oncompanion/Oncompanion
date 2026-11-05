@@ -8,7 +8,9 @@ import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -76,8 +78,17 @@ class SymptomJournalViewModelTest {
         runBlocking { it.signInWithGoogle("token") }
       }
 
+  /** The signed-in patient's care circle. */
+  private val circle = FakeCareCircleRepository()
+
   private fun viewModel(auth: AuthRepository = signedIn()) =
-      SymptomJournalViewModel(auth, repository, clock)
+      SymptomJournalViewModel(auth, repository, clock, careCircleRepository = circle)
+
+  /** Who the only entry of the journal shows as having added it. */
+  private fun SymptomJournalViewModel.shownAddedBy(): String? {
+    ShadowLooper.idleMainLooper()
+    return uiState.value.days.single().entries.single().addedByName
+  }
 
   @Test
   fun emptyJournal_isLoadedWithoutError() {
@@ -121,6 +132,7 @@ class SymptomJournalViewModelTest {
     val vm = viewModel()
 
     runBlocking { repository.deleteSymptom("alice", "deleted") }
+    ShadowLooper.idleMainLooper()
 
     assertEquals(listOf(LocalDate.of(2026, 10, 5) to listOf("kept")), idsByDay(vm.uiState.value))
   }
@@ -201,6 +213,7 @@ class SymptomJournalViewModelTest {
     val vm = viewModel()
 
     val id = repository.addSymptom("alice", entry("", "2026-10-05T08:00:00Z"))
+    ShadowLooper.idleMainLooper()
 
     assertEquals(
         listOf(
@@ -375,5 +388,59 @@ class SymptomJournalViewModelTest {
             .value
 
     assertTrue(state.canAdd)
+  }
+
+  // ----- Who added an entry (US-22) -----
+
+  /** Added by "bob", whose own profile says "Bob". */
+  private val addedByBob =
+      entry("s1", "2026-10-05T08:00:00Z").copy(addedBy = "bob", addedByName = "Bob")
+
+  private fun inAlicesCircle(firstName: String) =
+      circle.setMembers("alice", listOf(CareCircleMember(uid = "bob", firstName = firstName)))
+
+  @Test
+  fun patient_seesTheNameTheyGaveTheMember_untilTheyAreRemoved() {
+    repository.seed("alice", addedByBob)
+    inAlicesCircle("Robert")
+    val vm = viewModel()
+
+    assertEquals("Robert", vm.shownAddedBy())
+    // Renamed in the circle
+    inAlicesCircle("Rob")
+    assertEquals("Rob", vm.shownAddedBy())
+    // Removed from the circle: the name stored with the entry
+    circle.setMembers("alice", emptyList())
+    assertEquals("Bob", vm.shownAddedBy())
+  }
+
+  @Test
+  fun patient_circleCantBeRead_stillSeesTheEntry_withTheStoredName() {
+    repository.seed("alice", addedByBob)
+    circle.observeError = IllegalStateException("denied")
+
+    val vm = viewModel()
+
+    assertEquals("Bob", vm.shownAddedBy())
+    assertFalse(vm.uiState.value.hasError)
+  }
+
+  @Test
+  fun caregiver_seesTheStoredName_neverWhatThePatientCallsThem() {
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    // The patient calls the caregiver "Sam" in their circle; the entry stored "Bob"
+    repository.seed("patient", addedByBob.copy(addedBy = "caregiver"))
+
+    val vm =
+        SymptomJournalViewModel(
+            patient.auth,
+            repository,
+            clock,
+            patientUid = "patient",
+            resolveSection = patient.sectionAccess,
+            careCircleRepository = patient.circle,
+        )
+
+    assertEquals("Bob", vm.shownAddedBy())
   }
 }

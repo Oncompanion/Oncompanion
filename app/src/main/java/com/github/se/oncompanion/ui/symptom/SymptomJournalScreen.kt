@@ -105,7 +105,7 @@ fun SymptomJournalContent(
         )
       },
       floatingActionButton = {
-        // Only the patient adds to their journal
+        // The patient, or a caregiver they let add symptoms
         if (uiState.canAdd) {
           ExtendedFloatingActionButton(
               text = { Text(stringResource(R.string.symptom_add_title)) },
@@ -207,13 +207,13 @@ private fun EntryRow(journalEntry: JournalEntry, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(entry.title(), style = MaterialTheme.typography.titleMedium) },
         supportingContent =
-            if (summary == null && entry.addedByName == null) null
+            if (summary == null && journalEntry.addedByName == null) null
             else {
               {
                 Column {
                   summary?.let { Text(text = it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                   // A symptom a caregiver logged for the patient says who did
-                  entry.addedByName?.let { AddedBy(it) }
+                  journalEntry.addedByName?.let { AddedBy(it) }
                 }
               }
             },

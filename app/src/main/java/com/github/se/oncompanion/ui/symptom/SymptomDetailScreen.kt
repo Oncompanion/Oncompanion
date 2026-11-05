@@ -165,7 +165,7 @@ fun SymptomDetailContent(
                   )
                 },
             ) {
-              EntryDetail(entry, zone)
+              EntryDetail(entry, zone, uiState.addedByName)
             }
       }
     }
@@ -188,7 +188,7 @@ fun SymptomDetailContent(
 }
 
 @Composable
-private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
+private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
   Column(
       modifier = Modifier.fillMaxWidth().padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -213,7 +213,7 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId) {
       }
     }
     // A symptom a caregiver logged for the patient says who did
-    entry.addedByName?.let { AddedBy(it) }
+    addedByName?.let { AddedBy(it) }
   }
 }
 

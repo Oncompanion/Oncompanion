@@ -4,10 +4,13 @@ package com.github.se.oncompanion.ui.symptom
 
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
@@ -51,7 +54,10 @@ class SymptomDetailViewModelTest {
       id: String = "s1",
       auth: AuthRepository = signedIn(),
       symptoms: SymptomRepository = repository,
-  ) = SymptomDetailViewModel(id, auth, symptoms)
+  ) = SymptomDetailViewModel(id, auth, symptoms, careCircleRepository = circle)
+
+  /** The signed-in patient's care circle. */
+  private val circle = FakeCareCircleRepository()
 
   /** A ViewModel showing [fatigue], with the deletion confirmation open. */
   private fun confirmingDelete(
@@ -345,6 +351,7 @@ class SymptomDetailViewModelTest {
 
     // Deleted on another device
     runBlocking { repository.deleteSymptom("alice", "s1") }
+    shadowOf(Looper.getMainLooper()).idle()
 
     var state = vm.uiState.value
     assertTrue(state.isNotFound)
@@ -353,6 +360,7 @@ class SymptomDetailViewModelTest {
 
     // Coming back (e.g. the deletion was rolled back) doesn't reopen the dialog
     repository.seed("alice", fatigue)
+    shadowOf(Looper.getMainLooper()).idle()
     state = vm.uiState.value
     assertEquals(fatigue, state.entry)
     assertFalse(state.isDeleteDialogShown)
@@ -420,5 +428,41 @@ class SymptomDetailViewModelTest {
     assertNull(state.entry)
     assertFalse(state.isNotFound)
     assertFalse(state.hasError)
+  }
+
+  // ----- Who added the symptom (US-22) -----
+
+  /** Added by "bob", whose own profile says "Bob". */
+  private val addedByBob = fatigue.copy(addedBy = "bob", addedByName = "Bob")
+
+  @Test
+  fun patient_seesTheNameTheyGaveTheMember_untilTheyAreRemoved() {
+    repository.seed("alice", addedByBob)
+    circle.setMembers("alice", listOf(CareCircleMember(uid = "bob", firstName = "Robert")))
+    val vm = viewModel()
+
+    assertEquals("Robert", vm.uiState.value.addedByName)
+    circle.setMembers("alice", emptyList())
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals("Bob", vm.uiState.value.addedByName)
+  }
+
+  @Test
+  fun caregiver_seesTheStoredName_neverWhatThePatientCallsThem() {
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    // The patient calls the caregiver "Sam" in their circle; the symptom stored "Bob"
+    repository.seed("patient", addedByBob.copy(addedBy = "caregiver"))
+
+    val vm =
+        SymptomDetailViewModel(
+            "s1",
+            patient.auth,
+            repository,
+            patientUid = "patient",
+            resolveSection = patient.sectionAccess,
+            careCircleRepository = patient.circle,
+        )
+
+    assertEquals("Bob", vm.uiState.value.addedByName)
   }
 }
