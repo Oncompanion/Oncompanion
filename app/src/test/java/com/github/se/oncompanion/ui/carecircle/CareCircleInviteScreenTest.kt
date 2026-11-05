@@ -8,6 +8,9 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.assertIsDisplayed
@@ -523,5 +526,34 @@ class CareCircleInviteScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertIsDisplayed()
     runBlocking { invites.redeem(julie.inviteCode, "caregiver", "julie.d@gmail.com") }
     composeTestRule.onNodeWithText("Julie has joined your circle").assertIsDisplayed()
+  }
+
+  // ---- adding symptoms (US-22) ----
+
+  @Test
+  fun invite_showsWhetherTheMemberCanAddSymptoms() {
+    val canAdd = julie.copy(details = julie.details.copy(canAdd = setOf(CarePermission.SYMPTOMS)))
+    var invite by mutableStateOf(canAdd)
+    composeTestRule.setContent {
+      CareCircleInviteContent(
+          uiState = CareCircleInviteUiState.Invite(invite, expired = false),
+          onBack = {},
+          onSendEmail = {},
+          onShare = {},
+          onCopy = {},
+          onRenew = {},
+          onCancel = {},
+          onConfirmCancel = {},
+          onDismissCancel = {},
+          onRetry = {},
+      )
+    }
+    val row =
+        composeTestRule.onNodeWithTag(C.Tag.careCircleMemberCanAdd(CarePermission.SYMPTOMS.name))
+
+    row.performScrollTo().assertIsOn()
+    composeTestRule.onNodeWithText(string(R.string.permission_symptoms_add)).assertIsDisplayed()
+    invite = julie
+    row.performScrollTo().assertIsOff()
   }
 }
