@@ -36,9 +36,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.severity
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.LocalDate
@@ -53,6 +55,7 @@ fun SymptomJournalScreen(
     navigationActions: NavigationActions,
     modifier: Modifier = Modifier,
     viewModel: SymptomJournalViewModel = viewModel { SymptomJournalViewModel() },
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Keeps "Today" and "Yesterday" right while the journal is on screen: refreshes when it comes
@@ -68,6 +71,7 @@ fun SymptomJournalScreen(
       onAddClick = { navigationActions.navigateTo(Screen.SYMPTOM_ADD) },
       onRetry = viewModel::load,
       modifier = modifier,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -77,6 +81,7 @@ fun SymptomJournalScreen(
  * @param onEntryClick opens the entry with the given ID
  * @param onAddClick opens the add symptom screen
  * @param onRetry reloads the journal after an error
+ * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +92,7 @@ fun SymptomJournalContent(
     onAddClick: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptoms_screen),
@@ -97,12 +103,15 @@ fun SymptomJournalContent(
         )
       },
       floatingActionButton = {
-        ExtendedFloatingActionButton(
-            text = { Text(stringResource(R.string.symptom_add_title)) },
-            icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-            onClick = onAddClick,
-            modifier = Modifier.testTag(C.Tag.symptom_journal_add),
-        )
+        // Only the patient adds to their journal
+        if (uiState.canAdd) {
+          ExtendedFloatingActionButton(
+              text = { Text(stringResource(R.string.symptom_add_title)) },
+              icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+              onClick = onAddClick,
+              modifier = Modifier.testTag(C.Tag.symptom_journal_add),
+          )
+        }
       },
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -119,24 +128,38 @@ fun SymptomJournalContent(
                 onRetry = onRetry,
                 retryTestTag = C.Tag.symptom_journal_retry,
             )
+        // The patient a caregiver follows doesn't share their symptoms
+        uiState.isNotShared && caregiverOf != null ->
+            NotSharedMessage(caregiverOf, CarePermission.SYMPTOMS, Modifier.align(Alignment.Center))
         uiState.days.isEmpty() ->
             SymptomMessage(
                 title = stringResource(R.string.symptom_journal_empty_title),
                 hint = stringResource(R.string.symptom_journal_empty_hint),
                 testTag = C.Tag.symptom_journal_empty,
             )
-        else -> JournalList(uiState.days, uiState.today, onEntryClick)
+        else -> JournalList(uiState.days, uiState.today, uiState.canAdd, onEntryClick)
       }
     }
   }
 }
 
 @Composable
-private fun JournalList(days: List<JournalDay>, today: LocalDate, onEntryClick: (String) -> Unit) {
+private fun JournalList(
+    days: List<JournalDay>,
+    today: LocalDate,
+    hasAddButton: Boolean,
+    onEntryClick: (String) -> Unit,
+) {
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.symptom_journal_list),
-      // The bottom padding keeps the last entry above the add button
-      contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
+      // The bottom padding keeps the last entry above the add button, when there is one
+      contentPadding =
+          PaddingValues(
+              start = 16.dp,
+              top = 8.dp,
+              end = 16.dp,
+              bottom = if (hasAddButton) 88.dp else 8.dp,
+          ),
       verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     days.forEach { day ->

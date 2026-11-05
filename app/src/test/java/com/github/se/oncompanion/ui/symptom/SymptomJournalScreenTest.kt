@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -15,9 +16,11 @@ import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -28,6 +31,8 @@ import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
@@ -36,9 +41,11 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class SymptomJournalScreenTest {
@@ -65,7 +72,7 @@ class SymptomJournalScreenTest {
   /** Monday 5 October 2026. */
   private val today = LocalDate.of(2026, 10, 5)
 
-  private val loaded = SymptomJournalUiState(today = today, isLoading = false)
+  private val loaded = SymptomJournalUiState(today = today, isLoading = false, canAdd = true)
 
   private fun day(date: LocalDate, vararg entries: Pair<SymptomEntry, String>) =
       JournalDay(date, entries.map { (entry, time) -> JournalEntry(entry, LocalTime.parse(time)) })
@@ -380,5 +387,60 @@ class SymptomJournalScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_retry).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).assertIsDisplayed()
+  }
+
+  // ----- Caregiver mode (US-20) -----
+
+  private fun setCaregiverContent(state: SymptomJournalUiState) {
+    composeTestRule.setContent {
+      SymptomJournalContent(
+          uiState = state,
+          onBack = {},
+          onEntryClick = {},
+          onAddClick = {},
+          onRetry = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun caregiver_seesThePatientsJournal_withoutTheAddButton() {
+    setCaregiverContent(filled.copy(canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiver_symptomsNotShared_saysSo_insteadOfAnEmptyJournal() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithText("Anne doesn't share Symptoms with you").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_empty).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_symptomsNotShared_isFullyVisibleInLandscape() {
+    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_longJournal_endsWithoutTheAddButtonsSpace() {
+    // Enough entries to scroll in landscape, the newest first
+    val entries =
+        (0 until 12).map { i -> JournalEntry(fatigue.copy(id = "e$i"), LocalTime.of(20 - i, 0)) }
+    setCaregiverContent(loaded.copy(days = listOf(JournalDay(today, entries)), canAdd = false))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).performScrollToIndex(entries.size)
+
+    val list = composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).getBoundsInRoot()
+    val last = composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).getBoundsInRoot()
+    // Without the add button, no room is kept for it under the last entry
+    assertTrue("gap ${list.bottom - last.bottom}", list.bottom - last.bottom < 24.dp)
   }
 }
