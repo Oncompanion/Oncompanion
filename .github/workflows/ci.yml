@@ -236,6 +236,23 @@ jobs:
           firebase emulators:start --only auth,firestore --project oncompanion-c4144 > firebase-emulators.log 2>&1 &
           timeout 180 bash -c 'until curl -s localhost:8080 > /dev/null && curl -s localhost:9099 > /dev/null; do sleep 2; done'
 
+      # Checks often fails early (ktfmt after about a minute): then stop here, rather than after
+      # 10 minutes of connected tests whose run can't reach SonarCloud anyway. Checks still running,
+      # or its result unreadable: go on, "Wait for the Checks job" decides later
+      - name: Stop if the Checks job already failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          checks=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+            --jq '.jobs[] | select(.name == "Checks") | "\(.status) \(.conclusion)"') || exit 0
+          case "$checks" in
+            "completed success") ;;
+            completed*)
+              echo "The Checks job ended with \"${checks#completed }\", so the connected tests aren't run."
+              echo "Fix it, or use \"Re-run failed jobs\" to run Checks and this job again."
+              exit 1 ;;
+          esac
+
       # Run connected tests on the emulator
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
