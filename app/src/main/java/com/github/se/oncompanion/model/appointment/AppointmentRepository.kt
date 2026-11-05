@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
 
@@ -7,6 +8,10 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Reads and writes a patient's appointments, independently of Firebase. Callers resolve the patient
  * uid and cancel their observations when the account changes.
+ *
+ * Writes return once saved on the device, without waiting for the server. If the server later
+ * rejects one, the change is undone on the device and reported through
+ * [com.github.se.oncompanion.model.session.RejectedWrites], which tells the user.
  */
 interface AppointmentRepository {
   /**
@@ -32,7 +37,7 @@ interface AppointmentRepository {
   /**
    * Enqueues changes to the existing [appointment] for [uid], preserving its stored creation time.
    * Returns without waiting for server acknowledgement, including offline. An absent document is
-   * never created; its deferred update rejection is logged, not thrown to the caller.
+   * never created; its deferred update rejection is reported, not thrown to the caller.
    *
    * Validation and immediate enqueue failures are thrown. Later server rejection may roll back
    * locally visible changes; completion does not confirm server acceptance or a disk flush.
@@ -45,8 +50,8 @@ interface AppointmentRepository {
   /**
    * Enqueues deletion of appointment [id] for [uid], including offline. Deleting an absent document
    * is harmless. Returns without server acknowledgement or an independently verified disk flush.
-   * Immediate enqueue failures are thrown; deferred server rejection is logged and may restore the
-   * locally removed appointment.
+   * Immediate enqueue failures are thrown; deferred server rejection is reported and may restore
+   * the locally removed appointment.
    *
    * @throws IllegalArgumentException if [uid] or [id] is blank or contains a path separator
    */
@@ -56,9 +61,9 @@ interface AppointmentRepository {
    * Enqueues a new appointment for [uid] and returns its generated ID without waiting for server
    * acknowledgement, including offline. The supplied ID and creation timestamp are ignored.
    *
-   * Validation and immediate enqueue failures are thrown. A later server rejection is logged by the
-   * storage implementation and may roll back the locally visible entry; returning an ID does not
-   * confirm server acceptance or an independently verified disk flush.
+   * Validation and immediate enqueue failures are thrown. A later server rejection is reported by
+   * the storage implementation and may roll back the locally visible entry; returning an ID does
+   * not confirm server acceptance or an independently verified disk flush.
    *
    * @throws IllegalArgumentException if the appointment is invalid, or [uid] is blank or contains a
    *   path separator

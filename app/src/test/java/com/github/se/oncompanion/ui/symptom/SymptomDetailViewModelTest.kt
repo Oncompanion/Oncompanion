@@ -8,6 +8,7 @@ import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
@@ -188,6 +189,27 @@ class SymptomDetailViewModelTest {
     assertEquals(fatigue, state.entry)
     assertFalse(state.isNotFound)
     assertFalse(state.canDelete)
+  }
+
+  @Test
+  fun confirmDelete_rejectedLaterByTheServer_bringsTheEntryBackAndTellsTheUser() {
+    val rejectedWrites = RejectedWrites()
+    val symptoms = FakeSymptomRepository(rejectedWrites = rejectedWrites)
+    symptoms.seed("alice", fatigue)
+    symptoms.serverRejectsWrites = true
+    val vm = viewModel(symptoms = symptoms).apply { requestDelete() }
+
+    vm.confirmDelete()
+
+    // Done without waiting for the server
+    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertTrue(symptoms.symptoms("alice").isEmpty())
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    symptoms.rejectPendingWrites()
+
+    assertEquals(listOf(fatigue), symptoms.symptoms("alice"))
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test

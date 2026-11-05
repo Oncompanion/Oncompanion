@@ -4,6 +4,7 @@
 package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.model.appointment.*
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -189,6 +190,39 @@ class AppointmentEditViewModelTest {
         assertEquals("Corrected", saved.title)
         assertNull(saved.location)
         assertNull(saved.notes)
+      }
+
+  /** An edit the server rejects after Save returned is undone and reported, so the user is told. */
+  @Test
+  fun editRejectedLaterByTheServerIsUndoneAndReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val appointments = FakeAppointmentRepository(rejectedWrites = rejectedWrites)
+        appointments.seed("uid-patient", appointment)
+        appointments.serverRejectsWrites = true
+        val vm =
+            AppointmentFormViewModel(
+                LocalDate.of(2026, 10, 20),
+                zone,
+                appointments,
+                auth,
+                appointment.id,
+            )
+        advanceUntilIdle()
+        vm.onTitleChange("Rejected title")
+
+        vm.save()
+        advanceUntilIdle()
+
+        // Saved without waiting for the server
+        assertNotNull(vm.uiState.value.savedAt)
+        assertEquals("Rejected title", appointments.appointments("uid-patient").single().title)
+        assertEquals(0, rejectedWrites.unseen.value)
+
+        appointments.rejectPendingWrites()
+
+        assertEquals(listOf(appointment), appointments.appointments("uid-patient"))
+        assertEquals(1, rejectedWrites.unseen.value)
       }
 
   /** Switching accounts before observer delivery rejects old drafts and stale completions. */

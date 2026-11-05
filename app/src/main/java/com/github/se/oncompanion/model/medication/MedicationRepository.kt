@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
  *
  * Every function takes the [uid] of the patient the data belongs to. Reads work offline from the
  * local cache, and writes return as soon as they are saved on the device (also offline); they reach
- * the server when there is a connection.
+ * the server when there is a connection. If the server later rejects one, the change is undone on
+ * the device and reported through [com.github.se.oncompanion.model.session.RejectedWrites], which
+ * tells the user.
  */
 interface MedicationRepository {
 

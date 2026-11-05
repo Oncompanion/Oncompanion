@@ -454,5 +454,8 @@ object C {
 
     /** What to check on the row of the medication at [position], when it isn't open. */
     fun prescriptionReviewRowCheck(position: Int) = "prescription_review_row_check_$position"
+
+    // A change the server rejected and was undone
+    const val rejected_write_snackbar = "rejected_write_snackbar"
   }
 }

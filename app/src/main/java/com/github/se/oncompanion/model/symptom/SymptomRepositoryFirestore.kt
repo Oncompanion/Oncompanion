@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.symptom
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -16,17 +18,21 @@ import kotlinx.coroutines.flow.Flow
 /**
  * [SymptomRepository] backed by Cloud Firestore, documents at `/users/{uid}/symptoms/{id}`.
  *
- * Like [com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore], writes return as soon
- * as they are applied to the local cache, so logging a symptom never waits for the network. If the
- * server later rejects a write, Firestore rolls it back and the rejection is logged;
+ * Writes return as soon as they are saved on the device, so logging a symptom never waits for the
+ * network. If the server later rejects a write (security rules, revoked access), Firestore undoes
+ * it on the device and it is reported to [rejectedWrites], so the user is told;
  * [SymptomEntry.isValid] mirrors the rules so this shouldn't happen.
  */
 class SymptomRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : SymptomRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
@@ -69,6 +75,7 @@ class SymptomRepositoryFirestore(
             .set(fieldsOf(entry) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
             .addOnFailureListener { e ->
               Log.e(TAG, "The server rejected the symptom ${document.id}; it was rolled back", e)
+              rejectedWrites.report()
             }
         return@operation document.id
       }
@@ -86,6 +93,7 @@ class SymptomRepositoryFirestore(
               "Couldn't update the symptom ${entry.id} (deleted or rejected); rolled back",
               e,
           )
+          rejectedWrites.report()
         }
       }
 
@@ -93,6 +101,7 @@ class SymptomRepositoryFirestore(
     // Not awaited: the task only completes once the server confirms, which never happens offline
     collection(uid).document(id).delete().addOnFailureListener { e ->
       Log.e(TAG, "The server rejected deleting the symptom $id; it was restored", e)
+      rejectedWrites.report()
     }
   }
 

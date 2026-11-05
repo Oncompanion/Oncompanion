@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeleteState
 import java.time.LocalDate
@@ -293,6 +294,30 @@ class PrescriptionDetailViewModelTest {
     // Not shown as "no longer exists" while the screen closes
     assertFalse(vm.uiState.value.isNotFound)
     assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
+  }
+
+  @Test
+  fun confirmDelete_rejectedLaterByTheServer_bringsThePrescriptionBackAndTellsTheUser() = runTest {
+    val rejectedWrites = RejectedWrites()
+    val medications = FakeMedicationRepository(rejectedWrites = rejectedWrites)
+    medications.seed("alice", chemo)
+    medications.serverRejectsWrites = true
+    val vm = viewModel(medications = medications)
+    advanceUntilIdle()
+    vm.requestDelete()
+
+    vm.confirmDelete()
+    advanceUntilIdle()
+
+    // Done without waiting for the server
+    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertEquals(emptyList<Prescription>(), medications.prescriptionsOf("alice"))
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    medications.rejectPendingWrites()
+
+    assertEquals(listOf(chemo), medications.prescriptionsOf("alice"))
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test

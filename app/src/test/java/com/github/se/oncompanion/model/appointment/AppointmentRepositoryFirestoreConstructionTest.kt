@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
 
@@ -24,10 +25,13 @@ class AppointmentRepositoryFirestoreConstructionTest {
       runTest(StandardTestDispatcher()) {
         var requested = false
         val failure = IllegalStateException("Provider invoked")
-        val repository = AppointmentRepositoryFirestore {
-          requested = true
-          throw failure
-        }
+        val repository =
+            AppointmentRepositoryFirestore(
+                dbProvider = {
+                  requested = true
+                  throw failure
+                }
+            )
         val source = repository.observeAppointments("alice")
         assertFalse(requested)
         val error = runCatching { source.first() }.exceptionOrNull()
@@ -42,10 +46,13 @@ class AppointmentRepositoryFirestoreConstructionTest {
       runTest(StandardTestDispatcher()) {
         var requested = false
         val failure = IllegalStateException("Provider invoked")
-        val repository = AppointmentRepositoryFirestore {
-          requested = true
-          throw failure
-        }
+        val repository =
+            AppointmentRepositoryFirestore(
+                dbProvider = {
+                  requested = true
+                  throw failure
+                }
+            )
         val source = repository.observeAppointment("alice", "entry")
         assertFalse(requested)
         val error = runCatching { source.first() }.exceptionOrNull()
@@ -58,7 +65,8 @@ class AppointmentRepositoryFirestoreConstructionTest {
   @Test
   fun invalidInputDoesNotInitializeFirebase() =
       runTest(StandardTestDispatcher()) {
-        val repository = AppointmentRepositoryFirestore { error("Firebase must not be accessed") }
+        val repository =
+            AppointmentRepositoryFirestore(dbProvider = { error("Firebase must not be accessed") })
         val valid =
             Appointment(
                 title = "Consultation",

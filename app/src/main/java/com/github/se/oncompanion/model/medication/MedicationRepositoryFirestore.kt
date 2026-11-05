@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.medication
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
@@ -29,16 +31,21 @@ import kotlinx.coroutines.tasks.await
  * whole list. Writes return as soon as they are applied to the local cache, without waiting for the
  * server, so they never block the UI (offline, Firestore syncs them when the connection comes
  * back). Whether a prescription was deleted, which an update needs to know first, is also taken
- * from the local cache. If the server later rejects a write (security rules, or an update of a
- * prescription that doesn't exist), Firestore rolls the local change back and the rejection is
- * logged; [Prescription.isValid] mirrors the rules so the former shouldn't happen.
+ * from the local cache. If the server later rejects a write (security rules, revoked access, or an
+ * update of a prescription that doesn't exist), Firestore undoes it on the device and it is
+ * reported to [rejectedWrites], so the user is told; [Prescription.isValid] mirrors the rules so
+ * the first shouldn't happen.
  */
 class MedicationRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : MedicationRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
@@ -88,7 +95,7 @@ class MedicationRepositoryFirestore(
                 prescriptionFields(prescription) +
                     (FIELD_CREATED_AT to FieldValue.serverTimestamp())
             )
-            .logServerRejection(prescription.id)
+            .reportServerRejection(prescription.id)
       }
 
   override suspend fun updatePrescription(uid: String, prescription: Prescription): Unit =
@@ -100,11 +107,11 @@ class MedicationRepositoryFirestore(
         prescriptions(uid)
             .document(prescription.id)
             .update(prescriptionFields(prescription))
-            .logServerRejection(prescription.id)
+            .reportServerRejection(prescription.id)
       }
 
   override suspend fun deletePrescription(uid: String, id: String): Unit = SessionAccess.operation {
-    prescriptions(uid).document(id).delete().logServerRejection(id)
+    prescriptions(uid).document(id).delete().reportServerRejection(id)
   }
 
   private fun prescriptions(uid: String) =
@@ -137,9 +144,11 @@ class MedicationRepositoryFirestore(
     awaitClose { registration.remove() }
   }
 
-  private fun Task<Void>.logServerRejection(prescriptionId: String) {
+  /** Logs a later rejection of this write by the server and reports it, so the user is told. */
+  private fun Task<Void>.reportServerRejection(prescriptionId: String) {
     addOnFailureListener { e ->
       Log.e(TAG, "The server rejected prescription $prescriptionId; the change was rolled back", e)
+      rejectedWrites.report()
     }
   }
 

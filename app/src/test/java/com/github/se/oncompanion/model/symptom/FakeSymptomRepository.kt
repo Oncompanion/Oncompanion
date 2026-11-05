@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.model.symptom
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +26,17 @@ import kotlinx.coroutines.flow.update
  *   entry keeping its `createdAt`, and does nothing if it doesn't exist.
  * - [deleteSymptom] removes the entry, and does nothing if it doesn't exist.
  *
- * Test hooks: [observeError] and [writeError] simulate failures, [symptoms] exposes the stored
- * data.
+ * Test hooks: [observeError] and [writeError] simulate failures, [serverRejectsWrites] and
+ * [rejectPendingWrites] a server that rejects writes after they returned, [symptoms] exposes the
+ * stored data.
  *
  * @param clock source of the `createdAt` timestamp set when adding (the "server time")
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : SymptomRepository {
+class FakeSymptomRepository(
+    private val clock: () -> Instant = Instant::now,
+    rejectedWrites: RejectedWrites = RejectedWrites(),
+) : SymptomRepository {
 
   /** Stored entries, keyed by uid then by entry ID. */
   private val store = MutableStateFlow<Map<String, Map<String, SymptomEntry>>>(emptyMap())
@@ -43,6 +50,16 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
    * When non-null, [addSymptom], [updateSymptom] and [deleteSymptom] throw it and change nothing.
    */
   var writeError: Exception? = null
+
+  private val server = RejectingServer<Map<String, Map<String, SymptomEntry>>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** Snapshot of the stored entries of [uid], in no particular order. */
   fun symptoms(uid: String): List<SymptomEntry> = store.value[uid].orEmpty().values.toList()
@@ -71,6 +88,7 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
   override suspend fun addSymptom(uid: String, entry: SymptomEntry): String {
     writeError?.let { throw it }
     require(entry.isValid(now = clock())) { "Invalid symptom entry: $entry" }
+    server.saving(store.value)
     val id = "symptom-${nextId++}"
     seed(uid, entry.copy(id = id, createdAt = clock()))
     return id
@@ -80,6 +98,7 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
     writeError?.let { throw it }
     require(entry.id.isNotBlank()) { "The symptom to update has no ID" }
     require(entry.isValid(now = clock())) { "Invalid symptom entry: $entry" }
+    server.saving(store.value)
     store.update { current ->
       val stored = current[uid]?.get(entry.id) ?: return@update current
       current +
@@ -89,6 +108,7 @@ class FakeSymptomRepository(private val clock: () -> Instant = Instant::now) : S
 
   override suspend fun deleteSymptom(uid: String, id: String) {
     writeError?.let { throw it }
+    server.saving(store.value)
     store.update { current -> current + (uid to current[uid].orEmpty() - id) }
   }
 }
