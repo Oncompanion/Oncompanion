@@ -75,6 +75,23 @@ jobs:
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v6
 
+      # Robolectric downloads its Android jars (android-all) from Maven into ~/.m2, which the Gradle
+      # cache doesn't keep: a failed download failed every Robolectric test of the run (#300). The
+      # key is the Robolectric version only: another dependency's bump keeps the same entry, and an
+      # upgrade starts a new one without the old version's jars
+      - name: Robolectric version
+        id: robolectric
+        run: |
+          version=$(sed -n 's/^robolectric = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          [ -z "$version" ] && echo "No robolectric version in libs.versions.toml" && exit 1
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Robolectric cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ steps.robolectric.outputs.version }}
+
       - name: Grant execute permission for gradlew
         run: |
           chmod +x ./gradlew
@@ -98,7 +115,8 @@ jobs:
           ./gradlew testDebugUnitTest --build-cache
 
       # SonarCloud imports the lint issues, the unit test results and their coverage: the CI job
-      # downloads them before its analysis. Paths are kept under app/build/
+      # downloads them before its analysis. Paths are kept under app/build/. Kept 7 days, so
+      # "Re-run failed jobs" on the CI job alone still finds them a few days later
       - name: Upload reports for SonarCloud
         if: always()
         uses: actions/upload-artifact@v4
@@ -109,7 +127,7 @@ jobs:
             app/build/test-results/testDebugUnitTest/
             app/build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec
           if-no-files-found: warn
-          retention-days: 1
+          retention-days: 7
 
       # The release APK is built on every run, so a PR that breaks R8 (a missing keep rule) fails
       # here; it's signed and uploaded on main only, since PRs never use it.
@@ -218,6 +236,23 @@ jobs:
           firebase emulators:start --only auth,firestore --project oncompanion-c4144 > firebase-emulators.log 2>&1 &
           timeout 180 bash -c 'until curl -s localhost:8080 > /dev/null && curl -s localhost:9099 > /dev/null; do sleep 2; done'
 
+      # Checks often fails early (ktfmt after about a minute): then stop here, rather than after
+      # 10 minutes of connected tests whose run can't reach SonarCloud anyway. Checks still running,
+      # or its result unreadable: go on, "Wait for the Checks job" decides later
+      - name: Stop if the Checks job already failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          checks=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+            --jq '.jobs[] | select(.name == "Checks") | "\(.status) \(.conclusion)"') || exit 0
+          case "$checks" in
+            "completed success") ;;
+            completed*)
+              echo "The Checks job ended with \"${checks#completed }\", so the connected tests aren't run."
+              echo "Fix it, or use \"Re-run failed jobs\" to run Checks and this job again."
+              exit 1 ;;
+          esac
+
       # Run connected tests on the emulator
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
@@ -261,25 +296,34 @@ jobs:
           retention-days: 7
 
       # The lint report and the unit tests come from the Checks job, which runs at the same time and
-      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them
+      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them.
+      # If Checks failed, its reports are missing or partial and SonarCloud would show a wrong
+      # coverage: stop here, and "Re-run failed jobs" runs both jobs again (#300)
       - name: Wait for the Checks job
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           for _ in $(seq 60); do
-            status=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
-              --jq '.jobs[] | select(.name == "Checks") | .status')
-            # Renamed job: fail now with the reason rather than after 10 minutes
-            [ -z "$status" ] && echo "No job named Checks in this run" && exit 1
-            [ "$status" = "completed" ] && exit 0
+            # A read that fails (a GitHub API error) is tried again, rather than failing the job
+            # after its connected tests
+            if checks=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+              --jq '.jobs[] | select(.name == "Checks") | "\(.status) \(.conclusion)"'); then
+              # Renamed job: fail now with the reason rather than after 10 minutes
+              [ -z "$checks" ] && echo "No job named Checks in this run" && exit 1
+              case "$checks" in
+                "completed success") exit 0 ;;
+                completed*)
+                  echo "The Checks job ended with \"${checks#completed }\": SonarCloud isn't run without its reports."
+                  echo "Fix it, or use \"Re-run failed jobs\" to run Checks and this job again."
+                  exit 1 ;;
+              esac
+            fi
             sleep 10
           done
           echo "The Checks job didn't finish in time" && exit 1
 
-      # Missing when the Checks job failed early (formatting): Sonar then runs without them
       - name: Download reports of the Checks job
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: checks-reports
           path: app/build
