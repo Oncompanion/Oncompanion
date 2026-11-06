@@ -14,8 +14,10 @@ import android.speech.SpeechRecognizer as AndroidRecognizer
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -39,15 +41,18 @@ class AndroidSpeechRecognizer(
   @Volatile private var listening: AndroidRecognizer? = null
 
   override fun isAvailable(context: Context): Boolean =
-      AndroidRecognizer.isRecognitionAvailable(context)
+      AndroidRecognizer.isRecognitionAvailable(context.applicationContext)
 
   override fun listen(context: Context, language: SpeechLanguage): Flow<SpeechEvent> = flow {
+    // Only the app's context is kept while listening: a session can outlive the screen that
+    // started it (e.g. when the phone is rotated), and must not keep that screen alive
+    val appContext = context.applicationContext
     // Checked when listening starts, not when the flow is built: the user may have
     // granted the microphone in between
     when {
-      !hasMicrophone(context) -> emit(SpeechEvent.Failed(SpeechError.NO_PERMISSION))
-      !isAvailable(context) -> emit(SpeechEvent.Failed(SpeechError.UNAVAILABLE))
-      else -> emitAll(recognition(context, language))
+      !hasMicrophone(appContext) -> emit(SpeechEvent.Failed(SpeechError.NO_PERMISSION))
+      !isAvailable(appContext) -> emit(SpeechEvent.Failed(SpeechError.UNAVAILABLE))
+      else -> emitAll(recognition(appContext, language))
     }
   }
       .flowOn(mainDispatcher)
@@ -104,6 +109,8 @@ class AndroidSpeechRecognizer(
           recognizer.destroy()
         }
       }
+      // A session is short: keep every event, so a slow screen never loses the final one
+      .buffer(Channel.UNLIMITED)
 
   private fun hasMicrophone(context: Context): Boolean =
       ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==

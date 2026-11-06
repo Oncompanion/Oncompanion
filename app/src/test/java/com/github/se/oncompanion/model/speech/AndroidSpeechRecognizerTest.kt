@@ -5,7 +5,12 @@ package com.github.se.oncompanion.model.speech
 import android.Manifest
 import android.app.Application
 import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Looper
 import android.speech.RecognitionService
@@ -83,6 +88,7 @@ class AndroidSpeechRecognizerTest {
     )
     assertTrue(intent.getBooleanExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false))
     assertTrue(intent.getBooleanExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false))
+    assertEquals(1, intent.getIntExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 0))
     assertEquals(context.packageName, intent.getStringExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE))
   }
 
@@ -183,6 +189,34 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun onlyTheAppsContextIsKeptNeverTheScreens() = runTest {
+    // A screen's context that fails the test if anything but its app's context is used: keeping
+    // the screen would leak it when the phone is rotated while listening
+    val screen =
+        object : ContextWrapper(context) {
+          override fun getApplicationContext(): Context = context
+
+          override fun getPackageManager(): PackageManager = screenUsed()
+
+          override fun getPackageName(): String = screenUsed()
+
+          override fun checkPermission(permission: String, pid: Int, uid: Int): Int = screenUsed()
+
+          override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean =
+              screenUsed()
+
+          override fun getMainLooper(): Looper = screenUsed()
+        }
+
+    assertTrue(AndroidSpeechRecognizer().isAvailable(screen))
+    val session = startListening(from = screen)
+    android.triggerOnResults(results("tired"))
+    runCurrent()
+
+    assertEquals(listOf(SpeechEvent.FinalText("tired")), session.events)
+  }
+
+  @Test
   fun androidErrorsAreGroupedByWhatTheUserCanDo() {
     val cases =
         mapOf(
@@ -218,15 +252,19 @@ class AndroidSpeechRecognizerTest {
       language: SpeechLanguage = SpeechLanguage.ENGLISH,
       recognizer: AndroidSpeechRecognizer =
           AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler)),
+      from: Context = context,
   ): Session {
     val events = mutableListOf<SpeechEvent>()
     val job =
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-          recognizer.listen(context, language).toList(events)
+          recognizer.listen(from, language).toList(events)
         }
     shadowOf(Looper.getMainLooper()).idle()
     return Session(events, job)
   }
+
+  /** Fails the test: the screen's context was used instead of the app's. */
+  private fun screenUsed(): Nothing = throw AssertionError("The screen's context was used")
 
   /** Android's results holding [text] as the most likely one. */
   private fun results(text: String) =

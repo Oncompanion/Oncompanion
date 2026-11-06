@@ -10,8 +10,9 @@ import kotlinx.coroutines.flow.Flow
  * screens can be tested with a fake, and so nothing else in the app depends on Android's speech
  * APIs.
  *
- * Methods take the [Context] of the screen that listens, so ViewModels never hold one. The app
- * never keeps what is recorded: only the text comes back.
+ * Methods take the [Context] of the screen that listens, so ViewModels never hold one; only the
+ * app's context is kept, never the screen's. The app never keeps what is recorded: only the text
+ * comes back.
  */
 interface SpeechRecognizer {
   /** Whether the phone has a speech recognizer at all; if not, [listen] always fails. */
@@ -28,8 +29,9 @@ interface SpeechRecognizer {
   fun listen(context: Context, language: SpeechLanguage): Flow<SpeechEvent>
 
   /**
-   * The user is done speaking: stops listening and sends what was said as [SpeechEvent.FinalText].
-   * Does nothing when not listening.
+   * The user is done speaking: stops listening, then [listen]'s flow ends as usual, with
+   * [SpeechEvent.FinalText] or, if nothing was understood, [SpeechEvent.Failed]. Does nothing when
+   * not listening. Call it on the main thread, like [listen].
    */
   fun stop()
 }
