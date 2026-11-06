@@ -122,7 +122,9 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
-  fun afterStoppingWhatWasSaidStillComesBack() = runTest {
+  fun whatAndroidSendsAfterStopStillEndsTheSession() = runTest {
+    // Robolectric doesn't record stopListening(), so this can't check that stop() reaches
+    // Android: only that the text Android then sends still comes back and ends the session
     val recognizer = AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler))
     val session = startListening(recognizer = recognizer)
     android.triggerOnPartialResults(results("tired"))
@@ -142,9 +144,26 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
-  fun stoppingWhenNotListeningDoesNothing() {
-    // Nothing to stop: must not crash, e.g. when the user taps Stop twice
-    AndroidSpeechRecognizer().stop()
+  fun stoppingWhenNotListeningDoesNotCrash() = runTest {
+    // The same recognizer, as the app has one: e.g. the user taps Stop twice, or after leaving.
+    // Only checks that nothing crashes: Robolectric doesn't record stopListening()
+    val recognizer = AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler))
+    recognizer.stop()
+
+    // After a session that ended
+    val ended = startListening(recognizer = recognizer)
+    android.triggerOnResults(results("tired"))
+    runCurrent()
+    recognizer.stop()
+
+    // After a session that was cancelled
+    val cancelled = startListening(recognizer = recognizer)
+    cancelled.job.cancel()
+    runCurrent()
+    recognizer.stop()
+
+    assertEquals(listOf(SpeechEvent.FinalText("tired")), ended.events)
+    assertTrue(cancelled.events.isEmpty())
   }
 
   @Test
