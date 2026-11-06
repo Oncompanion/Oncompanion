@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <resources>
     <!-- Splash screen background in dark mode: the app's dark surface color -->
-    <color name="splash_background">#FF141218</color>
+    <color name="splash_background">#FF151B1E</color>
 </resources>
