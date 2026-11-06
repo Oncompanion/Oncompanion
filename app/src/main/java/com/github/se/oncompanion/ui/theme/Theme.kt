@@ -86,8 +86,9 @@ private val DarkColorScheme =
 
 /**
  * Oncompanion theme: the "Morning on the lake" colors of DESIGN.md, in light and dark, with the
- * extra colors in [MaterialTheme.lakeColors]. Dynamic (wallpaper) colors are intentionally not
- * used, so the app looks the same on every device.
+ * extra colors in [MaterialTheme.lakeColors], the Figtree type scale and the corner radii. Spacing
+ * is in [Spacing]. Dynamic (wallpaper) colors are intentionally not used, so the app looks the same
+ * on every device.
  */
 @Composable
 fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
@@ -97,6 +98,7 @@ fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Compo
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
+        shapes = Shapes,
         content = content,
     )
   }
