@@ -120,6 +120,11 @@ typography:
     fontWeight: 500
     lineHeight: "16px"
     letterSpacing: "0.025em"
+  button-label:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "17px"
+    fontWeight: 600
+    lineHeight: "20px"
 rounded:
   small: "8px"
   medium: "12px"
@@ -138,7 +143,7 @@ components:
   button-filled:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label-large}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.full}"
     padding: "0 24px"
     height: "56px"
@@ -249,7 +254,7 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 - **Title Medium** (600, 17/24): list titles, times, form questions, section headings.
 - **Title Small** (600, 15/20): group headers in lists ("This month", "Scheduled", the week range).
 - **Body Large** (400, 17/26): field values and the date under the greeting. **Body Medium** (15/22): details. **Body Small** (13/18): helper text.
-- **Label Large** (600, 15/20): buttons and chips. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
+- **Button label** (600, 17/20): every button, one step above Label Large as in the Figma buttons. **Label Large** (600, 15/20): chips and snackbar actions. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
 
 **The 200% Rule.** All text is sp and must reflow at 200% font scale: no fixed-height text containers, no truncated labels.
 
@@ -290,13 +295,13 @@ The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* compo
 Pills 56 dp tall, 24 dp side padding. Filled for the one main action, Tonal for a strong secondary, Outlined or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
 
 ### Chips
-Filter chips 48 dp tall (full touch target). Selected: dawn container with a check icon.
+Filter chips 48 dp tall (full touch target), 16 dp side padding. Selected: dawn container with a check icon, 8 dp before the label.
 
 ### Cards / Containers
 White on the warm ground, Large radius, no border. Lists live in one card with 1 dp Outline Variant dividers inset 16 dp. A row shows its value above its label (Body Large, then Body Small).
 
 ### Inputs / Fields
-Outlined, Medium radius, 56 dp, label inside above the value, trailing icon in a 48 dp target. States: empty, filled, error (red border and message) and *check*: a value the app drafted uses the dawn container, a 1.5 dp secondary border and the label "… · please check".
+Outlined, Medium radius, 58 dp in every state, label inside above the value, trailing icon in a 48 dp target. States: empty, filled, error (1.5 dp red border and message), focused (2 dp primary border while typing) and *check*: a value the app drafted uses the dawn container and a 1.5 dp secondary border, and its helper text says what to check ("Please check: the date was hard to read").
 
 ### Switches
 Material switches in a card row: name and one-line description on the left, switch on the right (e.g. what a member can see, notifications).
