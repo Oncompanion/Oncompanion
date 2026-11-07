@@ -99,6 +99,32 @@ class ObserveCarePlanningTest {
   }
 
   @Test
+  fun patient_readsEverySectionOfTheirPlanning() = runTest {
+    auth.signInWithGoogle("alice")
+    collect(null)
+
+    assertEquals(listOf<Set<CarePermission>?>(CarePermission.entries.toSet()), planning.sections)
+  }
+
+  @Test
+  fun caregiver_readsOnlyTheSharedSections_andFollowsSharingChanges() = runTest {
+    bobSees(CarePermission.PLANNING)
+    auth.signInWithGoogle("bob")
+    collect("alice")
+    // Alice then also shares her events: the planning is read again with them
+    bobSees(CarePermission.PLANNING, CarePermission.EVENTS)
+    runCurrent()
+
+    assertEquals(
+        listOf<Set<CarePermission>?>(
+            setOf(CarePermission.PLANNING),
+            setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+        ),
+        planning.sections,
+    )
+  }
+
+  @Test
   fun caregiver_planningNotShared_isNotSharedAndReadsNothing() = runTest {
     planning.items.value = listOf(chemo)
     bobSees(CarePermission.SYMPTOMS)

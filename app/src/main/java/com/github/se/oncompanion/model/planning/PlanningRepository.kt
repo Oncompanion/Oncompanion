@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.model.planning
 
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -52,4 +53,15 @@ fun interface PlanningRepository {
    * adapters. A source that is the same for everyone (the Ligue's events) ignores [ownerUid].
    */
   fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>>
+
+  /**
+   * Like the other [observeItems], with only the entries of [sections]: a caregiver gets the
+   * sections the patient shares with them (US-20), and the others are not read at all, so the
+   * server never refuses a read. A source that belongs to no section gives all its entries.
+   */
+  fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> = observeItems(ownerUid, range)
 }

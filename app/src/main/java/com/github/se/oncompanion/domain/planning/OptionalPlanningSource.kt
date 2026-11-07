@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.domain.planning
 
 import android.util.Log
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -23,11 +24,20 @@ class OptionalPlanningSource(private val source: PlanningRepository) : PlanningR
 
   /** The entries of [source] within [range], or none once it fails. */
   override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
-      source.observeItems(ownerUid, range).catch { e ->
-        if (e is CancellationException) throw e
-        Log.w(TAG, "An optional planning source failed; its entries are left out", e)
-        emit(emptyList())
-      }
+      orNone(source.observeItems(ownerUid, range))
+
+  /** The entries of [source] within [range] and [sections], or none once it fails. */
+  override fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> = orNone(source.observeItems(ownerUid, range, sections))
+
+  private fun orNone(items: Flow<List<PlanningItem>>): Flow<List<PlanningItem>> = items.catch { e ->
+    if (e is CancellationException) throw e
+    Log.w(TAG, "An optional planning source failed; its entries are left out", e)
+    emit(emptyList())
+  }
 
   private companion object {
     const val TAG = "OptionalPlanningSource"

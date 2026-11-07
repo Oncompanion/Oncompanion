@@ -4,9 +4,11 @@
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -19,23 +21,42 @@ object PlanningRepositoryProvider {
   /**
    * By default, a patient's appointments and medications and the Ligue events they confirmed,
    * merged by [ObservePlanning]. Events are an [OptionalPlanningSource]: if they can't be read,
-   * Planning still shows the appointments instead of an error. The providers are read on each
-   * observation, so replacing them also reaches Planning. Whose planning it is, and restarting it
-   * on an account change, is decided by [ObserveCarePlanning].
+   * Planning still shows the appointments instead of an error. Medications and events are a
+   * [SectionPlanningSource]: a caregiver only gets them when the patient also shares Prescriptions
+   * or Events. The providers are read on each observation, so replacing them also reaches Planning.
+   * Whose planning it is, and restarting it on an account change, is decided by
+   * [ObserveCarePlanning].
    */
   @Volatile
-  var repository: PlanningRepository = PlanningRepository { ownerUid, range ->
-    ObservePlanning(
-            AppointmentPlanningSource(AppointmentRepositoryProvider.repository),
-            MedicationPlanningSource(MedicationRepositoryProvider.repository),
-            // Events are nice to have: if they fail, the appointments still show
-            OptionalPlanningSource(
-                EventPlanningSource(
-                    EventRepositoryProvider.repository,
-                    EventRegistrationRepositoryProvider.repository,
-                )
-            ),
-        )
-        .observeItems(ownerUid, range)
-  }
+  var repository: PlanningRepository =
+      object : PlanningRepository {
+        override fun observeItems(ownerUid: String, range: PlanningRange) =
+            sources().observeItems(ownerUid, range)
+
+        override fun observeItems(
+            ownerUid: String,
+            range: PlanningRange,
+            sections: Set<CarePermission>,
+        ) = sources().observeItems(ownerUid, range, sections)
+      }
+
+  /** The sources of the default [repository], built from the providers' current repositories. */
+  private fun sources() =
+      ObservePlanning(
+          AppointmentPlanningSource(AppointmentRepositoryProvider.repository),
+          SectionPlanningSource(
+              CarePermission.PRESCRIPTIONS,
+              MedicationPlanningSource(MedicationRepositoryProvider.repository),
+          ),
+          SectionPlanningSource(
+              CarePermission.EVENTS,
+              // Events are nice to have: if they fail, the appointments still show
+              OptionalPlanningSource(
+                  EventPlanningSource(
+                      EventRepositoryProvider.repository,
+                      EventRegistrationRepositoryProvider.repository,
+                  )
+              ),
+          ),
+      )
 }

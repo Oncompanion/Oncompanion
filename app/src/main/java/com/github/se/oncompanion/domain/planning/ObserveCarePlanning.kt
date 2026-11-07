@@ -58,19 +58,28 @@ class ObserveCarePlanning(
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   operator fun invoke(patientUid: String?, range: PlanningRange): Flow<CarePlanning> =
-      resolveSection(CarePermission.PLANNING, patientUid).flatMapLatest { access ->
+      resolveSection.withSharedSections(CarePermission.PLANNING, patientUid).flatMapLatest {
+        val access = it.access
         when (access) {
           SectionAccess.Loading -> flowOf(CarePlanning.Loading)
           SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
           SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
-          is SectionAccess.Readable -> shown(access.ownerUid, range)
+          is SectionAccess.Readable -> shown(access.ownerUid, range, it.shared)
         }
       }
 
-  /** [ownerUid]'s entries, from [CarePlanning.Loading]; a read failure is [CarePlanning.Failed]. */
-  private fun shown(ownerUid: String, range: PlanningRange): Flow<CarePlanning> =
+  /**
+   * [ownerUid]'s entries of the [shared] sections (a caregiver gets medications and events only
+   * when the patient also shares Prescriptions or Events), from [CarePlanning.Loading]; a read
+   * failure is [CarePlanning.Failed].
+   */
+  private fun shown(
+      ownerUid: String,
+      range: PlanningRange,
+      shared: Set<CarePermission>,
+  ): Flow<CarePlanning> =
       planning
-          .observeItems(ownerUid, range)
+          .observeItems(ownerUid, range, shared)
           .map<List<PlanningItem>, CarePlanning> { CarePlanning.Shown(it) }
           .onStart { emit(CarePlanning.Loading) }
           .catch { e ->
