@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Paper lake band, exported from the Figma (page M2). The sky is
+     painted behind it in the colour of the time of day (PaperLake.kt). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="390dp"
+    android:height="100dp"
+    android:viewportWidth="390"
+    android:viewportHeight="100">
+    <!-- The Saleve -->
+    <path
+        android:fillColor="#C3B5E0"
+        android:pathData="M226,100V90L262,76L292,84L330,64L362,78L390,70V100H226Z" />
+    <!-- Its foothills -->
+    <path
+        android:fillColor="#A99BD0"
+        android:pathData="M190,100L214,94L256,88L302,94L348,86L390,92V100H190Z" />
+</vector>

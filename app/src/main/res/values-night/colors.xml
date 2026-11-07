@@ -3,4 +3,6 @@
 <resources>
     <!-- Splash screen background in dark mode: the app's dark surface color -->
     <color name="splash_background">#FF151B1E</color>
+    <!-- The waterline under the Paper lake band, the far water of the header (PaperLake.kt) -->
+    <color name="paper_lake_water">#FF134F5B</color>
 </resources>
