@@ -3,27 +3,24 @@
 
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
+import com.github.se.oncompanion.ui.theme.Spacing
+import com.github.se.oncompanion.ui.theme.buttonLabel
+import com.github.se.oncompanion.ui.theme.lakeColors
 
 /** The test tags of [DetailActions], declared by each feature in `C.kt`. */
 class DetailActionTags(val edit: String, val delete: String)
@@ -59,7 +56,11 @@ fun DetailWithActions(
   }
 }
 
-/** Available item actions, Edit before Delete, shared across detail screens. */
+/**
+ * Available item actions, Edit before Delete, shared across detail screens (Figma: "Bottom actions"
+ * of a detail): full-width outlined Edit and text Delete, 16 dp from the sides and 24 dp from the
+ * bottom.
+ */
 @Composable
 fun DetailActions(
     editLabel: String,
@@ -70,23 +71,30 @@ fun DetailActions(
 ) {
   if (onEdit == null && onDelete == null) return
   Column(
-      modifier = Modifier.fillMaxWidth().padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.lg, bottom = Spacing.xl),
+      verticalArrangement = Arrangement.spacedBy(Spacing.sm),
   ) {
     if (onEdit != null)
-        OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag(tags.edit)) {
-          Icon(
-              Icons.Default.Edit,
-              contentDescription = null,
-              Modifier.size(ButtonDefaults.IconSize),
-          )
-          Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-          Text(editLabel)
+        OutlinedButton(
+            onClick = onEdit,
+            border =
+                BorderStroke(LakeButtonDefaults.OutlineWidth, MaterialTheme.colorScheme.outline),
+            colors =
+                ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.lakeColors.primaryText
+                ),
+            contentPadding = LakeButtonDefaults.ContentPadding,
+            modifier = Modifier.fillMaxWidth().lakeButton(enabled = true).testTag(tags.edit),
+        ) {
+          Text(editLabel, style = MaterialTheme.typography.buttonLabel)
         }
     if (onDelete != null)
-        TextButton(onClick = onDelete, modifier = Modifier.testTag(tags.delete)) {
-          Text(deleteLabel)
-        }
+        LakeTextButton(
+            text = deleteLabel,
+            onClick = onDelete,
+            modifier = Modifier.fillMaxWidth().testTag(tags.delete),
+        )
   }
 }

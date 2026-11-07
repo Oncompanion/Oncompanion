@@ -5,27 +5,43 @@ package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
+import com.github.se.oncompanion.ui.assertSameColor
+import com.github.se.oncompanion.ui.assertTextStyle
+import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.buttonLabel
+import com.github.se.oncompanion.ui.theme.lakeColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class DetailActionsTest {
@@ -155,6 +171,74 @@ class DetailActionsTest {
     composeTestRule.setContent { DetailActions("Edit item", "Delete item", tags = TAGS) }
     composeTestRule.onNodeWithTag(TAGS.edit).assertDoesNotExist()
     composeTestRule.onNodeWithTag(TAGS.delete).assertDoesNotExist()
+  }
+
+  // ----- Figma: "Bottom actions" of a detail ("Symptom detail") -----
+
+  private lateinit var colors: ColorScheme
+  private lateinit var buttonLabel: TextStyle
+  private var primaryText = Color.Unspecified
+
+  /** Both actions at the bottom of a short detail, on the theme's surface. */
+  private fun setThemedContent() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        colors = MaterialTheme.colorScheme
+        buttonLabel = MaterialTheme.typography.buttonLabel
+        primaryText = MaterialTheme.lakeColors.primaryText
+        Surface(color = MaterialTheme.colorScheme.surface) {
+          DetailWithActions(
+              showActions = true,
+              contentTestTag = CONTENT,
+              actions = {
+                DetailActions("Edit item", "Delete item", { edits++ }, { deletes++ }, TAGS)
+              },
+          ) {
+            Text("Row")
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun actions_areFullWidth56dpButtons_8dpApart_24dpAboveTheBottom() {
+    setThemedContent()
+
+    val screen = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val edit = composeTestRule.onNodeWithTag(TAGS.edit).getUnclippedBoundsInRoot()
+    val delete = composeTestRule.onNodeWithTag(TAGS.delete).getUnclippedBoundsInRoot()
+    for ((name, button) in listOf("Edit" to edit, "Delete" to delete)) {
+      assertEquals("$name height", 56.dp, button.bottom - button.top)
+      assertEquals("$name left margin", 16.dp, button.left - screen.left)
+      assertEquals("$name right margin", 16.dp, screen.right - button.right)
+    }
+    assertEquals(8.dp, delete.top - edit.bottom)
+    assertEquals(24.dp, screen.bottom - delete.bottom)
+  }
+
+  @Test
+  fun bothLabels_useTheFigmaButtonLabel_inPrimaryText() {
+    setThemedContent()
+
+    for (label in listOf("Edit item", "Delete item")) {
+      composeTestRule
+          .onNodeWithText(label, useUnmergedTree = true)
+          .assertTextStyle(buttonLabel, primaryText)
+    }
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun edit_hasTheFigma1_5dpOutlineBorder() {
+    setThemedContent()
+
+    val edit = composeTestRule.onNodeWithTag(TAGS.edit)
+    edit.assertHeightIsEqualTo(56.dp)
+    // At the middle of the top edge: on the border, then just inside it
+    val width = edit.getUnclippedBoundsInRoot().let { it.right - it.left }
+    assertSameColor("border", colors.outline, edit.colorAt(width / 2, 0.5.dp))
+    assertSameColor("inside", colors.surface, edit.colorAt(width / 2, 2.5.dp))
   }
 
   private companion object {
