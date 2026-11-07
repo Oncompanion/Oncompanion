@@ -147,6 +147,10 @@
         {
           "type": "text",
           "id": "screens_t"
+        },
+        {
+          "type": "arrow",
+          "id": "screens_section"
         }
       ],
       "updated": 1794000000000,
@@ -497,6 +501,10 @@
         {
           "type": "text",
           "id": "registrations_t"
+        },
+        {
+          "type": "arrow",
+          "id": "section_registrations"
         }
       ],
       "updated": 1794000000000,
@@ -750,6 +758,188 @@
       "autoResize": true
     },
     {
+      "id": "section",
+      "type": "rectangle",
+      "x": 770,
+      "y": 200,
+      "width": 200,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#f08c00",
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1705680111,
+      "version": 1,
+      "versionNonce": 646892611,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "section_t"
+        },
+        {
+          "type": "arrow",
+          "id": "screens_section"
+        },
+        {
+          "type": "arrow",
+          "id": "section_registrations"
+        }
+      ],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "section_t",
+      "type": "text",
+      "x": 780,
+      "y": 227.5,
+      "width": 180,
+      "height": 45.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 996097411,
+      "version": 1,
+      "versionNonce": 651213111,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "text": "ObserveCareSection\n(see Care circle)",
+      "originalText": "ObserveCareSection\n(see Care circle)",
+      "fontSize": 18,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "section",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "screens_section",
+      "type": "arrow",
+      "x": 718,
+      "y": 120,
+      "width": 72,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 261523687,
+      "version": 1,
+      "versionNonce": 397348893,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          72,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "screens",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "section",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "section_registrations",
+      "type": "arrow",
+      "x": 870,
+      "y": 300,
+      "width": 0,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 713817235,
+      "version": 1,
+      "versionNonce": 447310333,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "section",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "registrations",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
       "id": "screens_auth",
       "type": "arrow",
       "x": 330.0,
@@ -856,7 +1046,7 @@
     {
       "id": "screens_registrations",
       "type": "arrow",
-      "x": 720,
+      "x": 705,
       "y": 120,
       "width": 60,
       "height": 260,
@@ -908,7 +1098,7 @@
     {
       "id": "for_patient_registrations",
       "type": "arrow",
-      "x": 870.0,
+      "x": 980,
       "y": 120,
       "width": 0.0,
       "height": 260,
@@ -1567,8 +1757,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Events and the directory are public Ligue content. Registrations are the patient's own data: the app only records that they registered\nwith the organizer. A caregiver sees the patient's registrations once #333 is done, and confirms one for them with US-42.",
-      "originalText": "Events and the directory are public Ligue content. Registrations are the patient's own data: the app only records that they registered\nwith the organizer. A caregiver sees the patient's registrations once #333 is done, and confirms one for them with US-42.",
+      "text": "Events and the directory are public Ligue content. Registrations are the patient's own data: the app only records that they registered\nwith the organizer. A caregiver sees whether the patient registered when Events is shared (ObserveCareSection), and confirms one for them with US-42.",
+      "originalText": "Events and the directory are public Ligue content. Registrations are the patient's own data: the app only records that they registered\nwith the organizer. A caregiver sees whether the patient registered when Events is shared (ObserveCareSection), and confirms one for them with US-42.",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "left",

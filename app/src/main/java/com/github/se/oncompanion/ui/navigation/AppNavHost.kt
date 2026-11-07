@@ -353,8 +353,11 @@ private fun SessionNavHost(
             eventId = eventId,
             // A second tap during the exit animation must not pop the screen below as well
             onBack = dropUnlessResumed { navigationActions.goBack() },
-            viewModel = viewModel { EventDetailViewModel(eventId) },
-            readOnly = chosenPatient != null,
+            // In caregiver mode, the chosen patient's registration, read-only, when they share
+            // Events
+            viewModel =
+                viewModel { EventDetailViewModel(eventId, patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }
