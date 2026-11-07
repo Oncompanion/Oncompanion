@@ -6,13 +6,18 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows how the app fits together, with the calls between its layers (#264). Each feature then has its own diagram below, with its classes, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
-Solid green = in the code, dashed green = partly built, grey dotted = a fake or empty stand-in for now, dashed white = planned. In the feature diagrams, solid arrows are calls the code makes today and dotted arrows are planned ones.
+Every diagram gives each layer one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls. The overview labels the few that carry a key mechanism:
 
-To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and update the markings when something planned gets built.
+- **Writes work offline.** A repository writes to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
+- **A caregiver only sees what is shared.** A screen showing a patient's data asks `ResolveSectionAccess`, which uses `ResolveCareCircleAccess` and the care circle repositories to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
+
+The overview only shows what is built. In the feature diagrams, planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls.
+
+To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
 ## Layers
 
@@ -159,8 +164,8 @@ navigation, patient data or persistence. Profile supplies the stateful HospitalF
 Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
-The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Edit Profile's search ViewModel connection is implemented behind provider configuration;
+The Account and Appointments diagrams show the reusable HospitalField (with its
+HospitalFieldViewModel) → HospitalRepositoryProxy path; the overview shows it from the profile. Edit Profile's search ViewModel connection is implemented behind provider configuration;
 Add Appointment integration remains planned.
 
 ## Optional profile hospital (issue #144)
@@ -456,7 +461,7 @@ now; a supported replacement/migration strategy can be reviewed separately after
 Generated Excalidraw/SVG changes are required architecture artifacts. No unrelated feature changes
 or coverage exclusions are included.
 
-The Account and overview diagrams include `SignOut` and `LocalSessionRepository`. No dependencies,
+The Account diagram includes `SignOut` and `LocalSessionRepository`; the overview shows `SignOut` and the session. No dependencies,
 Firebase rules or normal persistence settings change. Future Firestore repositories must use
 `SessionAccess.operation`, `snapshots` and the shared instance accessor. Server transactions must
 also use the tracker; non-suspending local enqueues use `immediate`, under the same gate lock.
@@ -513,4 +518,4 @@ calendar header in the agenda's lazy list on compact windows; Profile lets its t
 and actions share one scroll instead of pinning them around a small details viewport. Portrait
 keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
 use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
-feature diagrams document the layout behavior; the overview's core flows are unchanged.
+feature diagrams document the layout behavior; the overview is unchanged.
