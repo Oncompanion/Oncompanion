@@ -285,6 +285,7 @@ class SymptomDetailViewModelTest {
     val auth = signedIn()
     val vm = confirmingDelete(auth = auth)
     auth.signOut()
+    shadowOf(Looper.getMainLooper()).idle()
 
     vm.confirmDelete()
 

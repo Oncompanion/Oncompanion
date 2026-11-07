@@ -2,12 +2,12 @@
 
 package com.github.se.oncompanion.ui.symptom
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
@@ -23,13 +23,11 @@ import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.common.HasDeleteState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -82,19 +80,18 @@ class SymptomDetailViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
     private val patientUid: String? = null,
-    private val resolveSection: ResolveSectionAccess =
+    resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
     private val careCircleRepository: CareCircleRepository =
         CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
 
+  private val observeSection = ObserveCareSection(resolveSection)
+
   private val _uiState = MutableStateFlow(SymptomDetailUiState())
   val uiState: StateFlow<SymptomDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
-
-  /** Follows whose symptom may be read; [observation] reads it. */
-  private var access: Job? = null
 
   private val deletion =
       DeleteConfirmation(
@@ -112,72 +109,70 @@ class SymptomDetailViewModel(
   /** Starts (or, after an error, restarts) observing the symptom. */
   fun load() {
     _uiState.update { it.copy(isLoading = true, hasError = false) }
-    access?.cancel()
-    access = viewModelScope.launch {
-      // In a flow, so that even an auth that throws right away shows the error state
-      flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
-          .catch { e ->
-            Log.e(TAG, "Failed to check the access to the symptom $symptomId", e)
-            observation?.cancel()
-            // Nothing to delete without the access: the confirmation is dropped
-            _uiState.update {
-              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
-            }
+    observe()
+  }
+
+  /** Observes the symptom in place of the current observation, keeping what is shown. */
+  private fun observe() {
+    observation?.cancel()
+    observation = viewModelScope.launch {
+      observeSection(CarePermission.SYMPTOMS, patientUid) { ownerUid ->
+            combine(
+                symptomRepository.observeSymptom(ownerUid, symptomId),
+                namesOf(ownerUid),
+                ::Pair,
+            )
           }
-          .collect { section ->
-            if (section is SectionAccess.Readable) {
-              _uiState.update { it.copy(canEdit = section.canEdit, isNotShared = false) }
-              observe(section.ownerUid)
-            } else {
-              // Nothing to read: not known yet, not shared, or nobody to read it for. The
-              // confirmation is dropped, so it doesn't reopen by itself once the access is back
-              observation?.cancel()
-              _uiState.update {
-                it.copy(
-                    entry = null,
-                    addedByName = null,
-                    isLoading = section == SectionAccess.Loading,
-                    hasError = section == SectionAccess.NoAccess,
-                    isNotShared = section == SectionAccess.NotShared,
-                    canEdit = false,
-                    delete = it.delete.afterRead(false),
-                )
-              }
-            }
-          }
+          .collect { section -> _uiState.update { it.showing(section) } }
     }
   }
 
-  /** Observes the symptom of [uid] in place of the current observation, keeping what is shown. */
-  private fun observe(uid: String) {
-    observation?.cancel()
-    observation = viewModelScope.launch {
-      // The names the patient gave their circle; a caregiver sees the name stored with the symptom
-      val names =
-          if (patientUid == null) careCircleRepository.observeMemberNames(uid)
-          else flowOf(emptyMap())
-      combine(symptomRepository.observeSymptom(uid, symptomId), names, ::Pair)
-          .catch { e ->
-            Log.e(TAG, "Failed to load the symptom $symptomId", e)
-            // Nothing to delete without the symptom: the confirmation is dropped
-            _uiState.update {
-              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
-            }
-          }
-          .collect { (entry, names) ->
-            // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
-            _uiState.update {
-              it.copy(
-                  entry = entry,
-                  addedByName = entry?.let { e -> addedByName(e.addedBy, e.addedByName, names) },
-                  isLoading = false,
-                  hasError = false,
-                  delete = it.delete.afterRead(exists = entry != null),
-              )
-            }
-          }
-    }
-  }
+  /**
+   * The names the patient gave their circle, to show who added the symptom. A caregiver gets none:
+   * they see the name stored with the symptom.
+   */
+  private fun namesOf(ownerUid: String): Flow<Map<String, String>> =
+      if (patientUid == null) careCircleRepository.observeMemberNames(ownerUid)
+      else flowOf(emptyMap())
+
+  /**
+   * The detail for [section]. Without a symptom to show, the delete confirmation is dropped, so it
+   * doesn't reopen by itself once the symptom is back.
+   */
+  private fun SymptomDetailUiState.showing(
+      section: CareSection<Pair<SymptomEntry?, Map<String, String>>>
+  ): SymptomDetailUiState =
+      when (section) {
+        // What is shown stays until the symptom arrives, e.g. after a failed deletion
+        is CareSection.Loading -> copy(isLoading = entry == null)
+        // Nothing to read: not shared, or nobody to read it for
+        CareSection.NoAccess,
+        CareSection.NotShared ->
+            copy(
+                entry = null,
+                addedByName = null,
+                isLoading = false,
+                hasError = section == CareSection.NoAccess,
+                isNotShared = section == CareSection.NotShared,
+                canEdit = false,
+                delete = delete.afterRead(false),
+            )
+        is CareSection.Failed ->
+            copy(isLoading = false, hasError = true, delete = delete.afterRead(false))
+        // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
+        is CareSection.Shown -> {
+          val (shown, names) = section.data
+          copy(
+              entry = shown,
+              addedByName = shown?.let { addedByName(it.addedBy, it.addedByName, names) },
+              isLoading = false,
+              hasError = false,
+              isNotShared = false,
+              canEdit = section.canEdit,
+              delete = delete.afterRead(exists = shown != null),
+          )
+        }
+      }
 
   /** Asks the user to confirm the deletion. Nothing is deleted before [confirmDelete]. */
   fun requestDelete() = deletion.request()
@@ -194,7 +189,7 @@ class SymptomDetailViewModel(
           signedInUid = { authRepository.signedInUid(TAG) },
           stopObserving = { observation?.cancel() },
           delete = { uid -> symptomRepository.deleteSymptom(uid, symptomId) },
-          onFailure = ::observe,
+          onFailure = { observe() },
       )
 
   private companion object {
