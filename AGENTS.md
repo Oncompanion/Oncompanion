@@ -50,6 +50,7 @@ com.github.se.oncompanion/
   - A temporary message (snackbar) never covers an action, and goes away on its own.
   - The add, edit and detail views of the same item share their components and show the fields in the same order.
   - **Reuse shared components** from `ui/common` rather than building one per screen, so the same element looks and behaves the same everywhere: `DayPickerDialog`, `SaveButton`, `DetailActions`, `DeleteConfirmationDialog`, `ClickableReadOnlyField`, `isCompactHeight()`.
+  - **Theme tokens, never raw values**: colors from `MaterialTheme.colorScheme` / `lakeColors`, text from `MaterialTheme.typography`, corners from `MaterialTheme.shapes`, spacing from `Spacing`, the shadow from `Modifier.elevation1()`. The values and where each one is used are in [DESIGN.md](DESIGN.md).
   - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
     - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
