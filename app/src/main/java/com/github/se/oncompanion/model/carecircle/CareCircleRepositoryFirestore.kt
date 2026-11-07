@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.carecircle
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
@@ -16,18 +18,23 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * [CareCircleRepository] backed by Cloud Firestore, documents at `/users/{ownerUid}/circle/{uid}`.
- * Writes return once applied to the local cache; a write the server rejects is rolled back and
- * logged.
+ * Writes return once applied to the local cache; a write the server rejects (security rules,
+ * revoked access) is rolled back on the device and reported through [RejectedWrites], which tells
+ * the user.
  *
  * Firebase is only accessed when first used, not when the repository is created: screens can create
  * it (e.g. as a ViewModel default) even where Firebase isn't initialized, like unit tests.
  */
 class CareCircleRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : CareCircleRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   private val db: FirebaseFirestore
     get() = dbProvider()
@@ -110,7 +117,7 @@ class CareCircleRepositoryFirestore(
     require(details.isValid()) { "Invalid care circle member details" }
     // update, never set: a member removed on another device must not come back
     circle(ownerUid).document(memberUid).update(detailFields(details)).addOnFailureListener { e ->
-      logRejected("update of member $memberUid", e)
+      reportRejected("update of member $memberUid", e)
     }
   }
 
@@ -127,15 +134,17 @@ class CareCircleRepositoryFirestore(
                     .document(ownerUid)
             )
             .commit()
-            .addOnFailureListener { e -> logRejected("removal of member $memberUid", e) }
+            .addOnFailureListener { e -> reportRejected("removal of member $memberUid", e) }
       }
 
   private fun users() = db.collection(UserProfileRepositoryFirestore.COLLECTION)
 
   private fun circle(ownerUid: String) = users().document(ownerUid).collection(COLLECTION)
 
-  private fun logRejected(what: String, e: Exception) {
+  /** Logs and reports to [rejectedWrites] the server rejecting [what], already rolled back. */
+  private fun reportRejected(what: String, e: Exception) {
     Log.e(TAG, "The server rejected the $what; it was rolled back", e)
+    rejectedWrites.report()
   }
 
   private fun fromDocument(doc: DocumentSnapshot): CareCircleMember? {

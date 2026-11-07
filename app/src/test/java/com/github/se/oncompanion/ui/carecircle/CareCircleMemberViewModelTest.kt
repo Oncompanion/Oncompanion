@@ -10,6 +10,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -127,6 +128,27 @@ class CareCircleMemberViewModelTest {
     assertEquals(listOf(sophie), repository.members(ownerUid))
     // Not "no longer in your circle", although the listener saw Marc go
     assertEquals(CareCircleMemberUiState.Removed, viewModel.uiState.value)
+  }
+
+  @Test
+  fun confirmRemove_rejectedLaterByTheServer_bringsTheMemberBackAndTellsTheUser() = runTest {
+    val rejectedWrites = RejectedWrites()
+    repository = FakeCareCircleRepository(rejectedWrites)
+    val viewModel = shownMarc()
+    repository.serverRejectsWrites = true
+    viewModel.askRemove()
+    viewModel.confirmRemove()
+    advanceUntilIdle()
+
+    // Done without waiting for the server
+    assertEquals(CareCircleMemberUiState.Removed, viewModel.uiState.value)
+    assertEquals(listOf(sophie), repository.members(ownerUid))
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    repository.rejectPendingWrites()
+
+    assertEquals(listOf(marc, sophie), repository.members(ownerUid))
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test

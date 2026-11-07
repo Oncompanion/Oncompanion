@@ -5,8 +5,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore.Companion.COLLECTION
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore.Companion.FIELD_CONFIRMED_AT
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryFirestore.Companion.USERS_COLLECTION
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertEachRejectionIsReported
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Duration
@@ -38,7 +40,8 @@ class EventRegistrationRepositoryFirestoreTest {
   private val db
     get() = FirebaseEmulator.firestore
 
-  private val repository = EventRegistrationRepositoryFirestore(db)
+  private val rejectedWrites = RejectedWrites()
+  private val repository = EventRegistrationRepositoryFirestore(db, rejectedWrites)
   private lateinit var uid: String
 
   // Emulator data is shared between runs: each test uses its own events
@@ -112,6 +115,7 @@ class EventRegistrationRepositoryFirestoreTest {
     val saved = registrations().document(upcomingId).get(Source.SERVER).await()
     assertEquals(setOf(FIELD_CONFIRMED_AT), saved.data?.keys)
     assertNotNull(saved.getTimestamp(FIELD_CONFIRMED_AT))
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -136,6 +140,7 @@ class EventRegistrationRepositoryFirestoreTest {
     awaitSynced()
     val saved = registrations().get(Source.SERVER).await()
     assertEquals(listOf(otherUpcomingId), saved.documents.map { it.id })
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -147,6 +152,24 @@ class EventRegistrationRepositoryFirestoreTest {
 
     db.enableNetwork().await()
     awaitRegistered(startedId, false)
+  }
+
+  @Test
+  fun everyWriteTheServerRejects_isReported(): Unit = runBlocking {
+    assertEachRejectionIsReported(
+        db,
+        rejectedWrites,
+        listOf(
+            "the confirmation of an event that has started" to
+                {
+                  repository.confirm(uid, startedId)
+                },
+            "the removal of someone else's confirmation" to
+                {
+                  repository.remove("someone-else-$runId", upcomingId)
+                },
+        ),
+    )
   }
 
   @Test
