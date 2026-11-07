@@ -19,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -44,6 +43,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 
 /**
@@ -136,7 +136,7 @@ fun InformationContent(
       Spacer(Modifier.height(32.dp))
       Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // First name (required): "*Required" below it, or an error once it's been cleared
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.firstName,
             onValueChange = {
               firstNameEdited = true
@@ -161,7 +161,7 @@ fun InformationContent(
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_first_name_field),
         )
         // Family name (optional)
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.familyName,
             onValueChange = onFamilyNameChange,
             label = { Text(stringResource(R.string.onboarding_family_name)) },

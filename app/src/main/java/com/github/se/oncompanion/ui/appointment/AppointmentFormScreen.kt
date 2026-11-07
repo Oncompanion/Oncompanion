@@ -25,6 +25,8 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.*
+import com.github.se.oncompanion.ui.common.LakeFilterChip
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import java.time.LocalDate
@@ -177,7 +179,7 @@ fun AppointmentFormContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
       if (compact) topBar()
-      OutlinedTextField(
+      LakeTextField(
           state.title,
           onTitleChange,
           enabled = state.editable,
@@ -234,17 +236,17 @@ fun AppointmentFormContent(
       if (state.offsets.size > 1) {
         Text(stringResource(R.string.appointment_repeated_time))
         state.offsets.forEach { offset ->
-          FilterChip(
+          LakeFilterChip(
               selected = state.chosenOffset == offset,
               enabled = state.editable,
               onClick = { onOffsetChange(offset) },
-              label = { Text(stringResource(R.string.appointment_offset, offset.id)) },
+              label = stringResource(R.string.appointment_offset, offset.id),
           )
         }
       }
       // Temporary manual entry: hospital search is deferred until its service is configured.
       Column {
-        OutlinedTextField(
+        LakeTextField(
             state.location,
             onLocationChange,
             enabled = state.editable,
@@ -266,25 +268,22 @@ fun AppointmentFormContent(
       Text(stringResource(R.string.appointment_type))
       // Separate choices remain readable with large fonts or a narrow window.
       AppointmentType.entries.forEach { type ->
-        FilterChip(
+        LakeFilterChip(
             selected = state.type == type,
             enabled = state.editable,
             onClick = { onTypeChange(type) },
             modifier = Modifier.testTag(C.Tag.appointmentType(type.name)),
-            label = {
-              Text(
-                  stringResource(
-                      when (type) {
-                        AppointmentType.TREATMENT -> R.string.appointment_treatment
-                        AppointmentType.CONSULTATION -> R.string.appointment_consultation
-                        AppointmentType.OTHER -> R.string.appointment_other
-                      }
-                  )
-              )
-            },
+            label =
+                stringResource(
+                    when (type) {
+                      AppointmentType.TREATMENT -> R.string.appointment_treatment
+                      AppointmentType.CONSULTATION -> R.string.appointment_consultation
+                      AppointmentType.OTHER -> R.string.appointment_other
+                    }
+                ),
         )
       }
-      OutlinedTextField(
+      LakeTextField(
           state.notes,
           onNotesChange,
           enabled = state.editable,

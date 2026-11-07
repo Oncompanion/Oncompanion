@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +47,7 @@ import com.github.se.oncompanion.ui.common.HospitalField
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
 import com.github.se.oncompanion.ui.common.HospitalFieldViewModel
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
@@ -136,7 +136,7 @@ fun EditProfileContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
           val missing = state.firstName.isBlank()
-          OutlinedTextField(
+          LakeTextField(
               value = state.firstName,
               onValueChange = onFirstNameChange,
               enabled = state.canEdit,
@@ -158,7 +158,7 @@ fun EditProfileContent(
                   ),
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_first_name),
           )
-          OutlinedTextField(
+          LakeTextField(
               value = state.familyName,
               onValueChange = onFamilyNameChange,
               enabled = state.canEdit,

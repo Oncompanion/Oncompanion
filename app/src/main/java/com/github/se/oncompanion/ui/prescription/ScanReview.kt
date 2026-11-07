@@ -10,10 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -26,10 +24,9 @@ import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
-import com.github.se.oncompanion.ui.theme.warning
 
 // The review of a prescription read from a scan (Figma "US-10 / Review extracted information" and
-// "Review / Partly read"): the details to check are amber, not red, since they don't block Save.
+// "Review / Partly read"): the details to check are in dawn, not red, since they don't block Save.
 
 /** A field to check, and why: [notFound] when the scan has nothing for it, else it was unsure. */
 internal data class FieldCheck(val notFound: Boolean, val testTag: String)
@@ -115,22 +112,6 @@ internal fun ReviewNotice(uiState: PrescriptionFormUiState) {
   }
 }
 
-/** The colors of a field to check: amber border, label, reason and icon. */
-@Composable
-internal fun checkColors(): TextFieldColors {
-  val warning = MaterialTheme.colorScheme.warning
-  return OutlinedTextFieldDefaults.colors(
-      focusedBorderColor = warning,
-      unfocusedBorderColor = warning,
-      focusedLabelColor = warning,
-      unfocusedLabelColor = warning,
-      focusedSupportingTextColor = warning,
-      unfocusedSupportingTextColor = warning,
-      focusedTrailingIconColor = warning,
-      unfocusedTrailingIconColor = warning,
-  )
-}
-
 /**
  * Why the field is to check, below it. [whenRead] says it for a field that has a value: read
  * unsurely, converted or cut, the scan doesn't tell which. [whenNotFound] for one the scan didn't
@@ -158,7 +139,7 @@ internal fun CheckIcon() {
 }
 
 /**
- * What to check on a medication's row while it isn't open, in amber above its name: one detail by
+ * What to check on a medication's row while it isn't open, in dawn above its name: one detail by
  * name ("Please check the frequency", "Dosage not found"), or how many.
  */
 @Composable
@@ -174,7 +155,7 @@ internal fun RowCheck(position: Int, medication: MedicationDraft, details: List<
           )
   Text(
       text = text,
-      color = MaterialTheme.colorScheme.warning,
+      color = MaterialTheme.colorScheme.secondary,
       modifier = Modifier.testTag(C.Tag.prescriptionReviewRowCheck(position)),
   )
 }
