@@ -11,18 +11,32 @@ import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.carecircle.emailAlreadyInCircle
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
+import java.time.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +47,8 @@ import kotlinx.coroutines.launch
  * @property permissions what the person will see; none until the patient turns them on
  * @property canAdd the sections the person can also add to; only sections they see, none until the
  *   patient turns them on
+ * @property duplicate adding: who in the circle already has this email, if anyone (#257). Kept up
+ *   to date as the email, the circle and the time change; never set when editing
  * @property firstNameTouched whether the first name was ever changed: a blank first name is only
  *   shown as an error once the patient has typed in it, so a new form doesn't start out red
  * @property isEditing whether the form edits a member of the circle instead of adding someone
@@ -52,6 +68,7 @@ data class CareCircleMemberFormUiState(
     val email: String = "",
     val permissions: Set<CarePermission> = emptySet(),
     val canAdd: Set<CarePermission> = emptySet(),
+    val duplicate: EmailAlreadyInCircle? = null,
     val firstNameTouched: Boolean = false,
     val isEditing: Boolean = false,
     val isLoading: Boolean = false,
@@ -105,21 +122,31 @@ data class CareCircleMemberFormUiState(
 
   /**
    * Whether "Send invitation" (or "Save changes") is enabled: when editing, only once something
-   * changed, so tapping it can't rewrite the same details.
+   * changed, so tapping it can't rewrite the same details. Someone already in the circle with this
+   * email is never invited again: the patient opens their invitation instead.
    */
   val canSave: Boolean
-    get() = canEdit && !missingFirstName && !missingRelationship && !invalidEmail && !unchanged
+    get() =
+        canEdit &&
+            duplicate == null &&
+            !missingFirstName &&
+            !missingRelationship &&
+            !invalidEmail &&
+            !unchanged
 }
 
 /**
  * The form to add someone to the signed-in patient's care circle (#79), or to edit a member (#75):
  * their name, relationship, an email and what they can see.
  * - Adding: saving creates an invitation; the person becomes a member once they use its invite code
- *   (see docs/architecture.md, "Care circle invitations").
+ *   (see docs/architecture.md, "Care circle invitations"). An email already in the circle is
+ *   refused, and its invitation, if any, can be opened instead (#257).
  * - Editing [memberUid]: the form is filled in with the member's details once, then saving updates
  *   them. The email is their account email, which the patient can't change.
  *
  * @param memberUid the member to edit, or null to add someone
+ * @param clock tells whether an invitation with the same email has expired; tests pass one they
+ *   control
  */
 class CareCircleMemberFormViewModel(
     private val inviteRepository: CareCircleInviteRepository =
@@ -129,6 +156,7 @@ class CareCircleMemberFormViewModel(
     private val careCircleRepository: CareCircleRepository =
         CareCircleRepositoryProvider.repository,
     private val memberUid: String? = null,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
   private val _uiState =
@@ -137,8 +165,88 @@ class CareCircleMemberFormViewModel(
       )
   val uiState: StateFlow<CareCircleMemberFormUiState> = _uiState.asStateFlow()
 
+  /** Bumped to check expiry again without new data from the repositories. */
+  private val expiryChecks = MutableStateFlow(0)
+
+  private var duplicateCheck: Job? = null
+
+  /** What the email is compared with: the circle as last read, null until it has been read. */
+  private val circle = MutableStateFlow<Circle?>(null)
+
+  private data class Circle(
+      val members: List<CareCircleMember>,
+      val invites: List<CareCircleInvite>,
+  )
+
   init {
-    memberUid?.let(::fillInMember)
+    // Editing never compares the email: it is the member's own, and can't be changed
+    if (memberUid != null) fillInMember(memberUid) else checkForDuplicates()
+  }
+
+  /**
+   * Checks again whether an invitation with this email has expired. The screen calls it when it
+   * resumes: the timer below doesn't run while the phone sleeps, and the user may change the clock.
+   */
+  fun refreshExpiry() {
+    expiryChecks.update { it + 1 }
+  }
+
+  /**
+   * Keeps [circle] and [CareCircleMemberFormUiState.duplicate] up to date while adding someone:
+   * when the email changes, when the circle changes (from the local cache when offline), and when
+   * an invitation with this email expires. A list that can't be read counts as empty: the rules
+   * can't refuse a duplicate either, so not being able to check must not stop the patient from
+   * inviting someone.
+   */
+  private fun checkForDuplicates() {
+    val uid = authRepository.signedInUid(TAG) ?: return
+    duplicateCheck = viewModelScope.launch {
+      launch {
+        combine(
+                careCircleRepository.observeMembers(uid).emptyOnFailure(),
+                inviteRepository.observePendingInvites(uid).emptyOnFailure(),
+                ::Circle,
+            )
+            .collect { circle.value = it }
+      }
+      combine(
+              circle.filterNotNull(),
+              // Checked again when a failed save gives the form back
+              _uiState.map { it.email to it.save }.distinctUntilChanged(),
+              expiryChecks,
+          ) { circle, (email, save), _ ->
+            (email to circle).takeIf { save == SavePhase.EDITING }
+          }
+          // New data cancels the wait for the next expiry and starts again from it
+          .collectLatest { check ->
+            // Saving: the invitation being saved comes back, and isn't a duplicate
+            val (email, circle) = check ?: return@collectLatest
+            repeatAtEachExpiry(clock, circle.invites.map { it.expiresAt }) { now ->
+              val duplicate = emailAlreadyInCircle(email, circle.members, circle.invites, now)
+              _uiState.update {
+                if (it.save == SavePhase.EDITING) it.copy(duplicate = duplicate) else it
+              }
+            }
+          }
+    }
+  }
+
+  /**
+   * Who already has [email], from the circle as last read: the duplicate shown may not have caught
+   * up with it yet. Waits for the circle's first read (from the cache when offline, so it doesn't
+   * wait for the network), so sending can't skip the check. Never checked when editing or when
+   * nobody is signed in.
+   */
+  private suspend fun duplicateWhenSaving(email: String): EmailAlreadyInCircle? {
+    if (duplicateCheck == null) return null
+    val (members, invites) = circle.filterNotNull().first()
+    return emailAlreadyInCircle(email, members, invites, clock.instant())
+  }
+
+  private fun <T> Flow<List<T>>.emptyOnFailure(): Flow<List<T>> = catch { e ->
+    // Only the type: a message could name a document, and an invite's ID is its invite code
+    Log.w(TAG, "Couldn't read the circle to compare the email with: ${e.javaClass.simpleName}")
+    emit(emptyList())
   }
 
   /**
@@ -244,32 +352,44 @@ class CareCircleMemberFormViewModel(
     val details = state.details ?: return
     _uiState.value = state.copy(save = SavePhase.SAVING, saveFailed = false)
     viewModelScope.launch {
+      duplicateWhenSaving(state.email)?.let { duplicate ->
+        _uiState.update { it.copy(save = SavePhase.EDITING, duplicate = duplicate) }
+        return@launch
+      }
       // The new invite code when adding, null when editing
       val saved: Result<String?> =
           try {
-            val uid = checkNotNull(authRepository.signedInUid(TAG)) { "Nobody is signed in" }
-            Result.success(
-                if (memberUid != null) {
-                  careCircleRepository.updateMember(uid, memberUid, details)
-                  null
-                } else {
-                  createInvite(uid, details, email = state.email.trim().ifEmpty { null })
-                }
-            )
+            Result.success(saveForm(details, email = state.email.trim().ifEmpty { null }))
           } catch (e: CancellationException) {
             throw e
           } catch (e: Exception) {
-            Log.w(TAG, "Couldn't save the care circle member", e)
+            // Only the type: the message could name the invite's document, i.e. its code
+            Log.w(TAG, "Couldn't save the care circle member: ${e.javaClass.simpleName}")
             Result.failure(e)
           }
-      _uiState.value =
-          saved.fold(
-              onSuccess = { inviteCode ->
-                _uiState.value.copy(save = SavePhase.SAVED, savedInviteCode = inviteCode)
-              },
-              onFailure = { _uiState.value.copy(save = SavePhase.EDITING, saveFailed = true) },
-          )
+      saved.fold(
+          onSuccess = { inviteCode ->
+            // The screen is leaving: the new invitation must not show up as a duplicate
+            duplicateCheck?.cancel()
+            _uiState.update { it.copy(save = SavePhase.SAVED, savedInviteCode = inviteCode) }
+          },
+          // Back to editing, which checks the email against the circle again
+          onFailure = { _uiState.update { it.copy(save = SavePhase.EDITING, saveFailed = true) } },
+      )
     }
+  }
+
+  /**
+   * Updates the member being edited with [details], or invites someone new with them and [email].
+   * Returns the new invite code, null when editing.
+   */
+  private suspend fun saveForm(details: CareCircleMemberDetails, email: String?): String? {
+    val uid = checkNotNull(authRepository.signedInUid(TAG)) { "Nobody is signed in" }
+    if (memberUid != null) {
+      careCircleRepository.updateMember(uid, memberUid, details)
+      return null
+    }
+    return createInvite(uid, details, email)
   }
 
   /** Creates [ownerUid]'s invitation for [details] and returns its invite code. */

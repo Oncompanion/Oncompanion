@@ -8,6 +8,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
@@ -17,13 +18,21 @@ import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -60,7 +69,7 @@ class CareCircleMemberFormViewModelTest {
   }
 
   private fun viewModel(authRepository: AuthRepository = auth) =
-      CareCircleMemberFormViewModel(invites, profiles, authRepository)
+      CareCircleMemberFormViewModel(invites, profiles, authRepository, circle, clock = clock)
 
   /** Fills in a complete form: Julie Martin, daughter, julie@example.com. */
   private fun CareCircleMemberFormViewModel.fill() {
@@ -301,7 +310,8 @@ class CareCircleMemberFormViewModelTest {
   @Test
   fun missingProfile_isASaveError() =
       runTest(dispatcher) {
-        val viewModel = CareCircleMemberFormViewModel(invites, FakeUserProfileRepository(), auth)
+        val viewModel =
+            CareCircleMemberFormViewModel(invites, FakeUserProfileRepository(), auth, circle)
         viewModel.fill()
         saved(viewModel)
         assertTrue(viewModel.uiState.value.saveFailed)
@@ -353,7 +363,7 @@ class CareCircleMemberFormViewModelTest {
 
               override suspend fun getProfile(uid: String) = error("Asked the server")
             }
-        val viewModel = CareCircleMemberFormViewModel(invites, cachedOnly, auth)
+        val viewModel = CareCircleMemberFormViewModel(invites, cachedOnly, auth, circle)
         viewModel.fill()
         saved(viewModel)
         assertEquals("Annie", invites.created.single().ownerFirstName)
@@ -372,6 +382,307 @@ class CareCircleMemberFormViewModelTest {
         assertNull(viewModel.uiState.value.savedInviteCode)
       }
 
+  // ---- inviting someone already in the circle (#257) ----
+  // Who matches is tested on emailAlreadyInCircle; these tests check how the form uses it.
+
+  private val now = Instant.parse("2026-11-04T10:00:00Z")
+
+  /** How far the phone's clock jumped ahead, e.g. while it slept and no timer ran. */
+  private var clockJump = Duration.ZERO
+
+  /** [now] when each test starts, then moving with the test's virtual time and [clockJump]. */
+  private val clock =
+      object : Clock() {
+        override fun instant(): Instant =
+            now.plusMillis(dispatcher.scheduler.currentTime).plus(clockJump)
+
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+
+        override fun withZone(zone: ZoneId?): Clock = this
+      }
+
+  private fun inviteFor(
+      email: String?,
+      firstName: String = "Paul",
+      inviteCode: String = "INVITEPAUL",
+      createdAt: Instant? = now,
+  ) =
+      CareCircleInvite(
+          inviteCode = inviteCode,
+          ownerUid = ownerUid,
+          ownerFirstName = "Anne",
+          details = CareCircleMemberDetails(firstName = firstName),
+          email = email,
+          createdAt = createdAt,
+      )
+
+  /**
+   * The add form once it has read the circle. Not [advanceUntilIdle]: that would also run the
+   * expiry timer, days ahead.
+   */
+  private fun TestScope.loadedViewModel() = viewModel().also { runCurrent() }
+
+  /** Types [email], then lets the form compare it with the circle. */
+  private fun TestScope.typeEmail(viewModel: CareCircleMemberFormViewModel, email: String) {
+    viewModel.onEmailChange(email)
+    runCurrent()
+  }
+
+  @Test
+  fun anEmailAlreadyInTheCircle_isRefused_andTheFormNeverWritesForIt() =
+      runTest(dispatcher) {
+        val expired =
+            inviteFor("paul@example.com", createdAt = now.minus(CareCircleInvite.VALIDITY))
+        val cases: List<Pair<() -> Unit, EmailAlreadyInCircle>> =
+            listOf(
+                {
+                  circle.setMembers(
+                      ownerUid,
+                      listOf(marc.copy(firstName = "Paul", email = "paul@example.com")),
+                  )
+                } to EmailAlreadyInCircle.Member("Paul"),
+                {
+                  invites.setInvites(listOf(inviteFor("paul@example.com")))
+                } to EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+                // Not renewed from the form: its details may differ from what the form holds
+                {
+                  invites.setInvites(listOf(expired))
+                } to EmailAlreadyInCircle.ExpiredInvite("Paul", "INVITEPAUL"),
+            )
+        for ((setUpCircle, expected) in cases) {
+          invites.setInvites(emptyList())
+          circle.setMembers(ownerUid, emptyList())
+          setUpCircle()
+          val viewModel = loadedViewModel()
+          viewModel.fill()
+          typeEmail(viewModel, "paul@example.com")
+
+          assertEquals(expected, viewModel.uiState.value.duplicate)
+          assertFalse("$expected", viewModel.uiState.value.canSave)
+
+          viewModel.save()
+          runCurrent()
+
+          assertTrue("$expected", invites.created.isEmpty())
+          assertEquals("$expected", SavePhase.EDITING, viewModel.uiState.value.save)
+        }
+        assertEquals(expired, invites.invite(expired.inviteCode))
+      }
+
+  @Test
+  fun theTypedEmail_matchesWhateverItsCaseOrSpaces() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor(" Paul@EXAMPLE.com ")))
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+        for (typed in
+            listOf(
+                "paul@example.com",
+                " paul@example.com  ",
+                "PAUL@Example.COM",
+                "\tPaul@example.com",
+            )) {
+          typeEmail(viewModel, typed)
+
+          val state = viewModel.uiState.value
+          assertEquals(
+              typed,
+              EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+              state.duplicate,
+          )
+          assertFalse(typed, state.canSave)
+        }
+      }
+
+  @Test
+  fun sendTappedBeforeTheCircleIsRead_stillRefusesADuplicate() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor("julie@example.com", firstName = "Julie")))
+        // The circle hasn't been read yet: nothing is known to match, so Send is enabled
+        val viewModel = viewModel()
+        viewModel.fill()
+        assertNull(viewModel.uiState.value.duplicate)
+        assertTrue(viewModel.uiState.value.canSave)
+
+        viewModel.save()
+        runCurrent()
+
+        assertTrue(invites.created.isEmpty())
+        val state = viewModel.uiState.value
+        assertEquals(SavePhase.EDITING, state.save)
+        assertFalse(state.saveFailed)
+        assertEquals(EmailAlreadyInCircle.PendingInvite("Julie", "INVITEPAUL"), state.duplicate)
+      }
+
+  @Test
+  fun someoneNew_isInvitedAsBefore() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.duplicate)
+        saved(viewModel)
+
+        assertEquals("julie@example.com", invites.created.single().email)
+        assertEquals(SavePhase.SAVED, viewModel.uiState.value.save)
+      }
+
+  @Test
+  fun changingTheEmail_liftsTheRefusal() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+        typeEmail(viewModel, "paul@example.com")
+        assertFalse(viewModel.uiState.value.canSave)
+
+        typeEmail(viewModel, "paul.other@example.com")
+
+        assertNull(viewModel.uiState.value.duplicate)
+        assertTrue(viewModel.uiState.value.canSave)
+      }
+
+  @Test
+  fun theCircleChanging_updatesTheRefusal_whileTheFormIsOpen() =
+      runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+        typeEmail(viewModel, "paul@example.com")
+        assertTrue(viewModel.uiState.value.canSave)
+
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        runCurrent()
+        assertEquals(
+            EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+        assertFalse(viewModel.uiState.value.canSave)
+
+        invites.setInvites(emptyList())
+        runCurrent()
+        assertNull(viewModel.uiState.value.duplicate)
+        assertTrue(viewModel.uiState.value.canSave)
+      }
+
+  @Test
+  fun anInvitationExpiringWhileTheFormIsOpen_isShownExpired() =
+      runTest(dispatcher) {
+        val untilExpiry = Duration.ofHours(1)
+        val createdAt = now.minus(CareCircleInvite.VALIDITY).plus(untilExpiry)
+        invites.setInvites(listOf(inviteFor("paul@example.com", createdAt = createdAt)))
+        val viewModel = loadedViewModel()
+        typeEmail(viewModel, "paul@example.com")
+        assertEquals(
+            EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+
+        // The timer wakes up just after the expiry
+        advanceTimeBy(untilExpiry.toMillis() + 1)
+        runCurrent()
+        assertEquals(
+            EmailAlreadyInCircle.ExpiredInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+      }
+
+  @Test
+  fun refreshExpiry_showsAnInvitationThatExpiredWhileThePhoneSlept() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        val viewModel = loadedViewModel()
+        typeEmail(viewModel, "paul@example.com")
+
+        // The phone slept past the expiry: no timer ran
+        clockJump = CareCircleInvite.VALIDITY
+        assertEquals(
+            EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+
+        viewModel.refreshExpiry()
+        runCurrent()
+
+        assertEquals(
+            EmailAlreadyInCircle.ExpiredInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+      }
+
+  @Test
+  fun anUnreadableList_doesntStopTheInvitation_norTheCheckAgainstTheOtherOne() =
+      runTest(dispatcher) {
+        // Neither list can be read: the patient can still invite
+        circle.observeError = IllegalStateException("denied")
+        invites.observeError = IllegalStateException("denied")
+        val unreadable = loadedViewModel()
+        unreadable.fill()
+        saved(unreadable)
+        assertEquals(SavePhase.SAVED, unreadable.uiState.value.save)
+
+        // Only the members can't be read: the invitations are still checked
+        invites.observeError = null
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        val viewModel = loadedViewModel()
+        typeEmail(viewModel, "paul@example.com")
+        assertEquals(
+            EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+      }
+
+  @Test
+  fun theInvitationJustSaved_isNotTakenForADuplicate() =
+      runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+
+        saved(viewModel)
+
+        assertNull(viewModel.uiState.value.duplicate)
+        viewModel.consumeSaved()
+        // Back from the repository after the screen left: nothing should change on the way out
+        invites.setInvites(invites.created.map { it.copy(createdAt = now) })
+        runCurrent()
+        assertNull(viewModel.uiState.value.duplicate)
+      }
+
+  @Test
+  fun aSaveFailing_checksAgainTheCircleThatChangedMeanwhile() =
+      runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        invites.createGate = gate
+        invites.createError = IllegalStateException("boom")
+        val viewModel = loadedViewModel()
+        viewModel.fill()
+        viewModel.save()
+        runCurrent()
+
+        invites.setInvites(
+            listOf(inviteFor("julie@example.com", firstName = "Julie", inviteCode = "INVITEJULI"))
+        )
+        runCurrent()
+        assertNull(viewModel.uiState.value.duplicate)
+
+        gate.complete(Unit)
+        runCurrent()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.saveFailed)
+        assertEquals(EmailAlreadyInCircle.PendingInvite("Julie", "INVITEJULI"), state.duplicate)
+        assertFalse(state.canSave)
+      }
+
+  @Test
+  fun nobodySignedIn_readsNoCircle() =
+      runTest(dispatcher) {
+        viewModel(authRepository = FakeAuthRepository())
+        advanceUntilIdle()
+        assertTrue(circle.observedOwners.isEmpty())
+      }
+
   // ---- editing a member ----
 
   private val marc =
@@ -384,6 +695,21 @@ class CareCircleMemberFormViewModelTest {
           email = "marc.dubois@email.com",
       )
   private val circle = FakeCareCircleRepository().apply { setMembers(ownerUid, listOf(marc)) }
+
+  @Test
+  fun edit_neverComparesTheEmail() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor(marc.email)))
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        viewModel.onPermissionChange(CarePermission.SYMPTOMS, true)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.duplicate)
+        assertTrue(viewModel.uiState.value.canSave)
+        // Only the member being edited is read, not the whole circle
+        assertEquals(listOf(ownerUid), circle.observedOwners)
+      }
 
   private fun editViewModel(memberUid: String = marc.uid, authRepository: AuthRepository = auth) =
       CareCircleMemberFormViewModel(invites, profiles, authRepository, circle, memberUid)
