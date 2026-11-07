@@ -12,4 +12,6 @@
     <color name="splash_background">#FFFBF8F4</color>
     <!-- The waterline under the Paper lake band, the far water of the header (PaperLake.kt) -->
     <color name="paper_lake_water">#FFA9CFD8</color>
+    <!-- The hull of every boat on the lake, drawn or in Compose (LakeIllustrations.kt) -->
+    <color name="lake_hull">#FF1F2A30</color>
 </resources>
