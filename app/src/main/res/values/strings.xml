@@ -608,4 +608,7 @@
 
     <!-- A change the server rejected and was undone, shown over every screen -->
     <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>
+
+    <!-- Shared day picker, above the selected day -->
+    <string name="day_picker_title">Select date</string>
 </resources>

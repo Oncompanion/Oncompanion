@@ -466,5 +466,8 @@ object C {
 
     // A change the server rejected and was undone
     const val rejected_write_snackbar = "rejected_write_snackbar"
+
+    // Shared delete confirmation: the spinner while the item is being deleted
+    const val delete_dialog_progress = "delete_dialog_progress"
   }
 }
