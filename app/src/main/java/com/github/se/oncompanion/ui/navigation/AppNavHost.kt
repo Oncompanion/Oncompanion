@@ -133,6 +133,15 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  // Removed from the chosen patient's circle: the patients still followed, or joining a circle.
+  // The list shows even with one left, so the caregiver sees who removed them is gone
+  val lostAccess by caregiverMode.lostAccess.collectAsStateWithLifecycle()
+  LaunchedEffect(lostAccess) {
+    if (lostAccess) {
+      caregiverMode.accessLossHandled()
+      navigationActions.navigateAndClearBackStack(Screen.WHOSE_CARE_SWITCH)
+    }
+  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -220,6 +229,7 @@ private fun SessionNavHost(
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
             onSignedOut = signOut,
+            onNoPatient = { navigationActions.navigateAndClearBackStack(Route.JOIN_CIRCLE) },
         )
       }
     }

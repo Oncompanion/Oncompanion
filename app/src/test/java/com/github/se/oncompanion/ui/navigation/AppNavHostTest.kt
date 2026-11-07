@@ -396,6 +396,51 @@ class AppNavHostTest {
         .assertTextContains(context.getString(R.string.overview_care_of, "Paul"))
   }
 
+  /** Waits until a node with [tag] is on screen. */
+  private fun waitForTag(tag: String) =
+      composeTestRule.waitUntil(timeoutMillis = 5_000) {
+        composeTestRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+      }
+
+  @Test
+  fun caregiverMode_removedByTheOnlyPatient_goesBackToJoiningACircle() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    waitForTag(C.Tag.overview_whose_care)
+
+    // Anne removes the caregiver while they look at her Overview
+    circles.setMembers("p-anne", emptyList())
+
+    waitForTag(C.Tag.join_circle_screen)
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_removedByOneOfTwoPatients_listsTheOtherOne() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    waitForTag(C.Tag.whoseCarePatient("p-anne"))
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+
+    circles.setMembers("p-anne", emptyList())
+
+    // Back to "Whose care?", where only Paul is left, without choosing him for the caregiver
+    waitForTag(C.Tag.whoseCarePatient("p-paul"))
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).assertDoesNotExist()
+  }
+
   @Test
   fun caregiverMode_titleSwitchesPatient_andPlanningCantAdd() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")

@@ -144,8 +144,24 @@ class WhoseCareScreenTest {
           onJoinAnother = {},
           autoSelectSingle = autoSelectSingle,
           onSignedOut = { events += "signed out" },
+          onNoPatient = { events += "no patient" },
       )
     }
+  }
+
+  @Test
+  fun screen_followingNobody_goesToJoinACircle() {
+    setScreen(viewModelFollowing(), autoSelectSingle = true)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
+    composeTestRule.runOnIdle { assertEquals("no patient", events.first()) }
+  }
+
+  @Test
+  fun screen_removedFromTheLastCircle_goesToJoinACircle_evenWhenSwitching() {
+    // After a removal, the app opens the list without choosing for the caregiver
+    setScreen(viewModelFollowing(), autoSelectSingle = false)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
+    composeTestRule.runOnIdle { assertEquals("no patient", events.first()) }
   }
 
   @Test
