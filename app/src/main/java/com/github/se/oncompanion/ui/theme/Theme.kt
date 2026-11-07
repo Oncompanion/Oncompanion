@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
@@ -84,16 +85,23 @@ private val DarkColorScheme =
     )
 
 /**
- * Oncompanion theme: the Material 3 baseline colors and type scale used in the Figma mockups.
- * Dynamic (wallpaper) colors are intentionally not used, so the app looks the same on every device.
+ * Oncompanion theme: the "Morning on the lake" colors of DESIGN.md, in light and dark, with the
+ * extra colors in [MaterialTheme.lakeColors], the Figtree type scale and the corner radii. Spacing
+ * is in [Spacing]. Dynamic (wallpaper) colors are intentionally not used, so the app looks the same
+ * on every device.
  */
 @Composable
 fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-  MaterialTheme(
-      colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-      typography = Typography,
-      content = content,
-  )
+  CompositionLocalProvider(
+      LocalLakeColors provides if (darkTheme) DarkLakeColors else LightLakeColors
+  ) {
+    MaterialTheme(
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        typography = Typography,
+        shapes = Shapes,
+        content = content,
+    )
+  }
 }
 
 /**
