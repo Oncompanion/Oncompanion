@@ -32,6 +32,7 @@ import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
+import com.github.se.oncompanion.ui.auth.AccountCheckScreen
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SessionBoundary
@@ -165,6 +166,16 @@ private fun SessionNavHost(
                   }
               )
             },
+        )
+      }
+    }
+
+    // The account couldn't be checked at startup: no role is guessed until Retry knows it
+    navigation(startDestination = Screen.ACCOUNT_CHECK, route = Route.ACCOUNT_CHECK) {
+      composable(Screen.ACCOUNT_CHECK) {
+        AccountCheckScreen(
+            viewModel = viewModel { StartViewModel(decided = Route.ACCOUNT_CHECK) },
+            onChecked = { route -> navigationActions.navigateAndClearBackStack(route) },
         )
       }
     }

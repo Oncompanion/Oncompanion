@@ -403,6 +403,20 @@ class AppNavHostTest {
       }
 
   @Test
+  fun accountCheck_retry_startsWhereTheProfileSays() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "newcomer") })
+    runBlocking { auth.signInWithGoogle("token") }
+    setNavHost(Route.ACCOUNT_CHECK, authRepository = auth)
+    waitForTag(C.Tag.account_check_retry)
+
+    // Read this time: no profile yet, so the newcomer starts onboarding
+    composeTestRule.onNodeWithTag(C.Tag.account_check_retry).performClick()
+
+    waitForTag(C.Tag.onboarding_role_screen)
+    composeTestRule.onNodeWithTag(C.Tag.account_check_screen).assertDoesNotExist()
+  }
+
+  @Test
   fun caregiverMode_removedByTheOnlyPatient_goesBackToJoiningACircle() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
     setNavHost(

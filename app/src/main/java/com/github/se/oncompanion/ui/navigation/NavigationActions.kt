@@ -15,6 +15,7 @@ import java.time.LocalDate
  */
 object Route {
   const val AUTH = "auth"
+  const val ACCOUNT_CHECK = "account_check"
   const val ONBOARDING = "onboarding"
   const val JOIN_CIRCLE = "join_circle"
   const val WHOSE_CARE = "whose_care"
@@ -31,6 +32,9 @@ object Route {
 object Screen {
   // Route.AUTH
   const val SIGN_IN = "sign_in"
+
+  // Route.ACCOUNT_CHECK
+  const val ACCOUNT_CHECK = "account_check_home"
 
   // Route.ONBOARDING
   const val ONBOARDING_ROLE = "onboarding_role"
