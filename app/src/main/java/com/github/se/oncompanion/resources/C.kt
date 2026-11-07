@@ -337,6 +337,7 @@ object C {
 
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
+    const val not_shared_icon = "not_shared_icon"
     // Caregiver mode: who added an entry for the patient
     const val added_by = "added_by"
 

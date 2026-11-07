@@ -611,4 +611,7 @@
 
     <!-- Shared day picker, above the selected day -->
     <string name="day_picker_title">Select date</string>
+
+    <!-- Shared snackbar: closes the message before it goes away on its own -->
+    <string name="snackbar_dismiss">Dismiss</string>
 </resources>
