@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
  * App-wide snackbar that tells the user a change couldn't be saved and was undone, because the
@@ -64,7 +65,10 @@ fun RejectedWriteSnackbarContent(
           .imePadding()
           .padding(bottom = BOTTOM_BAR_HEIGHT)
           .testTag(C.Tag.rejected_write_snackbar),
-  )
+  ) { data ->
+    // The Figma snackbar spans the screen, less the 16 dp side margins
+    LakeSnackbar(data, Modifier.padding(horizontal = Spacing.lg))
+  }
 }
 
 private val BOTTOM_BAR_HEIGHT = 80.dp
