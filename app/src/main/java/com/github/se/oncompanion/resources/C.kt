@@ -470,5 +470,8 @@ object C {
 
     // Shared delete confirmation: the spinner while the item is being deleted
     const val delete_dialog_progress = "delete_dialog_progress"
+
+    // Shared filter chip: the check of a selected chip
+    const val filter_chip_check = "filter_chip_check"
   }
 }
