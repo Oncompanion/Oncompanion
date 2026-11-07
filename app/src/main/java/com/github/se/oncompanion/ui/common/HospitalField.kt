@@ -1,5 +1,6 @@
 // Co-authored-by: Codex
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +29,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.hospital.Hospital
 import com.github.se.oncompanion.model.hospital.HospitalRepository
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
  * Reusable location field with optional, explicitly requested hospital search. The form owns
@@ -85,8 +86,8 @@ fun HospitalFieldContent(
     enabled: Boolean = true,
     searchEnabled: Boolean = true,
 ) {
-  Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    OutlinedTextField(
+  Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    LakeTextField(
         value = value,
         onValueChange = {
           onHospitalSelected(null)

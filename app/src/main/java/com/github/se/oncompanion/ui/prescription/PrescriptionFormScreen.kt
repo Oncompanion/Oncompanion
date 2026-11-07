@@ -598,7 +598,7 @@ private fun DateField(
               )
             }
           },
-      colors = if (check != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+      isCheck = check != null,
   )
 
   if (pickerOpen) {
