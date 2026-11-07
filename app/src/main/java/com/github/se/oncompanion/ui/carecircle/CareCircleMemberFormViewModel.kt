@@ -259,7 +259,8 @@ class CareCircleMemberFormViewModel(
           } catch (e: CancellationException) {
             throw e
           } catch (e: Exception) {
-            Log.w(TAG, "Couldn't save the care circle member", e)
+            // Only the type: the message could name the invite's document, i.e. its code
+            Log.w(TAG, "Couldn't save the care circle member: ${e.javaClass.simpleName}")
             Result.failure(e)
           }
       _uiState.value =
