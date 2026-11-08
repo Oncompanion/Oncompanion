@@ -1,9 +1,9 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion
 
-import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.compose.ui.test.SemanticsMatcher
@@ -23,9 +23,9 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
-import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import java.time.LocalDate
@@ -427,13 +427,6 @@ class M1EndToEndTest {
   private fun waitFor(matcher: SemanticsMatcher) = compose.run {
     waitUntil(TIMEOUT_MS) { exists(matcher) }
     onNode(matcher)
-  }
-
-  /** Signs in against the Auth emulator with [idToken] instead of Google's account picker. */
-  private class EmulatorGoogleSignIn(private val idToken: String) : GoogleCredentialProvider {
-    override suspend fun getGoogleIdToken(context: Context) = idToken
-
-    override suspend fun clearCredentialState(context: Context) = Unit
   }
 
   private companion object {
