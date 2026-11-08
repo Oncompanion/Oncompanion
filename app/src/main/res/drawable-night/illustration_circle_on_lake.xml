@@ -2,8 +2,8 @@
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- The care circle on the lake, around the user's boat; the members' boats are drawn in Compose (MemberBoat), exported from the Figma (page M2) in the dark theme. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="358dp"
-    android:height="168dp"
+    android:width="179dp"
+    android:height="84dp"
     android:viewportWidth="358"
     android:viewportHeight="168">
     <path
