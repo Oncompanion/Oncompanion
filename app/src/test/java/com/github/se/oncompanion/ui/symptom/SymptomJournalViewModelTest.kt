@@ -344,6 +344,23 @@ class SymptomJournalViewModelTest {
   }
 
   @Test
+  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsOnNotShared() {
+    // The patient stops sharing: the server refuses the open read before the access change
+    // arrives (#204). The journal must not stay on the error
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    repository.observeError = IllegalStateException("PERMISSION_DENIED")
+    val vm = caregiverViewModel(patient)
+    ShadowLooper.idleMainLooper()
+    assertTrue(vm.uiState.value.hasError)
+
+    patient.shares(CarePermission.PLANNING)
+    ShadowLooper.idleMainLooper()
+
+    assertFalse(vm.uiState.value.hasError)
+    assertTrue(vm.uiState.value.isNotShared)
+  }
+
+  @Test
   fun caregiver_noAccessThenNotShared_saysNotShared_insteadOfTheError() {
     val patient = FollowedPatient().apply { removesTheCaregiver() }
     val vm = caregiverViewModel(patient)
