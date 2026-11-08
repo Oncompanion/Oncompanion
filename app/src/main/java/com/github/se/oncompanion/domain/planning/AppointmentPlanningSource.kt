@@ -31,6 +31,8 @@ class AppointmentPlanningSource(private val appointments: AppointmentRepository)
                   timing = PlanningTiming.Timed(appointment.scheduledAt),
                   title = appointment.title,
                   subtitle = appointment.location?.takeIf { it.isNotBlank() },
+                  addedBy = appointment.addedBy,
+                  addedByName = appointment.addedByName,
               )
             }
       }

@@ -6,6 +6,7 @@ import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
@@ -20,6 +21,9 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -48,6 +52,7 @@ class ObserveCarePlanningTest {
       ObserveCarePlanning(
           ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, profiles), auth),
           planning,
+          circle,
       )
 
   private val day = LocalDate.of(2026, 11, 4)
@@ -59,10 +64,17 @@ class ObserveCarePlanningTest {
           "Chemotherapy",
       )
 
-  private fun bobSees(vararg sections: CarePermission) =
+  private fun bobSees(vararg sections: CarePermission, canAdd: Set<CarePermission> = emptySet()) =
       circle.setMembers(
           "alice",
-          listOf(CareCircleMember(uid = "bob", firstName = "Bob", permissions = sections.toSet())),
+          listOf(
+              CareCircleMember(
+                  uid = "bob",
+                  firstName = "Bob",
+                  permissions = sections.toSet(),
+                  canAdd = canAdd,
+              )
+          ),
       )
 
   /** Collects the planning of [patientUid] in the background and returns what it emitted so far. */
@@ -82,7 +94,8 @@ class ObserveCarePlanningTest {
 
     val emissions = collect(null)
 
-    assertEquals(CarePlanning.Shown(listOf(chemo)), emissions.last())
+    // The patient can always add to their own planning
+    assertEquals(CarePlanning.Shown(listOf(chemo), canAdd = true), emissions.last())
     assertEquals(listOf("alice"), planning.owners)
   }
 
@@ -164,7 +177,7 @@ class ObserveCarePlanningTest {
     planning.items.value = listOf(chemo)
     auth.signInWithGoogle("nobody")
 
-    assertEquals(CarePlanning.Shown(listOf(chemo)), collect(null).last())
+    assertEquals(CarePlanning.Shown(listOf(chemo), canAdd = true), collect(null).last())
   }
 
   @Test
@@ -181,5 +194,79 @@ class ObserveCarePlanningTest {
     val bobs = collect("alice")
 
     assertEquals(CarePlanning.Shown(listOf(chemo)), bobs.last())
+  }
+
+  @Test
+  fun caregiver_getsAdd_onlyWhenThePatientLetsThemAddAppointments() = runTest {
+    planning.items.value = listOf(chemo)
+    auth.signInWithGoogle("bob")
+    val cases =
+        listOf(
+            emptySet<CarePermission>() to false,
+            setOf(CarePermission.SYMPTOMS) to false,
+            setOf(CarePermission.PLANNING) to true,
+        )
+    for ((canAdd, expected) in cases) {
+      bobSees(CarePermission.PLANNING, CarePermission.SYMPTOMS, canAdd = canAdd)
+      assertEquals(
+          "$canAdd",
+          CarePlanning.Shown(listOf(chemo), canAdd = expected),
+          collect("alice").last(),
+      )
+    }
+  }
+
+  @Test
+  fun addedBy_isTheNameThePatientGaveTheMember_whileTheCaregiverKeepsTheStoredOne() = runTest {
+    val added = chemo.copy(addedBy = "bob", addedByName = "Bob")
+    planning.items.value = listOf(added)
+    bobSees(CarePermission.PLANNING)
+    // alice calls bob by another name in her circle
+    circle.setMembers("alice", listOf(circle.members("alice").single().copy(firstName = "Bobby")))
+
+    auth.signInWithGoogle("alice")
+    assertEquals(
+        CarePlanning.Shown(listOf(added.copy(addedByName = "Bobby")), canAdd = true),
+        collect(null).last(),
+    )
+
+    auth.signInWithGoogle("bob")
+    assertEquals(CarePlanning.Shown(listOf(added)), collect("alice").last())
+  }
+
+  @Test
+  fun addedBy_fallsBackToTheStoredName_onceTheMemberIsRemoved() = runTest {
+    val added = chemo.copy(addedBy = "bob", addedByName = "Bob")
+    planning.items.value = listOf(added)
+    auth.signInWithGoogle("alice")
+
+    assertEquals(CarePlanning.Shown(listOf(added), canAdd = true), collect(null).last())
+  }
+
+  @Test
+  fun ownPlanning_neverWaitsForTheCircle() = runTest {
+    // Offline, a circle never read before may not answer
+    val silentCircle =
+        object : CareCircleRepository by circle {
+          override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> = flow {
+            awaitCancellation()
+          }
+        }
+    val observe =
+        ObserveCarePlanning(
+            ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, profiles), auth),
+            planning,
+            silentCircle,
+        )
+    val added = chemo.copy(addedBy = "bob", addedByName = "Bob")
+    planning.items.value = listOf(added)
+    auth.signInWithGoogle("alice")
+    val emissions = mutableListOf<CarePlanning>()
+    backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+      observe(null, range).collect { emissions += it }
+    }
+    runCurrent()
+
+    assertEquals(CarePlanning.Shown(listOf(added), canAdd = true), emissions.last())
   }
 }

@@ -260,10 +260,8 @@ private fun SessionNavHost(
         PlanningScreen(
             navigationActions,
             planningViewModel,
-            // Only the patient adds appointments
-            onAddAppointment =
-                if (chosenPatient != null) null
-                else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
+            // A caregiver only sees "Add" when the patient lets them add appointments (US-41)
+            onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
             onOpenAppointment = appointmentOpener(navigationActions),
             onOpenEvent = eventOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
@@ -321,10 +319,14 @@ private fun SessionNavHost(
             runCatching { LocalDate.parse(entry.arguments?.getString(Screen.APPOINTMENT_DATE)) }
                 .getOrNull()
                 ?.takeIf { it.year in 1..9999 } ?: LocalDate.now()
-        val form: AppointmentFormViewModel = viewModel { AppointmentFormViewModel(date) }
+        // In caregiver mode, the appointment goes in the chosen patient's planning (US-41)
+        val form: AppointmentFormViewModel = viewModel {
+          AppointmentFormViewModel(date, patientUid = chosenPatient?.uid)
+        }
         AppointmentFormScreen(
             form,
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            caregiverOf = chosenPatient?.firstName,
             onSaved = { instant ->
               // A completion during an exit animation must not pop the calendar as well.
               if (navController.currentBackStackEntry == entry) {

@@ -14,7 +14,11 @@ import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.addedByName
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.common.HasDeleteState
@@ -25,6 +29,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -46,11 +51,14 @@ sealed interface AppointmentDetailUiState : HasDeleteState {
    * All recorded patient fields are available for display.
    *
    * @property isOwn whether it is the user's own appointment: a caregiver only reads the patient's
+   * @property addedByName who added it, if a caregiver did (US-41): for the patient, the name they
+   *   gave that member in their circle; otherwise the name stored with it
    */
   data class Loaded(
       val appointment: Appointment,
       override val delete: DeleteState = DeleteState(),
       val isOwn: Boolean = true,
+      val addedByName: String? = appointment.addedByName,
   ) : AppointmentDetailUiState
 
   /** In caregiver mode, the patient doesn't share their planning. */
@@ -70,6 +78,7 @@ sealed interface AppointmentDetailUiState : HasDeleteState {
  *
  * @param patientUid in caregiver mode, the patient whose appointment is shown; null for the user's
  *   own
+ * @param careCircleRepository the patient's circle, for the name of the caregiver who added it
  */
 class AppointmentDetailViewModel(
     private val appointmentId: String,
@@ -78,6 +87,8 @@ class AppointmentDetailViewModel(
     private val patientUid: String? = null,
     private val resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
   private val state = MutableStateFlow<AppointmentDetailUiState>(AppointmentDetailUiState.Loading)
   /** Current read state, cleared when its owner changes. */
@@ -210,10 +221,15 @@ class AppointmentDetailViewModel(
     if (uid == null) return
     observation = viewModelScope.launch {
       // Late emissions belonging to a replaced session must never repopulate its private data.
+      // An appointment a caregiver added shows the name the patient gave them (a rename shows)
       flow { emitAll(repository.observeAppointment(uid, appointmentId)) }
-          .map<Appointment?, AppointmentDetailUiState> { appointment ->
+          .combine(careCircleRepository.observeMemberNames(uid)) { appointment, names ->
             appointment?.let {
-              AppointmentDetailUiState.Loaded(it, state.value.delete.afterRead(exists = true))
+              AppointmentDetailUiState.Loaded(
+                  it,
+                  state.value.delete.afterRead(exists = true),
+                  addedByName = addedByName(it.addedBy, it.addedByName, names),
+              )
             } ?: AppointmentDetailUiState.Unavailable
           }
           .catch { emit(AppointmentDetailUiState.Error) }

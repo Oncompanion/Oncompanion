@@ -33,7 +33,12 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-/** Collects the appointment draft and forwards confirmed input to its ViewModel. */
+/**
+ * Collects the appointment draft and forwards confirmed input to its ViewModel.
+ *
+ * @param caregiverOf the first name of the patient a caregiver adds the appointment for (US-41),
+ *   `null` for the user's own
+ */
 @Composable
 fun AppointmentFormScreen(
     viewModel: AppointmentFormViewModel,
@@ -41,6 +46,7 @@ fun AppointmentFormScreen(
     onSaved: (Instant) -> Unit,
     modifier: Modifier = Modifier,
     onSignedOut: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val currentOnSaved by rememberUpdatedState(onSaved)
@@ -70,10 +76,16 @@ fun AppointmentFormScreen(
       onBack,
       modifier,
       onRetry = viewModel::load,
+      caregiverOf = caregiverOf,
   )
 }
 
-/** Stateless add/edit form with optional manual location until hospital search is released. */
+/**
+ * Stateless add/edit form with optional manual location until hospital search is released.
+ *
+ * @param caregiverOf the patient's first name when a caregiver adds for them: the title says whose
+ *   planning it is
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentFormContent(
@@ -90,6 +102,7 @@ fun AppointmentFormContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
+    caregiverOf: String? = null,
 ) {
   var dateOpen by remember { mutableStateOf(false) }
   var timeOpen by remember { mutableStateOf(false) }
@@ -118,9 +131,11 @@ fun AppointmentFormContent(
     TopAppBar(
         title = {
           Text(
-              stringResource(
-                  if (state.isEditing) R.string.appointment_edit else R.string.appointment_add
-              )
+              when {
+                state.isEditing -> stringResource(R.string.appointment_edit)
+                caregiverOf != null -> stringResource(R.string.appointment_add_for, caregiverOf)
+                else -> stringResource(R.string.appointment_add)
+              }
           )
         },
         navigationIcon = {

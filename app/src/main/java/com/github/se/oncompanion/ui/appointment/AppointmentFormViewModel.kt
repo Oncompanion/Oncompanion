@@ -5,12 +5,15 @@ package com.github.se.oncompanion.ui.appointment
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CaregiverName
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import java.time.LocalDate
@@ -94,6 +97,15 @@ data class AppointmentFormUiState(
 
 /**
  * Creates or corrects a confirmed appointment locally; navigation remains outside this ViewModel.
+ *
+ * In caregiver mode (US-41), it adds the appointment to the planning of [patientUid], signed with
+ * the caregiver's uid and first name; the rules only accept it if the patient lets them add
+ * appointments. Only the patient edits an appointment.
+ *
+ * @param patientUid in caregiver mode, the patient whose planning gets the new appointment; null
+ *   for the user's own
+ * @param profileRepository the caregiver's profile, for the first name the appointment is signed
+ *   with
  */
 class AppointmentFormViewModel(
     private val initialDate: LocalDate,
@@ -101,7 +113,12 @@ class AppointmentFormViewModel(
     private val repository: AppointmentRepository = AppointmentRepositoryProvider.repository,
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val appointmentId: String? = null,
+    private val patientUid: String? = null,
+    profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
+  /** The first name a caregiver's appointment is signed with. */
+  private val caregiverName = CaregiverName(profileRepository, authRepository)
+
   private val state = MutableStateFlow(emptyState(initialDate))
   /** Draft and load/save feedback, shared by creation and editing. */
   val uiState = state.asStateFlow()
@@ -293,8 +310,14 @@ class AppointmentFormViewModel(
   private suspend fun writeAppointment(uid: String, appointment: Appointment, attempt: Int) {
     try {
       if (!isCurrentAttempt(uid, attempt)) return
-      if (appointmentId == null) repository.addAppointment(uid, appointment)
-      else repository.updateAppointment(uid, appointment)
+      if (appointmentId != null) repository.updateAppointment(uid, appointment)
+      else if (patientUid == null) repository.addAppointment(uid, appointment)
+      // A caregiver's appointment goes in the patient's planning, signed with who added it
+      else
+          repository.addAppointment(
+              patientUid,
+              appointment.copy(addedBy = uid, addedByName = caregiverName(uid)),
+          )
       if (isCurrentAttempt(uid, attempt))
           state.update {
             // Done only if the form still shows its appointment (e.g. it wasn't deleted meanwhile)

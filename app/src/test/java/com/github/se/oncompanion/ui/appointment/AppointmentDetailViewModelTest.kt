@@ -5,7 +5,9 @@ package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.appointment.*
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Instant
 import kotlinx.coroutines.*
@@ -344,5 +346,34 @@ class AppointmentDetailViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AppointmentDetailUiState.NotShared, vm.uiState.value)
+      }
+
+  // ----- An appointment a caregiver added (US-41) -----
+
+  @Test
+  fun addedByACaregiver_thePatientSeesTheNameTheyGaveThem_theCaregiverTheStoredOne() =
+      runTest(dispatcher) {
+        val added = appointment.copy(addedBy = "carol", addedByName = "Carol")
+        auth.signInWithGoogle("patient")
+        repository.seed("uid-patient", added)
+        repository.seed("patient", added)
+        val circle =
+            FakeCareCircleRepository().apply {
+              setMembers("uid-patient", listOf(CareCircleMember(uid = "carol", firstName = "Sis")))
+            }
+
+        val own =
+            AppointmentDetailViewModel("visit", repository, auth, careCircleRepository = circle)
+        val followed = caregiverViewModel(CarePermission.PLANNING)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Sis",
+            (own.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
+        assertEquals(
+            "Carol",
+            (followed.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
       }
 }

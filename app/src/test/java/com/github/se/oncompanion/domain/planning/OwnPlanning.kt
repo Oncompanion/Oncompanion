@@ -41,22 +41,23 @@ fun signedInPatient(): FakeAuthRepository = FakeAuthRepository {
 fun ownPlanning(
     planning: PlanningRepository,
     auth: AuthRepository = signedInPatient(),
-): ObserveCarePlanning =
-    ObserveCarePlanning(
-        ResolveSectionAccess(
-            ResolveCareCircleAccess(auth, FakeCareCircleRepository(), PatientProfiles),
-            auth,
-        ),
-        planning,
-    )
+): ObserveCarePlanning {
+  val circle = FakeCareCircleRepository()
+  return ObserveCarePlanning(
+      ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, PatientProfiles), auth),
+      planning,
+      circle,
+  )
+}
 
 /**
- * The [ObserveCarePlanning] of a caregiver signed in as "caregiver" who follows "patient", and sees
- * the [shared] sections of their [planning].
+ * The [ObserveCarePlanning] of a caregiver signed in as "caregiver" who follows "patient", sees the
+ * [shared] sections of their [planning], and may add to the [canAdd] ones.
  */
 fun followedPlanning(
     planning: PlanningRepository,
     shared: Set<CarePermission>,
+    canAdd: Set<CarePermission> = emptySet(),
 ): ObserveCarePlanning {
   val auth = FakeAuthRepository {
     AuthUser(it)
@@ -66,7 +67,14 @@ fun followedPlanning(
       FakeCareCircleRepository().apply {
         setMembers(
             "patient",
-            listOf(CareCircleMember(uid = "caregiver", firstName = "Sam", permissions = shared)),
+            listOf(
+                CareCircleMember(
+                    uid = "caregiver",
+                    firstName = "Sam",
+                    permissions = shared,
+                    canAdd = canAdd,
+                )
+            ),
         )
       }
   val profiles =
@@ -76,5 +84,6 @@ fun followedPlanning(
   return ObserveCarePlanning(
       ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, profiles), auth),
       planning,
+      circle,
   )
 }
