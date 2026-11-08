@@ -10,6 +10,19 @@
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />
+    <!-- Logging a symptom by voice (US-44). Not required: symptoms can always be typed -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+
+    <!-- Since Android 11, the phone's speech recognizer is hidden from the app unless declared
+         here: without it, voice logging would think the phone has none -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
