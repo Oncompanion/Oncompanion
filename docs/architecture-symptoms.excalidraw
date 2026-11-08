@@ -164,6 +164,10 @@
         {
           "type": "arrow",
           "id": "ar4"
+        },
+        {
+          "type": "arrow",
+          "id": "ar11"
         }
       ],
       "updated": 1791100000000,
@@ -336,12 +340,88 @@
       "index": "a008"
     },
     {
-      "id": "log_t",
+      "id": "parse",
+      "type": "rectangle",
+      "x": 1160,
+      "y": 200,
+      "width": 260,
+      "height": 110,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1632149332,
+      "version": 1,
+      "versionNonce": 1673266140,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "parse-label"
+        },
+        {
+          "type": "arrow",
+          "id": "ar11"
+        }
+      ],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a014"
+    },
+    {
+      "id": "parse-label",
       "type": "text",
-      "x": 830,
+      "x": 1170,
       "y": 217.5,
       "width": 240,
       "height": 75,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 7830363,
+      "version": 1,
+      "versionNonce": 106988763,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a009",
+      "text": "parseSpokenSymptom\ntranscript →\nSymptomDraft",
+      "originalText": "parseSpokenSymptom\ntranscript →\nSymptomDraft",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "parse",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "log_t",
+      "type": "text",
+      "x": 830,
+      "y": 230.0,
+      "width": 240,
+      "height": 50,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
@@ -362,8 +442,8 @@
       "link": null,
       "locked": false,
       "index": "a009",
-      "text": "LogSymptom\nvoice transcript\n→ symptom draft",
-      "originalText": "LogSymptom\nvoice transcript\n→ symptom draft",
+      "text": "LogSymptom\nsign & save",
+      "originalText": "LogSymptom\nsign & save",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2000,6 +2080,65 @@
       "containerId": null,
       "lineHeight": 1.25,
       "autoResize": true
+    },
+    {
+      "id": "ar11",
+      "type": "arrow",
+      "x": 1040,
+      "y": 70.0,
+      "width": 250.0,
+      "height": 130.0,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 2077361333,
+      "version": 1,
+      "versionNonce": 328549238,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1791100000000,
+      "link": null,
+      "locked": false,
+      "index": "a026",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          250.0,
+          130.0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "mode": "orbit",
+        "elementId": "logger",
+        "fixedPoint": [
+          0.6,
+          1
+        ]
+      },
+      "endBinding": {
+        "mode": "orbit",
+        "elementId": "parse",
+        "fixedPoint": [
+          0.5,
+          0
+        ]
+      }
     }
   ],
   "appState": {
