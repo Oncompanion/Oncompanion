@@ -2,8 +2,8 @@
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
 <!-- The Paper lake scene of Sign in. The sky is painted behind it in the colour of the time of day (PaperLake.kt), exported from the Figma (page M2) in the dark theme. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="390dp"
-    android:height="470dp"
+    android:width="166dp"
+    android:height="200dp"
     android:viewportWidth="390"
     android:viewportHeight="470">
     <path
