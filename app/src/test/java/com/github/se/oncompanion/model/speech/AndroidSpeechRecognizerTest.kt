@@ -125,7 +125,7 @@ class AndroidSpeechRecognizerTest {
   fun whatAndroidSendsAfterStopStillEndsTheSession() = runTest {
     // Robolectric doesn't record stopListening(), so this can't check that stop() reaches
     // Android: only that the text Android then sends still comes back and ends the session
-    val recognizer = AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler))
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
     val session = startListening(recognizer = recognizer)
     android.triggerOnPartialResults(results("tired"))
 
@@ -147,7 +147,7 @@ class AndroidSpeechRecognizerTest {
   fun stoppingWhenNotListeningDoesNotCrash() = runTest {
     // The same recognizer, as the app has one: e.g. the user taps Stop twice, or after leaving.
     // Only checks that nothing crashes: Robolectric doesn't record stopListening()
-    val recognizer = AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler))
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
     recognizer.stop()
 
     // After a session that ended
@@ -194,9 +194,9 @@ class AndroidSpeechRecognizerTest {
   @Test
   fun onAPhoneWithoutARecognizerNothingIsStarted() = runTest {
     shadowOf(context.packageManager).removeService(RECOGNITION_SERVICE)
-    val recognizer = AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler))
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
 
-    assertFalse(recognizer.isAvailable(context))
+    assertFalse(recognizer.isAvailable())
     val session = startListening(recognizer = recognizer)
     assertEquals(listOf(SpeechEvent.Failed(SpeechError.UNAVAILABLE)), session.events)
     assertNull(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
@@ -204,7 +204,7 @@ class AndroidSpeechRecognizerTest {
 
   @Test
   fun aPhoneWithARecognizerCanListen() {
-    assertTrue(AndroidSpeechRecognizer().isAvailable(context))
+    assertTrue(AndroidSpeechRecognizer(context).isAvailable())
   }
 
   @Test
@@ -227,8 +227,9 @@ class AndroidSpeechRecognizerTest {
           override fun getMainLooper(): Looper = screenUsed()
         }
 
-    assertTrue(AndroidSpeechRecognizer().isAvailable(screen))
-    val session = startListening(from = screen)
+    val recognizer = AndroidSpeechRecognizer(screen, UnconfinedTestDispatcher(testScheduler))
+    assertTrue(recognizer.isAvailable())
+    val session = startListening(recognizer = recognizer)
     android.triggerOnResults(results("tired"))
     runCurrent()
 
@@ -270,13 +271,12 @@ class AndroidSpeechRecognizerTest {
   private fun TestScope.startListening(
       language: SpeechLanguage = SpeechLanguage.ENGLISH,
       recognizer: AndroidSpeechRecognizer =
-          AndroidSpeechRecognizer(UnconfinedTestDispatcher(testScheduler)),
-      from: Context = context,
+          AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler)),
   ): Session {
     val events = mutableListOf<SpeechEvent>()
     val job =
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-          recognizer.listen(from, language).toList(events)
+          recognizer.listen(language).toList(events)
         }
     shadowOf(Looper.getMainLooper()).idle()
     return Session(events, job)

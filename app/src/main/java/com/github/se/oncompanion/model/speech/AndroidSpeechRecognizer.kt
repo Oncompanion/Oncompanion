@@ -30,29 +30,30 @@ import kotlinx.coroutines.flow.flowOn
  *
  * Nothing is recorded by the app: Android only hands back the text.
  *
+ * @param context any context of the app; only its application context is kept, so a screen given
+ *   here is never kept alive after it closes
  * @param mainDispatcher where Android's recognizer is created and driven; it only works on the main
  *   thread
  */
 class AndroidSpeechRecognizer(
-    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
+    context: Context,
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : SpeechRecognizer {
+
+  private val appContext: Context = context.applicationContext
 
   /** The recognizer currently listening, so [stop] can reach it; `null` when not listening. */
   @Volatile private var listening: AndroidRecognizer? = null
 
-  override fun isAvailable(context: Context): Boolean =
-      AndroidRecognizer.isRecognitionAvailable(context.applicationContext)
+  override fun isAvailable(): Boolean = AndroidRecognizer.isRecognitionAvailable(appContext)
 
-  override fun listen(context: Context, language: SpeechLanguage): Flow<SpeechEvent> = flow {
-    // Only the app's context is kept while listening: a session can outlive the screen that
-    // started it (e.g. when the phone is rotated), and must not keep that screen alive
-    val appContext = context.applicationContext
+  override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = flow {
     // Checked when listening starts, not when the flow is built: the user may have
     // granted the microphone in between
     when {
-      !hasMicrophone(appContext) -> emit(SpeechEvent.Failed(SpeechError.NO_PERMISSION))
-      !isAvailable(appContext) -> emit(SpeechEvent.Failed(SpeechError.UNAVAILABLE))
-      else -> emitAll(recognition(appContext, language))
+      !hasMicrophone() -> emit(SpeechEvent.Failed(SpeechError.NO_PERMISSION))
+      !isAvailable() -> emit(SpeechEvent.Failed(SpeechError.UNAVAILABLE))
+      else -> emitAll(recognition(language))
     }
   }
       .flowOn(mainDispatcher)
@@ -62,58 +63,57 @@ class AndroidSpeechRecognizer(
   }
 
   /** One listening session with Android's recognizer, destroyed when the flow ends. */
-  private fun recognition(context: Context, language: SpeechLanguage): Flow<SpeechEvent> =
-      callbackFlow {
-        val recognizer = AndroidRecognizer.createSpeechRecognizer(context)
-        listening = recognizer
-        recognizer.setRecognitionListener(
-            object : RecognitionListener {
-              override fun onReadyForSpeech(params: Bundle?) {
-                trySend(SpeechEvent.Listening)
-              }
+  private fun recognition(language: SpeechLanguage): Flow<SpeechEvent> = callbackFlow {
+    val recognizer = AndroidRecognizer.createSpeechRecognizer(appContext)
+    listening = recognizer
+    recognizer.setRecognitionListener(
+        object : RecognitionListener {
+          override fun onReadyForSpeech(params: Bundle?) {
+            trySend(SpeechEvent.Listening)
+          }
 
-              override fun onPartialResults(partialResults: Bundle?) {
-                bestText(partialResults)?.let { trySend(SpeechEvent.PartialText(it)) }
-              }
+          override fun onPartialResults(partialResults: Bundle?) {
+            bestText(partialResults)?.let { trySend(SpeechEvent.PartialText(it)) }
+          }
 
-              override fun onResults(results: Bundle?) {
-                val text = bestText(results)
-                trySend(
-                    if (text == null) SpeechEvent.Failed(SpeechError.NO_SPEECH)
-                    else SpeechEvent.FinalText(text)
-                )
-                close()
-              }
+          override fun onResults(results: Bundle?) {
+            val text = bestText(results)
+            trySend(
+                if (text == null) SpeechEvent.Failed(SpeechError.NO_SPEECH)
+                else SpeechEvent.FinalText(text)
+            )
+            close()
+          }
 
-              override fun onError(error: Int) {
-                trySend(SpeechEvent.Failed(speechErrorOf(error)))
-                close()
-              }
+          override fun onError(error: Int) {
+            trySend(SpeechEvent.Failed(speechErrorOf(error)))
+            close()
+          }
 
-              // Sound levels and the raw audio aren't used: the app keeps nothing of the recording
-              override fun onBeginningOfSpeech() = Unit
+          // Sound levels and the raw audio aren't used: the app keeps nothing of the recording
+          override fun onBeginningOfSpeech() = Unit
 
-              override fun onRmsChanged(rmsdB: Float) = Unit
+          override fun onRmsChanged(rmsdB: Float) = Unit
 
-              override fun onBufferReceived(buffer: ByteArray?) = Unit
+          override fun onBufferReceived(buffer: ByteArray?) = Unit
 
-              override fun onEndOfSpeech() = Unit
+          override fun onEndOfSpeech() = Unit
 
-              override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            }
-        )
-        recognizer.startListening(recognizerIntent(language, context.packageName))
-        awaitClose {
-          if (listening === recognizer) listening = null
-          // Also cancels listening if the user left before the end
-          recognizer.destroy()
+          override fun onEvent(eventType: Int, params: Bundle?) = Unit
         }
-      }
+    )
+    recognizer.startListening(recognizerIntent(language, appContext.packageName))
+    awaitClose {
+      if (listening === recognizer) listening = null
+      // Also cancels listening if the user left before the end
+      recognizer.destroy()
+    }
+  }
       // A session is short: keep every event, so a slow screen never loses the final one
       .buffer(Channel.UNLIMITED)
 
-  private fun hasMicrophone(context: Context): Boolean =
-      ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+  private fun hasMicrophone(): Boolean =
+      ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
           PackageManager.PERMISSION_GRANTED
 }
 

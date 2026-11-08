@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.model.speech
 
-import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -10,13 +9,12 @@ import kotlinx.coroutines.flow.Flow
  * screens can be tested with a fake, and so nothing else in the app depends on Android's speech
  * APIs.
  *
- * Methods take the [Context] of the screen that listens, so ViewModels never hold one; only the
- * app's context is kept, never the screen's. The app never keeps what is recorded: only the text
- * comes back.
+ * No method takes a `Context`, so the ViewModels that listen stay free of Android. The app never
+ * keeps what is recorded: only the text comes back.
  */
 interface SpeechRecognizer {
   /** Whether the phone has a speech recognizer at all; if not, [listen] always fails. */
-  fun isAvailable(context: Context): Boolean
+  fun isAvailable(): Boolean
 
   /**
    * Listens to the user in [language] while the flow is collected, preferring recognition on the
@@ -26,7 +24,7 @@ interface SpeechRecognizer {
    * Cancelling the collection stops listening and drops what was said. Only one listening at a
    * time: collect on the main thread.
    */
-  fun listen(context: Context, language: SpeechLanguage): Flow<SpeechEvent>
+  fun listen(language: SpeechLanguage): Flow<SpeechEvent>
 
   /**
    * The user is done speaking: stops listening, then [listen]'s flow ends as usual, with
