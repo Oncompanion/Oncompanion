@@ -10,12 +10,12 @@ The overview shows how the app fits together, with the calls between its layers 
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
-Every diagram gives each layer one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls. The overview labels the few that carry a key mechanism:
+Every diagram names its four layers and gives each one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls and go down. Planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls. The overview follows two core flows, numbered on their arrows:
 
-- **Writes work offline.** A repository writes to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
-- **A caregiver only sees what is shared.** A screen showing a patient's data asks `ResolveSectionAccess`, which uses `ResolveCareCircleAccess` and the care circle repositories to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
+1. **A write works offline.** A screen writes through its repository to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
+2. **A caregiver only sees what is shared.** A screen showing a patient's data asks `ResolveSectionAccess` (Planning and the Overview through `ObserveCarePlanning`), which uses `ResolveCareCircleAccess` and the care circle to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
 
-The overview only shows what is built. In the feature diagrams, planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls.
+The overview also shows the large planned areas (the voice journal, reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
 
 To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
@@ -222,6 +222,10 @@ remain separate work.
 ### Ligue events and directory
 
 ![Ligue events and directory](architecture-ligue.svg)
+
+### Reminders (planned)
+
+![Reminders (planned)](architecture-reminders.svg)
 
 ## Offline mode
 
