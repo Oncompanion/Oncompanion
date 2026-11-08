@@ -63,7 +63,10 @@ class ObserveCareSectionTest {
     val emissions = collect(followedPatientAccess(CarePermission.SYMPTOMS))
 
     assertEquals(
-        listOf(CareSection.Loading(), CareSection.Shown(listOf("Fatigue"), false, false)),
+        listOf(
+            CareSection.Loading(accessKnown = true),
+            CareSection.Shown(listOf("Fatigue"), false, false),
+        ),
         emissions.distinct(),
     )
     assertEquals(listOf("patient"), readers)
@@ -83,7 +86,7 @@ class ObserveCareSectionTest {
         listOf(
             FollowedPatient(CarePermission.PLANNING) to CareSection.NotShared,
             FollowedPatient().apply { removesTheCaregiver() } to CareSection.NoAccess,
-            FollowedPatient().apply { isUnconfirmed() } to CareSection.Loading(),
+            FollowedPatient().apply { isUnconfirmed() } to CareSection.Loading(accessKnown = false),
         )
     for ((patient, expected) in cases) {
       assertEquals(listOf<CareSection<List<String>>>(expected), collect(patient.sectionAccess))

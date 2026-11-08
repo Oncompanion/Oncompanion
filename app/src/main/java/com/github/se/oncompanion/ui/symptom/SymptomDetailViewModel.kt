@@ -143,8 +143,20 @@ class SymptomDetailViewModel(
       section: CareSection<Pair<SymptomEntry?, Map<String, String>>>
   ): SymptomDetailUiState =
       when (section) {
-        // What is shown stays until the symptom arrives, e.g. after a failed deletion
-        is CareSection.Loading -> copy(isLoading = entry == null)
+        // What is shown stays until the symptom arrives (e.g. after a failed deletion), but not
+        // while the access itself isn't known: then nothing of it may show
+        is CareSection.Loading ->
+            if (section.accessKnown) copy(isLoading = entry == null, isNotShared = false)
+            else
+                copy(
+                    entry = null,
+                    addedByName = null,
+                    isLoading = true,
+                    hasError = false,
+                    isNotShared = false,
+                    canEdit = false,
+                    delete = delete.afterRead(false),
+                )
         // Nothing to read: not shared, or nobody to read it for
         CareSection.NoAccess,
         CareSection.NotShared ->
@@ -158,7 +170,12 @@ class SymptomDetailViewModel(
                 delete = delete.afterRead(false),
             )
         is CareSection.Failed ->
-            copy(isLoading = false, hasError = true, delete = delete.afterRead(false))
+            copy(
+                isLoading = false,
+                hasError = true,
+                isNotShared = false,
+                delete = delete.afterRead(false),
+            )
         // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
         is CareSection.Shown -> {
           val (shown, names) = section.data

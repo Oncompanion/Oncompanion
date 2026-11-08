@@ -135,8 +135,19 @@ class PrescriptionDetailViewModel(
       section: CareSection<Prescription?>
   ): PrescriptionDetailUiState =
       when (section) {
-        // What is shown stays until the prescription arrives, e.g. after a failed deletion
-        is CareSection.Loading -> copy(isLoading = prescription == null)
+        // What is shown stays until the prescription arrives (e.g. after a failed deletion), but
+        // not while the access itself isn't known: then nothing of it may show
+        is CareSection.Loading ->
+            if (section.accessKnown) copy(isLoading = prescription == null, isNotShared = false)
+            else
+                copy(
+                    prescription = null,
+                    isLoading = true,
+                    hasError = false,
+                    isNotShared = false,
+                    isOwn = false,
+                    delete = delete.afterRead(false),
+                )
         // Nothing to read: not shared, or nobody to read it for
         CareSection.NoAccess,
         CareSection.NotShared ->
@@ -149,7 +160,12 @@ class PrescriptionDetailViewModel(
                 delete = delete.afterRead(false),
             )
         is CareSection.Failed ->
-            copy(isLoading = false, hasError = true, delete = delete.afterRead(false))
+            copy(
+                isLoading = false,
+                hasError = true,
+                isNotShared = false,
+                delete = delete.afterRead(false),
+            )
         // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
         is CareSection.Shown ->
             copy(

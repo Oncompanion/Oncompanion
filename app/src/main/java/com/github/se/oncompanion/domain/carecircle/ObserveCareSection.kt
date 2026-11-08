@@ -19,10 +19,16 @@ import kotlinx.coroutines.flow.onStart
 sealed interface CareSection<out T> {
 
   /**
-   * Nothing to show yet: the access or the data isn't known. Once the access is, [canAdd] says
-   * whether adding may be offered already: it doesn't wait for the data.
+   * Nothing to show yet: the access or the data isn't known.
+   *
+   * @property accessKnown whether only the data is loading. While the access isn't known, show none
+   *   of the data, not even what was shown before; once it is, what is shown may stay until the
+   *   data arrives (e.g. after a failed deletion).
+   * @property canAdd whether adding may be offered already, once the access is known: it doesn't
+   *   wait for the data
    */
-  data class Loading(val canAdd: Boolean = false) : CareSection<Nothing>
+  data class Loading(val accessKnown: Boolean = false, val canAdd: Boolean = false) :
+      CareSection<Nothing>
 
   /**
    * The section's [data].
@@ -104,7 +110,7 @@ class ObserveCareSection(
     emitAll(read(access.ownerUid))
   }
       .map<T, CareSection<T>> { CareSection.Shown(it, access.canEdit, access.canAdd) }
-      .onStart { emit(CareSection.Loading(canAdd = access.canAdd)) }
+      .onStart { emit(CareSection.Loading(accessKnown = true, canAdd = access.canAdd)) }
       .catch { e ->
         if (e is CancellationException) throw e
         Log.e(TAG, "Couldn't read $section: ${e.javaClass.simpleName}")
