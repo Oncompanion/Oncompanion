@@ -6,12 +6,16 @@ package com.github.se.oncompanion
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -20,6 +24,7 @@ import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.printToString
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
@@ -151,59 +156,62 @@ class M1EndToEndTest {
 
   /** Google sign-in, then onboarding as a patient: the Overview greets them by first name. */
   private fun signInAndOnboard(firstName: String) {
-    waitFor(hasTestTag(C.Tag.google_sign_in_button)).performClick()
-
     // A new account goes to onboarding
-    waitFor(hasTestTag(C.Tag.onboarding_role_patient)).performClick()
-    tag(C.Tag.onboarding_continue_button).performClick()
-    waitFor(hasTestTag(C.Tag.onboarding_first_name_field)).replaceText(firstName)
-    tag(C.Tag.onboarding_save_button).reveal().performClick()
+    open(C.Tag.google_sign_in_button, hasTestTag(C.Tag.onboarding_role_patient)).performClick()
+    open(C.Tag.onboarding_continue_button, hasTestTag(C.Tag.onboarding_first_name_field))
+        .replaceText(firstName)
 
-    waitFor(hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true))
+    open(
+        C.Tag.onboarding_save_button,
+        hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true),
+    )
   }
 
   /** From the Overview: a prescription entered manually appears in the prescriptions list. */
   private fun addPrescription(doctor: String, medication: String) {
-    tag(C.Tag.overview_shortcut_prescriptions).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.prescriptions_enter_manually_button)).performClick()
-
-    waitFor(hasTestTag(C.Tag.prescription_form_prescribed_by_field)).typeText(doctor)
+    open(
+        C.Tag.overview_shortcut_prescriptions,
+        hasTestTag(C.Tag.prescriptions_enter_manually_button),
+    )
+    open(
+            C.Tag.prescriptions_enter_manually_button,
+            hasTestTag(C.Tag.prescription_form_prescribed_by_field),
+        )
+        .typeText(doctor)
     tag(C.Tag.prescription_form_medication_name_field).reveal().typeText(medication)
     tag(C.Tag.prescription_form_dosage_field).reveal().typeText("20 mg")
     tag(C.Tag.prescription_form_frequency_field).reveal().typeText("Once a day")
-    // Save stays at the bottom of the screen, outside the scrolling fields
-    tag(C.Tag.prescription_form_save_button).performClick()
-
     // Saving returns to the list, which shows the new prescription
-    waitFor(hasTestTag(C.Tag.prescriptions_list) and hasAnyDescendant(hasText(medication)))
-    tag(C.Tag.prescriptions_back_button).performClick()
-    waitFor(hasTestTag(C.Tag.overview_greeting))
+    open(
+        C.Tag.prescription_form_save_button,
+        hasTestTag(C.Tag.prescriptions_list) and hasAnyDescendant(hasText(medication)),
+    )
+    open(C.Tag.prescriptions_back_button, hasTestTag(C.Tag.overview_greeting))
   }
 
   /** From the Planning tab: an appointment added for tomorrow appears on that day. */
   private fun addAppointmentTomorrow(title: String) {
-    tag(C.Tag.bottom_navigation_tab_planning).performClick()
-    waitFor(hasTestTag(C.Tag.planning_screen))
+    open(C.Tag.bottom_navigation_tab_planning, hasTestTag(C.Tag.planning_screen))
 
     selectTomorrowInPlanning()
 
-    tag(C.Tag.planning_add).performClick()
-    waitFor(hasTestTag(C.Tag.appointment_title)).typeText(title)
+    open(C.Tag.planning_add, hasTestTag(C.Tag.appointment_title)).typeText(title)
     tag(C.Tag.appointment_time).performClick()
     tag(C.Tag.appointment_confirm).performClick()
     tag(C.Tag.appointment_location).reveal().typeText("HUG, oncology")
-    tag(C.Tag.appointment_save).reveal().performClick()
-
     // Saving returns to the calendar, on the appointment's day
-    waitFor(hasTestTag(C.Tag.planning_screen) and hasAnyDescendant(hasText(title)))
+    open(
+        C.Tag.appointment_save,
+        hasTestTag(C.Tag.planning_screen) and hasAnyDescendant(hasText(title)),
+    )
   }
 
   /** The link between Planning and the Overview: the new appointment is the next one there. */
   private fun seeNextAppointmentOnOverview(title: String) {
-    tag(C.Tag.bottom_navigation_tab_overview).performClick()
-    waitFor(
+    open(
+        C.Tag.bottom_navigation_tab_overview,
         hasTestTag(C.Tag.overview_next_appointment) and
-            (hasText(title, substring = true) or hasAnyDescendant(hasText(title)))
+            (hasText(title, substring = true) or hasAnyDescendant(hasText(title))),
     )
   }
 
@@ -212,17 +220,18 @@ class M1EndToEndTest {
    * confirms there that they registered with the organizer (US-25).
    */
   private fun confirmRegistrationForLigueEvent(title: String, place: String) {
-    tag(C.Tag.bottom_navigation_tab_events).performClick()
     // The list only composes the cards on screen: scroll to ours first, in case earlier events
     // (e.g. left by a crashed run) push it down
-    waitFor(hasTestTag(C.Tag.events_list)).performScrollToKey(ligueEvent)
-    waitFor(hasTestTag(C.Tag.eventCard(ligueEvent))).performClick()
-
-    waitFor(hasTestTag(C.Tag.event_detail_event_title) and hasText(title, substring = true))
+    open(C.Tag.bottom_navigation_tab_events, hasTestTag(C.Tag.events_list))
+        .performScrollToKey(ligueEvent)
+    open(
+        hasTestTag(C.Tag.eventCard(ligueEvent)),
+        hasTestTag(C.Tag.event_detail_event_title) and hasText(title, substring = true),
+    )
     waitFor(hasTestTag(C.Tag.event_detail_location) and hasText(place, substring = true))
     waitFor(hasTestTag(C.Tag.event_detail_confirm)).reveal().performClick()
     waitFor(hasTestTag(C.Tag.event_detail_registration_confirmed))
-    tag(C.Tag.event_detail_back).performClick()
+    open(C.Tag.event_detail_back, hasTestTag(C.Tag.events_list))
   }
 
   /**
@@ -230,8 +239,7 @@ class M1EndToEndTest {
    * patient's appointment.
    */
   private fun seeConfirmedEventInPlanning(title: String, appointment: String) {
-    tag(C.Tag.bottom_navigation_tab_planning).performClick()
-    waitFor(hasTestTag(C.Tag.planning_screen))
+    open(C.Tag.bottom_navigation_tab_planning, hasTestTag(C.Tag.planning_screen))
     selectTomorrowInPlanning()
 
     waitFor(
@@ -239,49 +247,44 @@ class M1EndToEndTest {
             hasAnyDescendant(hasText(title)) and
             hasAnyDescendant(hasText(appointment))
     )
-    tag(C.Tag.bottom_navigation_tab_overview).performClick()
-    waitFor(hasTestTag(C.Tag.overview_greeting))
+    open(C.Tag.bottom_navigation_tab_overview, hasTestTag(C.Tag.overview_greeting))
   }
 
   /** From the Overview: a symptom logged in a few taps appears in the journal. */
   private fun logSymptom() {
-    tag(C.Tag.overview_shortcut_symptoms).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.symptom_journal_add)).performClick()
-
-    waitFor(hasTestTag(C.Tag.symptomAddType("FATIGUE"))).performClick()
-    tag(C.Tag.symptom_add_save).performClick()
+    open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
+    open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType("FATIGUE"))).performClick()
 
     // Saving returns to the journal, with the new entry
-    waitFor(
+    open(
+        C.Tag.symptom_add_save,
         hasTestTag(C.Tag.symptom_journal_list) and
-            hasAnyDescendant(hasText(string(R.string.symptom_type_fatigue)))
+            hasAnyDescendant(hasText(string(R.string.symptom_type_fatigue))),
     )
-    tag(C.Tag.symptom_back_button).performClick()
-    waitFor(hasTestTag(C.Tag.overview_greeting))
+    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.overview_greeting))
   }
 
   /** From the journal: the symptom just logged is deleted after confirming, and is gone. */
   private fun deleteSymptom() {
-    tag(C.Tag.overview_shortcut_symptoms).reveal().performClick()
     val fatigue = string(R.string.symptom_type_fatigue)
-    waitFor(hasText(fatigue, substring = true)).performClick()
-
-    waitFor(hasTestTag(C.Tag.symptom_detail_delete)).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.symptom_delete_confirm)).performClick()
-
+    open(C.Tag.overview_shortcut_symptoms, hasText(fatigue, substring = true))
+    open(hasText(fatigue, substring = true), hasTestTag(C.Tag.symptom_detail_delete))
+        .reveal()
+        .performClick()
     // Back in the journal, which is empty again
-    waitFor(hasTestTag(C.Tag.symptom_journal_empty))
-    tag(C.Tag.symptom_back_button).performClick()
-    waitFor(hasTestTag(C.Tag.overview_greeting))
+    open(C.Tag.symptom_delete_confirm, hasTestTag(C.Tag.symptom_journal_empty))
+    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.overview_greeting))
   }
 
   /** The profile shows the onboarding first name; a hospital entered there is saved. */
   private fun seeProfileAndAddHospital(firstName: String, hospital: String) {
-    tag(C.Tag.overview_shortcut_profile).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.profile_name) and hasText(firstName, substring = true))
+    open(
+        C.Tag.overview_shortcut_profile,
+        hasTestTag(C.Tag.profile_name) and hasText(firstName, substring = true),
+    )
 
-    tag(C.Tag.profile_edit).performClick()
-    waitFor(hasTestTag(C.Tag.hospital_field)).reveal().typeText(hospital)
+    open(C.Tag.profile_edit, hasTestTag(C.Tag.hospital_field)).reveal().typeText(hospital)
+    // Not open(): typing starts a hospital search, whose spinner Save doesn't wait for
     tag(C.Tag.edit_profile_save).reveal().performClick()
 
     waitFor(
@@ -295,32 +298,34 @@ class M1EndToEndTest {
    * waiting to join. Joining with the invite code on the caregiver's side has no screen yet (#137).
    */
   private fun inviteToCareCircle(firstName: String) {
-    tag(C.Tag.overview_shortcut_care_circle).reveal().performClick()
     // A new patient's circle is empty: its add button is in the page
-    waitFor(hasTestTag(C.Tag.care_circle_empty_add_button)).performClick()
-
-    waitFor(hasTestTag(C.Tag.care_circle_form_first_name)).typeText(firstName)
+    open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_empty_add_button))
+    open(C.Tag.care_circle_empty_add_button, hasTestTag(C.Tag.care_circle_form_first_name))
+        .typeText(firstName)
     tag(C.Tag.care_circle_form_relationship).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.careCircleFormRelationshipOption("DAUGHTER"))).performClick()
-    tag(C.Tag.care_circle_form_save_button).reveal().performClick()
-
+    // On a short screen the menu scrolls, and an option below its visible part can't be tapped
+    waitFor(hasTestTag(C.Tag.careCircleFormRelationshipOption("DAUGHTER"))).reveal().performClick()
+    // Without a relationship Save does nothing, so a missed pick fails here, not at the invite code
+    waitFor(
+        hasTestTag(C.Tag.care_circle_form_relationship) and
+            hasText(string(R.string.relationship_daughter))
+    )
     // Saving shows the invite code to share, in place of the form
-    waitFor(hasTestTag(C.Tag.care_circle_invite_code))
-    tag(C.Tag.care_circle_invite_back_button).performClick()
+    open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_invite_code))
 
     // Back returns to the circle, where the invitation is pending
-    waitFor(
+    open(
+        C.Tag.care_circle_invite_back_button,
         hasTestTag(C.Tag.care_circle_member_list) and
             hasAnyDescendant(hasTestTag(C.Tag.care_circle_pending_section)) and
-            hasAnyDescendant(hasText(firstName, substring = true))
+            hasAnyDescendant(hasText(firstName, substring = true)),
     )
   }
 
   /** Signing out, after confirming, goes back to the sign-in screen. */
   private fun signOut() {
-    tag(C.Tag.profile_sign_out).reveal().performClick()
-    waitFor(hasTestTag(C.Tag.profile_sign_out_confirm)).performClick()
-    waitFor(hasTestTag(C.Tag.sign_in_screen))
+    open(C.Tag.profile_sign_out, hasTestTag(C.Tag.profile_sign_out_confirm))
+    open(C.Tag.profile_sign_out_confirm, hasTestTag(C.Tag.sign_in_screen))
   }
 
   /**
@@ -328,9 +333,10 @@ class M1EndToEndTest {
    * onboarding, and their data is still there.
    */
   private fun signInAgain(firstName: String, nextAppointment: String) {
-    waitFor(hasTestTag(C.Tag.google_sign_in_button)).performClick()
-
-    waitFor(hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true))
+    open(
+        C.Tag.google_sign_in_button,
+        hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true),
+    )
     waitFor(
         hasTestTag(C.Tag.overview_next_appointment) and
             (hasText(nextAppointment, substring = true) or
@@ -366,6 +372,26 @@ class M1EndToEndTest {
   // Waits for it too: right after Android relaunches the screen, the app isn't drawn yet
   private fun tag(testTag: String) = waitFor(hasTestTag(testTag))
 
+  /** [open] for the node tagged [from]. */
+  private fun open(from: String, to: SemanticsMatcher) = open(hasTestTag(from), to)
+
+  /**
+   * Taps [from] to open another screen, then waits for [to] and returns it. Every step that changes
+   * screen goes through here, so all of them wait the same way.
+   *
+   * Before tapping, it waits for the current screen to finish loading: what replaces a spinner
+   * moves the content below it (on the Overview, the day's data pushes the tiles down), and a tap
+   * while it moves can land next to its target. Nothing retries the tap: a tap that really opens
+   * nothing is a bug, and the test must fail on it.
+   */
+  private fun open(from: SemanticsMatcher, to: SemanticsMatcher): SemanticsNodeInteraction {
+    waitFor(from)
+    waitFor(isLoading, gone = true)
+    compose.waitForIdle()
+    waitFor(from).reveal().performClick()
+    return waitFor(to, failure = "Tapping ${from.description} didn't open the next screen.")
+  }
+
   /** Types [text] at the end of the field, then closes the keyboard (see [closeKeyboard]). */
   private fun SemanticsNodeInteraction.typeText(text: String) = apply {
     performTextInput(text)
@@ -397,6 +423,7 @@ class M1EndToEndTest {
       performScrollTo()
     } catch (e: AssertionError) {
       // Not in a scrolling area: the node is already where it can be clicked
+      if (e.message?.contains(NO_SCROLL_PARENT) != true) throw e
     }
   }
 
@@ -423,11 +450,36 @@ class M1EndToEndTest {
     }
   }
 
-  /** Waits for the node (data comes from the emulators asynchronously), then returns it. */
-  private fun waitFor(matcher: SemanticsMatcher) = compose.run {
-    waitUntil(TIMEOUT_MS) { exists(matcher) }
+  /**
+   * Waits for the node (data comes from the emulators asynchronously), then returns it. On timeout,
+   * the failure lists what was on screen, since CI keeps no screenshot. With [gone], it waits for
+   * no node to match instead. [failure] starts the message with what the step was doing.
+   */
+  private fun waitFor(
+      matcher: SemanticsMatcher,
+      gone: Boolean = false,
+      failure: String = "",
+  ) = compose.run {
+    try {
+      waitUntil(TIMEOUT_MS) { exists(matcher) != gone }
+    } catch (e: ComposeTimeoutException) {
+      val state = if (gone) "Still a node" else "No node"
+      throw AssertionError(
+          "$failure $state ${matcher.description} after $TIMEOUT_MS ms.\n${screen()}".trim(),
+          e,
+      )
+    }
     onNode(matcher)
   }
+
+  /** The semantics tree of every window on screen (dialogs and menus have their own). */
+  private fun screen() =
+      try {
+        compose.onAllNodes(isRoot(), useUnmergedTree = true).printToString(maxDepth = Int.MAX_VALUE)
+      } catch (e: IllegalStateException) {
+        if (e.message?.startsWith("No compose hierarchies found") != true) throw e
+        "No Compose screen shown."
+      }
 
   /** Signs in against the Auth emulator with [idToken] instead of Google's account picker. */
   private class EmulatorGoogleSignIn(private val idToken: String) : GoogleCredentialProvider {
@@ -438,5 +490,14 @@ class M1EndToEndTest {
 
   private companion object {
     const val TIMEOUT_MS = 15_000L
+
+    /** How [performScrollTo] says the node isn't in a scrolling area. */
+    const val NO_SCROLL_PARENT = "has no parent layout with a Scroll SemanticsAction"
+
+    /** A screen's loading spinner: every one is tagged `<feature>_loading`. */
+    val isLoading =
+        SemanticsMatcher("is a loading spinner") {
+          it.config.getOrNull(SemanticsProperties.TestTag)?.endsWith("_loading") == true
+        }
   }
 }

@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -198,6 +199,30 @@ class PaperLakeTest {
 
     compose.onNodeWithTag(HEADER).assertHeightIsEqualTo(100.dp)
     assertSameColor("band sky by day", HorizonDayTopLight, skyColor())
+  }
+
+  @Test
+  fun withoutATime_eachSizeShowsTheSkyOfThePhonesTime() {
+    val expected =
+        when (timeOfDayAt(LocalTime.now())) {
+          TimeOfDay.DAWN -> HorizonDawnTopLight
+          TimeOfDay.DAY -> HorizonDayTopLight
+          TimeOfDay.DUSK -> HorizonDuskTopLight
+        }
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        Column {
+          PaperLakeHeader(Modifier.testTag("header"))
+          PaperLakeBand(Modifier.testTag("band"))
+          PaperLakeScene(Modifier.testTag("scene").width(390.dp))
+        }
+      }
+    }
+
+    listOf("header", "band", "scene").forEach { tag ->
+      val sky = compose.onNodeWithTag(tag).captureToImage().toPixelMap()[4, 4]
+      assertSameColor("$tag sky now", expected, sky)
+    }
   }
 
   // setContent can only be called once per test: the time is swapped in a state instead

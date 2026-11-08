@@ -14,9 +14,12 @@ import com.github.se.oncompanion.domain.auth.SignOut
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
+import com.github.se.oncompanion.model.speech.AndroidSpeechRecognizer
+import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -35,11 +38,13 @@ class MainActivityTest {
           val auth = FakeAuthRepository()
           AuthRepositoryProvider.repository = auth
           SignOutProvider.signOut = SignOut(auth, FakeLocalSessionRepository())
+          SpeechRecognizerProvider.reset()
         }
 
         override fun after() {
           AuthRepositoryProvider.repository = originalAuth
           SignOutProvider.signOut = originalSignOut
+          SpeechRecognizerProvider.reset()
         }
       }
 
@@ -84,5 +89,10 @@ class MainActivityTest {
         WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
         softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST,
     )
+  }
+
+  @Test
+  fun mainActivity_givesThePhonesSpeechRecognizerTheAppsContext() {
+    assertTrue(SpeechRecognizerProvider.recognizer is AndroidSpeechRecognizer)
   }
 }
