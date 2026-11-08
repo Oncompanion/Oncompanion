@@ -175,8 +175,7 @@ private class SpokenWhen(
             .map { (hours, minutes) ->
               hours
                   .map { LocalTime.of(it, minutes) }
-                  .filter { !day.atTime(it).atZone(now.zone).isAfter(now) }
-                  .singleOrNull()
+                  .singleOrNull { !day.atTime(it).atZone(now.zone).isAfter(now) }
             }
             .distinct()
     return date to times.singleOrNull()
