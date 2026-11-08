@@ -113,7 +113,6 @@ class ObserveCarePlanning(
     val entries = this
     return careCircle
         .observeMemberNames(access.ownerUid)
-        .onStart { emit(emptyMap()) }
         .distinctUntilChanged()
         .flatMapLatest { names ->
           entries

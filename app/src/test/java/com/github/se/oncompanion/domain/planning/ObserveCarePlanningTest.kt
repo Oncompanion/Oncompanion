@@ -6,7 +6,6 @@ import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
-import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
@@ -21,9 +20,6 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -246,17 +242,12 @@ class ObserveCarePlanningTest {
   @Test
   fun ownPlanning_neverWaitsForTheCircle() = runTest {
     // Offline, a circle never read before may not answer
-    val silentCircle =
-        object : CareCircleRepository by circle {
-          override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> = flow {
-            awaitCancellation()
-          }
-        }
+    circle.membersNeverAnswer = true
     val observe =
         ObserveCarePlanning(
             ResolveSectionAccess(ResolveCareCircleAccess(auth, circle, profiles), auth),
             planning,
-            silentCircle,
+            circle,
         )
     val added = chemo.copy(addedBy = "bob", addedByName = "Bob")
     planning.items.value = listOf(added)

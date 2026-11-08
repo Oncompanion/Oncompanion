@@ -376,4 +376,23 @@ class AppointmentDetailViewModelTest {
             (followed.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
         )
       }
+
+  @Test
+  fun circleNeverAnswers_thePatientStillSeesTheAppointment_withTheStoredName() =
+      runTest(dispatcher) {
+        // Offline, a circle never read on this device may not answer at all
+        val added = appointment.copy(addedBy = "carol", addedByName = "Carol")
+        auth.signInWithGoogle("patient")
+        repository.seed("uid-patient", added)
+        val circle = FakeCareCircleRepository().apply { membersNeverAnswer = true }
+
+        val vm =
+            AppointmentDetailViewModel("visit", repository, auth, careCircleRepository = circle)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Carol",
+            (vm.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
+      }
 }

@@ -485,10 +485,24 @@ class SymptomDetailViewModelTest {
     repository.seed("alice", addedByBob)
     circle.setMembers("alice", listOf(CareCircleMember(uid = "bob", firstName = "Robert")))
     val vm = viewModel()
+    // The stored name shows first, then the circle's once it is read
+    shadowOf(Looper.getMainLooper()).idle()
 
     assertEquals("Robert", vm.uiState.value.addedByName)
     circle.setMembers("alice", emptyList())
     shadowOf(Looper.getMainLooper()).idle()
+    assertEquals("Bob", vm.uiState.value.addedByName)
+  }
+
+  @Test
+  fun patient_circleNeverAnswers_stillSeesTheSymptom_withTheStoredName() {
+    // Offline, a circle never read on this device may not answer at all
+    repository.seed("alice", addedByBob)
+    circle.membersNeverAnswer = true
+
+    val vm = viewModel()
+
+    assertEquals(addedByBob, vm.uiState.value.entry)
     assertEquals("Bob", vm.uiState.value.addedByName)
   }
 

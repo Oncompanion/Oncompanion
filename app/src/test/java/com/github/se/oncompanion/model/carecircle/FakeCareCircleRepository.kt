@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.model.carecircle
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,9 +21,10 @@ import kotlinx.coroutines.flow.map
  * [CareCircleMembership.Unconfirmed] until taken out of it, like a member document the server
  * hasn't confirmed yet. [updateMember] refuses invalid details and leaves a missing member out,
  * like Firestore's `update`. Test hooks: [setMembers] changes a circle, [unconfirmedMembers]
- * simulates a server that hasn't answered, [observeError], [updateError] and [removeError] make the
- * matching calls fail, [observedOwners] records who was observed, [updated] and [removed] record
- * the writes, and [activeObservations] counts the collections still running.
+ * simulates a server that hasn't answered, [membersNeverAnswer] a circle never read offline,
+ * [observeError], [updateError] and [removeError] make the matching calls fail, [observedOwners]
+ * records who was observed, [updated] and [removed] record the writes, and [activeObservations]
+ * counts the collections still running.
  */
 class FakeCareCircleRepository : CareCircleRepository {
 
@@ -40,6 +42,12 @@ class FakeCareCircleRepository : CareCircleRepository {
     set(value) {
       unconfirmed.value = value
     }
+
+  /**
+   * When true, [observeMembers] emits nothing, like a circle never read on this device while
+   * offline.
+   */
+  var membersNeverAnswer = false
 
   /** When non-null, collecting [observeMembers], [observeMember] or [observeMembership] fails. */
   var observeError: Exception? = null
@@ -78,7 +86,11 @@ class FakeCareCircleRepository : CareCircleRepository {
 
   override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> =
       tracked(ownerUid) {
-        circles.map { circle -> circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME) }
+        if (membersNeverAnswer) flow { awaitCancellation() }
+        else
+            circles.map { circle ->
+              circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME)
+            }
       }
 
   override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> =
