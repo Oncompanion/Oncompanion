@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.symptom
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CaregiverName
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
@@ -153,6 +154,9 @@ class AddSymptomViewModel(
     private val patientUid: String? = null,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
+
+  /** The first name a caregiver's symptom is signed with. */
+  private val caregiverName = CaregiverName(profileRepository, authRepository)
 
   private val _uiState =
       MutableStateFlow(
@@ -305,18 +309,6 @@ class AddSymptomViewModel(
     }
   }
 
-  /**
-   * The caregiver's first name, from their profile (in the local cache, also offline), or else from
-   * their Google account.
-   */
-  private suspend fun caregiverName(uid: String): String =
-      runCatching { profileRepository.observeProfile(uid).first()?.firstName }
-          .getOrNull()
-          ?.takeIf { it.isNotBlank() }
-          ?.take(SymptomEntry.MAX_ADDED_BY_NAME_LENGTH)
-          ?: runCatching { authRepository.currentUser?.firstNameGuess() }.getOrNull()
-          ?: DEFAULT_CAREGIVER_NAME
-
   /** The error has been shown. */
   fun clearError() {
     _uiState.update { it.copy(error = null) }
@@ -349,12 +341,6 @@ class AddSymptomViewModel(
 
   private companion object {
     const val TAG = "AddSymptomViewModel"
-
-    /**
-     * Stored as the name of a caregiver with neither a profile name nor a Google name, which
-     * onboarding prevents: the rules need a name, and the uid still says who it was.
-     */
-    const val DEFAULT_CAREGIVER_NAME = "Caregiver"
   }
 }
 
