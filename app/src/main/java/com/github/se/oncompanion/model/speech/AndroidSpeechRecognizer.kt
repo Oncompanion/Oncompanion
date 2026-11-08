@@ -45,6 +45,9 @@ class AndroidSpeechRecognizer(
   /** The recognizer currently listening, so [stop] can reach it; `null` when not listening. */
   @Volatile private var listening: AndroidRecognizer? = null
 
+  /** Whether the user asked the current session to [stop]. */
+  @Volatile private var stopRequested = false
+
   override fun isAvailable(): Boolean = AndroidRecognizer.isRecognitionAvailable(appContext)
 
   override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = flow {
@@ -59,13 +62,16 @@ class AndroidSpeechRecognizer(
       .flowOn(mainDispatcher)
 
   override fun stop() {
-    listening?.stopListening()
+    val recognizer = listening ?: return
+    stopRequested = true
+    recognizer.stopListening()
   }
 
   /** One listening session with Android's recognizer, destroyed when the flow ends. */
   private fun recognition(language: SpeechLanguage): Flow<SpeechEvent> = callbackFlow {
     val recognizer = AndroidRecognizer.createSpeechRecognizer(appContext)
     listening = recognizer
+    stopRequested = false
     recognizer.setRecognitionListener(
         object : RecognitionListener {
           override fun onReadyForSpeech(params: Bundle?) {
@@ -86,7 +92,12 @@ class AndroidSpeechRecognizer(
           }
 
           override fun onError(error: Int) {
-            trySend(SpeechEvent.Failed(speechErrorOf(error)))
+            // Some phones answer a stop before any speech with a client error: the user stopped
+            // without saying anything, which is not a failure
+            val reason =
+                if (error == AndroidRecognizer.ERROR_CLIENT && stopRequested) SpeechError.NO_SPEECH
+                else speechErrorOf(error)
+            trySend(SpeechEvent.Failed(reason))
             close()
           }
 

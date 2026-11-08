@@ -144,6 +144,37 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun stoppingBeforeSpeakingIsNothingHeardNotAFailure() = runTest {
+    // Some phones end a stop before any speech with ERROR_CLIENT: only after a stop is it silence
+    val cases = listOf(true to SpeechError.NO_SPEECH, false to SpeechError.FAILED)
+    for ((stopped, expected) in cases) {
+      val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
+      val session = startListening(recognizer = recognizer)
+      if (stopped) recognizer.stop()
+
+      android.triggerOnError(AndroidRecognizer.ERROR_CLIENT)
+      runCurrent()
+
+      assertEquals("stopped: $stopped", listOf(SpeechEvent.Failed(expected)), session.events)
+    }
+  }
+
+  @Test
+  fun aStopIsForgottenWhenTheNextSessionStarts() = runTest {
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
+    startListening(recognizer = recognizer)
+    recognizer.stop()
+    android.triggerOnResults(results("tired"))
+    runCurrent()
+
+    val next = startListening(recognizer = recognizer)
+    android.triggerOnError(AndroidRecognizer.ERROR_CLIENT)
+    runCurrent()
+
+    assertEquals(listOf(SpeechEvent.Failed(SpeechError.FAILED)), next.events)
+  }
+
+  @Test
   fun stoppingWhenNotListeningDoesNotCrash() = runTest {
     // The same recognizer, as the app has one: e.g. the user taps Stop twice, or after leaving.
     // Only checks that nothing crashes: Robolectric doesn't record stopListening()
