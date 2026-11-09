@@ -3,6 +3,10 @@
 package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -120,11 +124,13 @@ class WhoseCareScreenTest {
 
   // --- WhoseCareScreen with a view model ---
 
-  private fun viewModelFollowing(vararg patients: Pair<String, String>): WhoseCareViewModel {
+  private fun viewModelFollowing(
+      vararg patients: Pair<String, String>,
+      circles: FakeCareCircleRepository = FakeCareCircleRepository(),
+  ): WhoseCareViewModel {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository()
-    val circles = FakeCareCircleRepository()
     for ((uid, _) in patients) {
       circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
     }
@@ -162,6 +168,42 @@ class WhoseCareScreenTest {
     setScreen(viewModelFollowing(), autoSelectSingle = false)
     composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
     composeTestRule.runOnIdle { assertEquals("no patient", events.first()) }
+  }
+
+  @Test
+  fun screen_aListNotConfirmedYet_staysHere_insteadOfGoingToJoin() {
+    // Joined again while the device still remembers the removal, or a patient that can't be read
+    val cases =
+        listOf<Pair<String, FakeCareCircleRepository.() -> Unit>>(
+            "unconfirmed" to { unconfirmedMembers = setOf("p-anne" to "caregiver") },
+            "unreadable" to { observeError = IllegalStateException("denied") },
+        )
+    var current by mutableStateOf<WhoseCareViewModel?>(null)
+    composeTestRule.setContent {
+      current?.let { viewModel ->
+        key(viewModel) {
+          WhoseCareScreen(
+              viewModel = viewModel,
+              onBack = null,
+              onPatientChosen = { events += "chose ${it.uid}" },
+              onJoinAnother = {},
+              autoSelectSingle = true,
+              onSignedOut = { events += "signed out" },
+              onNoPatient = { events += "no patient" },
+          )
+        }
+      }
+    }
+    for ((name, setUp) in cases) {
+      val viewModel =
+          viewModelFollowing("p-anne" to "Anne", circles = FakeCareCircleRepository().apply(setUp))
+      composeTestRule.runOnIdle {
+        events.clear()
+        current = viewModel
+      }
+      composeTestRule.waitUntil(timeoutMillis = 5_000) { !viewModel.uiState.value.isLoading }
+      composeTestRule.runOnIdle { assertEquals(name, emptyList<String>(), events) }
+    }
   }
 
   @Test

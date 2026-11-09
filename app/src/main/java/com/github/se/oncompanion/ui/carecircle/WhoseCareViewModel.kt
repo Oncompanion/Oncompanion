@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CareCircleMembership
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
@@ -49,12 +50,16 @@ data class FollowedPatient(
  * @property hasError true if it couldn't be loaded; Retry can then work
  * @property isSignedOut true when nobody is signed in anymore (e.g. the session expired): Retry
  *   can't work, the caregiver has to sign in again
+ * @property isConfirmed true when the server confirmed whether the caregiver is in each circle. An
+ *   empty list only means they follow nobody once it is confirmed: right after joining again, the
+ *   device can still remember the removal, and a patient who can't be read isn't known either
  */
 data class WhoseCareUiState(
     val patients: List<FollowedPatient> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     val isSignedOut: Boolean = false,
+    val isConfirmed: Boolean = false,
 )
 
 /**
@@ -98,37 +103,63 @@ class WhoseCareViewModel(
             Log.e(TAG, "Failed to load the followed patients", e)
             _uiState.update { it.copy(isLoading = false, hasError = true) }
           }
-          .collect { patients ->
-            _uiState.update { WhoseCareUiState(patients = patients, isLoading = false) }
+          .collect { answers ->
+            _uiState.update {
+              WhoseCareUiState(
+                  patients =
+                      answers
+                          .filterIsInstance<Answer.Followed>()
+                          .map { it.patient }
+                          .sortedBy { it.firstName.lowercase() },
+                  isLoading = false,
+                  isConfirmed = answers.none { it == Answer.Unknown },
+              )
+            }
           }
     }
   }
 
-  /** Each circle with what its patient shares with [caregiverUid], live, sorted by first name. */
-  private fun followed(circles: List<JoinedCareCircle>, caregiverUid: String) =
+  /** What each circle's patient answers about [caregiverUid], live. */
+  private fun followed(circles: List<JoinedCareCircle>, caregiverUid: String): Flow<List<Answer>> =
       if (circles.isEmpty()) flowOf(emptyList())
-      else
-          combine(circles.map { patientOf(it, caregiverUid) }) { patients ->
-            patients.filterNotNull().sortedBy { it.firstName.lowercase() }
-          }
+      else combine(circles.map { patientOf(it, caregiverUid) }) { it.toList() }
 
   /**
-   * The patient of [circle], or null once they removed the caregiver (their member document is
-   * gone) or if it can't be read: only that patient is left out, not the whole list.
+   * Whether [circle]'s patient still has the caregiver in their circle, with what they share. A
+   * patient whose answer isn't known (not confirmed by the server, or unreadable) is left out of
+   * the list, but doesn't count as a removal.
    */
-  private fun patientOf(circle: JoinedCareCircle, caregiverUid: String): Flow<FollowedPatient?> =
+  private fun patientOf(circle: JoinedCareCircle, caregiverUid: String): Flow<Answer> =
       circleRepository
-          .observeMember(circle.patientUid, caregiverUid)
-          .map { member ->
-            member?.let {
-              FollowedPatient(circle.patientUid, circle.patientFirstName, it.permissions)
+          .observeMembership(circle.patientUid, caregiverUid)
+          .map { membership ->
+            when (membership) {
+              is CareCircleMembership.Member ->
+                  Answer.Followed(
+                      FollowedPatient(
+                          circle.patientUid,
+                          circle.patientFirstName,
+                          membership.member.permissions,
+                      )
+                  )
+              CareCircleMembership.NotMember -> Answer.Removed
+              CareCircleMembership.Unconfirmed -> Answer.Unknown
             }
           }
           .catch { e ->
             if (e is CancellationException) throw e
             Log.w(TAG, "Couldn't read the access to ${circle.patientUid}; left out", e)
-            emit(null)
+            emit(Answer.Unknown)
           }
+
+  /** What one patient answers: still followed, removed the caregiver, or not known yet. */
+  private sealed interface Answer {
+    data class Followed(val patient: FollowedPatient) : Answer
+
+    data object Removed : Answer
+
+    data object Unknown : Answer
+  }
 
   private companion object {
     const val TAG = "WhoseCareViewModel"

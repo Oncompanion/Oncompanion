@@ -51,8 +51,8 @@ import com.github.se.oncompanion.resources.C
  *   the list (when opening the app), rather than when switching on purpose
  * @param onSignedOut called when nobody is signed in anymore (e.g. the session expired), to sign in
  *   again: the list can't be read until then
- * @param onNoPatient called when the caregiver follows nobody anymore (e.g. the only patient
- *   removed them), to join a circle instead of choosing from an empty list
+ * @param onNoPatient called when the server confirmed the caregiver follows nobody anymore (e.g.
+ *   the only patient removed them), to join a circle instead of choosing from an empty list
  */
 @Composable
 fun WhoseCareScreen(
@@ -62,7 +62,7 @@ fun WhoseCareScreen(
     onJoinAnother: () -> Unit,
     autoSelectSingle: Boolean,
     onSignedOut: () -> Unit,
-    onNoPatient: () -> Unit = {},
+    onNoPatient: () -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Signed out: Retry can't work, so the caregiver goes to sign in, as from the join screen
@@ -75,8 +75,11 @@ fun WhoseCareScreen(
       autoSelected = true
       onPatientChosen(single)
     }
-    // Nobody to choose: straight to joining a circle, as when the caregiver signed up
-    if (!uiState.isLoading && !uiState.hasError && uiState.patients.isEmpty()) {
+    // Nobody to choose: straight to joining a circle, as when the caregiver signed up. Only once
+    // the server confirmed it: the device alone can still remember a removal after joining again
+    if (
+        !uiState.isLoading && !uiState.hasError && uiState.isConfirmed && uiState.patients.isEmpty()
+    ) {
       onNoPatient()
     }
   }
