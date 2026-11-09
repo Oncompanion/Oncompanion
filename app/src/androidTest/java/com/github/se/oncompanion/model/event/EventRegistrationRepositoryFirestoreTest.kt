@@ -306,6 +306,9 @@ class EventRegistrationRepositoryFirestoreTest {
     val shared = EventRegistrationRepositoryFirestore()
     shared.confirm(uid, upcomingId)
     awaitRegistered(upcomingId, true, shared)
+    // Accepted before tearDown deletes the event: a rejection here would reach the app-wide count
+    // and show its snackbar over the buttons of a later AppNavHost test
+    awaitSynced()
   }
 
   @Test
