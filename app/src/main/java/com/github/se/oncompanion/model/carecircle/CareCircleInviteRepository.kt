@@ -10,8 +10,9 @@ import kotlinx.coroutines.flow.Flow
  *
  * Writes return right away, without waiting for the server, so they never block the UI: the write
  * is queued on this device and shown at once by reads and listeners, also offline. It reaches the
- * server later; if the server rejects it, Firestore undoes it and the failure is only logged, the
- * caller isn't told.
+ * server later; if the server rejects it, the change is undone on the device and reported through
+ * [com.github.se.oncompanion.model.session.RejectedWrites], which tells the user. [redeem] is the
+ * exception: it needs the server and returns its answer, so it reports nothing.
  */
 interface CareCircleInviteRepository {
 

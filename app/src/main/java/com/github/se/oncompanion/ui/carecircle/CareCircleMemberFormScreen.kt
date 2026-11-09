@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -60,6 +59,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
@@ -215,7 +215,7 @@ private fun NameRow(
     onFamilyNameChange: (String) -> Unit,
 ) {
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    OutlinedTextField(
+    LakeTextField(
         value = uiState.firstName,
         onValueChange = onFirstNameChange,
         enabled = uiState.canEdit,
@@ -226,7 +226,7 @@ private fun NameRow(
         keyboardOptions = nameKeyboard,
         modifier = Modifier.weight(1f).testTag(C.Tag.care_circle_form_first_name),
     )
-    OutlinedTextField(
+    LakeTextField(
         value = uiState.familyName,
         onValueChange = onFamilyNameChange,
         enabled = uiState.canEdit,
@@ -257,7 +257,7 @@ private fun RelationshipField(
       expanded = expanded && enabled,
       onExpandedChange = { expanded = it },
   ) {
-    OutlinedTextField(
+    LakeTextField(
         value = relationship?.let { stringResource(it.label) }.orEmpty(),
         onValueChange = {},
         readOnly = true,
@@ -293,7 +293,7 @@ private fun RelationshipField(
 @Composable
 private fun EmailField(uiState: CareCircleMemberFormUiState, onEmailChange: (String) -> Unit) {
   if (uiState.isEditing && uiState.email.isBlank()) return
-  OutlinedTextField(
+  LakeTextField(
       value = uiState.email,
       onValueChange = onEmailChange,
       enabled = uiState.canEdit && !uiState.isEditing,

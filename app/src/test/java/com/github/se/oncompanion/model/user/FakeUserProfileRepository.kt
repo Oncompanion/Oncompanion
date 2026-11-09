@@ -3,6 +3,8 @@
 
 package com.github.se.oncompanion.model.user
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,13 +26,17 @@ import kotlinx.coroutines.flow.update
  * - [getProfile] returns the stored profile, or null.
  * - [observeProfile] emits the current value, then every change.
  *
- * Test hooks: [getProfileError] and [writeError] simulate unexpected failures, [profiles] exposes a
- * snapshot of the stored data.
+ * Test hooks: [getProfileError] and [writeError] simulate unexpected failures,
+ * [serverRejectsWrites] and [rejectPendingWrites] a server that rejects writes after they returned,
+ * [profiles] exposes a snapshot of the stored data.
  *
  * @param clock source of the `createdAt` timestamp set on creation (the "server time").
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeUserProfileRepository(private val clock: () -> Instant = Instant::now) :
-    UserProfileRepository {
+class FakeUserProfileRepository(
+    private val clock: () -> Instant = Instant::now,
+    rejectedWrites: RejectedWrites = RejectedWrites(),
+) : UserProfileRepository {
 
   private val store = MutableStateFlow<Map<String, UserProfile>>(emptyMap())
 
@@ -42,6 +48,16 @@ class FakeUserProfileRepository(private val clock: () -> Instant = Instant::now)
 
   /** When non-null, [createProfile] and [updateProfile] throw it and store nothing. */
   var writeError: Exception? = null
+
+  private val server = RejectingServer<Map<String, UserProfile>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** Snapshot of the stored profiles, keyed by uid. */
   val profiles: Map<String, UserProfile>
@@ -65,12 +81,14 @@ class FakeUserProfileRepository(private val clock: () -> Instant = Instant::now)
   override suspend fun createProfile(profile: UserProfile) {
     writeError?.let { throw it }
     require(profile.isValid()) { "Invalid profile: $profile" }
+    server.saving(store.value)
     store.update { it + (profile.uid to profile.copy(createdAt = clock())) }
   }
 
   override suspend fun updateProfile(profile: UserProfile) {
     writeError?.let { throw it }
     require(profile.isValid()) { "Invalid profile: $profile" }
+    server.saving(store.value)
     store.update { current ->
       val existing = current[profile.uid] ?: return@update current
       current +

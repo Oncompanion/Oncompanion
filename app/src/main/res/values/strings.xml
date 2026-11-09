@@ -612,4 +612,13 @@
 
     <!-- A change the server rejected and was undone, shown over every screen -->
     <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>
+
+    <!-- Shared day picker, above the selected day -->
+    <string name="day_picker_title">Select date</string>
+
+    <!-- Shared snackbar: closes the message before it goes away on its own -->
+    <string name="snackbar_dismiss">Dismiss</string>
+
+    <!-- Shared text field: what screen readers say about a field in error -->
+    <string name="field_error">Invalid input</string>
 </resources>
