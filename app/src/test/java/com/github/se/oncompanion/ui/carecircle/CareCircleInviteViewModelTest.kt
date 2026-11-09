@@ -12,6 +12,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -348,6 +349,30 @@ class CareCircleInviteViewModelTest {
 
     assertNull(invites.invite(inviteCode))
     assertEquals(CareCircleInviteUiState.Cancelled, viewModel.uiState.value)
+  }
+
+  @Test
+  fun confirmCancel_rejectedLaterByTheServer_bringsTheInviteBackAndTellsTheUser() = runTest {
+    val rejectedWrites = RejectedWrites()
+    invites = FakeCareCircleInviteRepository(circle, rejectedWrites)
+    invites.setInvites(listOf(julie()))
+    invites.serverRejectsWrites = true
+    val viewModel = createViewModel()
+    runCurrent()
+
+    viewModel.askCancel()
+    viewModel.confirmCancel()
+    advanceUntilIdle()
+
+    // Done without waiting for the server
+    assertEquals(CareCircleInviteUiState.Cancelled, viewModel.uiState.value)
+    assertNull(invites.invite(inviteCode))
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    invites.rejectPendingWrites()
+
+    assertEquals(julie(), invites.invite(inviteCode))
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test

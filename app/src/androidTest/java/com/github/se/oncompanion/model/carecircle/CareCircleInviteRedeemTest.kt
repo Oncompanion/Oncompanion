@@ -4,6 +4,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.FirebaseApp
@@ -34,6 +35,7 @@ import org.junit.runner.RunWith
 class CareCircleInviteRedeemTest {
 
   private lateinit var repository: CareCircleInviteRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
   private lateinit var bobUid: String
 
@@ -56,7 +58,8 @@ class CareCircleInviteRedeemTest {
     bobUid = EmulatorTestData.createUser("bob")
     EmulatorTestData.createProfile("CAREGIVER")
     aliceUid = EmulatorTestData.createUser("alice") // alice, the patient, stays signed in
-    repository = CareCircleInviteRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = CareCircleInviteRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -191,13 +194,16 @@ class CareCircleInviteRedeemTest {
   }
 
   @Test
-  fun redeem_byAPatient_isRefusedByTheServer(): Unit = runBlocking {
+  fun redeem_byAPatient_isRefusedByTheServer_andNotReportedAsUndone(): Unit = runBlocking {
     val invite = aliceInvite()
     EmulatorTestData.createUser("dave")
     EmulatorTestData.createProfile("PATIENT")
     val daveUid = FirebaseEmulator.auth.currentUser!!.uid
     val result = withTimeout(20_000) { repository.redeem(invite.inviteCode, daveUid, null) }
     assertEquals(RedeemResult.InvalidOrUsed, result)
+    // The join screen shows the answer, and nothing was saved on the device to undo
+    withTimeout(10_000) { db.waitForPendingWrites().await() }
+    assertEquals("a refused join is not a rejected write", 0, rejectedWrites.unseen.value)
   }
 
   @Test
