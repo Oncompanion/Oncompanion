@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -58,15 +59,20 @@ class ObserveCarePlanning(
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   operator fun invoke(patientUid: String?, range: PlanningRange): Flow<CarePlanning> =
-      resolveSection.withSharedSections(CarePermission.PLANNING, patientUid).flatMapLatest {
-        val access = it.access
-        when (access) {
-          SectionAccess.Loading -> flowOf(CarePlanning.Loading)
-          SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
-          SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
-          is SectionAccess.Readable -> shown(access.ownerUid, range, it.shared)
-        }
-      }
+      resolveSection
+          .withSharedSections(CarePermission.PLANNING, patientUid)
+          // Only the sections Planning reads: sharing another one (Symptoms) must not reload it
+          .map { it.copy(shared = it.shared intersect READ_SECTIONS) }
+          .distinctUntilChanged()
+          .flatMapLatest {
+            val access = it.access
+            when (access) {
+              SectionAccess.Loading -> flowOf(CarePlanning.Loading)
+              SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
+              SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
+              is SectionAccess.Readable -> shown(access.ownerUid, range, it.shared)
+            }
+          }
 
   /**
    * [ownerUid]'s entries of the [shared] sections (a caregiver gets medications and events only
@@ -90,5 +96,9 @@ class ObserveCarePlanning(
 
   private companion object {
     const val TAG = "ObserveCarePlanning"
+
+    /** The sections Planning shows entries of: appointments, medications and events. */
+    val READ_SECTIONS =
+        setOf(CarePermission.PLANNING, CarePermission.PRESCRIPTIONS, CarePermission.EVENTS)
   }
 }

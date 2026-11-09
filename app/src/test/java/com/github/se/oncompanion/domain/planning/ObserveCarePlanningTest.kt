@@ -103,7 +103,26 @@ class ObserveCarePlanningTest {
     auth.signInWithGoogle("alice")
     collect(null)
 
-    assertEquals(listOf<Set<CarePermission>?>(CarePermission.entries.toSet()), planning.sections)
+    assertEquals(
+        listOf(setOf(CarePermission.PLANNING, CarePermission.PRESCRIPTIONS, CarePermission.EVENTS)),
+        planning.sections,
+    )
+  }
+
+  @Test
+  fun caregiver_aSectionPlanningDoesntRead_changesNothing() = runTest {
+    planning.items.value = listOf(chemo)
+    bobSees(CarePermission.PLANNING)
+    auth.signInWithGoogle("bob")
+    val emissions = collect("alice")
+    val before = emissions.toList()
+
+    // Alice also shares her symptoms, which Planning doesn't show: no reload, no Loading
+    bobSees(CarePermission.PLANNING, CarePermission.SYMPTOMS)
+    runCurrent()
+
+    assertEquals(before, emissions)
+    assertEquals(listOf(setOf(CarePermission.PLANNING)), planning.sections)
   }
 
   @Test
@@ -116,7 +135,7 @@ class ObserveCarePlanningTest {
     runCurrent()
 
     assertEquals(
-        listOf<Set<CarePermission>?>(
+        listOf(
             setOf(CarePermission.PLANNING),
             setOf(CarePermission.PLANNING, CarePermission.EVENTS),
         ),
