@@ -23,9 +23,9 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1708957521,
+      "seed": 2132480061,
       "version": 1,
-      "versionNonce": 1679116189,
+      "versionNonce": 346094056,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -52,9 +52,9 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1725048951,
+      "seed": 588093311,
       "version": 1,
-      "versionNonce": 1193309984,
+      "versionNonce": 1849076401,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -81,9 +81,9 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1540910401,
+      "seed": 991070208,
       "version": 1,
-      "versionNonce": 1633982922,
+      "versionNonce": 648200382,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -110,9 +110,9 @@
       "roundness": {
         "type": 3
       },
-      "seed": 649821630,
+      "seed": 1002170859,
       "version": 1,
-      "versionNonce": 996247159,
+      "versionNonce": 51810463,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -120,11 +120,11 @@
       "locked": false
     },
     {
-      "id": "screens",
+      "id": "hospital_ui",
       "type": "rectangle",
       "x": 210,
       "y": 20,
-      "width": 1050,
+      "width": 240,
       "height": 100,
       "angle": 0,
       "strokeColor": "#7048e8",
@@ -146,7 +146,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "screens_t"
+          "id": "hospital_ui_t"
         }
       ],
       "updated": 1794000000000,
@@ -154,11 +154,11 @@
       "locked": false
     },
     {
-      "id": "screens_t",
+      "id": "hospital_ui_t",
       "type": "text",
-      "x": 373.65,
+      "x": 196.35,
       "y": 47.5,
-      "width": 722.7,
+      "width": 267.3,
       "height": 45.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -179,29 +179,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "AppointmentFormScreen (add/edit) · AppointmentDetailScreen (+ ViewModels)\nconfirmed deletion · sign-out → sign-in · retry load failures",
-      "originalText": "AppointmentFormScreen (add/edit) · AppointmentDetailScreen (+ ViewModels)\nconfirmed deletion · sign-out → sign-in · retry load failures",
+      "text": "HospitalField (+ ViewModel)\nui/common",
+      "originalText": "HospitalField (+ ViewModel)\nui/common",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "screens",
+      "containerId": "hospital_ui",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "for_patient",
+      "id": "screens",
       "type": "rectangle",
-      "x": 1290,
+      "x": 480,
       "y": 20,
-      "width": 240,
+      "width": 1050,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#7048e8",
+      "backgroundColor": "#e5dbff",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -216,7 +216,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "for_patient_t"
+          "id": "screens_t"
         }
       ],
       "updated": 1794000000000,
@@ -224,14 +224,14 @@
       "locked": false
     },
     {
-      "id": "for_patient_t",
+      "id": "screens_t",
       "type": "text",
-      "x": 1293.125,
-      "y": 38.125,
-      "width": 233.75000000000003,
-      "height": 63.75,
+      "x": 643.65,
+      "y": 47.5,
+      "width": 722.7,
+      "height": 45.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -249,29 +249,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Add, edit, delete for\nthe patient (US-41, #341)\n(planned)",
-      "originalText": "Add, edit, delete for\nthe patient (US-41, #341)\n(planned)",
-      "fontSize": 17,
+      "text": "AppointmentFormScreen (add/edit) · AppointmentDetailScreen (+ ViewModels)\nconfirmed deletion · sign-out → sign-in · retry load failures",
+      "originalText": "AppointmentFormScreen (add/edit) · AppointmentDetailScreen (+ ViewModels)\nconfirmed deletion · sign-out → sign-in · retry load failures",
+      "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "for_patient",
+      "containerId": "screens",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "hospital_ui",
+      "id": "for_patient",
       "type": "rectangle",
       "x": 1560,
       "y": 20,
       "width": 240,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#7048e8",
-      "backgroundColor": "#e5dbff",
+      "strokeColor": "#868e96",
+      "backgroundColor": "#ffffff",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -286,7 +286,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "hospital_ui_t"
+          "id": "for_patient_t"
         }
       ],
       "updated": 1794000000000,
@@ -294,14 +294,14 @@
       "locked": false
     },
     {
-      "id": "hospital_ui_t",
+      "id": "for_patient_t",
       "type": "text",
-      "x": 1546.35,
-      "y": 47.5,
-      "width": 267.3,
-      "height": 45.0,
+      "x": 1563.125,
+      "y": 38.125,
+      "width": 233.75000000000003,
+      "height": 63.75,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -319,20 +319,20 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "HospitalField (+ ViewModel)\nui/common, in the form",
-      "originalText": "HospitalField (+ ViewModel)\nui/common, in the form",
-      "fontSize": 18,
+      "text": "Add, edit, delete for\nthe patient (US-41, #341)\n(planned)",
+      "originalText": "Add, edit, delete for\nthe patient (US-41, #341)\n(planned)",
+      "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "hospital_ui",
+      "containerId": "for_patient",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
       "id": "summary",
       "type": "rectangle",
-      "x": 750,
+      "x": 1020,
       "y": 200,
       "width": 510,
       "height": 100,
@@ -366,7 +366,7 @@
     {
       "id": "summary_t",
       "type": "text",
-      "x": 813.325,
+      "x": 1083.325,
       "y": 218.125,
       "width": 383.35,
       "height": 63.75,
@@ -402,7 +402,7 @@
     {
       "id": "access",
       "type": "rectangle",
-      "x": 1290,
+      "x": 1560,
       "y": 200,
       "width": 240,
       "height": 100,
@@ -436,7 +436,7 @@
     {
       "id": "access_t",
       "type": "text",
-      "x": 1320.9,
+      "x": 1590.9,
       "y": 227.5,
       "width": 178.20000000000002,
       "height": 45.0,
@@ -470,7 +470,7 @@
       "autoResize": true
     },
     {
-      "id": "auth",
+      "id": "hospital",
       "type": "rectangle",
       "x": 210,
       "y": 380,
@@ -496,7 +496,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "auth_t"
+          "id": "hospital_t"
         }
       ],
       "updated": 1794000000000,
@@ -504,12 +504,12 @@
       "locked": false
     },
     {
-      "id": "auth_t",
+      "id": "hospital_t",
       "type": "text",
-      "x": 260.7,
-      "y": 418.75,
-      "width": 138.60000000000002,
-      "height": 22.5,
+      "x": 216.14999999999998,
+      "y": 407.5,
+      "width": 227.70000000000002,
+      "height": 45.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -529,18 +529,18 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "AuthRepository",
-      "originalText": "AuthRepository",
+      "text": "HospitalRepositoryProxy\n+ HospitalProxyClient",
+      "originalText": "HospitalRepositoryProxy\n+ HospitalProxyClient",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "auth",
+      "containerId": "hospital",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "appointments",
+      "id": "auth",
       "type": "rectangle",
       "x": 480,
       "y": 380,
@@ -566,7 +566,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "appointments_t"
+          "id": "auth_t"
         }
       ],
       "updated": 1794000000000,
@@ -574,12 +574,12 @@
       "locked": false
     },
     {
-      "id": "appointments_t",
+      "id": "auth_t",
       "type": "text",
-      "x": 545.55,
-      "y": 407.5,
-      "width": 108.9,
-      "height": 45.0,
+      "x": 530.7,
+      "y": 418.75,
+      "width": 138.60000000000002,
+      "height": 22.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -599,18 +599,18 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Appointment\nRepository",
-      "originalText": "Appointment\nRepository",
+      "text": "AuthRepository",
+      "originalText": "AuthRepository",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "appointments",
+      "containerId": "auth",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "symptoms",
+      "id": "appointments",
       "type": "rectangle",
       "x": 750,
       "y": 380,
@@ -636,7 +636,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "symptoms_t"
+          "id": "appointments_t"
         }
       ],
       "updated": 1794000000000,
@@ -644,11 +644,11 @@
       "locked": false
     },
     {
-      "id": "symptoms_t",
+      "id": "appointments_t",
       "type": "text",
-      "x": 820.5,
+      "x": 815.55,
       "y": 407.5,
-      "width": 99.00000000000001,
+      "width": 108.9,
       "height": 45.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -669,18 +669,18 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Symptom\nRepository",
-      "originalText": "Symptom\nRepository",
+      "text": "Appointment\nRepository",
+      "originalText": "Appointment\nRepository",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "symptoms",
+      "containerId": "appointments",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "medications",
+      "id": "symptoms",
       "type": "rectangle",
       "x": 1020,
       "y": 380,
@@ -706,7 +706,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "medications_t"
+          "id": "symptoms_t"
         }
       ],
       "updated": 1794000000000,
@@ -714,7 +714,7 @@
       "locked": false
     },
     {
-      "id": "medications_t",
+      "id": "symptoms_t",
       "type": "text",
       "x": 1090.5,
       "y": 407.5,
@@ -739,29 +739,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Medication\nRepository",
-      "originalText": "Medication\nRepository",
+      "text": "Symptom\nRepository",
+      "originalText": "Symptom\nRepository",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "medications",
+      "containerId": "symptoms",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "pdf",
+      "id": "medications",
       "type": "rectangle",
       "x": 1290,
       "y": 380,
       "width": 240,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#d3f9d8",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -776,7 +776,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "pdf_t"
+          "id": "medications_t"
         }
       ],
       "updated": 1794000000000,
@@ -784,14 +784,14 @@
       "locked": false
     },
     {
-      "id": "pdf_t",
+      "id": "medications_t",
       "type": "text",
-      "x": 1355.55,
+      "x": 1360.5,
       "y": 407.5,
-      "width": 108.9,
+      "width": 99.00000000000001,
       "height": 45.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -809,29 +809,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "PdfExporter\n(planned)",
-      "originalText": "PdfExporter\n(planned)",
+      "text": "Medication\nRepository",
+      "originalText": "Medication\nRepository",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "pdf",
+      "containerId": "medications",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "hospital",
+      "id": "pdf",
       "type": "rectangle",
       "x": 1560,
       "y": 380,
       "width": 240,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#2f9e44",
-      "backgroundColor": "#d3f9d8",
+      "strokeColor": "#868e96",
+      "backgroundColor": "#ffffff",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -846,7 +846,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "hospital_t"
+          "id": "pdf_t"
         }
       ],
       "updated": 1794000000000,
@@ -854,14 +854,14 @@
       "locked": false
     },
     {
-      "id": "hospital_t",
+      "id": "pdf_t",
       "type": "text",
-      "x": 1566.15,
+      "x": 1625.55,
       "y": 407.5,
-      "width": 227.70000000000002,
+      "width": 108.9,
       "height": 45.0,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -879,18 +879,18 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "HospitalRepositoryProxy\n+ HospitalProxyClient",
-      "originalText": "HospitalRepositoryProxy\n+ HospitalProxyClient",
+      "text": "PdfExporter\n(planned)",
+      "originalText": "PdfExporter\n(planned)",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "hospital",
+      "containerId": "pdf",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "firebase_auth",
+      "id": "proxy",
       "type": "rectangle",
       "x": 210,
       "y": 560,
@@ -916,7 +916,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "firebase_auth_t"
+          "id": "proxy_t"
         }
       ],
       "updated": 1794000000000,
@@ -924,12 +924,12 @@
       "locked": false
     },
     {
-      "id": "firebase_auth_t",
+      "id": "proxy_t",
       "type": "text",
-      "x": 265.65,
-      "y": 598.75,
-      "width": 128.70000000000002,
-      "height": 22.5,
+      "x": 217.8,
+      "y": 578.125,
+      "width": 224.4,
+      "height": 63.75,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -949,22 +949,22 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Firebase Auth",
-      "originalText": "Firebase Auth",
-      "fontSize": 18,
+      "text": "Hospital search proxy\ncache + quotas + limiter\n(not deployed)",
+      "originalText": "Hospital search proxy\ncache + quotas + limiter\n(not deployed)",
+      "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "firebase_auth",
+      "containerId": "proxy",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "firestore",
+      "id": "firebase_auth",
       "type": "rectangle",
       "x": 480,
       "y": 560,
-      "width": 780,
+      "width": 240,
       "height": 100,
       "angle": 0,
       "strokeColor": "#495057",
@@ -986,7 +986,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "firestore_t"
+          "id": "firebase_auth_t"
         }
       ],
       "updated": 1794000000000,
@@ -994,12 +994,12 @@
       "locked": false
     },
     {
-      "id": "firestore_t",
+      "id": "firebase_auth_t",
       "type": "text",
-      "x": 612.5999999999999,
-      "y": 587.5,
-      "width": 514.8000000000001,
-      "height": 45.0,
+      "x": 535.65,
+      "y": 598.75,
+      "width": 128.70000000000002,
+      "height": 22.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1019,29 +1019,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Cloud Firestore\n/users/{uid}/appointments · symptoms · prescriptions",
-      "originalText": "Cloud Firestore\n/users/{uid}/appointments · symptoms · prescriptions",
+      "text": "Firebase Auth",
+      "originalText": "Firebase Auth",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "firestore",
+      "containerId": "firebase_auth",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "android_pdf",
+      "id": "firestore",
       "type": "rectangle",
-      "x": 1290,
+      "x": 750,
       "y": 560,
-      "width": 240,
+      "width": 780,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
+      "strokeColor": "#495057",
+      "backgroundColor": "#e9ecef",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1056,7 +1056,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "android_pdf_t"
+          "id": "firestore_t"
         }
       ],
       "updated": 1794000000000,
@@ -1064,14 +1064,14 @@
       "locked": false
     },
     {
-      "id": "android_pdf_t",
+      "id": "firestore_t",
       "type": "text",
-      "x": 1349.225,
-      "y": 578.125,
-      "width": 121.55000000000001,
-      "height": 63.75,
+      "x": 882.5999999999999,
+      "y": 587.5,
+      "width": 514.8000000000001,
+      "height": 45.0,
       "angle": 0,
-      "strokeColor": "#868e96",
+      "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -1089,29 +1089,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Android PDF\n+ share sheet\n(planned)",
-      "originalText": "Android PDF\n+ share sheet\n(planned)",
-      "fontSize": 17,
+      "text": "Cloud Firestore\n/users/{uid}/appointments · symptoms · prescriptions",
+      "originalText": "Cloud Firestore\n/users/{uid}/appointments · symptoms · prescriptions",
+      "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "android_pdf",
+      "containerId": "firestore",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "proxy",
+      "id": "android_pdf",
       "type": "rectangle",
       "x": 1560,
       "y": 560,
       "width": 240,
       "height": 100,
       "angle": 0,
-      "strokeColor": "#495057",
-      "backgroundColor": "#e9ecef",
+      "strokeColor": "#868e96",
+      "backgroundColor": "#ffffff",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1126,7 +1126,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "proxy_t"
+          "id": "android_pdf_t"
         }
       ],
       "updated": 1794000000000,
@@ -1134,14 +1134,14 @@
       "locked": false
     },
     {
-      "id": "proxy_t",
+      "id": "android_pdf_t",
       "type": "text",
-      "x": 1567.8,
+      "x": 1619.225,
       "y": 578.125,
-      "width": 224.4,
+      "width": 121.55000000000001,
       "height": 63.75,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -1159,29 +1159,29 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Hospital search proxy\ncache + quotas + limiter\n(not deployed)",
-      "originalText": "Hospital search proxy\ncache + quotas + limiter\n(not deployed)",
+      "text": "Android PDF\n+ share sheet\n(planned)",
+      "originalText": "Android PDF\n+ share sheet\n(planned)",
       "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "proxy",
+      "containerId": "android_pdf",
       "lineHeight": 1.25,
       "autoResize": true
     },
     {
-      "id": "screens_auth",
+      "id": "screens_hospital",
       "type": "arrow",
-      "x": 330.0,
-      "y": 120,
-      "width": 0.0,
-      "height": 260,
+      "x": 480,
+      "y": 70.0,
+      "width": 30,
+      "height": 0.0,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "solid",
+      "strokeStyle": "dotted",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1203,8 +1203,8 @@
           0
         ],
         [
-          0.0,
-          260
+          -30,
+          0.0
         ]
       ],
       "lastCommittedPoint": null,
@@ -1216,15 +1216,15 @@
         "gap": 4
       },
       "endBinding": {
-        "elementId": "auth",
+        "elementId": "hospital_ui",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "screens_appointments",
+      "id": "hospital_ui_hospital",
       "type": "arrow",
-      "x": 600.0,
+      "x": 330.0,
       "y": 120,
       "width": 0.0,
       "height": 260,
@@ -1263,29 +1263,29 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "screens",
+        "elementId": "hospital_ui",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "appointments",
+        "elementId": "hospital",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "screens_summary",
+      "id": "screens_auth",
       "type": "arrow",
-      "x": 870.0,
+      "x": 600.0,
       "y": 120,
       "width": 0.0,
-      "height": 80,
+      "height": 260,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1308,7 +1308,7 @@
         ],
         [
           0.0,
-          80
+          260
         ]
       ],
       "lastCommittedPoint": null,
@@ -1320,18 +1320,18 @@
         "gap": 4
       },
       "endBinding": {
-        "elementId": "summary",
+        "elementId": "auth",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "screens_access",
+      "id": "screens_appointments",
       "type": "arrow",
-      "x": 1260,
+      "x": 870.0,
       "y": 120,
-      "width": 70,
-      "height": 80,
+      "width": 0.0,
+      "height": 260,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
@@ -1359,8 +1359,8 @@
           0
         ],
         [
-          70,
-          80
+          0.0,
+          260
         ]
       ],
       "lastCommittedPoint": null,
@@ -1372,15 +1372,15 @@
         "gap": 4
       },
       "endBinding": {
-        "elementId": "access",
+        "elementId": "appointments",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "for_patient_access",
+      "id": "screens_summary",
       "type": "arrow",
-      "x": 1460.0,
+      "x": 1140.0,
       "y": 120,
       "width": 0.0,
       "height": 80,
@@ -1419,29 +1419,29 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "for_patient",
+        "elementId": "screens",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "access",
+        "elementId": "summary",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "summary_appointments",
+      "id": "screens_access",
       "type": "arrow",
-      "x": 790,
-      "y": 300,
-      "width": 110,
+      "x": 1530,
+      "y": 120,
+      "width": 70,
       "height": 80,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1463,7 +1463,7 @@
           0
         ],
         [
-          -110,
+          70,
           80
         ]
       ],
@@ -1471,21 +1471,21 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "summary",
+        "elementId": "screens",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "appointments",
+        "elementId": "access",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "summary_symptoms",
+      "id": "for_patient_access",
       "type": "arrow",
-      "x": 870.0,
-      "y": 300,
+      "x": 1730.0,
+      "y": 120,
       "width": 0.0,
       "height": 80,
       "angle": 0,
@@ -1523,18 +1523,70 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "summary",
+        "elementId": "for_patient",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "symptoms",
+        "elementId": "access",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "summary_medications",
+      "id": "summary_appointments",
+      "type": "arrow",
+      "x": 1060,
+      "y": 300,
+      "width": 110,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 279172787,
+      "version": 1,
+      "versionNonce": 260573196,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -110,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "summary",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "appointments",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "summary_symptoms",
       "type": "arrow",
       "x": 1140.0,
       "y": 300,
@@ -1553,9 +1605,61 @@
       "roundness": {
         "type": 2
       },
-      "seed": 279172787,
+      "seed": 1329753548,
       "version": 1,
-      "versionNonce": 260573196,
+      "versionNonce": 1914012529,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "summary",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "symptoms",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "summary_medications",
+      "type": "arrow",
+      "x": 1410.0,
+      "y": 300,
+      "width": 0.0,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1222328496,
+      "version": 1,
+      "versionNonce": 1656961616,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -1588,7 +1692,7 @@
     {
       "id": "summary_pdf",
       "type": "arrow",
-      "x": 1220,
+      "x": 1490,
       "y": 300,
       "width": 110,
       "height": 80,
@@ -1605,9 +1709,9 @@
       "roundness": {
         "type": 2
       },
-      "seed": 1329753548,
+      "seed": 1490376254,
       "version": 1,
-      "versionNonce": 1914012529,
+      "versionNonce": 96907016,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -1638,113 +1742,9 @@
       }
     },
     {
-      "id": "hospital_ui_hospital",
-      "type": "arrow",
-      "x": 1680.0,
-      "y": 120,
-      "width": 0.0,
-      "height": 260,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 1222328496,
-      "version": 1,
-      "versionNonce": 1656961616,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0.0,
-          260
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "hospital_ui",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "hospital",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "auth_firebase_auth",
+      "id": "hospital_proxy",
       "type": "arrow",
       "x": 330.0,
-      "y": 480,
-      "width": 0.0,
-      "height": 80,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 1490376254,
-      "version": 1,
-      "versionNonce": 96907016,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0.0,
-          80
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "auth",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "firebase_auth",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "appointments_fs",
-      "type": "arrow",
-      "x": 600.0,
       "y": 480,
       "width": 0.0,
       "height": 80,
@@ -1783,20 +1783,20 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "appointments",
+        "elementId": "hospital",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "firestore",
+        "elementId": "proxy",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "symptoms_fs",
+      "id": "auth_firebase_auth",
       "type": "arrow",
-      "x": 870.0,
+      "x": 600.0,
       "y": 480,
       "width": 0.0,
       "height": 80,
@@ -1835,20 +1835,20 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "symptoms",
+        "elementId": "auth",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "firestore",
+        "elementId": "firebase_auth",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "medications_fs",
+      "id": "appointments_fs",
       "type": "arrow",
-      "x": 1140.0,
+      "x": 870.0,
       "y": 480,
       "width": 0.0,
       "height": 80,
@@ -1887,7 +1887,7 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "medications",
+        "elementId": "appointments",
         "focus": 0,
         "gap": 4
       },
@@ -1898,9 +1898,9 @@
       }
     },
     {
-      "id": "pdf_android_pdf",
+      "id": "symptoms_fs",
       "type": "arrow",
-      "x": 1410.0,
+      "x": 1140.0,
       "y": 480,
       "width": 0.0,
       "height": 80,
@@ -1909,7 +1909,7 @@
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
-      "strokeStyle": "dotted",
+      "strokeStyle": "solid",
       "roughness": 0,
       "opacity": 100,
       "groupIds": [],
@@ -1939,20 +1939,20 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "pdf",
+        "elementId": "symptoms",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "android_pdf",
+        "elementId": "firestore",
         "focus": 0,
         "gap": 4
       }
     },
     {
-      "id": "hospital_proxy",
+      "id": "medications_fs",
       "type": "arrow",
-      "x": 1680.0,
+      "x": 1410.0,
       "y": 480,
       "width": 0.0,
       "height": 80,
@@ -1991,12 +1991,64 @@
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "startBinding": {
-        "elementId": "hospital",
+        "elementId": "medications",
         "focus": 0,
         "gap": 4
       },
       "endBinding": {
-        "elementId": "proxy",
+        "elementId": "firestore",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "pdf_android_pdf",
+      "type": "arrow",
+      "x": 1680.0,
+      "y": 480,
+      "width": 0.0,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1708957521,
+      "version": 1,
+      "versionNonce": 1679116189,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "pdf",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "android_pdf",
         "focus": 0,
         "gap": 4
       }
@@ -2019,9 +2071,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 2132480061,
+      "seed": 714537755,
       "version": 1,
-      "versionNonce": 346094056,
+      "versionNonce": 1929245187,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2055,9 +2107,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 714537755,
+      "seed": 1725048951,
       "version": 1,
-      "versionNonce": 1929245187,
+      "versionNonce": 1193309984,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2091,9 +2143,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 588093311,
+      "seed": 1195809358,
       "version": 1,
-      "versionNonce": 1849076401,
+      "versionNonce": 1783684942,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2127,9 +2179,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 1195809358,
+      "seed": 1540910401,
       "version": 1,
-      "versionNonce": 1783684942,
+      "versionNonce": 1633982922,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2163,9 +2215,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 991070208,
+      "seed": 356416555,
       "version": 1,
-      "versionNonce": 648200382,
+      "versionNonce": 756849393,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2199,9 +2251,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 356416555,
+      "seed": 649821630,
       "version": 1,
-      "versionNonce": 756849393,
+      "versionNonce": 996247159,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2235,9 +2287,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 1002170859,
+      "seed": 2082899072,
       "version": 1,
-      "versionNonce": 51810463,
+      "versionNonce": 783156688,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2271,9 +2323,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 2082899072,
+      "seed": 1128488134,
       "version": 1,
-      "versionNonce": 783156688,
+      "versionNonce": 1210883261,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2307,9 +2359,9 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 1128488134,
+      "seed": 17581914,
       "version": 1,
-      "versionNonce": 1210883261,
+      "versionNonce": 625675343,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -2331,7 +2383,7 @@
       "x": 20,
       "y": 700,
       "width": 1804,
-      "height": 45.0,
+      "height": 67.5,
       "angle": 0,
       "strokeColor": "#495057",
       "backgroundColor": "transparent",
@@ -2343,16 +2395,16 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 17581914,
+      "seed": 1799361520,
       "version": 1,
-      "versionNonce": 625675343,
+      "versionNonce": 1585932014,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "A caregiver sees the patient's appointment read-only when the patient shares Planning (ObserveCareSection); adding, editing and\ndeleting for the patient come with US-41 and #341. The summary only reports what the patient logged, and the patient chooses what goes in it.",
-      "originalText": "A caregiver sees the patient's appointment read-only when the patient shares Planning (ObserveCareSection); adding, editing and\ndeleting for the patient come with US-41 and #341. The summary only reports what the patient logged, and the patient chooses what goes in it.",
+      "text": "The form doesn't use HospitalField yet: searching a hospital there is planned. A caregiver sees the patient's appointment read-only\nwhen the patient shares Planning (ObserveCareSection); adding, editing and deleting for the patient come with US-41 and #341.\nThe summary only reports what the patient logged, and the patient chooses what goes in it.",
+      "originalText": "The form doesn't use HospitalField yet: searching a hospital there is planned. A caregiver sees the patient's appointment read-only\nwhen the patient shares Planning (ObserveCareSection); adding, editing and deleting for the patient come with US-41 and #341.\nThe summary only reports what the patient logged, and the patient chooses what goes in it.",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "left",
