@@ -24,6 +24,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.ui.SMALL_PHONE
+import com.github.se.oncompanion.ui.assertNoWordIsCut
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import org.junit.Assert.assertEquals
@@ -31,9 +33,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** [LakeSnackbar]'s action, as the Figma "Snackbar" (Shared patterns) draws it. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LakeSnackbarTest {
 
   @get:Rule val composeTestRule = createComposeRule()
@@ -42,8 +47,8 @@ class LakeSnackbarTest {
   private lateinit var typography: Typography
   private var result: SnackbarResult? = null
 
-  /** A snackbar with a Retry action, and a close button when [withDismissAction]. */
-  private fun showWithRetry(withDismissAction: Boolean = false) {
+  /** A snackbar with a [action] such as Retry, and a close button when [withDismissAction]. */
+  private fun showWithRetry(withDismissAction: Boolean = false, action: String = "Retry") {
     composeTestRule.setContent {
       OncompanionTheme {
         colors = MaterialTheme.colorScheme
@@ -53,7 +58,7 @@ class LakeSnackbarTest {
           result =
               hostState.showSnackbar(
                   MESSAGE,
-                  actionLabel = "Retry",
+                  actionLabel = action,
                   withDismissAction = withDismissAction,
                   duration = SnackbarDuration.Long,
               )
@@ -96,8 +101,27 @@ class LakeSnackbarTest {
     assertTrue(retry().getUnclippedBoundsInRoot().right <= close.getUnclippedBoundsInRoot().left)
   }
 
+  // On a narrow phone at 200%, a long action beside the message would leave it a few letters a line
+  @Test
+  @Config(qualifiers = SMALL_PHONE, fontScale = 2f)
+  fun aLongAction_atLargeFont_leavesTheMessageAndTheActionReadable() {
+    showWithRetry(withDismissAction = true, action = LONG_ACTION)
+
+    for (text in listOf(MESSAGE, LONG_ACTION)) {
+      composeTestRule.onNodeWithText(text, useUnmergedTree = true).assertNoWordIsCut()
+    }
+    val snackbar = composeTestRule.onNodeWithTag(SNACKBAR).getUnclippedBoundsInRoot()
+    val action = composeTestRule.onNode(hasText(LONG_ACTION) and hasClickAction())
+    val bounds = action.getUnclippedBoundsInRoot()
+    assertTrue(
+        "the action is inside",
+        bounds.left >= snackbar.left && bounds.right <= snackbar.right,
+    )
+  }
+
   private companion object {
     const val SNACKBAR = "snackbar"
     const val MESSAGE = "Couldn't sign in with Google. Please try again."
+    const val LONG_ACTION = "Try again later"
   }
 }

@@ -30,6 +30,22 @@ fun SemanticsNodeInteraction.assertTextStyle(expected: TextStyle, color: Color) 
 }
 
 /**
+ * Fails unless this text breaks its lines only between words: a word cut in two means its row left
+ * it too little room to read. Find the text with `useUnmergedTree = true`.
+ */
+fun SemanticsNodeInteraction.assertNoWordIsCut() {
+  val layouts = mutableListOf<TextLayoutResult>()
+  checkNotNull(fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action)
+      .invoke(layouts)
+  val layout = layouts.single()
+  val text = layout.layoutInput.text.text
+  for (line in 0 until layout.lineCount - 1) {
+    val end = layout.getLineEnd(line)
+    assertTrue("\"$text\" is cut after \"${text.take(end)}\"", text[end - 1].isWhitespace())
+  }
+}
+
+/**
  * The color drawn at ([x], [y]) from this node's top left corner. The test needs
  * `@GraphicsMode(GraphicsMode.Mode.NATIVE)` to draw real pixels.
  */
