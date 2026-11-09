@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** The patient a caregiver chose in "Whose care?", whose care the app then shows. */
@@ -30,8 +31,8 @@ data class ChosenPatient(val uid: String, val firstName: String)
  * the choice survives Android stopping the app in the background.
  *
  * It also follows the caregiver's access to the chosen patient: once the patient removes them from
- * their circle, it leaves caregiver mode and raises [lostAccess], so the app stops showing a screen
- * that can no longer read anything.
+ * their circle, it leaves caregiver mode and raises [lostAccess] with their first name, so the app
+ * stops showing a screen that can no longer read anything and tells the caregiver why.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CaregiverModeViewModel(
@@ -50,13 +51,13 @@ class CaregiverModeViewModel(
   /** The chosen patient, or `null` in patient mode. */
   val patient: StateFlow<ChosenPatient?> = _patient.asStateFlow()
 
-  private val _lostAccess = MutableStateFlow(false)
+  private val _lostAccess = MutableStateFlow<String?>(null)
 
   /**
-   * True once the chosen patient removed the caregiver from their circle, until the app has taken
-   * them back to choosing whose care to follow ([accessLossHandled]).
+   * The first name of the chosen patient once they removed the caregiver from their circle, until
+   * the app has taken them back to choosing whose care to follow ([accessLossHandled]); else null.
    */
-  val lostAccess: StateFlow<Boolean> = _lostAccess.asStateFlow()
+  val lostAccess: StateFlow<String?> = _lostAccess.asStateFlow()
 
   init {
     viewModelScope.launch {
@@ -68,6 +69,7 @@ class CaregiverModeViewModel(
                     // Signing out also denies the access, but that is not a removal: sign-out
                     // handles it
                     .filter { it == CareAccess.Denied && auth.currentUser != null }
+                    .map { patient }
                     // Only this patient's follow ends: the next patient chosen is still followed
                     .catch { e ->
                       if (e is CancellationException) throw e
@@ -79,16 +81,16 @@ class CaregiverModeViewModel(
                       )
                     }
           }
-          .collect {
+          .collect { removedBy ->
             leave()
-            _lostAccess.value = true
+            _lostAccess.value = removedBy.firstName
           }
     }
   }
 
   /** The app took the caregiver back to choosing whose care to follow after [lostAccess]. */
   fun accessLossHandled() {
-    _lostAccess.value = false
+    _lostAccess.value = null
   }
 
   /** Shows [patient]'s care from now on, until another patient is chosen or [leave]. */

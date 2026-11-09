@@ -62,6 +62,41 @@ class WhoseCareScreenTest {
   }
 
   @Test
+  fun content_removedFromACircle_saysWho_thenGoesAway() {
+    // A patient with no first name stored is still named in the message, without "''s"
+    var removedFrom by mutableStateOf<String?>("Anne")
+    composeTestRule.setContent {
+      WhoseCareContent(
+          uiState = WhoseCareUiState(patients = listOf(paul), isLoading = false),
+          onBack = null,
+          onPatientClick = {},
+          onJoinAnother = { events += "join" },
+          onRetry = {},
+          removedFrom = removedFrom,
+          onRemovalShown = {
+            events += "shown $removedFrom"
+            removedFrom = null
+          },
+      )
+    }
+    val cases =
+        listOf(
+            "Anne" to string(R.string.removed_from_circle, "Anne"),
+            "" to string(R.string.removed_from_circle_unnamed),
+        )
+    for ((name, message) in cases) {
+      composeTestRule.runOnIdle { removedFrom = name }
+      composeTestRule.onNodeWithText(message).assertIsDisplayed()
+      // Joining another circle stays reachable
+      node(C.Tag.whose_care_join_another).assertIsDisplayed()
+
+      composeTestRule.mainClock.advanceTimeBy(10_000)
+      composeTestRule.onNodeWithText(message).assertDoesNotExist()
+    }
+    assertEquals(listOf("shown Anne", "shown "), events)
+  }
+
+  @Test
   fun content_loading_showsOnlyTheSpinner() {
     setContent(WhoseCareUiState())
     node(C.Tag.whose_care_loading).assertIsDisplayed()

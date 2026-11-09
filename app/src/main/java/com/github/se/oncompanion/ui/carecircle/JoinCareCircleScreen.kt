@@ -49,6 +49,8 @@ import com.github.se.oncompanion.resources.C
  * @param onOpenProfile opens the profile, from which the caregiver can also sign out
  * @param onSignedOut called when nobody is signed in anymore (e.g. the session expired), to sign in
  *   again: joining can't work until then
+ * @param removedFrom the first name of the patient who just removed the caregiver, to say so
+ * @param onRemovalShown called once that message went away
  */
 @Composable
 fun JoinCareCircleScreen(
@@ -56,6 +58,8 @@ fun JoinCareCircleScreen(
     onDone: () -> Unit,
     onOpenProfile: () -> Unit,
     onSignedOut: () -> Unit,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Signed out: Join can't work, so the caregiver goes to sign in instead of tapping it again
@@ -68,6 +72,8 @@ fun JoinCareCircleScreen(
       onJoin = viewModel::join,
       onDone = onDone,
       onOpenProfile = onOpenProfile,
+      removedFrom = removedFrom,
+      onRemovalShown = onRemovalShown,
   )
 }
 
@@ -80,10 +86,14 @@ fun JoinCareCircleContent(
     onDone: () -> Unit,
     onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   Scaffold(
       // Ends the screen at the keyboard (the activity is adjustResize): Join can be scrolled to
-      modifier = modifier.testTag(C.Tag.join_circle_screen).imePadding()
+      modifier = modifier.testTag(C.Tag.join_circle_screen).imePadding(),
+      // Why the caregiver is here after a removal; as the bottom bar, it never covers Join
+      bottomBar = { RemovedFromCircleSnackbar(removedFrom, onRemovalShown) },
   ) { innerPadding ->
     Column(
         modifier =

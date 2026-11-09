@@ -338,6 +338,8 @@ object C {
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
 
+    const val removed_from_circle_snackbar = "removed_from_circle_snackbar"
+
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
     // Caregiver mode: who added an entry for the patient

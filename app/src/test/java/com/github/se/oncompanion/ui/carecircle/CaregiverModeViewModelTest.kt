@@ -13,9 +13,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -86,19 +84,20 @@ class CaregiverModeViewModelTest {
   }
 
   @Test
-  fun removedByTheChosenPatient_leavesCaregiverMode_untilHandled() {
+  fun removedByTheChosenPatient_leavesCaregiverMode_withTheirName_untilHandled() {
     val savedState = SavedStateHandle()
     val vm = viewModel(savedState)
     vm.choose(patient)
-    assertFalse(vm.lostAccess.value)
+    assertNull(vm.lostAccess.value)
 
     following.removesTheCaregiver()
 
-    assertTrue(vm.lostAccess.value)
+    // With who removed them, so the app can say so
+    assertEquals("Anne", vm.lostAccess.value)
     assertNull(vm.patient.value)
     assertNull(viewModel(savedState).patient.value)
     vm.accessLossHandled()
-    assertFalse(vm.lostAccess.value)
+    assertNull(vm.lostAccess.value)
   }
 
   @Test
@@ -116,7 +115,7 @@ class CaregiverModeViewModelTest {
         )
     for (change in changes) {
       change()
-      assertFalse(vm.lostAccess.value)
+      assertNull(vm.lostAccess.value)
     }
   }
 
@@ -127,7 +126,7 @@ class CaregiverModeViewModelTest {
     val vm = viewModel()
     vm.choose(patient)
 
-    assertFalse(vm.lostAccess.value)
+    assertNull(vm.lostAccess.value)
     assertEquals(ChosenPatient("patient", "Anne"), vm.patient.value)
   }
 
@@ -141,6 +140,6 @@ class CaregiverModeViewModelTest {
     vm.choose(paul)
     following.circle.setMembers(paul.uid, emptyList())
 
-    assertTrue(vm.lostAccess.value)
+    assertEquals("Paul", vm.lostAccess.value)
   }
 }

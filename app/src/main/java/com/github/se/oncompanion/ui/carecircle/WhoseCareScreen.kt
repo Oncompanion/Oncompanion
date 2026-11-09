@@ -53,6 +53,8 @@ import com.github.se.oncompanion.resources.C
  *   again: the list can't be read until then
  * @param onNoPatient called when the server confirmed the caregiver follows nobody anymore (e.g.
  *   the only patient removed them), to join a circle instead of choosing from an empty list
+ * @param removedFrom the first name of the patient who just removed the caregiver, to say so
+ * @param onRemovalShown called once that message went away
  */
 @Composable
 fun WhoseCareScreen(
@@ -63,6 +65,8 @@ fun WhoseCareScreen(
     autoSelectSingle: Boolean,
     onSignedOut: () -> Unit,
     onNoPatient: () -> Unit,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Signed out: Retry can't work, so the caregiver goes to sign in, as from the join screen
@@ -89,6 +93,8 @@ fun WhoseCareScreen(
       onPatientClick = onPatientChosen,
       onJoinAnother = onJoinAnother,
       onRetry = viewModel::load,
+      removedFrom = removedFrom,
+      onRemovalShown = onRemovalShown,
   )
 }
 
@@ -102,9 +108,13 @@ fun WhoseCareContent(
     onJoinAnother: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.whose_care_screen),
+      // Why the caregiver is here after a removal; as the bottom bar, it never covers the list
+      bottomBar = { RemovedFromCircleSnackbar(removedFrom, onRemovalShown) },
       topBar = {
         TopAppBar(
             title = { Text(stringResource(R.string.whose_care_title)) },

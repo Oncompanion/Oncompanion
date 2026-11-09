@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -137,8 +140,11 @@ private fun SessionNavHost(
   // Removed from the chosen patient's circle: the patients still followed, or joining a circle.
   // The list shows even with one left, so the caregiver sees who removed them is gone
   val lostAccess by caregiverMode.lostAccess.collectAsStateWithLifecycle()
+  // Who removed them, until the message saying so went away on the screen they land on
+  var removedFrom by rememberSaveable { mutableStateOf<String?>(null) }
   LaunchedEffect(lostAccess) {
-    if (lostAccess) {
+    lostAccess?.let { firstName ->
+      removedFrom = firstName
       caregiverMode.accessLossHandled()
       navigationActions.navigateAndClearBackStack(Screen.WHOSE_CARE_SWITCH)
     }
@@ -212,6 +218,8 @@ private fun SessionNavHost(
             onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
             onSignedOut = signOut,
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }
@@ -241,6 +249,8 @@ private fun SessionNavHost(
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
             onSignedOut = signOut,
             onNoPatient = { navigationActions.navigateAndClearBackStack(Route.JOIN_CIRCLE) },
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }

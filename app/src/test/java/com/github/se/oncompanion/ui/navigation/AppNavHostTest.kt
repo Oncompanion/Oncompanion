@@ -98,6 +98,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -414,6 +415,8 @@ class AppNavHostTest {
 
     waitForTag(C.Tag.onboarding_role_screen)
     composeTestRule.onNodeWithTag(C.Tag.account_check_screen).assertDoesNotExist()
+    // Back can't return to the account check
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
   }
 
   @Test
@@ -432,11 +435,18 @@ class AppNavHostTest {
 
     waitForTag(C.Tag.join_circle_screen)
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
   }
 
+  private fun removedMessage(firstName: String) =
+      ApplicationProvider.getApplicationContext<Context>()
+          .getString(R.string.removed_from_circle, firstName)
+
   @Test
-  fun caregiverMode_removedByOneOfTwoPatients_listsTheOtherOne() {
-    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+  fun caregiverMode_removedByOneOfTwoPatients_listsTheOtherOne_thenTheLastOneToo() {
+    // Two patients with the same first name: the second removal must be noticed all the same
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-anne-b" to "Anne")
     setNavHost(
         Route.WHOSE_CARE,
         careCircleRepository = circles,
@@ -449,10 +459,21 @@ class AppNavHostTest {
 
     circles.setMembers("p-anne", emptyList())
 
-    // Back to "Whose care?", where only Paul is left, without choosing him for the caregiver
-    waitForTag(C.Tag.whoseCarePatient("p-paul"))
+    // Back to "Whose care?", where only the other one is left, without choosing for the caregiver
+    waitForTag(C.Tag.whoseCarePatient("p-anne-b"))
     composeTestRule.onNodeWithTag(C.Tag.whose_care_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).assertDoesNotExist()
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
+
+    // The last one removes them too: straight to joining a circle
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne-b")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+    circles.setMembers("p-anne-b", emptyList())
+
+    waitForTag(C.Tag.join_circle_screen)
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
   }
 
   @Test
