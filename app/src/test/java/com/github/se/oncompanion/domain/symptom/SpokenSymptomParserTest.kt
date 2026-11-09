@@ -85,6 +85,12 @@ class SpokenSymptomParserTest {
             // A bare number isn't a time, and a time that hasn't come yet is dropped
             Case("headache at 9", listOf(HEADACHE)),
             Case("headache at 3 pm", listOf(HEADACHE)),
+            // A day that can't be placed: no time on today either
+            Case("headache tomorrow at 9 am", listOf(HEADACHE)),
+            Case("headache the day after tomorrow at 9 am", listOf(HEADACHE)),
+            Case("headache Monday at 9 am", listOf(HEADACHE)),
+            Case("headache next week", listOf(HEADACHE)),
+            Case("headache yesterday at 9 am", listOf(HEADACHE), null, yesterday, at(9)),
             // Contradicting times or intensities: not guessed
             Case("yesterday, no, 2 hours ago"),
             Case("2 hours ago or 3 hours ago"),
@@ -165,6 +171,12 @@ class SpokenSymptomParserTest {
             Case("nausées à 13h30", listOf(NAUSEA), time = at(13, 30)),
             Case("nausées à 8 heures du soir hier", listOf(NAUSEA), null, yesterday, at(20)),
             Case("nausées à 15h", listOf(NAUSEA)),
+            // A day that can't be placed: no time on today either
+            Case("nausées demain à 9h", listOf(NAUSEA)),
+            Case("nausées après-demain à 9h", listOf(NAUSEA)),
+            Case("nausées lundi à 9h", listOf(NAUSEA)),
+            Case("nausées la semaine dernière", listOf(NAUSEA)),
+            Case("nausées hier à 9h", listOf(NAUSEA), null, yesterday),
             Case("je ne me sens pas très bien"),
         ),
     )

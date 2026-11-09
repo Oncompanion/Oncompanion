@@ -143,7 +143,8 @@ private fun intensitySaid(words: List<String>, vocabulary: SpokenVocabulary): In
 /**
  * When the symptom was felt, from [words] said at [now]: a duration ago ("2 hours ago"), a day
  * ("yesterday"), a time of day ("at 9 am", "à 15h"), or a day and a time. Vague moments ("this
- * morning") are left empty, as are contradicting ones and times that haven't come yet.
+ * morning") are left empty, as are contradicting ones, times that haven't come yet and any other
+ * day said ("tomorrow", "lundi"), which a time alone would otherwise place on today.
  */
 private class SpokenWhen(
     private val words: List<String>,
@@ -154,6 +155,8 @@ private class SpokenWhen(
   private val daysAgo = mutableListOf<Long>()
   /** The hours each time of day said could be, and its minutes. */
   private val clockTimes = mutableListOf<Pair<List<Int>, Int>>()
+  /** Whether a day other than today or [SpokenVocabulary.daysAgo] was said. */
+  private var otherDay = false
 
   /** The day and time said, each `null` if not said or unclear. */
   fun resolve(): Pair<LocalDate?, LocalTime?> {
@@ -162,7 +165,7 @@ private class SpokenWhen(
     val days = daysAgo.distinct()
     // A duration ago already says the day and time: anything else said contradicts it
     val contradicts = minutesAgo.isNotEmpty() && (days.isNotEmpty() || clockTimes.isNotEmpty())
-    if (minutesAgo.size > 1 || days.size > 1 || contradicts) return null to null
+    if (otherDay || minutesAgo.size > 1 || days.size > 1 || contradicts) return null to null
     minutesAgo.singleOrNull()?.let {
       val at = now.minusMinutes(it).truncatedTo(ChronoUnit.MINUTES)
       return at.toLocalDate() to at.toLocalTime()
@@ -187,6 +190,7 @@ private class SpokenWhen(
       i +=
           readDurationAgo(i).takeIf { it > 0 }
               ?: readDay(i).takeIf { it > 0 }
+              ?: readOtherDay(i).takeIf { it > 0 }
               ?: readClock(i).takeIf { it > 0 }
               ?: 1
     }
@@ -232,6 +236,10 @@ private class SpokenWhen(
     daysAgo += days
     return length
   }
+
+  /** "tomorrow", "lundi": a day that can't be placed. How many words it takes, or 0. */
+  private fun readOtherDay(i: Int): Int =
+      anyAt(words, i, vocabulary.otherDays).also { if (it > 0) otherDay = true }
 
   /**
    * A time of day: "15h30", "3:30 pm", "9 o'clock", "8 heures du soir". A number alone isn't one.

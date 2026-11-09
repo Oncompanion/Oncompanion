@@ -33,6 +33,8 @@ internal typealias Phrase = List<String>
  * @property halfHour half an hour, as one phrase
  * @property minuteUnits, hourUnits the units of a duration
  * @property daysAgo days said by name, with how many days ago they are
+ * @property otherDays days the parser can't place ("tomorrow", "lundi"): when one is said, the day
+ *   and time stay empty rather than default to today
  * @property clockWords what makes a number a time of day ("9 o'clock", "9 heures")
  * @property morning, afternoon what says whether a time is before or after noon
  */
@@ -51,6 +53,7 @@ internal class SpokenVocabulary(
     val minuteUnits: Set<String>,
     val hourUnits: Set<String>,
     daysAgo: Map<String, Long>,
+    otherDays: List<String>,
     clockWords: List<String>,
     morning: List<String>,
     afternoon: List<String>,
@@ -68,6 +71,7 @@ internal class SpokenVocabulary(
       daysAgo
           .map { (phrase, days) -> spokenWords(phrase) to days }
           .sortedByDescending { it.first.size }
+  val otherDays: List<Phrase> = phrases(otherDays)
   val clockWords: List<Phrase> = phrases(clockWords)
   val morning: List<Phrase> = phrases(morning)
   val afternoon: List<Phrase> = phrases(afternoon)
@@ -232,6 +236,19 @@ internal class SpokenVocabulary(
             minuteUnits = setOf("minute", "minutes", "min", "mins"),
             hourUnits = setOf("hour", "hours", "hr", "hrs"),
             daysAgo = mapOf("yesterday" to 1, "day before yesterday" to 2),
+            otherDays =
+                listOf(
+                    "tomorrow",
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                    "next week",
+                    "last week",
+                ),
             clockWords = listOf("o'clock"),
             morning = listOf("am", "in the morning"),
             afternoon = listOf("pm", "in the afternoon", "in the evening", "at night"),
@@ -367,6 +384,19 @@ internal class SpokenVocabulary(
             minuteUnits = setOf("minute", "minutes", "min"),
             hourUnits = setOf("heure", "heures", "h"),
             daysAgo = mapOf("hier" to 1, "avant-hier" to 2),
+            otherDays =
+                listOf(
+                    "demain",
+                    "lundi",
+                    "mardi",
+                    "mercredi",
+                    "jeudi",
+                    "vendredi",
+                    "samedi",
+                    "dimanche",
+                    "semaine prochaine",
+                    "semaine dernière",
+                ),
             clockWords = listOf("h", "heure", "heures"),
             morning = listOf("du matin"),
             afternoon = listOf("de l'après-midi", "du soir"),
