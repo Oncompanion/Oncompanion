@@ -442,7 +442,7 @@ private fun PhotoPreview(
     photo: File,
     photoDispatcher: CoroutineDispatcher,
     modifier: Modifier,
-    dimmed: Boolean = false,
+    dimmed: Boolean,
     below: @Composable ColumnScope.() -> Unit,
 ) {
   Column(

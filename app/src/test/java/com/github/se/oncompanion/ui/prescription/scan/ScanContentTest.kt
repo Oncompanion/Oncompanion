@@ -453,7 +453,7 @@ class ScanContentTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun reading_dimsThePhoto() {
+  fun reading_dimsThePhotoByHalf_untilItIsRead() {
     // A white page, so dimming shows
     val photo =
         temporaryFolder.newFile().apply {
@@ -463,11 +463,11 @@ class ScanContentTest {
                 .compress(Bitmap.CompressFormat.JPEG, 90, it)
           }
         }
-    val reading = mutableStateOf(false)
+    val state = mutableStateOf(granted().copy(photo = photo))
     val dispatcher = StandardTestDispatcher()
     compose.setContent {
       ScanContent(
-          uiState = granted().copy(photo = photo, isReading = reading.value),
+          uiState = state.value,
           onBack = {},
           onEnterManually = {},
           onOpenSettings = {},
@@ -483,10 +483,15 @@ class ScanContentTest {
         }
     val before = photoLuminance()
 
-    reading.value = true
+    state.value = state.value.copy(isReading = true)
     compose.waitForIdle()
+    // Half of the white page, half of the dark screen behind it
+    assertEquals((before + luminance(SurfaceDark)) / 2, photoLuminance(), 0.05)
 
-    assertTrue("before $before, while reading ${photoLuminance()}", photoLuminance() < before)
+    // Back to full brightness for the patient to check it once nothing could be read
+    state.value = state.value.copy(isReading = false, nothingRead = NothingRead.NO_TEXT)
+    compose.waitForIdle()
+    assertEquals(before, photoLuminance(), 0.01)
   }
 
   @Test
