@@ -3,7 +3,6 @@
 
 package com.github.se.oncompanion.ui.common
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,16 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.github.se.oncompanion.ui.theme.Spacing
-import com.github.se.oncompanion.ui.theme.buttonLabel
-import com.github.se.oncompanion.ui.theme.lakeColors
 
 /** The test tags of [DetailActions], declared by each feature in `C.kt`. */
 class DetailActionTags(val edit: String, val delete: String)
@@ -77,22 +70,16 @@ fun DetailActions(
       verticalArrangement = Arrangement.spacedBy(Spacing.sm),
   ) {
     if (onEdit != null)
-        OutlinedButton(
+        LakeButton(
+            text = editLabel,
             onClick = onEdit,
-            border =
-                BorderStroke(LakeButtonDefaults.OutlineWidth, MaterialTheme.colorScheme.outline),
-            colors =
-                ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.lakeColors.primaryText
-                ),
-            contentPadding = LakeButtonDefaults.ContentPadding,
-            modifier = Modifier.fillMaxWidth().lakeButton(enabled = true).testTag(tags.edit),
-        ) {
-          Text(editLabel, style = MaterialTheme.typography.buttonLabel)
-        }
+            style = LakeButtonStyle.Outlined,
+            modifier = Modifier.fillMaxWidth().testTag(tags.edit),
+        )
     if (onDelete != null)
-        LakeTextButton(
+        LakeButton(
             text = deleteLabel,
+            style = LakeButtonStyle.Text,
             onClick = onDelete,
             modifier = Modifier.fillMaxWidth().testTag(tags.delete),
         )

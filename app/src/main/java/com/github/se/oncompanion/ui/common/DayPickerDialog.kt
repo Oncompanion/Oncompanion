@@ -70,7 +70,8 @@ fun DayPickerDialog(
       onDismissRequest = onDismiss,
       colors = colors,
       confirmButton = {
-        LakeTextButton(
+        LakeButton(
+            style = LakeButtonStyle.Text,
             text = confirmLabel,
             onClick = {
               val millis = pickerState.selectedDateMillis
@@ -80,7 +81,8 @@ fun DayPickerDialog(
         )
       },
       dismissButton = {
-        LakeTextButton(
+        LakeButton(
+            style = LakeButtonStyle.Text,
             text = cancelLabel,
             onClick = onDismiss,
             modifier = Modifier.testTag(testTags.cancel),

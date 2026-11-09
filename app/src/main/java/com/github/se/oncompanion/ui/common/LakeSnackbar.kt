@@ -23,12 +23,14 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
- * The Figma "Snackbar": flat (Material's snackbar always casts a shadow, the Figma's doesn't), on
- * Inverse Surface with Medium corners, the message then a close button when it asks for one. No
- * snackbar has an action (e.g. Retry) yet.
+ * The Figma "Snackbar", for a [SnackbarHost]: flat (Material's snackbar always casts a shadow, the
+ * Figma's doesn't), on Inverse Surface with Medium corners: the message, its action when it has one
+ * (e.g. Retry, below the message when it doesn't fit beside it), then a close button when it asks
+ * for one. A snackbar is never the only place to act on something important: it goes away on its
+ * own.
  */
 @Composable
-internal fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
+fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
   val colors = MaterialTheme.colorScheme
   val visuals = data.visuals
   Surface(
@@ -38,15 +40,26 @@ internal fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
       modifier = modifier.fillMaxWidth(),
   ) {
     Row(
-        Modifier.heightIn(min = MIN_HEIGHT)
-            .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.xs),
+        Modifier.heightIn(min = MIN_HEIGHT).padding(start = Spacing.lg, end = Spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text(
-          visuals.message,
-          style = MaterialTheme.typography.bodyMedium,
-          modifier = Modifier.weight(1f).padding(vertical = Spacing.sm),
+      // The Figma's 4 dp above and below go around the message only, so the action keeps the
+      // snackbar's whole 48 dp as its touch target
+      MessageAndAction(
+          message = {
+            Text(
+                visuals.message,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = Spacing.xs),
+            )
+          },
+          action =
+              visuals.actionLabel?.let {
+                { LinkAction(it, colors.inversePrimary, data::performAction) }
+              },
+          gap = Spacing.sm,
+          modifier = Modifier.weight(1f),
       )
       if (visuals.withDismissAction) {
         IconButton(onClick = data::dismiss) {

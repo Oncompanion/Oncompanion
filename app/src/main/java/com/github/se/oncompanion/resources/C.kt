@@ -337,7 +337,6 @@ object C {
 
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
-    const val not_shared_icon = "not_shared_icon"
     // Caregiver mode: who added an entry for the patient
     const val added_by = "added_by"
 
@@ -468,8 +467,11 @@ object C {
     // A change the server rejected and was undone
     const val rejected_write_snackbar = "rejected_write_snackbar"
 
-    // Shared delete confirmation: the spinner while the item is being deleted
-    const val delete_dialog_progress = "delete_dialog_progress"
+    // Shared dialog: the spinner while its action is on its way
+    const val dialog_progress = "dialog_progress"
+
+    // Shared message state: its round info tile
+    const val message_state_icon = "message_state_icon"
 
     // Shared filter chip: the check of a selected chip
     const val filter_chip_check = "filter_chip_check"
