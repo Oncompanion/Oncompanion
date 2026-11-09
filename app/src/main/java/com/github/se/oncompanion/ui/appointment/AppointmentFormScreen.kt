@@ -26,8 +26,6 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.*
-import com.github.se.oncompanion.ui.common.LakeFilterChip
-import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Instant
 import java.time.LocalDate
