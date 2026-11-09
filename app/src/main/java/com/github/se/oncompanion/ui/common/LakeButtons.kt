@@ -3,9 +3,12 @@
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
@@ -16,11 +19,14 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.ui.theme.Spacing
 import com.github.se.oncompanion.ui.theme.buttonLabel
@@ -114,6 +120,30 @@ fun LakeButton(
   }
 }
 
+/**
+ * A short text action inside a banner or a snackbar (e.g. Retry), smaller than a button: Label
+ * Large in [color], 8 dp on each side, and still a full 48 dp touch target.
+ */
+@Composable
+internal fun LinkAction(
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+          modifier
+              .heightIn(min = LINK_ACTION_HEIGHT)
+              .clip(MaterialTheme.shapes.medium)
+              .clickable(role = Role.Button, onClick = onClick)
+              .padding(horizontal = Spacing.sm),
+  ) {
+    Text(label, style = MaterialTheme.typography.labelLarge, color = color)
+  }
+}
+
 /** The small spinner of the Figma (Progress/Circular, Size=Small), in [color]. */
 @Composable
 internal fun SmallSpinner(color: Color, modifier: Modifier = Modifier) {
@@ -123,6 +153,9 @@ internal fun SmallSpinner(color: Color, modifier: Modifier = Modifier) {
       modifier = modifier.size(SMALL_SPINNER_SIZE),
   )
 }
+
+// The touch target of a banner's or snackbar's action
+private val LINK_ACTION_HEIGHT = 48.dp
 
 // The size of a button's leading icon in the Figma
 private val ICON_SIZE = 24.dp

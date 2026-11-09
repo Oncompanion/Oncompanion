@@ -2,9 +2,7 @@
 
 package com.github.se.oncompanion.ui.common
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -17,10 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.ui.theme.Spacing
@@ -80,28 +76,18 @@ fun LakeBanner(
           modifier = Modifier.weight(1f).padding(vertical = Spacing.xs),
       )
       if (actionLabel != null) {
-        // A link-like action, smaller than a button, still a full touch target
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier =
-                Modifier.heightIn(min = MIN_HEIGHT)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable(role = Role.Button, onClick = onAction)
-                    .testTag(actionTestTag)
-                    .padding(horizontal = Spacing.sm),
-        ) {
-          Text(
-              actionLabel,
-              style = MaterialTheme.typography.labelLarge,
-              color = MaterialTheme.lakeColors.primaryText,
-          )
-        }
+        LinkAction(
+            actionLabel,
+            MaterialTheme.lakeColors.primaryText,
+            onAction,
+            Modifier.testTag(actionTestTag),
+        )
       }
     }
   }
 }
 
-// The height of a one-line banner, and of its action, in the Figma
+// The height of a one-line banner in the Figma
 private val MIN_HEIGHT = 48.dp
 
 // The size of the info icon in the Figma
