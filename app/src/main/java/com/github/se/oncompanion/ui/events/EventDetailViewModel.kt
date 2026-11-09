@@ -44,9 +44,11 @@ enum class RegistrationStatus {
   /** The registration couldn't be read or changed. */
   ERROR,
   /**
-   * Nothing is shown about it: the patient a caregiver follows doesn't share Events with them, or
-   * the caregiver has no access to the patient anymore.
+   * The patient a caregiver follows doesn't share Events with them: the page says so, so the
+   * caregiver doesn't take it for "not registered".
    */
+  NOT_SHARED,
+  /** Nothing is shown about it: the caregiver has no access to the patient anymore. */
   HIDDEN,
 }
 
@@ -205,7 +207,7 @@ class EventDetailViewModel(
       // A patient who isn't signed in can't confirm anything
       CareSection.NoAccess ->
           if (patientUid == null) RegistrationStatus.ERROR else RegistrationStatus.HIDDEN
-      CareSection.NotShared -> RegistrationStatus.HIDDEN
+      CareSection.NotShared -> RegistrationStatus.NOT_SHARED
       is CareSection.Failed -> RegistrationStatus.ERROR
       is CareSection.Shown -> {
         val (ownerUid, isRegistered) = section.data

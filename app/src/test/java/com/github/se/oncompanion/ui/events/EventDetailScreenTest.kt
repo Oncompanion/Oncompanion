@@ -21,6 +21,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
@@ -28,6 +29,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.carecircle.label
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -496,9 +498,40 @@ class EventDetailScreenTest {
   }
 
   @Test
-  fun caregiver_eventsNotShared_showsTheEventAndNothingAboutTheRegistration() {
+  fun caregiver_eventsNotShared_saysSo_insteadOfTheRegistration() {
+    setContent(loaded(RegistrationStatus.NOT_SHARED), caregiverOf = "Anne")
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertIsDisplayed()
+    assertTextInside(
+        context.getString(
+            R.string.not_shared_title,
+            "Anne",
+            context.getString(CarePermission.EVENTS.label),
+        ),
+        C.Tag.not_shared,
+    )
+    for (tag in
+        listOf(
+            C.Tag.event_detail_registration_confirmed,
+            C.Tag.event_detail_confirm,
+            C.Tag.event_detail_registration_error,
+        )) {
+      composeTestRule.onNodeWithTag(tag).assertDoesNotExist()
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_eventsNotShared_isFullyVisibleInLandscape() {
+    setContent(loaded(RegistrationStatus.NOT_SHARED), caregiverOf = "Anne")
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).performScrollTo().assertIsFullyVisible()
+  }
+
+  @Test
+  fun caregiver_noAccessAnymore_showsTheEventAndNothingAboutTheRegistration() {
     setContent(loaded(RegistrationStatus.HIDDEN), caregiverOf = "Anne")
 
+    composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.event_detail_event_title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.event_detail_visit_website).assertIsDisplayed()
     for (tag in
