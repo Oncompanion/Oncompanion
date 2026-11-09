@@ -168,6 +168,11 @@ private fun fieldColors(style: BoxStyle) =
         unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurface,
         disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface,
         errorTrailingIconColor = MaterialTheme.colorScheme.onSurface,
+        // The whole field fades when disabled, so its parts keep their enabled colors
+        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        disabledPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        disabledSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
 /**

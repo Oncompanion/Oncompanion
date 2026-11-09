@@ -163,6 +163,28 @@ class LakeTextFieldTest {
     assertSameColor("beside the helper", colors.surface, besideHelper)
   }
 
+  // The whole field fades to 38% when disabled, so its parts mustn't fade again on their own
+  @Test
+  fun disabled_fadesItsPlaceholderAndSuffixOnlyOnce() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        colors = MaterialTheme.colorScheme
+        typography = MaterialTheme.typography
+        LakeTextField(
+            value = "",
+            onValueChange = {},
+            enabled = false,
+            placeholder = { Text("Duration") },
+            suffix = { Text("days") },
+        )
+      }
+    }
+
+    for (part in listOf("Duration", "days")) {
+      text(part).assertTextStyle(typography.bodyLarge, colors.onSurfaceVariant)
+    }
+  }
+
   /** One field per [FORM] case: empty or filled, with or without a helper. */
   private fun setForm() {
     composeTestRule.setContent {
