@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -50,16 +49,16 @@ fun timeOfDayAt(time: LocalTime): TimeOfDay =
  *
  * The illustration is decorative: TalkBack only reads [content].
  *
- * @param time the time whose light the sky shows, the phone's time by default
+ * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
 @Composable
 fun PaperLakeHeader(
+    time: LocalTime,
     modifier: Modifier = Modifier,
-    time: LocalTime = remember { LocalTime.now() },
     content: @Composable BoxScope.() -> Unit = {},
 ) {
   if (isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE) {
-    PaperLakeBand(modifier, time, content)
+    PaperLakeBand(time, modifier, content)
     return
   }
   Box(
@@ -85,12 +84,12 @@ fun PaperLakeHeader(
  * of [time], the Salève at the end and a waterline across the whole width. Decorative, like
  * [PaperLakeHeader].
  *
- * @param time the time whose light the sky shows, the phone's time by default
+ * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
 @Composable
 fun PaperLakeBand(
+    time: LocalTime,
     modifier: Modifier = Modifier,
-    time: LocalTime = remember { LocalTime.now() },
     content: @Composable BoxScope.() -> Unit = {},
 ) {
   Box(
@@ -121,12 +120,12 @@ fun PaperLakeBand(
  * The tall Paper lake of Sign in (Figma "Paper lake scene"): the same lake as [PaperLakeHeader],
  * with a boat, under a sky in the colour of [time]. Decorative.
  *
- * @param time the time whose light the sky shows, the phone's time by default
+ * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
 @Composable
 fun PaperLakeScene(
+    time: LocalTime,
     modifier: Modifier = Modifier,
-    time: LocalTime = remember { LocalTime.now() },
 ) {
   Box(
       modifier
