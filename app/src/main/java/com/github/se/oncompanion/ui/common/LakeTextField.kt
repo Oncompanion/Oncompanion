@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -26,10 +27,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
+import kotlin.math.roundToInt
 
 /**
  * The Figma "Text field": the label inside the box, above the value once there is one, unlike
@@ -182,16 +186,21 @@ private fun fieldColors(style: BoxStyle) =
  * The [label], counted as no taller than the room Material keeps for it once it is small above the
  * value. Inside an empty field the label is as large as the value, and Material would make the box
  * taller for it (60 dp instead of the Figma's 58). This way the box is as tall empty as filled, at
- * any text size, so focusing a field never grows it out of a scrolled view.
+ * any text size, so focusing a field never grows it out of a scrolled view. A label that wraps
+ * (e.g. at a large text size) keeps its full height, so the box grows for it instead of the label
+ * covering the value.
  */
 @Composable
 private fun NoTallerThanSmall(label: @Composable () -> Unit) {
-  val smallLabel =
-      with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.roundToPx() }
+  val density = LocalDensity.current
+  // Material gives the label a style between bodyLarge and bodySmall while it shrinks
+  val line = LocalTextStyle.current.lineHeightPx(density)
+  val smallLabel = with(density) { MaterialTheme.typography.bodySmall.lineHeight.roundToPx() }
   Box(
       Modifier.layout { measurable, constraints ->
         val placeable = measurable.measure(constraints)
-        val height = minOf(placeable.height, smallLabel)
+        val wraps = (placeable.height / line).roundToInt() > 1
+        val height = if (wraps) placeable.height else minOf(placeable.height, smallLabel)
         // Centered on the space it is counted for, so it is drawn where Material places it
         layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
       }
@@ -199,3 +208,10 @@ private fun NoTallerThanSmall(label: @Composable () -> Unit) {
     label()
   }
 }
+
+/**
+ * The height of one line of this style, as Android lays it out: with a large text size the font
+ * grows less than 2x, and the line height keeps its ratio to the font size.
+ */
+private fun TextStyle.lineHeightPx(density: Density): Float =
+    with(density) { fontSize.toPx() } * lineHeight.value / fontSize.value
