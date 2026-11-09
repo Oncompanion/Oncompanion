@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The draft of the care circle member form: what the patient typed and chose, and where saving is.
@@ -234,12 +235,15 @@ class CareCircleMemberFormViewModel(
   /**
    * Who already has [email], from the circle as last read: the duplicate shown may not have caught
    * up with it yet. Waits for the circle's first read (from the cache when offline, so it doesn't
-   * wait for the network), so sending can't skip the check. Never checked when editing or when
-   * nobody is signed in.
+   * wait for the network), so sending can't skip the check, but only for
+   * [FIRST_READ_TIMEOUT_MILLIS]: not being able to check must not stop the invitation. Never
+   * checked when editing or when nobody is signed in.
    */
   private suspend fun duplicateWhenSaving(email: String): EmailAlreadyInCircle? {
     if (duplicateCheck == null) return null
-    val (members, invites) = circle.filterNotNull().first()
+    val (members, invites) =
+        withTimeoutOrNull(FIRST_READ_TIMEOUT_MILLIS) { circle.filterNotNull().first() }
+            ?: return null
     return emailAlreadyInCircle(email, members, invites, clock.instant())
   }
 
@@ -420,5 +424,8 @@ class CareCircleMemberFormViewModel(
 
   private companion object {
     const val TAG = "CareCircleMemberForm"
+
+    /** How long Send waits for the circle's first read before sending without the check. */
+    const val FIRST_READ_TIMEOUT_MILLIS = 3_000L
   }
 }

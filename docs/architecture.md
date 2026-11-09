@@ -358,7 +358,7 @@ There are two emails: `invites/{inviteCode}.email` is where the patient sends th
 
 Known limitations:
 - Revoking access while the patient is offline only takes effect once their phone syncs.
-- The duplicate check can miss someone: two phones can invite the same email at once, and nothing is checked if the circle can't be read, since not being able to check must not stop an invitation. Sending waits for the circle's first read, from the cache when offline. The result is an extra invitation, which the patient can cancel. If the person uses it with the account they already joined with, `AlreadyMember` refuses it; with another Google account, they join as a second member, whom the patient can remove.
+- The duplicate check can miss someone: two phones can invite the same email at once, and nothing is checked if the circle can't be read, since not being able to check must not stop an invitation. Sending waits for the circle's first read, from the cache when offline, for 3 seconds at most: a slower read sends without the check. The result is an extra invitation, which the patient can cancel. If the person uses it with the account they already joined with, `AlreadyMember` refuses it; with another Google account, they join as a second member, whom the patient can remove.
 - If the patient changes their first name, caregivers keep the old one: a patient makes no other writes into caregivers' data, so the new name isn't pushed into each caregiver's `patients` list.
 - Someone with a patient account can't join a circle; they would need to sign in with another Google account.
 - An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.

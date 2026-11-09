@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
@@ -26,6 +27,10 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -512,6 +517,34 @@ class CareCircleMemberFormViewModelTest {
         assertEquals(SavePhase.EDITING, state.save)
         assertFalse(state.saveFailed)
         assertEquals(EmailAlreadyInCircle.PendingInvite("Julie", "INVITEPAUL"), state.duplicate)
+      }
+
+  @Test
+  fun aCircleThatIsNeverRead_holdsUpSendForThreeSecondsAtMost() =
+      runTest(dispatcher) {
+        val neverRead: List<Flow<List<CareCircleMember>>> =
+            listOf(flow { awaitCancellation() }, emptyFlow())
+        for (members in neverRead) {
+          val unread =
+              object : CareCircleRepository by circle {
+                override fun observeMembers(ownerUid: String) = members
+              }
+          val viewModel =
+              CareCircleMemberFormViewModel(invites, profiles, auth, unread, clock = clock)
+          viewModel.fill()
+          val invitesBefore = invites.created.size
+
+          viewModel.save()
+          advanceTimeBy(2_999)
+          runCurrent()
+          assertEquals(SavePhase.SAVING, viewModel.uiState.value.save)
+          assertEquals(invitesBefore, invites.created.size)
+
+          advanceTimeBy(1)
+          runCurrent()
+          assertEquals(SavePhase.SAVED, viewModel.uiState.value.save)
+          assertEquals(invitesBefore + 1, invites.created.size)
+        }
       }
 
   @Test
