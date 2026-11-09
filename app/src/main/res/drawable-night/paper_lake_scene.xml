@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
-<!-- The Paper lake scene of Sign in. The sky is painted behind it in the colour of the time of day (PaperLake.kt), exported from the Figma (page M2) in the dark theme. -->
+<!-- The Paper lake scene of Sign in, exported from the Figma (page M2) in the dark theme: the shapes behind the far
+     water. The sky and the far water are painted in the colours of the time of day
+     (PaperLake.kt), then the front layer is drawn on top. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="166dp"
     android:height="200dp"
@@ -18,31 +20,4 @@
     <path
         android:fillColor="#E3E6E7"
         android:pathData="M116 340C117 290 118.5 240 121 196C130 203 139 218 143 238C136 226 129 216 124.4 212C124 258 124.4 300 125 340H116Z" />
-    <path
-        android:fillColor="#134F5B"
-        android:pathData="M390 336H0V470H390V336Z" />
-    <path
-        android:fillColor="#0E3F49"
-        android:pathData="M390 384H0V470H390V384Z" />
-    <path
-        android:fillColor="#082C33"
-        android:pathData="M390 436H0V470H390V436Z" />
-    <path
-        android:fillColor="#E3E6E7"
-        android:pathData="M283 346H217C215.343 346 214 347.343 214 349C214 350.657 215.343 352 217 352H283C284.657 352 286 350.657 286 349C286 347.343 284.657 346 283 346Z" />
-    <path
-        android:fillColor="#E3E6E7"
-        android:pathData="M269.5 360H230.5C229.119 360 228 361.119 228 362.5C228 363.881 229.119 365 230.5 365H269.5C270.881 365 272 363.881 272 362.5C272 361.119 270.881 360 269.5 360Z" />
-    <path
-        android:fillColor="#E3E6E7"
-        android:pathData="M258 372H242C240.895 372 240 372.895 240 374C240 375.105 240.895 376 242 376H258C259.105 376 260 375.105 260 374C260 372.895 259.105 372 258 372Z" />
-    <path
-        android:fillColor="#B07A55"
-        android:pathData="M270 404V340L304 404H270Z" />
-    <path
-        android:fillColor="#8A5E45"
-        android:pathData="M266 404V356L242 404H266Z" />
-    <path
-        android:fillColor="#3B4448"
-        android:pathData="M236 406H312L302 420H246L236 406Z" />
 </vector>

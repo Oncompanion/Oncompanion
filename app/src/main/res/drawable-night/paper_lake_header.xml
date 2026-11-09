@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
-<!-- The Paper lake header, exported from the Figma (page M2) in the dark theme. The sky is
-     painted behind it in the colour of the time of day (PaperLake.kt). -->
+<!-- The Paper lake header, exported from the Figma (page M2) in the dark theme: the shapes behind the far
+     water. The sky and the far water are painted in the colours of the time of day
+     (PaperLake.kt), then the front layer is drawn on top. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="195dp"
     android:height="105dp"
@@ -23,20 +24,4 @@
     <path
         android:fillColor="#BCC6CB"
         android:pathData="M198,160C198.4,140 199,118 200.5,100C204.5,103 208.5,110 211,120C207.5,114 204.5,110 202.6,108.5C202.4,128 202.6,146 203,160H198Z" />
-    <!-- Water, far -->
-    <path
-        android:fillColor="#134F5B"
-        android:pathData="M390,156H0V210H390V156Z" />
-    <!-- Water, middle -->
-    <path
-        android:fillColor="#0E3F49"
-        android:pathData="M390,176H0V210H390V176Z" />
-    <!-- Water, near -->
-    <path
-        android:fillColor="#082C33"
-        android:pathData="M390,194H0V210H390V194Z" />
-    <!-- Light on the water -->
-    <path
-        android:fillColor="#BCC6CB"
-        android:pathData="M278.5,160H245.5C244.672,160 244,160.672 244,161.5C244,162.328 244.672,163 245.5,163H278.5C279.328,163 280,162.328 280,161.5C280,160.672 279.328,160 278.5,160Z" />
 </vector>

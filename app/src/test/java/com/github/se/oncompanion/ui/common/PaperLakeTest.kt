@@ -20,9 +20,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.theme.Horizon
+import com.github.se.oncompanion.ui.theme.HorizonDawnBottomDark
+import com.github.se.oncompanion.ui.theme.HorizonDawnBottomLight
 import com.github.se.oncompanion.ui.theme.HorizonDawnTopDark
 import com.github.se.oncompanion.ui.theme.HorizonDawnTopLight
+import com.github.se.oncompanion.ui.theme.HorizonDayBottomDark
+import com.github.se.oncompanion.ui.theme.HorizonDayBottomLight
+import com.github.se.oncompanion.ui.theme.HorizonDayTopDark
 import com.github.se.oncompanion.ui.theme.HorizonDayTopLight
+import com.github.se.oncompanion.ui.theme.HorizonDuskBottomDark
+import com.github.se.oncompanion.ui.theme.HorizonDuskBottomLight
 import com.github.se.oncompanion.ui.theme.HorizonDuskTopDark
 import com.github.se.oncompanion.ui.theme.HorizonDuskTopLight
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -76,6 +84,18 @@ class PaperLakeTest {
   }
 
   /** The colour of the sky, in the header's top-left corner. */
+  /** The colour at ([x], [y]) dp in the node tagged [tag]. */
+  private fun pixel(tag: String, x: Float, y: Float): Color {
+    val density = compose.density.density
+    return compose
+        .onNodeWithTag(tag)
+        .captureToImage()
+        .toPixelMap()[(x * density).toInt(), (y * density).toInt()]
+  }
+
+  /** The colour at ([x], [y]) dp in the header. */
+  private fun colorAt(x: Float, y: Float) = pixel(HEADER, x, y)
+
   private fun skyColor(): Color {
     val pixels = compose.onNodeWithTag(HEADER).captureToImage().toPixelMap()
     return pixels[4, 4]
@@ -135,25 +155,40 @@ class PaperLakeTest {
   }
 
   @Test
-  fun sky_followsTheTimeOfDay_inTheLightTheme() {
-    mapOf(
-            "08:00" to HorizonDawnTopLight,
-            "14:00" to HorizonDayTopLight,
-            "21:00" to HorizonDuskTopLight,
+  fun skyAndLake_followTheTimeOfDay_inBothThemes() {
+    // The sky in the top-left corner and the far water just under the mountains' foot, in the
+    // header (210 dp on this 411 dp window); the theme's Horizon gives both, light and dark
+    val cases =
+        listOf(
+            Triple("08:00", false, Horizon(HorizonDawnTopLight, HorizonDawnBottomLight)),
+            Triple("14:00", false, Horizon(HorizonDayTopLight, HorizonDayBottomLight)),
+            Triple("21:00", false, Horizon(HorizonDuskTopLight, HorizonDuskBottomLight)),
+            Triple("08:00", true, Horizon(HorizonDawnTopDark, HorizonDawnBottomDark)),
+            Triple("14:00", true, Horizon(HorizonDayTopDark, HorizonDayBottomDark)),
+            Triple("21:00", true, Horizon(HorizonDuskTopDark, HorizonDuskBottomDark)),
         )
-        .forEach { (time, sky) ->
-          setHeaderFresh(time, darkTheme = false)
-          assertSameColor("sky at $time", sky, skyColor())
-        }
+    cases.forEach { (time, dark, horizon) ->
+      setHeaderFresh(time, darkTheme = dark)
+      val theme = if (dark) "dark" else "light"
+      assertSameColor("sky at $time, $theme", horizon.top, skyColor())
+      assertSameColor("lake at $time, $theme", horizon.bottom, colorAt(20f, FAR_WATER_Y))
+    }
   }
 
   @Test
-  @Config(qualifiers = "night")
-  fun sky_followsTheTimeOfDay_inTheDarkTheme() {
-    mapOf("08:00" to HorizonDawnTopDark, "21:00" to HorizonDuskTopDark).forEach { (time, sky) ->
-      setHeaderFresh(time, darkTheme = true)
-      assertSameColor("sky at $time", sky, skyColor())
+  fun bandAndScene_paintTheirWaterInTheLakeColour() {
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        Column {
+          PaperLakeBand(LocalTime.parse("08:00"), Modifier.testTag("band"))
+          PaperLakeScene(LocalTime.parse("21:00"), Modifier.testTag("scene").width(390.dp))
+        }
+      }
     }
+
+    // The band's waterline is its bottom 4 dp; the scene's far water starts at 336 of 470 dp
+    assertSameColor("band waterline at dawn", HorizonDawnBottomLight, pixel("band", 20f, 98f))
+    assertSameColor("scene water at dusk", HorizonDuskBottomLight, pixel("scene", 20f, 360f))
   }
 
   @Test
@@ -272,6 +307,8 @@ class PaperLakeTest {
 
   private companion object {
     const val HEADER = "paper_lake"
+    // In the header's far water band: under the foothills, above the middle band
+    const val FAR_WATER_Y = 165f
     const val TITLE = "Good morning, Anne"
   }
 }
