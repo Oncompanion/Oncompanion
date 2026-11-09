@@ -62,17 +62,22 @@ class CaregiverModeViewModel(
     viewModelScope.launch {
       _patient
           .flatMapLatest { patient ->
-            if (patient == null) emptyFlow() else resolveAccess(patient.uid)
-          }
-          // Signing out also denies the access, but that is not a removal: sign-out handles it
-          .filter { it == CareAccess.Denied && auth.currentUser != null }
-          .catch { e ->
-            if (e is CancellationException) throw e
-            // Without the access, the screens show their own error; nothing more to do here
-            Log.w(
-                TAG,
-                "Couldn't follow the access to the chosen patient: ${e.javaClass.simpleName}",
-            )
+            if (patient == null) emptyFlow()
+            else
+                resolveAccess(patient.uid)
+                    // Signing out also denies the access, but that is not a removal: sign-out
+                    // handles it
+                    .filter { it == CareAccess.Denied && auth.currentUser != null }
+                    // Only this patient's follow ends: the next patient chosen is still followed
+                    .catch { e ->
+                      if (e is CancellationException) throw e
+                      // Without the access, the screens show their own error; nothing more here
+                      Log.w(
+                          TAG,
+                          "Couldn't follow the access to the chosen patient: " +
+                              e.javaClass.simpleName,
+                      )
+                    }
           }
           .collect {
             leave()

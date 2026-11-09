@@ -107,7 +107,13 @@ class CaregiverModeViewModelTest {
     vm.choose(patient)
 
     // The screens show what isn't shared; sign-out takes the caregiver to sign in
-    val changes = listOf({ following.shares() }, { following.auth.signOut() })
+    // Offline, a membership the server hasn't confirmed isn't a removal either (#204)
+    val changes =
+        listOf(
+            { following.shares() },
+            { following.isUnconfirmed() },
+            { following.auth.signOut() },
+        )
     for (change in changes) {
       change()
       assertFalse(vm.lostAccess.value)
@@ -123,5 +129,18 @@ class CaregiverModeViewModelTest {
 
     assertFalse(vm.lostAccess.value)
     assertEquals(ChosenPatient("patient", "Anne"), vm.patient.value)
+  }
+
+  @Test
+  fun anAccessThatFailedOnce_stillLetsTheNextPatientsRemovalBeNoticed() {
+    following.circle.observeError = IllegalStateException("offline")
+    val vm = viewModel()
+    vm.choose(anne)
+    following.circle.observeError = null
+
+    vm.choose(paul)
+    following.circle.setMembers(paul.uid, emptyList())
+
+    assertTrue(vm.lostAccess.value)
   }
 }
