@@ -33,6 +33,7 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.buttonLabel
 import com.github.se.oncompanion.ui.theme.lakeColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -209,6 +210,21 @@ class DeleteConfirmationDialogTest {
     val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
     assertEquals(confirm.bottom, cancel.top)
     assertEquals(confirm.right, cancel.right)
+  }
+
+  // A Delete label as wide as the dialog left no room for the spinner beside it
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun stackedWhileDeleting_theSpinnerStaysInTheDialog_nextToCancel() {
+    setContent(isDeleting = true, confirmLabel = "Delete this item and all of its notes")
+
+    val dialog = composeTestRule.onNodeWithTag(TAGS.dialog).getUnclippedBoundsInRoot()
+    val spinner =
+        composeTestRule.onNodeWithTag(C.Tag.delete_dialog_progress).getUnclippedBoundsInRoot()
+    val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
+    assertTrue(spinner.left >= dialog.left)
+    assertEquals(cancel.left, spinner.right)
+    assertTrue(spinner.top >= cancel.top && spinner.bottom <= cancel.bottom)
   }
 
   @Test
