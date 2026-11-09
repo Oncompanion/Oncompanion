@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.theme.lakeColors
 
 /** The Empty lake (Figma "Illustration/Empty lake"), above the message of an empty state. */
 @Composable
@@ -150,14 +150,14 @@ private fun boatColors(tone: BoatTone): BoatColors {
         BoatColors(
             scheme.secondaryContainer,
             null,
-            colorResource(R.color.lake_hull),
+            MaterialTheme.lakeColors.hull,
             scheme.onSecondaryContainer,
         )
     BoatTone.DUSK ->
         BoatColors(
             scheme.tertiaryContainer,
             null,
-            colorResource(R.color.lake_hull),
+            MaterialTheme.lakeColors.hull,
             scheme.onTertiaryContainer,
         )
     BoatTone.PENDING ->

@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.github.se.oncompanion.ui.theme.LakeHullDark
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.OutlineLight
 import com.github.se.oncompanion.ui.theme.SecondaryContainerDark
@@ -125,6 +126,8 @@ class LakeIllustrationsTest {
     val scale = 48f / 37.5f
 
     assertSameColor("dark dawn sail", SecondaryContainerDark, colorAt(20f * scale, 24f * scale))
+    // The hull reads on dark water: the theme's hull, not the light theme's ink
+    assertSameColor("dark hull", LakeHullDark, colorAt(17.5f * scale, 34f * scale))
   }
 
   @Test

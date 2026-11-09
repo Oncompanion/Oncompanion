@@ -3,6 +3,4 @@
 <resources>
     <!-- Splash screen background in dark mode: the app's dark surface color -->
     <color name="splash_background">#FF151B1E</color>
-    <!-- The hull of every boat on the lake, drawn or in Compose (LakeIllustrations.kt) -->
-    <color name="lake_hull">#FF3B4448</color>
 </resources>

@@ -10,6 +10,4 @@
     <color name="white">#FFFFFFFF</color>
     <!-- Splash screen background: the app's surface color (Morning on the lake) -->
     <color name="splash_background">#FFFBF8F4</color>
-    <!-- The hull of every boat on the lake, drawn or in Compose (LakeIllustrations.kt) -->
-    <color name="lake_hull">#FF1F2A30</color>
 </resources>
