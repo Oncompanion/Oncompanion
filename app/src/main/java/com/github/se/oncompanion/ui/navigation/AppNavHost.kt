@@ -246,6 +246,8 @@ private fun SessionNavHost(
                 navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
             // Their Overview, in caregiver mode
             onPatientChosen = { patient ->
+              // Chosen while the message showed: it must not come back next time
+              removedFrom = null
               caregiverMode.choose(patient)
               navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
             },
