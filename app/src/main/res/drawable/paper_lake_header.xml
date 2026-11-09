@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Paper lake header, exported from the Figma (page M2): the shapes behind the far
+     water. The sky and the far water are painted in the colours of the time of day
+     (PaperLake.kt), then the front layer is drawn on top. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="195dp"
+    android:height="105dp"
+    android:viewportWidth="390"
+    android:viewportHeight="210">
+    <!-- The sun -->
+    <path
+        android:fillColor="#FBF8F4"
+        android:pathData="M262,170C275.255,170 286,159.255 286,146C286,132.745 275.255,122 262,122C248.745,122 238,132.745 238,146C238,159.255 248.745,170 262,170Z" />
+    <!-- The Saleve -->
+    <path
+        android:fillColor="#C3B5E0"
+        android:pathData="M0,152L40,140L84,146L130,134L172,144L220,124L262,138L304,110L344,128L390,116V158H0V152Z" />
+    <!-- Its foothills -->
+    <path
+        android:fillColor="#A99BD0"
+        android:pathData="M0,158L60,148L120,154L180,144L240,156L300,146L390,152V162H0V158Z" />
+    <!-- The Jet d'eau -->
+    <path
+        android:fillColor="#FBF8F4"
+        android:pathData="M198,160C198.4,140 199,118 200.5,100C204.5,103 208.5,110 211,120C207.5,114 204.5,110 202.6,108.5C202.4,128 202.6,146 203,160H198Z" />
+</vector>
