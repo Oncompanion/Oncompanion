@@ -11,6 +11,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +63,15 @@ fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
       }
     }
   }
+}
+
+/**
+ * Material's [SnackbarHost] showing our [LakeSnackbar], 16 dp from the sides as in the Figma. Every
+ * screen uses it, so their messages look the same.
+ */
+@Composable
+fun LakeSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
+  SnackbarHost(hostState, modifier) { LakeSnackbar(it, Modifier.padding(horizontal = Spacing.lg)) }
 }
 
 // The height of a one-line snackbar in the Figma

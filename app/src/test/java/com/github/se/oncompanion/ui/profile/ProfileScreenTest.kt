@@ -186,7 +186,8 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     composeTestRule.onNodeWithText("Alex Moreau").assertIsDisplayed()
     composeTestRule.onNodeWithText("alex@example.com").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Breast cancer").assertIsDisplayed()
+    // The details scroll above the Figma's 56 dp buttons
+    composeTestRule.onNodeWithText("Breast cancer").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithText("Geneva Hospital").assertIsDisplayed()
   }

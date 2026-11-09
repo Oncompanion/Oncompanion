@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,7 +30,6 @@ import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +48,9 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SignOutDialog
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -162,23 +161,22 @@ fun ProfileContent(
         }
       }
       if (profile is ProfileUiState.Loaded) {
-        Button(
+        LakeButton(
+            text = stringResource(R.string.edit_profile_title),
             onClick = onEdit,
             enabled = !signingOut,
             modifier =
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(C.Tag.profile_edit),
-        ) {
-          Text(stringResource(R.string.edit_profile_title))
-        }
+        )
       }
       if (profile != ProfileUiState.SignedOut && profile != ProfileUiState.SignOutComplete) {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.profile_sign_out),
             onClick = onSignOut,
+            style = LakeButtonStyle.Text,
             enabled = !signingOut,
             modifier = Modifier.fillMaxWidth().padding(16.dp).testTag(C.Tag.profile_sign_out),
-        ) {
-          Text(stringResource(R.string.profile_sign_out))
-        }
+        )
       }
     }
   }
@@ -355,19 +353,12 @@ private fun ProfileLoading(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ProfileError(modifier: Modifier = Modifier, onRetry: () -> Unit) {
-  Column(
-      modifier = modifier.padding(24.dp).testTag(C.Tag.profile_error),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center,
-  ) {
-    Text(
-        text = stringResource(R.string.profile_error),
-        style = MaterialTheme.typography.bodyLarge,
-        textAlign = TextAlign.Center,
+  Box(modifier.testTag(C.Tag.profile_error), contentAlignment = Alignment.Center) {
+    LakeMessageState(
+        title = stringResource(R.string.profile_error),
+        actionLabel = stringResource(R.string.profile_retry),
+        onAction = onRetry,
+        actionTestTag = C.Tag.profile_retry,
     )
-    Spacer(Modifier.height(16.dp))
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.profile_retry)) {
-      Text(stringResource(R.string.profile_retry))
-    }
   }
 }

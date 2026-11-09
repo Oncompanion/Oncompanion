@@ -7,14 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +21,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,10 +29,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -49,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -66,6 +62,9 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
@@ -180,7 +179,7 @@ fun PrescriptionFormContent(
       modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
       // Without fields there is no keyboard, so the top bar can stay fixed
       topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose) },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
   ) { innerPadding ->
@@ -256,15 +255,14 @@ fun PrescriptionFormContent(
           }
         }
 
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_add_medication),
             onClick = onAddMedication,
+            style = LakeButtonStyle.Text,
             enabled = uiState.canAddMedication,
+            icon = rememberVectorPainter(Icons.Default.Add),
             modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
-        ) {
-          Icon(Icons.Default.Add, contentDescription = null)
-          Spacer(Modifier.width(8.dp))
-          Text(stringResource(R.string.prescription_form_add_medication))
-        }
+        )
       }
       if (scrollsEverything) FormSaveButton(uiState, onSave)
     }
@@ -342,12 +340,11 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
             R.string.prescription_form_load_error_title,
             R.string.prescription_form_load_error_hint,
         )
-        Button(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_retry),
             onClick = onRetry,
             modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_retry))
-        }
+        )
       }
       // The fields are shown instead
       PrescriptionFormLoad.READY -> Unit
@@ -395,12 +392,12 @@ private fun OpenMedication(
           modifier = Modifier.weight(1f).testTag(C.Tag.prescription_form_medication_title),
       )
       if (canRemove) {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_remove_medication),
             onClick = onRemove,
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.prescription_form_remove_medication_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_remove_medication))
-        }
+        )
       }
     }
 

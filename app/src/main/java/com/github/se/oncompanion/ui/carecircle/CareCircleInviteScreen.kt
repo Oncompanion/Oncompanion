@@ -21,11 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,12 +28,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +61,15 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DialogTags
+import com.github.se.oncompanion.ui.common.LakeBanner
+import com.github.se.oncompanion.ui.common.LakeBannerTone
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeDialog
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -253,7 +253,7 @@ fun CareCircleInviteContent(
             },
         )
       },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     val contentModifier = Modifier.fillMaxSize().padding(innerPadding)
     when (uiState) {
@@ -277,12 +277,11 @@ fun CareCircleInviteContent(
               title = stringResource(R.string.care_circle_invite_error),
               modifier = contentModifier.testTag(C.Tag.care_circle_invite_error),
           ) {
-            Button(
+            LakeButton(
+                text = stringResource(R.string.care_circle_retry),
                 onClick = onRetry,
                 modifier = Modifier.testTag(C.Tag.care_circle_invite_retry_button),
-            ) {
-              Text(stringResource(R.string.care_circle_retry))
-            }
+            )
           }
       is CareCircleInviteUiState.Joined -> {
         val member = uiState.member
@@ -365,13 +364,11 @@ private fun CenteredMessage(
 
 @Composable
 private fun BackToCircleButton(onBack: () -> Unit) {
-  Button(
+  LakeButton(
+      text = stringResource(R.string.care_circle_invite_back_to_circle),
       onClick = onBack,
-      modifier =
-          Modifier.heightIn(min = 56.dp).testTag(C.Tag.care_circle_invite_back_to_circle_button),
-  ) {
-    Text(stringResource(R.string.care_circle_invite_back_to_circle))
-  }
+      modifier = Modifier.testTag(C.Tag.care_circle_invite_back_to_circle_button),
+  )
 }
 
 /** The person, the invite code and its actions, what they will see, and "Cancel invitation". */
@@ -438,17 +435,16 @@ private fun InviteDetails(
       }
     }
 
-    TextButton(
+    LakeButton(
+        text = stringResource(R.string.care_circle_invite_cancel),
         onClick = onCancel,
+        style = LakeButtonStyle.Text,
         enabled = !state.isWorking,
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        isDestructive = true,
         modifier =
             Modifier.align(Alignment.CenterHorizontally)
-                .heightIn(min = 56.dp)
                 .testTag(C.Tag.care_circle_invite_cancel_button),
-    ) {
-      Text(stringResource(R.string.care_circle_invite_cancel))
-    }
+    )
   }
 }
 
@@ -514,25 +510,14 @@ private fun formatDay(instant: Instant): String =
  */
 @Composable
 private fun SyncWarning() {
-  Row(
+  LakeBanner(
+      message = stringResource(R.string.care_circle_invite_sync_warning),
+      tone = LakeBannerTone.Waiting,
+      // Lined up with the code card and the actions around it
       modifier =
-          Modifier.fillMaxWidth()
-              .padding(horizontal = 24.dp, vertical = 4.dp)
+          Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.xs)
               .testTag(C.Tag.care_circle_invite_sync_warning),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Icon(
-        Icons.Outlined.Warning,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(
-        text = stringResource(R.string.care_circle_invite_sync_warning),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-  }
+  )
 }
 
 /** "Send by email" when the patient gave an email, then "Share" and "Copy". */
@@ -545,84 +530,59 @@ private fun InviteActions(
     onCopy: () -> Unit,
 ) {
   if (!invite.email.isNullOrBlank()) {
-    Button(
+    LakeButton(
+        text = stringResource(R.string.care_circle_invite_send_email),
         onClick = onSendEmail,
         enabled = enabled,
-        modifier =
-            Modifier.fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .testTag(C.Tag.care_circle_invite_email_button),
-    ) {
-      Text(stringResource(R.string.care_circle_invite_send_email))
-    }
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.care_circle_invite_email_button),
+    )
   }
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    OutlinedButton(
+    LakeButton(
+        text = stringResource(R.string.care_circle_invite_share),
         onClick = onShare,
+        style = LakeButtonStyle.Outlined,
         enabled = enabled,
-        modifier =
-            Modifier.weight(1f)
-                .heightIn(min = 56.dp)
-                .testTag(C.Tag.care_circle_invite_share_button),
-    ) {
-      Text(stringResource(R.string.care_circle_invite_share))
-    }
-    OutlinedButton(
+        modifier = Modifier.weight(1f).testTag(C.Tag.care_circle_invite_share_button),
+    )
+    LakeButton(
+        text = stringResource(R.string.care_circle_invite_copy),
         onClick = onCopy,
+        style = LakeButtonStyle.Outlined,
         enabled = enabled,
-        modifier =
-            Modifier.weight(1f).heightIn(min = 56.dp).testTag(C.Tag.care_circle_invite_copy_button),
-    ) {
-      Text(stringResource(R.string.care_circle_invite_copy))
-    }
+        modifier = Modifier.weight(1f).testTag(C.Tag.care_circle_invite_copy_button),
+    )
   }
 }
 
 /** "Get a new code", with a spinner while the new invitation is being created. */
 @Composable
 private fun RenewButton(isWorking: Boolean, onRenew: () -> Unit) {
-  Button(
+  LakeButton(
+      text = stringResource(R.string.care_circle_invite_renew),
       onClick = onRenew,
-      enabled = !isWorking,
-      modifier =
-          Modifier.fillMaxWidth()
-              .heightIn(min = 56.dp)
-              .testTag(C.Tag.care_circle_invite_renew_button),
-  ) {
-    if (isWorking) {
-      CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
-    } else {
-      Text(stringResource(R.string.care_circle_invite_renew))
-    }
-  }
+      isWorking = isWorking,
+      modifier = Modifier.fillMaxWidth().testTag(C.Tag.care_circle_invite_renew_button),
+  )
 }
 
 /** "Cancel Julie's invitation? The code will stop working." */
 @Composable
 private fun CancelDialog(firstName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-  AlertDialog(
-      onDismissRequest = onDismiss,
-      title = { Text(stringResource(R.string.care_circle_invite_cancel_title, firstName)) },
-      text = { Text(stringResource(R.string.care_circle_invite_cancel_body)) },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.care_circle_invite_cancel_confirm),
-        ) {
-          Text(stringResource(R.string.care_circle_invite_cancel))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.testTag(C.Tag.care_circle_invite_cancel_dismiss),
-        ) {
-          Text(stringResource(R.string.care_circle_invite_cancel_keep))
-        }
-      },
-      modifier = Modifier.testTag(C.Tag.care_circle_invite_cancel_dialog),
+  LakeDialog(
+      title = stringResource(R.string.care_circle_invite_cancel_title, firstName),
+      message = stringResource(R.string.care_circle_invite_cancel_body),
+      confirmLabel = stringResource(R.string.care_circle_invite_cancel),
+      cancelLabel = stringResource(R.string.care_circle_invite_cancel_keep),
+      onConfirm = onConfirm,
+      onCancel = onDismiss,
+      tags =
+          DialogTags(
+              dialog = C.Tag.care_circle_invite_cancel_dialog,
+              confirm = C.Tag.care_circle_invite_cancel_confirm,
+              cancel = C.Tag.care_circle_invite_cancel_dismiss,
+          ),
+      isDestructive = true,
   )
 }
 

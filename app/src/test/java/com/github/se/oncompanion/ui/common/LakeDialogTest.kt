@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -32,7 +33,7 @@ class LakeDialogTest {
   private lateinit var typography: Typography
   private var primaryText = Color.Unspecified
 
-  private fun setContent(isWorking: Boolean = false) {
+  private fun setContent(isWorking: Boolean = false, focusCancel: Boolean = false) {
     composeTestRule.setContent {
       OncompanionTheme {
         typography = MaterialTheme.typography
@@ -46,6 +47,7 @@ class LakeDialogTest {
             onCancel = {},
             tags = TAGS,
             isWorking = isWorking,
+            focusCancel = focusCancel,
         )
       }
     }
@@ -70,6 +72,14 @@ class LakeDialogTest {
     composeTestRule.onNodeWithTag(C.Tag.dialog_progress).assertIsDisplayed()
     composeTestRule.onNodeWithTag(TAGS.confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(TAGS.cancel).assertIsNotEnabled()
+  }
+
+  // E.g. "Stay signed in" when signing out would discard changes not yet saved online
+  @Test
+  fun focusCancel_putsTheFocusOnCancelFirst() {
+    setContent(focusCancel = true)
+
+    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsFocused()
   }
 
   private companion object {
