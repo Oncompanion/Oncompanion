@@ -12,6 +12,8 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.detailFields
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
 import com.google.firebase.Timestamp
@@ -36,18 +38,23 @@ import kotlinx.coroutines.tasks.await
  *
  * Writes don't await Firestore's tasks on purpose: those only complete once the server confirms,
  * which would block offline. Each write is queued on the device, where reads and listeners see it
- * at once, and the function returns. If the server later rejects it, Firestore rolls it back and
- * the rejection is only logged; [CareCircleMemberDetails.isValid] mirrors the rules so this
- * shouldn't happen. [redeem] is the exception: it is a transaction, which needs the server. The
- * detail fields have the same names as on a [CareCircleMember], so the rules can check a member
- * copies its invite.
+ * at once, and the function returns. If the server later rejects it (security rules, revoked
+ * access), it is rolled back on the device and reported through [RejectedWrites], which tells the
+ * user; [CareCircleMemberDetails.isValid] mirrors the rules so this shouldn't happen. [redeem] is
+ * the exception: it is a transaction, which needs the server, so its failure is returned to the
+ * join screen and never reported. The detail fields have the same names as on a [CareCircleMember],
+ * so the rules can check a member copies its invite.
  */
 class CareCircleInviteRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : CareCircleInviteRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
@@ -71,9 +78,9 @@ class CareCircleInviteRepositoryFirestore(
             isSynced = false,
         )
     // A set on an existing invite code counts as an update for the rules, so a (very unlikely)
-    // collision is rejected and logged instead of overwriting another invite
+    // collision is rejected and reported instead of overwriting another invite
     invites().document(invite.inviteCode).set(newInviteFields(invite)).addOnFailureListener { e ->
-      logRejected(RejectedWrite.CREATION, e)
+      reportRejected(RejectedWrite.CREATION, e)
     }
     return@operation invite
   }
@@ -135,12 +142,12 @@ class CareCircleInviteRepositoryFirestore(
     invites()
         .document(inviteCode)
         .update(detailFields(details) + (FIELD_EMAIL to email))
-        .addOnFailureListener { e -> logRejected(RejectedWrite.UPDATE, e) }
+        .addOnFailureListener { e -> reportRejected(RejectedWrite.UPDATE, e) }
   }
 
   override suspend fun cancelInvite(inviteCode: String): Unit = SessionAccess.operation {
     invites().document(inviteCode).delete().addOnFailureListener { e ->
-      logRejected(RejectedWrite.CANCELLATION, e)
+      reportRejected(RejectedWrite.CANCELLATION, e)
     }
   }
 
@@ -159,7 +166,7 @@ class CareCircleInviteRepositoryFirestore(
             .set(invites().document(renewed.inviteCode), newInviteFields(renewed))
             .delete(invites().document(expired.inviteCode))
             .commit()
-            .addOnFailureListener { e -> logRejected(RejectedWrite.RENEWAL, e) }
+            .addOnFailureListener { e -> reportRejected(RejectedWrite.RENEWAL, e) }
         return@operation renewed
       }
 
@@ -287,6 +294,15 @@ class CareCircleInviteRepositoryFirestore(
           .collection(CareCircleRepositoryFirestore.COLLECTION)
           .document(memberUid)
 
+  /**
+   * Logs the server rejecting [write] without naming the invite ([logRejected]), and reports it to
+   * [rejectedWrites] so the user is told the change was undone.
+   */
+  private fun reportRejected(write: RejectedWrite, e: Exception) {
+    logRejected(write, e)
+    rejectedWrites.report()
+  }
+
   private fun requireValid(details: CareCircleMemberDetails, email: String?) {
     require(details.isValid()) { "Invalid care circle member details" }
     require(email == null || CareCircleInvite.isValidEmail(email)) { "Invalid email" }
@@ -371,7 +387,7 @@ class CareCircleInviteRepositoryFirestore(
     }
   }
 
-  /** The writes [logRejected] can report: an enum, so an invite code can't be passed by mistake. */
+  /** The writes [logRejected] can log: an enum, so an invite code can't be passed by mistake. */
   internal enum class RejectedWrite(val label: String) {
     CREATION("creation"),
     UPDATE("update"),
