@@ -6,10 +6,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -27,7 +24,7 @@ import androidx.compose.ui.semantics.semantics
  * It looks like the other fields of a form but works as a button, also for screen readers.
  *
  * @param onClickLabel what tapping does, read by screen readers (e.g. "Pick a date")
- * @param colors the field's colors, e.g. to mark it as to check
+ * @param isCheck the value was drafted by the app and the user should check it (Figma: Check)
  */
 @Composable
 fun ClickableReadOnlyField(
@@ -39,10 +36,10 @@ fun ClickableReadOnlyField(
     modifier: Modifier = Modifier,
     supportingText: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
-    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
+    isCheck: Boolean = false,
 ) {
   val currentOnClick by rememberUpdatedState(onClick)
-  OutlinedTextField(
+  LakeTextField(
       value = value,
       onValueChange = {},
       readOnly = true,
@@ -50,7 +47,7 @@ fun ClickableReadOnlyField(
       trailingIcon = trailingIcon,
       supportingText = supportingText,
       isError = isError,
-      colors = colors,
+      isCheck = isCheck,
       singleLine = true,
       modifier =
           modifier
