@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Paper lake header: what is in front of the far water (the nearer water, the light
+     on it and any boat), drawn over the tinted far water (PaperLake.kt). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="195dp"
+    android:height="105dp"
+    android:viewportWidth="390"
+    android:viewportHeight="210">
+    <!-- Water, middle -->
+    <path
+        android:fillColor="#7FB3C0"
+        android:pathData="M390,176H0V210H390V176Z" />
+    <!-- Water, near -->
+    <path
+        android:fillColor="#2F6F7E"
+        android:pathData="M390,194H0V210H390V194Z" />
+    <!-- Light on the water -->
+    <path
+        android:fillColor="#FBF8F4"
+        android:pathData="M278.5,160H245.5C244.672,160 244,160.672 244,161.5C244,162.328 244.672,163 245.5,163H278.5C279.328,163 280,162.328 280,161.5C280,160.672 279.328,160 278.5,160Z" />
+</vector>

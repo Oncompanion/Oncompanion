@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Paper lake scene of Sign in: the far water, white here and tinted in Compose with the lake
+     colour of the time of day (Horizon.bottom, PaperLake.kt). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="166dp"
+    android:height="200dp"
+    android:viewportWidth="390"
+    android:viewportHeight="470">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M390 336H0V470H390V336Z" />
+</vector>
