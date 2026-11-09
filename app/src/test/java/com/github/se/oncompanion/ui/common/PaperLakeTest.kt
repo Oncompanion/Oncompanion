@@ -70,7 +70,7 @@ class PaperLakeTest {
   private fun setHeader(time: String = "08:00", darkTheme: Boolean = false) {
     compose.setContent {
       OncompanionTheme(darkTheme = darkTheme) {
-        PaperLakeHeader(Modifier.testTag(HEADER), time = LocalTime.parse(time)) { Text(TITLE) }
+        PaperLakeHeader(LocalTime.parse(time), Modifier.testTag(HEADER)) { Text(TITLE) }
       }
     }
   }
@@ -125,7 +125,7 @@ class PaperLakeTest {
   fun header_growsWithATallTitle() {
     compose.setContent {
       OncompanionTheme(darkTheme = false) {
-        PaperLakeHeader(Modifier.testTag(HEADER), time = LocalTime.NOON) {
+        PaperLakeHeader(LocalTime.NOON, Modifier.testTag(HEADER)) {
           Box(Modifier.height(300.dp).width(10.dp))
         }
       }
@@ -174,7 +174,7 @@ class PaperLakeTest {
   fun scene_fillsTheWidth_underTheSkyOfTheTime() {
     compose.setContent {
       OncompanionTheme(darkTheme = false) {
-        PaperLakeScene(Modifier.testTag(HEADER).width(390.dp), time = LocalTime.parse("14:00"))
+        PaperLakeScene(LocalTime.parse("14:00"), Modifier.testTag(HEADER).width(390.dp))
       }
     }
 
@@ -193,7 +193,7 @@ class PaperLakeTest {
   fun band_isTheFigmaHeight_evenInPortrait() {
     compose.setContent {
       OncompanionTheme(darkTheme = false) {
-        PaperLakeBand(Modifier.testTag(HEADER), time = LocalTime.parse("14:00"))
+        PaperLakeBand(LocalTime.parse("14:00"), Modifier.testTag(HEADER))
       }
     }
 
@@ -202,26 +202,52 @@ class PaperLakeTest {
   }
 
   @Test
-  fun withoutATime_eachSizeShowsTheSkyOfThePhonesTime() {
-    val expected =
-        when (timeOfDayAt(LocalTime.now())) {
-          TimeOfDay.DAWN -> HorizonDawnTopLight
-          TimeOfDay.DAY -> HorizonDayTopLight
-          TimeOfDay.DUSK -> HorizonDuskTopLight
-        }
+  fun withOnlyATime_eachSizeShowsItsSky() {
+    // The plainest use: no modifier and no content
     compose.setContent {
       OncompanionTheme(darkTheme = false) {
         Column {
-          PaperLakeHeader(Modifier.testTag("header"))
-          PaperLakeBand(Modifier.testTag("band"))
-          PaperLakeScene(Modifier.testTag("scene").width(390.dp))
+          Box(Modifier.testTag("header")) { PaperLakeHeader(LocalTime.NOON) }
+          Box(Modifier.testTag("band")) { PaperLakeBand(LocalTime.NOON) }
+          Box(Modifier.testTag("scene").width(390.dp)) { PaperLakeScene(LocalTime.NOON) }
         }
       }
     }
 
     listOf("header", "band", "scene").forEach { tag ->
       val sky = compose.onNodeWithTag(tag).captureToImage().toPixelMap()[4, 4]
-      assertSameColor("$tag sky now", expected, sky)
+      assertSameColor("$tag sky at noon", HorizonDayTopLight, sky)
+    }
+  }
+
+  @Test
+  // Tall enough for all three sizes at once
+  @Config(qualifiers = "w411dp-h2400dp-xhdpi")
+  fun whenTheScreenRecomposes_theSkyFollowsTheTime_notTheTitle() {
+    val title = mutableStateOf("Good morning, Anne")
+    val time = mutableStateOf("08:00")
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        Column {
+          val at = LocalTime.parse(time.value)
+          PaperLakeHeader(at, Modifier.testTag("header")) { Text(title.value) }
+          PaperLakeBand(at, Modifier.testTag("band")) { Text(title.value) }
+          PaperLakeScene(at, Modifier.testTag("scene").width(390.dp))
+        }
+      }
+    }
+    fun sky(tag: String) = compose.onNodeWithTag(tag).captureToImage().toPixelMap()[4, 4]
+
+    title.value = "Good afternoon, Anne"
+    compose.waitForIdle()
+    listOf("header", "band", "scene").forEach {
+      assertSameColor("$it after a new title", HorizonDawnTopLight, sky(it))
+    }
+
+    time.value = "21:00"
+    compose.waitForIdle()
+    listOf("header", "band", "scene").forEach {
+      assertSameColor("$it at 21:00", HorizonDuskTopLight, sky(it))
     }
   }
 
@@ -237,7 +263,7 @@ class PaperLakeTest {
       started = true
       compose.setContent {
         OncompanionTheme(darkTheme = dark.value) {
-          PaperLakeHeader(Modifier.testTag(HEADER), time = LocalTime.parse(time.value))
+          PaperLakeHeader(LocalTime.parse(time.value), Modifier.testTag(HEADER))
         }
       }
     }
