@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.Spacing
-import com.github.se.oncompanion.ui.theme.lakeColors
 
 /** The test tags of a [DeleteConfirmationDialog], declared by each feature in `C.kt`. */
 class DeleteDialogTags(
@@ -97,7 +96,8 @@ fun DeleteConfirmationDialog(
               } else Spacer(Modifier)
             },
             dismiss = {
-              LakeTextButton(
+              LakeButton(
+                  style = LakeButtonStyle.Text,
                   text = cancelLabel,
                   onClick = onCancel,
                   enabled = !isDeleting,
@@ -105,12 +105,12 @@ fun DeleteConfirmationDialog(
               )
             },
             confirm = {
-              LakeTextButton(
+              LakeButton(
+                  style = LakeButtonStyle.Text,
                   text = confirmLabel,
                   onClick = onConfirm,
                   enabled = !isDeleting,
-                  // Only the destructive action is red, and not while it is under way
-                  color = if (isDeleting) MaterialTheme.lakeColors.primaryText else colors.error,
+                  isDestructive = true,
                   modifier = Modifier.testTag(tags.confirm),
               )
             },

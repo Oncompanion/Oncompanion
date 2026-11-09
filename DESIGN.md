@@ -150,7 +150,21 @@ components:
   button-tonal:
     backgroundColor: "{colors.primary-container}"
     textColor: "{colors.on-primary-container}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.full}"
+    padding: "0 24px"
+    height: "56px"
+  button-outlined:
+    textColor: "{colors.primary-text}"
+    typography: "{typography.button-label}"
+    rounded: "{rounded.full}"
+    padding: "0 24px"
+    height: "56px"
+  button-text:
+    textColor: "{colors.primary-text}"
+    typography: "{typography.button-label}"
+    rounded: "{rounded.full}"
+    padding: "0 24px"
     height: "56px"
   chip-selected:
     backgroundColor: "{colors.secondary-container}"
@@ -292,7 +306,7 @@ The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* compo
 ## Components
 
 ### Buttons
-Pills 56 dp tall, 24 dp side padding. Filled for the one main action, Tonal for a strong secondary, Outlined or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
+Pills 56 dp tall, 24 dp side padding, with an optional 24 dp leading icon 8 dp before the label. Filled for the one main action, Tonal for a strong secondary, Outlined (a 1.5 dp Outline border) or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
 
 ### Chips
 Filter chips 48 dp tall (full touch target), 16 dp side padding. Selected: dawn container with a check icon, 8 dp before the label.
