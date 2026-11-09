@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -73,6 +74,8 @@ fun LakeTextField(
           modifier
               // Screen readers announce the error, as on Material's fields
               .semantics { if (isError) error(errorMessage) }
+              // As wide as Material's field when a screen gives it no width
+              .defaultMinSize(minWidth = TextFieldDefaults.MinWidth)
               .alpha(if (enabled) 1f else LakeButtonDefaults.DISABLED_ALPHA),
       enabled = enabled,
       readOnly = readOnly,

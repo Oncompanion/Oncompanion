@@ -7,6 +7,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -183,6 +185,18 @@ class LakeTextFieldTest {
     for (part in listOf("Duration", "days")) {
       text(part).assertTextStyle(typography.bodyLarge, colors.onSurfaceVariant)
     }
+  }
+
+  // Screens give their fields a width, but a field must stay usable if one forgets
+  @Test
+  fun withoutAWidth_isAsWideAsMaterialsField() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        LakeTextField(value = "", onValueChange = {}, modifier = Modifier.testTag(FIELD))
+      }
+    }
+
+    field().assertWidthIsAtLeast(TextFieldDefaults.MinWidth)
   }
 
   /** One field per [FORM] case: empty or filled, with or without a helper. */
