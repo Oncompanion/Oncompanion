@@ -2,12 +2,12 @@
 
 package com.github.se.oncompanion.ui.symptom
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
@@ -22,20 +22,14 @@ import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -87,11 +81,13 @@ class SymptomJournalViewModel(
     private val symptomRepository: SymptomRepository = SymptomRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val patientUid: String? = null,
-    private val resolveSection: ResolveSectionAccess =
+    resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
     private val careCircleRepository: CareCircleRepository =
         CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
+
+  private val observeSection = ObserveCareSection(resolveSection)
 
   private val _uiState = MutableStateFlow(SymptomJournalUiState(today = LocalDate.now(clock)))
   val uiState: StateFlow<SymptomJournalUiState> = _uiState.asStateFlow()
@@ -103,59 +99,38 @@ class SymptomJournalViewModel(
   }
 
   /** Starts (or, after an error, restarts) observing the journal. */
-  @OptIn(ExperimentalCoroutinesApi::class)
   fun load() {
     observation?.cancel()
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     observation = viewModelScope.launch {
-      // In a flow, so that even an auth that throws right away shows the error state
-      flow { emitAll(resolveSection(CarePermission.SYMPTOMS, patientUid)) }
-          // Whose journal it is is known before its entries: adding doesn't wait for them, and
-          // still works if they can't be read
-          .onEach { access ->
-            if (access is SectionAccess.Readable) {
-              _uiState.update { it.copy(isNotShared = false, canAdd = access.canAdd) }
-            }
+      observeSection(CarePermission.SYMPTOMS, patientUid) { ownerUid ->
+            combine(symptomRepository.observeSymptoms(ownerUid), namesOf(ownerUid), ::Pair)
           }
-          .flatMapLatest(::journalOf)
-          .catch { e ->
-            Log.e(TAG, "Failed to load the symptom journal", e)
-            // A patient can still log a symptom if their journal fails. A caregiver can't: their
-            // access may have been taken away, and nothing would tell them once it is back
-            _uiState.update {
-              it.copy(
-                  isLoading = false,
-                  hasError = true,
-                  isNotShared = false,
-                  canAdd = it.canAdd && patientUid == null,
-              )
-            }
-          }
-          .collect { change -> _uiState.update(change) }
+          .collect { section -> _uiState.update { it.showing(section) } }
     }
   }
 
   /**
-   * How the journal changes with [access]: the entries it may read, or why there are none. Each
-   * access sets every flag, so nothing from the previous one stays (e.g. an error after "not
-   * shared"), and only a journal the user may write to offers to add.
+   * The journal for [section]: its entries, or why there are none. Every flag is set each time, so
+   * nothing from the previous access stays (e.g. an error after "not shared").
    */
-  private fun journalOf(
-      access: SectionAccess
-  ): Flow<(SymptomJournalUiState) -> SymptomJournalUiState> =
-      when (access) {
-        SectionAccess.Loading -> flowOf { it.withoutEntries(isLoading = true) }
+  private fun SymptomJournalUiState.showing(
+      section: CareSection<Pair<List<SymptomEntry>, Map<String, String>>>
+  ): SymptomJournalUiState =
+      when (section) {
+        // Whose journal it is is known before its entries: adding doesn't wait for them
+        is CareSection.Loading -> withoutEntries(isLoading = true).copy(canAdd = section.canAdd)
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        SectionAccess.NoAccess -> flowOf { it.withoutEntries(hasError = true) }
-        SectionAccess.NotShared -> flowOf { it.withoutEntries(isNotShared = true) }
-        is SectionAccess.Readable ->
-            combine(symptomRepository.observeSymptoms(access.ownerUid), namesOf(access.ownerUid)) {
-                entries,
-                names ->
-              { state: SymptomJournalUiState ->
-                state.copy(days = daysOf(entries, names), isLoading = false, hasError = false)
-              }
-            }
+        CareSection.NoAccess -> withoutEntries(hasError = true)
+        CareSection.NotShared -> withoutEntries(isNotShared = true)
+        // A patient can still log a symptom if their journal fails; a caregiver can't
+        is CareSection.Failed -> withoutEntries(hasError = true).copy(canAdd = section.canAdd)
+        is CareSection.Shown ->
+            withoutEntries()
+                .copy(
+                    days = daysOf(section.data.first, section.data.second),
+                    canAdd = section.canAdd,
+                )
       }
 
   /**
@@ -199,8 +174,4 @@ class SymptomJournalViewModel(
           }
           .groupBy({ it.first }, { it.second })
           .map { (date, dayEntries) -> JournalDay(date, dayEntries) }
-
-  private companion object {
-    const val TAG = "SymptomJournalViewModel"
-  }
 }

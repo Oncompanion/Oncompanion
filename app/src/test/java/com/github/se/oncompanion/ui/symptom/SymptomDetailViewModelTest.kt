@@ -285,6 +285,7 @@ class SymptomDetailViewModelTest {
     val auth = signedIn()
     val vm = confirmingDelete(auth = auth)
     auth.signOut()
+    shadowOf(Looper.getMainLooper()).idle()
 
     vm.confirmDelete()
 
@@ -428,6 +429,50 @@ class SymptomDetailViewModelTest {
     assertNull(state.entry)
     assertFalse(state.isNotFound)
     assertFalse(state.hasError)
+  }
+
+  /** A caregiver's view of "patient"'s symptom, while [patient] changes the access. */
+  private fun followedViewModel(patient: FollowedPatient) =
+      SymptomDetailViewModel(
+          "s1",
+          patient.auth,
+          repository,
+          patientUid = "patient",
+          resolveSection = patient.sectionAccess,
+          careCircleRepository = patient.circle,
+      )
+
+  @Test
+  fun caregiver_accessUnknownAgain_hidesTheSymptom() {
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    repository.seed("patient", fatigue)
+    val vm = followedViewModel(patient)
+    assertEquals(fatigue, vm.uiState.value.entry)
+
+    // e.g. the membership now only comes from the cache, and the server hasn't confirmed it
+    patient.isUnconfirmed()
+    shadowOf(Looper.getMainLooper()).idle()
+
+    val state = vm.uiState.value
+    assertNull(state.entry)
+    assertNull(state.addedByName)
+    assertTrue(state.isLoading)
+    assertFalse(state.canEdit)
+  }
+
+  @Test
+  fun caregiver_readRefusedOnceShared_isAnErrorOnly_notNotShared() {
+    val patient = FollowedPatient(CarePermission.PLANNING)
+    repository.seed("patient", fatigue)
+    val vm = followedViewModel(patient)
+    assertTrue(vm.uiState.value.isNotShared)
+
+    repository.observeError = IllegalStateException("Permission denied")
+    patient.shares(CarePermission.SYMPTOMS)
+    shadowOf(Looper.getMainLooper()).idle()
+
+    assertTrue(vm.uiState.value.hasError)
+    assertFalse(vm.uiState.value.isNotShared)
   }
 
   // ----- Who added the symptom (US-22) -----

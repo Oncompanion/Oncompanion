@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.ui.prescription
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
@@ -497,5 +498,47 @@ class PrescriptionDetailViewModelTest {
     assertTrue(viewModel.uiState.value.isNotShared)
     assertFalse(viewModel.uiState.value.isNotFound)
     assertFalse(viewModel.uiState.value.hasError)
+  }
+
+  /** A caregiver's view of "patient"'s prescription, while [patient] changes the access. */
+  private fun followedViewModel(patient: FollowedPatient) =
+      PrescriptionDetailViewModel(
+          "chemo",
+          patient.auth,
+          repository,
+          patientUid = "patient",
+          resolveSection = patient.sectionAccess,
+      )
+
+  @Test
+  fun caregiver_accessUnknownAgain_hidesThePrescription() {
+    val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+    assertEquals(chemo, viewModel.uiState.value.prescription)
+
+    // e.g. the membership now only comes from the cache, and the server hasn't confirmed it
+    patient.isUnconfirmed()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertNull(viewModel.uiState.value.prescription)
+    assertTrue(viewModel.uiState.value.isLoading)
+  }
+
+  @Test
+  fun caregiver_readRefusedOnceShared_isAnErrorOnly_notNotShared() {
+    val patient = FollowedPatient(CarePermission.SYMPTOMS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+    assertTrue(viewModel.uiState.value.isNotShared)
+
+    repository.readError = IllegalStateException("Permission denied")
+    patient.shares(CarePermission.PRESCRIPTIONS)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertTrue(viewModel.uiState.value.hasError)
+    assertFalse(viewModel.uiState.value.isNotShared)
   }
 }

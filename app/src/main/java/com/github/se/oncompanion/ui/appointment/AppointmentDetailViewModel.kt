@@ -5,9 +5,10 @@ package com.github.se.oncompanion.ui.appointment
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
@@ -18,21 +19,16 @@ import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.common.HasDeleteState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 /** Exclusive states prevent old appointment content from remaining visible after a read failure. */
@@ -153,33 +149,29 @@ class AppointmentDetailViewModel(
   /**
    * In caregiver mode, reads the patient's appointment while they share their planning. Nothing can
    * be deleted, so the session checks of the patient's own detail aren't needed: an account or
-   * access change restarts the read from [AppointmentDetailUiState.Loading].
+   * access change restarts the read from [AppointmentDetailUiState.Loading], and a read error
+   * doesn't stop following the access (e.g. "not shared" once the patient stops sharing).
    */
-  @OptIn(ExperimentalCoroutinesApi::class)
   private fun followPatient(patientUid: String) {
     authentication?.cancel()
     authentication = viewModelScope.launch {
-      flow { emitAll(resolveSection(CarePermission.PLANNING, patientUid)) }
-          .flatMapLatest(::patientAppointment)
-          .catch { emit(AppointmentDetailUiState.Error) }
-          .collect { state.value = it }
+      ObserveCareSection(resolveSection)(CarePermission.PLANNING, patientUid) { ownerUid ->
+            repository.observeAppointment(ownerUid, appointmentId)
+          }
+          .collect { state.value = patientAppointment(it) }
     }
   }
 
-  /** What the caregiver sees with [access]: the patient's appointment, or why it isn't shown. */
-  private fun patientAppointment(access: SectionAccess): Flow<AppointmentDetailUiState> =
-      when (access) {
-        is SectionAccess.Readable ->
-            repository
-                .observeAppointment(access.ownerUid, appointmentId)
-                .map<Appointment?, AppointmentDetailUiState> { appointment ->
-                  appointment?.let { AppointmentDetailUiState.Loaded(it, isOwn = false) }
-                      ?: AppointmentDetailUiState.Unavailable
-                }
-                .onStart { emit(AppointmentDetailUiState.Loading) }
-        SectionAccess.NotShared -> flowOf(AppointmentDetailUiState.NotShared)
-        SectionAccess.Loading -> flowOf(AppointmentDetailUiState.Loading)
-        SectionAccess.NoAccess -> flowOf(AppointmentDetailUiState.Unavailable)
+  /** What the caregiver sees for [section]: the patient's appointment, or why it isn't shown. */
+  private fun patientAppointment(section: CareSection<Appointment?>): AppointmentDetailUiState =
+      when (section) {
+        is CareSection.Shown ->
+            section.data?.let { AppointmentDetailUiState.Loaded(it, isOwn = false) }
+                ?: AppointmentDetailUiState.Unavailable
+        CareSection.NotShared -> AppointmentDetailUiState.NotShared
+        is CareSection.Loading -> AppointmentDetailUiState.Loading
+        CareSection.NoAccess -> AppointmentDetailUiState.Unavailable
+        is CareSection.Failed -> AppointmentDetailUiState.Error
       }
 
   private fun observeAuthentication() {
