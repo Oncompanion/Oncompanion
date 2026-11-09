@@ -49,6 +49,8 @@ class TypeTest {
           Role("Label Large", { it.labelLarge }, 15, FontWeight.SemiBold, 20),
           Role("Label Medium", { it.labelMedium }, 13, FontWeight.SemiBold, 16, 0.015),
           Role("Label Small", { it.labelSmall }, 12, FontWeight.Medium, 16, 0.025),
+          // Not a Material role: the label of the Figma "Button" component
+          Role("Button label", { it.buttonLabel }, 17, FontWeight.SemiBold, 20),
       )
 
   @Before

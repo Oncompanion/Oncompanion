@@ -103,6 +103,11 @@ typography:
     fontSize: "13px"
     fontWeight: 400
     lineHeight: "18px"
+  button-label:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "17px"
+    fontWeight: 600
+    lineHeight: "20px"
   label-large:
     fontFamily: "Figtree, Roboto, sans-serif"
     fontSize: "15px"
@@ -138,7 +143,7 @@ components:
   button-filled:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label-large}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.full}"
     padding: "0 24px"
     height: "56px"
@@ -249,7 +254,7 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 - **Title Medium** (600, 17/24): list titles, times, form questions, section headings.
 - **Title Small** (600, 15/20): group headers in lists ("This month", "Scheduled", the week range).
 - **Body Large** (400, 17/26): field values and the date under the greeting. **Body Medium** (15/22): details. **Body Small** (13/18): helper text.
-- **Label Large** (600, 15/20): buttons and chips. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
+- **Button label** (600, 17/20): every button's label, as in the Figma "Button". **Label Large** (600, 15/20): chips. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
 
 **The 200% Rule.** All text is sp and must reflow at 200% font scale: no fixed-height text containers, no truncated labels.
 
