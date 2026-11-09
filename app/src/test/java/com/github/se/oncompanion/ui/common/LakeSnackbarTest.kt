@@ -10,7 +10,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -46,11 +49,12 @@ class LakeSnackbarTest {
   private lateinit var colors: ColorScheme
   private lateinit var typography: Typography
   private var result: SnackbarResult? = null
+  private var dark by mutableStateOf(false)
 
   /** A snackbar with a [action] such as Retry, and a close button when [withDismissAction]. */
   private fun showWithRetry(withDismissAction: Boolean = false, action: String = "Retry") {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         colors = MaterialTheme.colorScheme
         typography = MaterialTheme.typography
         val hostState = remember { SnackbarHostState() }
@@ -71,12 +75,16 @@ class LakeSnackbarTest {
   private fun retry() = composeTestRule.onNode(hasText("Retry") and hasClickAction())
 
   @Test
-  fun theAction_isLabelLarge_inInversePrimary_8dpFromTheEnd_atLeast48dpTall() {
+  fun theAction_isLabelLarge_inInversePrimary_inBothThemes_8dpFromTheEnd_atLeast48dpTall() {
     showWithRetry()
 
-    composeTestRule
-        .onNodeWithText("Retry", useUnmergedTree = true)
-        .assertTextStyle(typography.labelLarge, colors.inversePrimary)
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      composeTestRule
+          .onNodeWithText("Retry", useUnmergedTree = true)
+          .assertTextStyle(typography.labelLarge, colors.inversePrimary)
+    }
     retry().assertHeightIsAtLeast(48.dp)
     val snackbar = composeTestRule.onNodeWithTag(SNACKBAR).getUnclippedBoundsInRoot()
     assertEquals(8.dp, snackbar.right - retry().getUnclippedBoundsInRoot().right)

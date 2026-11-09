@@ -29,15 +29,20 @@ fun SemanticsNodeInteraction.assertTextStyle(expected: TextStyle, color: Color) 
   assertSameColor("$text color", color, style.color)
 }
 
+/** How this text is laid out. Find the text with `useUnmergedTree = true`. */
+fun SemanticsNodeInteraction.textLayout(): TextLayoutResult {
+  val layouts = mutableListOf<TextLayoutResult>()
+  checkNotNull(fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action)
+      .invoke(layouts)
+  return layouts.single()
+}
+
 /**
  * Fails unless this text breaks its lines only between words: a word cut in two means its row left
  * it too little room to read. Find the text with `useUnmergedTree = true`.
  */
 fun SemanticsNodeInteraction.assertNoWordIsCut() {
-  val layouts = mutableListOf<TextLayoutResult>()
-  checkNotNull(fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action)
-      .invoke(layouts)
-  val layout = layouts.single()
+  val layout = textLayout()
   val text = layout.layoutInput.text.text
   for (line in 0 until layout.lineCount - 1) {
     val end = layout.getLineEnd(line)

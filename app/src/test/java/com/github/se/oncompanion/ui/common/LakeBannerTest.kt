@@ -7,6 +7,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -45,6 +48,7 @@ class LakeBannerTest {
   private lateinit var typography: Typography
   private var primaryText = Color.Unspecified
   private var retries = 0
+  private var dark by mutableStateOf(false)
 
   /** One banner per tone, tagged with its tone's name, with an [action] when [withAction]. */
   private fun setContent(
@@ -53,7 +57,7 @@ class LakeBannerTest {
       action: String = "Retry",
   ) {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         colors = MaterialTheme.colorScheme
         typography = MaterialTheme.typography
         primaryText = MaterialTheme.lakeColors.primaryText
@@ -87,18 +91,23 @@ class LakeBannerTest {
       }
 
   @Test
-  fun eachTone_isA48dpBox_withMediumCorners_inItsFigmaColors() {
+  fun eachTone_isA48dpBox_withMediumCorners_inItsFigmaColors_inBothThemes() {
     setContent()
 
-    for (tone in LakeBannerTone.entries) {
-      val (container, content) = figmaColors(tone)
-      banner(tone).assertHeightIsEqualTo(48.dp)
-      composeTestRule
-          .onNodeWithText("Couldn't refresh the events. ${tone.name}", useUnmergedTree = true)
-          .assertTextStyle(typography.bodyMedium, content)
-      // Left of the icon, in the 12 dp padding; the very corner is rounded off
-      assertSameColor("$tone container", container, banner(tone).colorAt(6.dp, 24.dp))
-      assertSameColor("$tone corner", colors.surface, banner(tone).colorAt(1.dp, 1.dp))
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      for (tone in LakeBannerTone.entries) {
+        val (container, content) = figmaColors(tone)
+        banner(tone).assertHeightIsEqualTo(48.dp)
+        composeTestRule
+            .onNodeWithText("Couldn't refresh the events. ${tone.name}", useUnmergedTree = true)
+            .assertTextStyle(typography.bodyMedium, content)
+        // Left of the icon, in the 12 dp padding; the very corner is rounded off
+        val where = "$tone, dark $theme"
+        assertSameColor("$where container", container, banner(tone).colorAt(6.dp, 24.dp))
+        assertSameColor("$where corner", colors.surface, banner(tone).colorAt(1.dp, 1.dp))
+      }
     }
   }
 

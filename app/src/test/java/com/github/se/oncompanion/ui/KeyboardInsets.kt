@@ -17,8 +17,8 @@ const val LANDSCAPE_PHONE = "w915dp-h412dp-xhdpi"
 /** The same for a small phone, where even less height is left above the keyboard. */
 const val SMALL_LANDSCAPE_PHONE = "w640dp-h360dp-xhdpi"
 
-/** Robolectric qualifiers of a narrow phone held upright, where long labels have the least room. */
-const val SMALL_PHONE = "w360dp-h640dp-xhdpi"
+/** Robolectric qualifiers of the narrowest phones held upright: long labels have the least room. */
+const val SMALL_PHONE = "w320dp-h640dp-xhdpi"
 
 /**
  * Tells the screen under test that the keyboard is open and covers [heightPx] at the bottom of the

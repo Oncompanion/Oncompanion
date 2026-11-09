@@ -6,6 +6,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -18,6 +21,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.colorAt
@@ -26,6 +31,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /** [LakeMessageState] as the Figma "Message state" (Shared patterns). */
@@ -38,10 +44,11 @@ class LakeMessageStateTest {
   private lateinit var colors: ColorScheme
   private lateinit var typography: Typography
   private var retries = 0
+  private var dark by mutableStateOf(false)
 
   private fun setContent(message: String? = LINE, actionLabel: String? = null) {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         colors = MaterialTheme.colorScheme
         typography = MaterialTheme.typography
         Surface(color = MaterialTheme.colorScheme.surface) {
@@ -62,14 +69,21 @@ class LakeMessageStateTest {
       composeTestRule.onNodeWithText(text, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
   @Test
-  fun startsWithA64dpRoundTile_onSurfaceContainerHigh_24dpAboveTheTitle() {
+  fun startsWithA64dpRoundTile_onSurfaceContainerHigh_inBothThemes_24dpAboveTheTitle() {
     setContent()
 
     val tile = composeTestRule.onNodeWithTag(C.Tag.message_state_icon)
     tile.assertWidthIsEqualTo(64.dp).assertHeightIsEqualTo(64.dp)
-    // Inside the circle, left of the icon; the tile's corner is outside the circle
-    assertSameColor("tile", colors.surfaceContainerHigh, tile.colorAt(8.dp, 32.dp))
-    assertSameColor("outside", colors.surface, tile.colorAt(2.dp, 2.dp))
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      // Inside the circle, left of the icon; the tile's corner is outside the circle
+      assertSameColor("tile, dark $theme", colors.surfaceContainerHigh, tile.colorAt(8.dp, 32.dp))
+      assertSameColor("outside, dark $theme", colors.surface, tile.colorAt(2.dp, 2.dp))
+      composeTestRule
+          .onNodeWithText(TITLE, useUnmergedTree = true)
+          .assertTextStyle(typography.titleLarge, colors.onSurface)
+    }
     assertEquals(24.dp, bounds(TITLE).top - tile.getUnclippedBoundsInRoot().bottom)
   }
 
@@ -118,6 +132,15 @@ class LakeMessageStateTest {
     setContent()
 
     composeTestRule.onNodeWithTag(ACTION).assertDoesNotExist()
+  }
+
+  // A phone held sideways at 200% has room for little more than the tile: Retry must stay reachable
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun at200PercentFont_inShortLandscape_theActionIsFullyVisible() {
+    setContent(actionLabel = "Retry")
+
+    composeTestRule.onNodeWithTag(ACTION).assertIsFullyVisible()
   }
 
   private companion object {
