@@ -6,13 +6,18 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows how the app fits together, with the calls between its layers (#264). Each feature then has its own diagram below, with its classes, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
-Solid green = in the code, dashed green = partly built, grey dotted = a fake or empty stand-in for now, dashed white = planned. In the feature diagrams, solid arrows are calls the code makes today and dotted arrows are planned ones.
+Every diagram names its four layers and gives each one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls and go down. Planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls. The overview follows two core flows, numbered on their arrows:
 
-To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and update the markings when something planned gets built.
+1. **A write works offline.** A screen writes through its repository to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
+2. **A caregiver only sees what is shared.** A screen showing a section of a patient's data reads it through `ObserveCareSection` (Planning and the Overview through `ObserveCarePlanning`), which asks `ResolveSectionAccess`; that uses `ResolveCareCircleAccess` and the care circle to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
+
+The overview also shows the large planned areas (the voice journal, reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
+
+To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
 ## Layers
 
@@ -35,10 +40,11 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 - `ResolveCareCircleAccess` decides whose data the current user is looking at (their own, or a patient who shared with them) and what they are allowed to see. Every screen that shows patient data asks it for the target `uid`, so caregiver mode is not a separate code path. It combines `AuthRepository`, `UserProfileRepository` and `CareCircleRepository`, and is called with the chosen patient's uid (`null`, or the user's own uid, for their own data). The profile role limits what may be asked: a patient only sees their own data, and a caregiver only a patient whose circle they are in. It returns a live `Flow<CareAccess>`:
   - `Granted(ownerUid, sections, isOwn)`: the uid to read and the `CarePermission` sections that may be shown. The patient's own data has every section and `canEdit`; a caregiver gets the sections in their member document (`/users/{patientUid}/circle/{uid}`) and never `canEdit`.
   - `Denied` when the caregiver isn't in the patient's circle (removed, never added, or their member document is malformed), or the role doesn't allow it (a caregiver asking for their own data, a patient asking for someone else's), or nobody is signed in.
-    In caregiver mode, `CaregiverModeViewModel` follows the access to the chosen patient: once it is `Denied` while someone is signed in (the patient removed the caregiver), it leaves caregiver mode and the app opens "Whose care?" with the patients left, or "Join a care circle" when there is none.
-    At startup, `StartViewModel` never guesses a role: if the profile can't be read in time (nothing saved on the phone, no server yet), it opens the account check ("Couldn't check your account", with Retry) instead of the patient's Overview.
+    In caregiver mode, `CaregiverModeViewModel` follows the access to the chosen patient: once it is `Denied` while someone is signed in (the patient removed the caregiver), it leaves caregiver mode and the app opens "Whose care?" with the patients left, or "Join a care circle" when the server confirmed there is none, saying "You're no longer in Anne's care circle.". A read error only ends the follow of that patient. "Whose care?" reads each circle with `observeMembership`, so a removal the device still remembers right after joining again isn't taken for following nobody.
   - `Unconfirmed` when this device has no record of the user's profile, or of the caregiver's member document, and the server hasn't confirmed it yet (e.g. just joined, a second phone, or signed in again). It shows no patient data and becomes `Granted` or `Denied` once the server confirms. Screens show it as "checking access". The caregiver's access comes from `CareCircleRepository.observeMembership`, which tells a missing document confirmed by the server (`NotMember`) from one the server hasn't confirmed yet (`Unconfirmed`); `observeMember`, used by the care circle screens, is unchanged.
   - It re-emits when the user signs in or out, or the patient changes this member's permissions or removes them, so open screens follow. An account change cancels the previous account's member listener. A member document this device has a record of answers right away from the local cache. Known limit: the Firestore cache can't tell a deleted member document from one it never fetched, so a removal this device already saw also shows `Unconfirmed`, not `Denied`, until the server answers; no data is shown meanwhile. It fails like the repositories' flows when the profile or the circle can't be read, so screens keep their usual retry. It only decides what the UI shows and offers: `firestore.rules` are the real gate on what can be read and written (per-section member reads come with #135's rules change).
+
+**Startup.** `StartViewModel` never guesses a role: if the profile can't be read in time (nothing saved on the phone, no server yet), it opens the account check ("Couldn't check your account") instead of the patient's Overview. Retry decides the start again, and "Use another account" signs out (`AccountSwitchViewModel`, as in onboarding), so nobody is stuck there.
 
 **Data layer** (`model/<feature>/`). Data classes, a repository interface, and its Firestore implementation (`SymptomRepository` / `SymptomRepositoryFirestore`). Ligue events have their own `EventRepository`, separate from the directory of contacts and programs. The patient's confirmations that they registered for an event with its organizer (US-25) are in `EventRegistrationRepository`: one document per event, keyed by the event's id, so confirming twice never creates a duplicate. Oncompanion only records what the patient says; registering stays on the organizer's website, linked from the event's `websiteUrl`. Device services (`TextRecognizer`, `SpeechRecognizer`, `ReminderScheduler`, `PdfExporter`) follow the same interface + implementation pattern, so domain code never touches ML Kit or Android APIs directly.
 
@@ -161,8 +167,8 @@ navigation, patient data or persistence. Profile supplies the stateful HospitalF
 Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
-The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Edit Profile's search ViewModel connection is implemented behind provider configuration;
+The Account and Appointments diagrams show the reusable HospitalField (with its
+HospitalFieldViewModel) → HospitalRepositoryProxy path; the overview shows it from the profile. Edit Profile's search ViewModel connection is implemented behind provider configuration;
 Add Appointment integration remains planned.
 
 ## Optional profile hospital (issue #144)
@@ -219,6 +225,10 @@ remain separate work.
 ### Ligue events and directory
 
 ![Ligue events and directory](architecture-ligue.svg)
+
+### Reminders (planned)
+
+![Reminders (planned)](architecture-reminders.svg)
 
 ## Offline mode
 
@@ -458,7 +468,7 @@ now; a supported replacement/migration strategy can be reviewed separately after
 Generated Excalidraw/SVG changes are required architecture artifacts. No unrelated feature changes
 or coverage exclusions are included.
 
-The Account and overview diagrams include `SignOut` and `LocalSessionRepository`. No dependencies,
+The Account diagram includes `SignOut` and `LocalSessionRepository`; the overview shows `SignOut` and the session. No dependencies,
 Firebase rules or normal persistence settings change. Future Firestore repositories must use
 `SessionAccess.operation`, `snapshots` and the shared instance accessor. Server transactions must
 also use the tracker; non-suspending local enqueues use `immediate`, under the same gate lock.
@@ -515,4 +525,4 @@ calendar header in the agenda's lazy list on compact windows; Profile lets its t
 and actions share one scroll instead of pinning them around a small details viewport. Portrait
 keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
 use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
-feature diagrams document the layout behavior; the overview's core flows are unchanged.
+feature diagrams document the layout behavior; the overview is unchanged.
