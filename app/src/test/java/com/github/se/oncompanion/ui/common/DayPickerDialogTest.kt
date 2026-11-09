@@ -141,7 +141,9 @@ class DayPickerDialogTest {
     assertSameColor("container", colors.surfaceContainerLowest, picker.colorAt(width - 8.dp, 8.dp))
   }
 
+  // The Figma writes the day in British English
   @Test
+  @Config(qualifiers = "en-rGB")
   fun titleAndSelectedDay_useTheFigmaStyles() {
     setContent(LocalDate.of(2026, 10, 3))
     val title =
@@ -150,6 +152,15 @@ class DayPickerDialogTest {
 
     assertStyle(title, typography.labelMedium, colors.onSurfaceVariant)
     assertStyle("Sat, 3 Oct 2026", typography.headlineSmall, colors.onSurface)
+  }
+
+  // Material's calendar follows the phone's language, so the selected day above it does too
+  @Test
+  @Config(qualifiers = "fr-rFR")
+  fun selectedDay_isInThePhonesLanguage() {
+    setContent(LocalDate.of(2026, 10, 3))
+
+    composeTestRule.onNodeWithText("sam. 3 oct. 2026", useUnmergedTree = true).assertIsDisplayed()
   }
 
   @Test

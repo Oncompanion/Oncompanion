@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.common
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,7 +15,9 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.github.se.oncompanion.R
@@ -23,16 +26,15 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /** The test tags of a picker dialog: the picker itself and its two buttons. */
 data class PickerTestTags(val picker: String, val confirm: String, val cancel: String)
 
 /**
  * A dialog to pick a calendar day, starting on [date] (Figma: "Log symptoms – Date picker"): white,
- * with the selected day as its headline, and no switch to typing the date. [onConfirm] gets the
- * picked day; dismissing or cancelling calls [onDismiss]. The caller closes the dialog in both
- * cases.
+ * with the selected day as its headline, and no switch to typing the date. Like Material's calendar
+ * below it, the headline follows the phone's language. [onConfirm] gets the picked day; dismissing
+ * or cancelling calls [onDismiss]. The caller closes the dialog in both cases.
  *
  * @param latestDate the last day that can be picked (e.g. today, for something that already
  *   happened), or `null` for no limit
@@ -53,6 +55,15 @@ fun DayPickerDialog(
           initialSelectedDateMillis = date.toPickerMillis(),
           selectableDates = latestDate?.let(::selectableUpTo) ?: DatePickerDefaults.AllDates,
       )
+  // The selected day above the calendar, e.g. "Fri, 30 Oct 2026" on a British phone
+  val locale = LocalConfiguration.current.locales[0]
+  val headlineFormatter =
+      remember(locale) {
+        DateTimeFormatter.ofPattern(
+            DateFormat.getBestDateTimePattern(locale, HEADLINE_SKELETON),
+            locale,
+        )
+      }
   val colors =
       DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
   DatePickerDialog(
@@ -104,8 +115,8 @@ fun DayPickerDialog(
   }
 }
 
-// The selected day above the calendar, e.g. "Fri, 30 Oct 2026"
-private val headlineFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH)
+// The fields of the headline: the phone's language decides their order and punctuation
+private const val HEADLINE_SKELETON = "EEEdMMMyyyy"
 
 /** Only the days up to [latestDate] (and their years) can be picked. */
 @OptIn(ExperimentalMaterial3Api::class)
