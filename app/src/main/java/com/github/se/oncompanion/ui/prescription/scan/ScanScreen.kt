@@ -82,6 +82,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.Spacing
 import java.io.File
@@ -396,7 +397,7 @@ private const val A4_RATIO = 1.414f
 
 /**
  * The shutter (Figma "Shutter"): a disc inside a ring, faded as a whole while a photo can't be
- * taken; a spinner shows on the disc while the photo is being taken.
+ * taken yet (camera starting), but not while one is being taken, when a spinner shows on the disc.
  */
 @Composable
 private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit) {
@@ -411,7 +412,7 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
       // Screen readers announce the button, which has no visible text
       modifier =
           Modifier.size(SHUTTER_SIZE)
-              .alpha(if (enabled || isCapturing) 1f else DISABLED_ALPHA)
+              .alpha(if (enabled || isCapturing) 1f else LakeButtonDefaults.DISABLED_ALPHA)
               .testTag(C.Tag.prescription_scan_capture_button)
               .semantics { contentDescription = description },
   ) {
@@ -431,9 +432,6 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
 private val SHUTTER_SIZE = 72.dp
 private val SHUTTER_DISC_SIZE = 56.dp
 private val SHUTTER_RING_WIDTH = 4.dp
-
-// A control that can't be used yet fades as a whole, like the shared buttons
-private const val DISABLED_ALPHA = 0.38f
 
 /**
  * The photo just taken, with [below] it what can be done with it: check it, see it being read, or

@@ -25,6 +25,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
+import com.github.se.oncompanion.ui.theme.SurfaceDark
 import java.io.File
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
@@ -486,6 +487,31 @@ class ScanContentTest {
     compose.waitForIdle()
 
     assertTrue("before $before, while reading ${photoLuminance()}", photoLuminance() < before)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun shutter_fadesWhileAPhotoCantBeTaken_butNotWhileOneIsBeingTaken() {
+    val state = mutableStateOf(granted())
+    compose.setContent {
+      ScanContent(uiState = state.value, onBack = {}, onEnterManually = {}, onOpenSettings = {})
+    }
+    fun disc() =
+        compose
+            .onNodeWithTag(C.Tag.prescription_scan_capture_button)
+            .captureToImage()
+            .toPixelMap()
+            .let { luminance(it[it.width / 2, it.height / 2]) }
+    val ready = disc()
+
+    state.value = granted(CameraStatus.STARTING)
+    compose.waitForIdle()
+    // 38% of the disc over the dark screen
+    assertEquals(0.38 * ready + 0.62 * luminance(SurfaceDark), disc(), 0.05)
+
+    state.value = granted().copy(isCapturing = true)
+    compose.waitForIdle()
+    assertEquals(ready, disc(), 0.05)
   }
 
   private fun luminance(color: androidx.compose.ui.graphics.Color) =
