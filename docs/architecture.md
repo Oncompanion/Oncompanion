@@ -6,13 +6,18 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows how the app fits together, with the calls between its layers (#264). Each feature then has its own diagram below, with its classes, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
-Solid green = in the code, dashed green = partly built, grey dotted = a fake or empty stand-in for now, dashed white = planned. In the feature diagrams, solid arrows are calls the code makes today and dotted arrows are planned ones.
+Every diagram names its four layers and gives each one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls and go down. Planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls. The overview follows two core flows, numbered on their arrows:
 
-To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and update the markings when something planned gets built.
+1. **A write works offline.** A screen writes through its repository to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
+2. **A caregiver only sees what is shared.** A screen showing a section of a patient's data reads it through `ObserveCareSection` (Planning and the Overview through `ObserveCarePlanning`), which asks `ResolveSectionAccess`; that uses `ResolveCareCircleAccess` and the care circle to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
+
+The overview also shows the large planned areas (the voice journal, reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
+
+To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
 ## Layers
 
@@ -26,7 +31,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 - `DraftPrescriptionFromScan` reads the photo of a scan with the `TextRecognizer`, then returns a `ScanOutcome`: the *draft* with the details to check flagged (`readPrescription`), no text (nothing read, or reading failed), or not a prescription (text read surely but no medication, like a label), so the screen tells the patient which. Nothing is saved until the patient confirms the draft in the form. It is in `domain/` because it builds a `PrescriptionDraft`, while the reading steps it relies on (below, "Prescription scan") are in `model/`.
 - `GenerateAppointmentSummary` gathers the symptoms and medications for an upcoming appointment into a summary the patient can show on screen or export as a PDF (through `PdfExporter`). The patient chooses what goes in it, and it only reports what they logged.
 - `ObservePlanning` merges the Planning sources into one list sorted by day and time: appointments (`AppointmentPlanningSource`) and the Ligue events the patient confirmed (`EventPlanningSource`, US-30), which combines that person's confirmations (`EventRegistrationRepository`) with the events of the displayed range (`EventRepository`), past weeks included. Medications use `MedicationPlanningSource`. Ligue events are optional: `PlanningRepositoryProvider` wraps them in `OptionalPlanningSource`, so if they fail to load they are left out and Planning still shows the rest. Appointments and medications are essential: if one of them fails, the whole list fails and Planning offers a retry, rather than a calendar that silently misses a medical appointment. `PlanningRepository.observeItems(ownerUid, range)` reads one person's planning; `AppointmentPlanningSource` and `MedicationPlanningSource` adapt that person's cached appointments and medications to the requested date range, and `EventPlanningSource` reads that person's confirmations, so a caregiver sees the events their patient confirmed. Production Planning uses `ObservePlanning` over all three sources through `PlanningRepositoryProvider`.
-- `ObserveCarePlanning` decides whose planning Planning and the Overview show, so caregiver mode (US-20) is the same code path. It asks `ResolveSectionAccess`, which every screen showing one section of patient data uses: the user's own data is `Readable` and editable once they are signed in (also offline before their profile is on the device), and a followed patient's goes through `ResolveCareCircleAccess`, `Readable` but not editable when the patient shares the section, `NotShared` otherwise. It then reads the planning of that `ownerUid`. The symptom journal and detail use `ResolveSectionAccess` the same way for `SYMPTOMS`: a caregiver reads the patient's symptoms with no edit or delete action, and adds one only if the patient allows it (`canAdd`, US-22), sees "Anne doesn't share Symptoms with you" otherwise, and gets the Overview's Symptoms shortcut only when it is shared. The prescriptions list and detail do the same for `PRESCRIPTIONS`, with no scan, add, edit or delete for a caregiver, and the appointment page shows a caregiver the patient's appointment read-only when they share `PLANNING`. It emits `Loading` (access or entries not known yet), `Shown(items)`, `NotShared` (the followed patient doesn't share their planning: the screens say "Anne doesn't share Planning with you"), `NoAccess` (signed out, or not in the circle) or `Failed` (a read error, with Retry). An account or access change starts over from `Loading`, so the previous person's entries never show for the next one, and a read failure doesn't stop it: the next account still loads. `PlanningViewModel` and `OverviewViewModel` take it with the chosen patient's uid from navigation (null for the user's own planning); their clock and display zone default to the system settings. Planning has no store of its own: each `PlanningSource` references the feature that owns the data and handles editing.
+- `ObserveCarePlanning` decides whose planning Planning and the Overview show, so caregiver mode (US-20) is the same code path. It asks `ResolveSectionAccess`, which every screen showing one section of patient data uses: the user's own data is `Readable` and editable once they are signed in (also offline before their profile is on the device), and a followed patient's goes through `ResolveCareCircleAccess`, `Readable` but not editable when the patient shares the section, `NotShared` otherwise. It then reads the planning of that `ownerUid`. The symptom journal and detail, the prescriptions list and detail, and the caregiver's appointment page read their section through `ObserveCareSection` (#323), so none maps the access to its own flags: it emits `Loading` (with whether adding may be offered already), `Shown(data, canEdit, canAdd)`, `NotShared`, `NoAccess` or `Failed`. A read failure doesn't end it, so a later access change still applies, e.g. "not shared" when the server refuses the open read before the patient's change arrives. The symptom journal and detail use it for `SYMPTOMS`: a caregiver reads the patient's symptoms with no edit or delete action, and adds one only if the patient allows it (`canAdd`, US-22), sees "Anne doesn't share Symptoms with you" otherwise, and gets the Overview's Symptoms shortcut only when it is shared. The prescriptions list and detail do the same for `PRESCRIPTIONS`, with no scan, add, edit or delete for a caregiver, and the appointment page shows a caregiver the patient's appointment read-only when they share `PLANNING`. It emits `Loading` (access or entries not known yet), `Shown(items)`, `NotShared` (the followed patient doesn't share their planning: the screens say "Anne doesn't share Planning with you"), `NoAccess` (signed out, or not in the circle) or `Failed` (a read error, with Retry). An account or access change starts over from `Loading`, so the previous person's entries never show for the next one, and a read failure doesn't stop it: the next account still loads. `PlanningViewModel` and `OverviewViewModel` take it with the chosen patient's uid from navigation (null for the user's own planning); their clock and display zone default to the system settings. Planning has no store of its own: each `PlanningSource` references the feature that owns the data and handles editing.
   - `PlanningTiming.Timed` holds an instant for an appointment or event. `DateOnly` holds a calendar date for an active medication; it is not a scheduled intake, and its day does not shift with the display zone. Medication frequency is recorded free text and is never interpreted into times or doses.
   - `PlanningRange` specifies inclusive/exclusive calendar dates and a display zone, with derived instant boundaries for timed queries. Future adapters emit only occurrences in that range. Medication expansion must be bounded to it, using `startDate` and `durationDays`; a row describes the recorded active period, not a claim that a dose is due on that day. Non-daily free-text frequency remains visible without interpreting it.
   - The selected-day agenda shows date-only medications first under “No set time”, then appointments/events under “Scheduled” in time order. Keys include source IDs and occurrence date/time, independent of editable text. Frequency is separate from appointment/event subtitle text.
@@ -159,8 +164,8 @@ navigation, patient data or persistence. Profile supplies the stateful HospitalF
 Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
-The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Edit Profile's search ViewModel connection is implemented behind provider configuration;
+The Account and Appointments diagrams show the reusable HospitalField (with its
+HospitalFieldViewModel) → HospitalRepositoryProxy path; the overview shows it from the profile. Edit Profile's search ViewModel connection is implemented behind provider configuration;
 Add Appointment integration remains planned.
 
 ## Optional profile hospital (issue #144)
@@ -217,6 +222,10 @@ remain separate work.
 ### Ligue events and directory
 
 ![Ligue events and directory](architecture-ligue.svg)
+
+### Reminders (planned)
+
+![Reminders (planned)](architecture-reminders.svg)
 
 ## Offline mode
 
@@ -456,7 +465,7 @@ now; a supported replacement/migration strategy can be reviewed separately after
 Generated Excalidraw/SVG changes are required architecture artifacts. No unrelated feature changes
 or coverage exclusions are included.
 
-The Account and overview diagrams include `SignOut` and `LocalSessionRepository`. No dependencies,
+The Account diagram includes `SignOut` and `LocalSessionRepository`; the overview shows `SignOut` and the session. No dependencies,
 Firebase rules or normal persistence settings change. Future Firestore repositories must use
 `SessionAccess.operation`, `snapshots` and the shared instance accessor. Server transactions must
 also use the tracker; non-suspending local enqueues use `immediate`, under the same gate lock.
@@ -513,4 +522,4 @@ calendar header in the agenda's lazy list on compact windows; Profile lets its t
 and actions share one scroll instead of pinning them around a small details viewport. Portrait
 keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
 use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
-feature diagrams document the layout behavior; the overview's core flows are unchanged.
+feature diagrams document the layout behavior; the overview is unchanged.

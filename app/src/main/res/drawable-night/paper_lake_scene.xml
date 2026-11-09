@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Paper lake scene of Sign in, exported from the Figma (page M2) in the dark theme: the shapes behind the far
+     water. The sky and the far water are painted in the colours of the time of day
+     (PaperLake.kt), then the front layer is drawn on top. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="166dp"
+    android:height="200dp"
+    android:viewportWidth="390"
+    android:viewportHeight="470">
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M250 336C285.346 336 314 307.346 314 272C314 236.654 285.346 208 250 208C214.654 208 186 236.654 186 272C186 307.346 214.654 336 250 336Z" />
+    <path
+        android:fillColor="#463C66"
+        android:pathData="M0 300L50 262L90 276L150 214L200 262L250 236L300 270L350 240L390 258V330H0V300Z" />
+    <path
+        android:fillColor="#3A3155"
+        android:pathData="M0 318L70 290L130 306L200 280L280 312L340 296L390 306V340H0V318Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M116 340C117 290 118.5 240 121 196C130 203 139 218 143 238C136 226 129 216 124.4 212C124 258 124.4 300 125 340H116Z" />
+</vector>
