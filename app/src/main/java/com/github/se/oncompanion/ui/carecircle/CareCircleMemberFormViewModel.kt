@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.auth.signedInUser
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryProvider
@@ -19,6 +20,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.model.carecircle.emailAlreadyInCircle
+import com.github.se.oncompanion.model.carecircle.isSameEmail
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -50,6 +52,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   patient turns them on
  * @property duplicate adding: who in the circle already has this email, if anyone (#257). Kept up
  *   to date as the email, the circle and the time change; never set when editing
+ * @property accountEmail adding: the signed-in patient's own email, null when editing or if their
+ *   account has none
  * @property firstNameTouched whether the first name was ever changed: a blank first name is only
  *   shown as an error once the patient has typed in it, so a new form doesn't start out red
  * @property isEditing whether the form edits a member of the circle instead of adding someone
@@ -70,6 +74,7 @@ data class CareCircleMemberFormUiState(
     val permissions: Set<CarePermission> = emptySet(),
     val canAdd: Set<CarePermission> = emptySet(),
     val duplicate: EmailAlreadyInCircle? = null,
+    val accountEmail: String? = null,
     val firstNameTouched: Boolean = false,
     val isEditing: Boolean = false,
     val isLoading: Boolean = false,
@@ -94,6 +99,17 @@ data class CareCircleMemberFormUiState(
    */
   val invalidEmail: Boolean
     get() = !isEditing && email.isNotBlank() && !CareCircleInvite.isValidEmail(email.trim())
+
+  /**
+   * Whether the patient typed their own email. A patient account can't join a circle, so that
+   * invitation could never be used.
+   */
+  val isOwnEmail: Boolean
+    get() = isSameEmail(email, accountEmail)
+
+  /** Whether this email can't be invited: it's the patient's own, or already in the circle. */
+  val emailRefused: Boolean
+    get() = isOwnEmail || duplicate != null
 
   /** Whether the form is shown: not while the member to edit is loading or missing. */
   val showsForm: Boolean
@@ -129,7 +145,7 @@ data class CareCircleMemberFormUiState(
   val canSave: Boolean
     get() =
         canEdit &&
-            duplicate == null &&
+            !emailRefused &&
             !missingFirstName &&
             !missingRelationship &&
             !invalidEmail &&
@@ -200,7 +216,9 @@ class CareCircleMemberFormViewModel(
    * inviting someone.
    */
   private fun checkForDuplicates() {
-    val uid = authRepository.signedInUid(TAG) ?: return
+    val user = authRepository.signedInUser(TAG) ?: return
+    val uid = user.uid
+    _uiState.update { it.copy(accountEmail = user.email) }
     duplicateCheck = viewModelScope.launch {
       launch {
         combine(

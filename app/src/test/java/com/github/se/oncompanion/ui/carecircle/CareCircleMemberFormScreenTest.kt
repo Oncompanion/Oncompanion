@@ -351,6 +351,8 @@ class CareCircleMemberFormScreenTest {
     val memberText = string(R.string.care_circle_form_duplicate, "Julie")
     val pendingText = string(R.string.care_circle_form_duplicate_pending, "Julie")
     val expiredText = string(R.string.care_circle_form_duplicate_expired, "Julie")
+    val ownEmail = complete.copy(accountEmail = complete.email)
+    val ownText = string(R.string.care_circle_form_own_email)
     // The form, its warning, and the invite code the link opens (none for a member)
     val cases =
         listOf(
@@ -363,6 +365,15 @@ class CareCircleMemberFormScreenTest {
             Triple(complete.copy(duplicate = expired), expiredText, "OLDCODE234"),
             // Filling in the rest wouldn't allow sending: the form doesn't ask for it
             Triple(CareCircleMemberFormUiState(duplicate = pending), pendingText, "NEWCODE234"),
+            Triple(ownEmail, ownText, null),
+            // Filling in the rest wouldn't allow sending: the form doesn't ask for it
+            Triple(
+                CareCircleMemberFormUiState(email = complete.email, accountEmail = complete.email),
+                ownText,
+                null,
+            ),
+            // An invitation already sent to their own email: nothing there to open
+            Triple(ownEmail.copy(duplicate = pending), ownText, null),
         )
     content(cases.first().first)
     for ((form, warning, inviteCode) in cases) {

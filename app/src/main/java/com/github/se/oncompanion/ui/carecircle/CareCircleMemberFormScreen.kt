@@ -325,6 +325,7 @@ private fun EmailField(
             when {
               uiState.isEditing -> stringResource(R.string.care_circle_form_account_email)
               uiState.invalidEmail -> stringResource(R.string.care_circle_form_invalid_email)
+              uiState.isOwnEmail -> stringResource(R.string.care_circle_form_own_email)
               else ->
                   when (duplicate) {
                     null -> stringResource(R.string.care_circle_form_email_hint)
@@ -344,14 +345,14 @@ private fun EmailField(
             }
         )
       },
-      isError = uiState.invalidEmail || duplicate != null,
+      isError = uiState.invalidEmail || uiState.emailRefused,
       singleLine = true,
       keyboardOptions =
           KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.care_circle_form_email),
   )
   // Their invitation already holds the access to give and the code to send, or to renew
-  if (duplicate is EmailAlreadyInCircle.Invite && uiState.canEdit) {
+  if (duplicate is EmailAlreadyInCircle.Invite && uiState.canEdit && !uiState.isOwnEmail) {
     TextButton(
         onClick = { onOpenInvite(duplicate.inviteCode) },
         modifier = Modifier.testTag(C.Tag.care_circle_form_open_invite),
@@ -489,7 +490,7 @@ private fun missingText(uiState: CareCircleMemberFormUiState): Int? =
     when {
       !uiState.canEdit -> null
       // The email has its own message, and filling in the rest wouldn't allow sending
-      uiState.duplicate != null -> null
+      uiState.emailRefused -> null
       // A member always has a relationship: only the first name can be missing
       uiState.isEditing ->
           R.string.care_circle_form_missing_first_name_edit.takeIf { uiState.missingFirstName }

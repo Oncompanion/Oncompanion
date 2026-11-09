@@ -55,6 +55,22 @@ class EmailAlreadyInCircleTest {
   }
 
   @Test
+  fun isSameEmail_ignoresCaseAndSpaces_andABlankEmailMatchesNothing() {
+    val cases =
+        listOf(
+            Triple("anne@example.com", " ANNE@Example.com ", true),
+            Triple("anne@example.com", "marc@example.com", false),
+            Triple("anne@example.com", null, false),
+            Triple(null, null, false),
+            Triple("", null, false),
+            Triple("  ", "", false),
+        )
+    for ((first, second, expected) in cases) {
+      assertEquals("'$first', '$second'", expected, isSameEmail(first, second))
+    }
+  }
+
+  @Test
   fun aBlankEmail_orPeopleWithoutOne_neverMatch() {
     val members = listOf(member("Julie", null), member("Marc", " "))
     val invites = listOf(invite("Julie", null), invite("Lea", "  "))

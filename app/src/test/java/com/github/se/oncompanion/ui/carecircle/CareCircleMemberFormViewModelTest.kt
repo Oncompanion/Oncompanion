@@ -548,6 +548,39 @@ class CareCircleMemberFormViewModelTest {
       }
 
   @Test
+  fun thePatientsOwnEmail_isRefused_onlyWhenAdding() =
+      runTest(dispatcher) {
+        val withEmail =
+            FakeAuthRepository(onSignIn = { AuthUser(ownerUid, email = "anne@example.com") })
+        withEmail.signInWithGoogle("token")
+        val viewModel = viewModel(withEmail).also { runCurrent() }
+        viewModel.fill()
+        for (own in listOf("anne@example.com", " ANNE@Example.com ")) {
+          viewModel.onEmailChange(own)
+
+          assertTrue(own, viewModel.uiState.value.isOwnEmail)
+          assertFalse(own, viewModel.uiState.value.canSave)
+        }
+
+        viewModel.save()
+        runCurrent()
+        assertTrue(invites.created.isEmpty())
+        assertEquals(SavePhase.EDITING, viewModel.uiState.value.save)
+
+        viewModel.onEmailChange("julie@example.com")
+        assertFalse(viewModel.uiState.value.isOwnEmail)
+        assertTrue(viewModel.uiState.value.canSave)
+
+        // A member's email is theirs, even if it happens to be the same
+        circle.setMembers(ownerUid, listOf(marc.copy(email = "anne@example.com")))
+        val edit = editViewModel(authRepository = withEmail)
+        advanceUntilIdle()
+        edit.onPermissionChange(CarePermission.SYMPTOMS, true)
+        assertFalse(edit.uiState.value.isOwnEmail)
+        assertTrue(edit.uiState.value.canSave)
+      }
+
+  @Test
   fun someoneNew_isInvitedAsBefore() =
       runTest(dispatcher) {
         invites.setInvites(listOf(inviteFor("paul@example.com")))

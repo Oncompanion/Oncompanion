@@ -324,6 +324,8 @@
     <string name="care_circle_form_duplicate_expired">%1$s\'s invitation with this email has expired. Open it to get a new code.</string>
     <!-- Under that message, opens their invitation -->
     <string name="care_circle_form_open_invite">Open the invitation</string>
+    <!-- Under the email, when the patient typed their own -->
+    <string name="care_circle_form_own_email">This is your own email. Enter the email of the person you want to invite.</string>
     <!-- Edit a care circle member (#75) -->
     <string name="care_circle_form_edit_title">Edit member</string>
     <string name="care_circle_form_account_email">Account email. It can\'t be changed.</string>

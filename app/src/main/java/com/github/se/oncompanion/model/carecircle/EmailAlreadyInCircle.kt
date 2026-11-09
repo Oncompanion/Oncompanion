@@ -45,15 +45,13 @@ fun emailAlreadyInCircle(
     invites: List<CareCircleInvite>,
     now: Instant,
 ): EmailAlreadyInCircle? {
-  val wanted = comparableEmail(email)
-  if (wanted.isEmpty()) return null
   members
-      .firstOrNull { comparableEmail(it.email) == wanted }
+      .firstOrNull { isSameEmail(it.email, email) }
       ?.let {
         return EmailAlreadyInCircle.Member(it.firstName)
       }
   val (expired, working) =
-      invites.filter { comparableEmail(it.email) == wanted }.partition { it.isExpired(now) }
+      invites.filter { isSameEmail(it.email, email) }.partition { it.isExpired(now) }
   working.newest()?.let {
     return EmailAlreadyInCircle.PendingInvite(it.details.firstName, it.inviteCode)
   }
@@ -61,6 +59,13 @@ fun emailAlreadyInCircle(
     EmailAlreadyInCircle.ExpiredInvite(it.details.firstName, it.inviteCode)
   }
 }
+
+/**
+ * Whether [first] and [second] are the same email, whatever their case and the spaces around them.
+ * A missing or blank email is nobody's, so it never matches.
+ */
+fun isSameEmail(first: String?, second: String?): Boolean =
+    comparableEmail(first).let { it.isNotEmpty() && it == comparableEmail(second) }
 
 /** The invitation created last; one without a creation time hasn't reached the server yet. */
 private fun List<CareCircleInvite>.newest(): CareCircleInvite? =
