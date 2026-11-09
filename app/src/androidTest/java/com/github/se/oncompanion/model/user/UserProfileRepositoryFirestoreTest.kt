@@ -4,8 +4,10 @@
 package com.github.se.oncompanion.model.user
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertEachRejectionIsReported
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -36,6 +38,7 @@ import org.junit.runner.RunWith
 class UserProfileRepositoryFirestoreTest {
 
   private lateinit var repository: UserProfileRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
 
   private val db
@@ -46,7 +49,8 @@ class UserProfileRepositoryFirestoreTest {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
     aliceUid = EmulatorTestData.createUser("alice")
-    repository = UserProfileRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = UserProfileRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -120,6 +124,7 @@ class UserProfileRepositoryFirestoreTest {
     val stored = repository.getProfile(aliceUid)
     assertSameContent(alice(), stored)
     assertNotNull("createdAt is set once the server confirms", stored!!.createdAt)
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -255,6 +260,7 @@ class UserProfileRepositoryFirestoreTest {
     assertSameContent(expected, stored)
     assertEquals(Role.PATIENT, stored!!.role)
     assertEquals(createdAt, stored.createdAt)
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
 
     val server = serverSnapshot(aliceUid)
     assertEquals("PATIENT", server.getString(UserProfileRepositoryFirestore.FIELD_ROLE))
@@ -304,6 +310,8 @@ class UserProfileRepositoryFirestoreTest {
     assertFalse("no document on the server", serverSnapshot(aliceUid).exists())
     assertNull("no document in the local cache", cachedSnapshot(aliceUid))
     assertNull(repository.getProfile(aliceUid))
+    // The update the server refused is reported, like a rejected one: the user's change is undone
+    withTimeout(10_000) { rejectedWrites.unseen.first { it == 1 } }
   }
 
   // ---- observe ----
@@ -458,6 +466,30 @@ class UserProfileRepositoryFirestoreTest {
     )
   }
 
+  @Test
+  fun everyWriteTheServerRejects_isReported(): Unit = runBlocking {
+    val bob = UserProfile(EmulatorTestData.createUser("bob"), Role.PATIENT, firstName = "Bob")
+    repository.createProfile(bob)
+    awaitServerAck()
+    EmulatorTestData.signIn("alice")
+
+    // Alice can only write her own profile
+    assertEachRejectionIsReported(
+        db,
+        rejectedWrites,
+        listOf(
+            "the creation of someone else's profile" to
+                {
+                  repository.createProfile(alice().copy(uid = "someone-else"))
+                },
+            "the update of someone else's profile" to
+                {
+                  repository.updateProfile(bob.copy(firstName = "Hacked"))
+                },
+        ),
+    )
+  }
+
   // ---- malformed documents ----
 
   @Test
@@ -565,6 +597,8 @@ class UserProfileRepositoryFirestoreTest {
     delay(500)
     assertFalse(serverSnapshot(aliceUid).exists())
     assertNull(cachedSnapshot(aliceUid))
+    // The update the server refused is reported, like a rejected one: the user's change is undone
+    withTimeout(10_000) { rejectedWrites.unseen.first { it == 1 } }
   }
 
   @Test
