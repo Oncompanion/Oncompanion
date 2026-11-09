@@ -345,7 +345,7 @@ Time, title, detail and a 48 dp check target. A taken dose dims (On Surface Vari
 - **Dialog**: white, Extra Large radius, 312 dp wide, 24 dp padding (12 dp at the bottom) and 12 dp between its parts, over a scrim: a Title Large title, a Body Medium message, then text buttons, inline or stacked (confirm above cancel) when labels are long. Only a destructive action is red. A failure adds a red line under the message; while the action is on its way, both buttons and Back are disabled and a small spinner sits just before Cancel. Used only for decisions (delete, remove, a duplicate prescription).
 - **Snackbar**: short-lived feedback at the bottom, with an action when it helps (Retry).
 - **Inline banner**: a lasting note at the top of the content: the info icon (a neutral notice, never a red warning), one Body Medium line, and an optional Label Large action such as Retry, 48 dp tall with Medium corners. Neutral for a notice (e.g. a blocked permission, a failed refresh); Waiting for something that isn't final yet (e.g. not synced, a draft to check, a list saved earlier). Never a banner only because the phone is offline: reads use the cache.
-- **Message state**: icon, title, one line and an optional action, centered where the content would be.
+- **Message state**: icon, title, an optional line and an optional action, centered where the content would be.
 
 ### Progress
 Circular progress, 48 dp, centered where the content will appear; the small on-primary variant sits inside a button ("Signing you in…").
