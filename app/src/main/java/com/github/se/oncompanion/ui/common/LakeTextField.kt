@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
@@ -72,8 +73,6 @@ fun LakeTextField(
           modifier
               // Screen readers announce the error, as on Material's fields
               .semantics { if (isError) error(errorMessage) }
-              // As tall empty as filled, so focusing doesn't grow it out of a scrolled view
-              .defaultMinSize(minHeight = FIELD_MIN_HEIGHT)
               .alpha(if (enabled) 1f else LakeButtonDefaults.DISABLED_ALPHA),
       enabled = enabled,
       readOnly = readOnly,
@@ -94,7 +93,7 @@ fun LakeTextField(
         visualTransformation = VisualTransformation.None,
         interactionSource = interactions,
         isError = isError,
-        label = label,
+        label = label?.let { { NoTallerThanSmall(it) } },
         placeholder = placeholder,
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
@@ -171,5 +170,24 @@ private fun fieldColors(style: BoxStyle) =
         errorTrailingIconColor = MaterialTheme.colorScheme.onSurface,
     )
 
-// The Figma box is 58 dp in every state: the 56 dp of Material's field, plus its border
-private val FIELD_MIN_HEIGHT = 58.dp
+/**
+ * The [label], counted as no taller than the room Material keeps for it once it is small above the
+ * value. Inside an empty field the label is as large as the value, and Material would make the box
+ * taller for it (60 dp instead of the Figma's 58). This way the box is as tall empty as filled, at
+ * any text size, so focusing a field never grows it out of a scrolled view.
+ */
+@Composable
+private fun NoTallerThanSmall(label: @Composable () -> Unit) {
+  val smallLabel =
+      with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.roundToPx() }
+  Box(
+      Modifier.layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val height = minOf(placeable.height, smallLabel)
+        // Centered on the space it is counted for, so it is drawn where Material places it
+        layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
+      }
+  ) {
+    label()
+  }
+}

@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +33,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /** [LakeTextField] as the Figma "Text field" (Brand & Theme), state by state. */
@@ -161,7 +163,72 @@ class LakeTextFieldTest {
     assertSameColor("beside the helper", colors.surface, besideHelper)
   }
 
+  /** One field per [FORM] case: empty or filled, with or without a helper. */
+  private fun setForm() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        colors = MaterialTheme.colorScheme
+        Surface(color = MaterialTheme.colorScheme.surface) {
+          Column {
+            for ((tag, text, helper) in FORM) {
+              LakeTextField(
+                  value = text,
+                  onValueChange = {},
+                  label = { Text("Label") },
+                  supportingText = if (helper) ({ Text("Helper") }) else null,
+                  singleLine = true,
+                  modifier = Modifier.testTag(tag),
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Fails unless every field of [setForm] has its box's bottom border [height] below its top, so
+   * fields side by side line up whether they have a helper (e.g. "*Required") or a value.
+   */
+  private fun assertEveryBoxIs(height: Dp) {
+    for ((tag) in FORM) {
+      val node = composeTestRule.onNodeWithTag(tag)
+      val middle = node.getUnclippedBoundsInRoot().let { it.right - it.left } / 2
+      assertSameColor("$tag, inside", colors.surface, node.colorAt(middle, height - 1.5.dp))
+      assertSameColor("$tag, bottom border", colors.outline, node.colorAt(middle, height - 0.5.dp))
+    }
+  }
+
+  @Test
+  fun theBox_is58dpTall_emptyOrFilled_withOrWithoutAHelper() {
+    setForm()
+
+    assertEveryBoxIs(58.dp)
+  }
+
+  // Material counts the label inside an empty field as large; at 200% that used to differ by 5 dp
+  @Test
+  @Config(fontScale = 2f)
+  fun at200PercentFont_everyBoxIsAsTall() {
+    setForm()
+    val bounds = composeTestRule.onNodeWithTag(FORM.first().tag).getUnclippedBoundsInRoot()
+
+    assertEveryBoxIs(bounds.bottom - bounds.top)
+  }
+
   private companion object {
     const val FIELD = "field"
+
+    /** A field of a form: its test tag, its value and whether it has a helper. */
+    data class FormField(val tag: String, val text: String, val helper: Boolean)
+
+    // The first one has no helper, so its height is its box's
+    val FORM =
+        listOf(
+            FormField("empty", "", helper = false),
+            FormField("filled", "Value", helper = false),
+            FormField("empty with a helper", "", helper = true),
+            FormField("filled with a helper", "Value", helper = true),
+        )
   }
 }
