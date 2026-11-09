@@ -2,11 +2,10 @@
 
 package com.github.se.oncompanion.utils
 
+import androidx.test.platform.app.InstrumentationRegistry
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
@@ -43,8 +42,9 @@ suspend fun assertEachRejectionIsReported(
     val reported = withTimeoutOrNull(10.seconds) { rejectedWrites.unseen.first { it > index } }
     assertNotNull("the server's rejection of $name wasn't reported", reported)
   }
-  // Once the server answered every write and the failure listeners ran, nothing more comes in
+  // Once the server answered every write, its failure listeners are queued on the main thread:
+  // running everything queued there lets a second report of any write arrive before the check
   withTimeout(10.seconds) { db.waitForPendingWrites().await() }
-  delay(500.milliseconds)
+  InstrumentationRegistry.getInstrumentation().waitForIdleSync()
   assertEquals("each write is reported exactly once", writes.size, rejectedWrites.unseen.value)
 }
