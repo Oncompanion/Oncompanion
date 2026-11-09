@@ -243,7 +243,6 @@ private fun CenteredMessage(
     title: String,
     supportingText: String,
     modifier: Modifier = Modifier,
-    action: @Composable () -> Unit = {},
 ) {
   Column(
       modifier = modifier.fillMaxSize().padding(32.dp),
@@ -264,6 +263,5 @@ private fun CenteredMessage(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
-    action()
   }
 }
