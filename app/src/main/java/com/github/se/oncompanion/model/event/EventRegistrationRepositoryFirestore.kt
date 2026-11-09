@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.event
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
@@ -18,15 +20,19 @@ import kotlinx.coroutines.flow.Flow
  * the same document, so there are never duplicates.
  *
  * Writes return once saved on the phone and sync when the connection returns. If the server rejects
- * one (e.g. the event started before the phone synced), it is logged and Firestore rolls the local
- * write back, which [observeIsRegistered] then emits.
+ * one (e.g. the event started before the phone synced), it is rolled back on the device, which
+ * [observeIsRegistered] then emits, and reported through [RejectedWrites], which tells the user.
  */
 class EventRegistrationRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : EventRegistrationRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
@@ -67,13 +73,19 @@ class EventRegistrationRepositoryFirestore(
     // The server sets the time, so the rules can check it against the event's start
     document(uid, eventId)
         .set(mapOf(FIELD_CONFIRMED_AT to FieldValue.serverTimestamp()))
-        .addOnFailureListener { Log.e(TAG, "Confirmation for event $eventId was rejected", it) }
+        .addOnFailureListener { reportRejected("Confirmation for event $eventId", it) }
   }
 
   override fun remove(uid: String, eventId: String): Unit = SessionAccess.immediate {
     document(uid, eventId).delete().addOnFailureListener {
-      Log.e(TAG, "Removing the confirmation for event $eventId was rejected", it)
+      reportRejected("Removing the confirmation for event $eventId", it)
     }
+  }
+
+  /** Logs and reports to [rejectedWrites] the server rejecting [what], already rolled back. */
+  private fun reportRejected(what: String, e: Exception) {
+    Log.e(TAG, "$what was rejected", e)
+    rejectedWrites.report()
   }
 
   private fun document(uid: String, eventId: String): DocumentReference {

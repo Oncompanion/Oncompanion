@@ -8,6 +8,10 @@ import kotlinx.coroutines.flow.Flow
  * The patient's confirmations that they registered for an event with its organizer (US-25).
  * Oncompanion only stores what the patient says: it never registers them with the organizer and
  * doesn't check it.
+ *
+ * Writes return once saved on the device, without waiting for the server. If the server later
+ * rejects one, the change is undone on the device and reported through
+ * [com.github.se.oncompanion.model.session.RejectedWrites], which tells the user.
  */
 interface EventRegistrationRepository {
 

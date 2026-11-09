@@ -3,14 +3,11 @@
 package com.github.se.oncompanion.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 
 private val LightColorScheme =
     lightColorScheme(
@@ -103,10 +100,3 @@ fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Compo
     )
   }
 }
-
-/**
- * Amber for what the user should check but doesn't block anything, such as a detail read from a
- * scan. [ColorScheme.error] stays for what must be fixed. Light or dark like the scheme's surface.
- */
-val ColorScheme.warning: Color
-  get() = if (surface.luminance() > 0.5f) WarningLight else WarningDark

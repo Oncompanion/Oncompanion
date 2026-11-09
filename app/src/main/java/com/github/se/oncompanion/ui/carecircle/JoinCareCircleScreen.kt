@@ -21,7 +21,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeTextField
 
 /**
  * "Join a care circle" (US-15): a caregiver enters the invite code the patient shared, then sees
@@ -142,7 +142,7 @@ private fun CodeForm(
   Spacer(Modifier.height(32.dp))
   // The invite code: an example below it, or why the last try failed
   val error = uiState.error
-  OutlinedTextField(
+  LakeTextField(
       value = uiState.code,
       onValueChange = onCodeChange,
       label = { Text(stringResource(R.string.join_circle_code)) },

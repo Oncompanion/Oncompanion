@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.session
 
@@ -60,7 +61,7 @@ class LocalSessionRepositoryFirestoreTest {
     restartDatabase()
     local = LocalSessionRepositoryFirestore(dbProvider = { db })
     local.prepare()
-    profiles = UserProfileRepositoryFirestore { db }
+    profiles = UserProfileRepositoryFirestore(dbProvider = { db })
   }
 
   private fun restartDatabase() {

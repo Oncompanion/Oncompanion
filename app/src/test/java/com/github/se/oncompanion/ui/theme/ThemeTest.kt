@@ -90,8 +90,6 @@ class ThemeTest {
           Role("Horizon/Dusk Top", { it.lake.dusk.top }, 0xFFE3D9F0, 0xFF2E2745),
           Role("Horizon/Dusk Bottom", { it.lake.dusk.bottom }, 0xFFC3B5E0, 0xFF1D1A2E),
           Role("Horizon/On Horizon", { it.lake.onHorizon }, 0xFF1F2A30, 0xFFE3E6E7),
-          // Not in the Figma: the scan's amber, kept until #352
-          Role("Warning", { it.scheme.warning }, 0xFFA15C00, 0xFFFFB95C),
       )
 
   @Test

@@ -89,8 +89,3 @@ val HorizonDayBottomDark = Color(0xFF15292F)
 val HorizonDuskTopDark = Color(0xFF2E2745)
 val HorizonDuskBottomDark = Color(0xFF1D1A2E)
 val OnHorizonDark = Color(0xFFE3E6E7)
-
-// Not in Material 3: amber for what to check but doesn't block anything (e.g. a detail read from a
-// scan), unlike the red error. Kept until the scan screens move to the dawn container (#352).
-val WarningLight = Color(0xFFA15C00)
-val WarningDark = Color(0xFFFFB95C)

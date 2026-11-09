@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.ui.appointment
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -207,6 +209,17 @@ class AppointmentFormScreenTest {
       compose.onNodeWithTag(C.Tag.appointmentType(it.name)).performScrollTo().performClick()
     }
     assertEquals(AppointmentType.entries, selected)
+  }
+
+  /** Only one type can be chosen, so screen readers hear radio buttons, not checkboxes. */
+  @Test
+  fun typeChips_areRadioButtons() {
+    show(state())
+    AppointmentType.entries.forEach {
+      compose
+          .onNodeWithTag(C.Tag.appointmentType(it.name))
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
   }
 
   /** Nonexistent and repeated local times show why the form cannot yet save. */
