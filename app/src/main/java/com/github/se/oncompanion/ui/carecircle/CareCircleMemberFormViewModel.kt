@@ -320,7 +320,9 @@ class CareCircleMemberFormViewModel(
    * [CareCircleInvite.MAX_EMAIL_LENGTH] (the longest email the server accepts).
    */
   fun onEmailChange(value: String) = edit {
-    it.copy(email = value.take(CareCircleInvite.MAX_EMAIL_LENGTH))
+    val email = value.take(CareCircleInvite.MAX_EMAIL_LENGTH)
+    // A new email drops the old one's warning at once; the same email wouldn't be compared again
+    if (email == it.email) it else it.copy(email = email, duplicate = null)
   }
 
   /**

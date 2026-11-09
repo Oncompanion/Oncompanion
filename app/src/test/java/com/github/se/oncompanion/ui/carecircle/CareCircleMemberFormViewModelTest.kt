@@ -578,6 +578,24 @@ class CareCircleMemberFormViewModelTest {
       }
 
   @Test
+  fun aNewEmail_dropsTheOldWarningAtOnce_butTheSameEmailKeepsIt() =
+      runTest(dispatcher) {
+        invites.setInvites(listOf(inviteFor("paul@example.com")))
+        val viewModel = loadedViewModel()
+        typeEmail(viewModel, "paul@example.com")
+        val warning = EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL")
+        assertEquals(warning, viewModel.uiState.value.duplicate)
+
+        // E.g. typing past the length limit
+        typeEmail(viewModel, "paul@example.com")
+        assertEquals(warning, viewModel.uiState.value.duplicate)
+
+        // Before the form has compared the new email with the circle
+        viewModel.onEmailChange("paul@example.co")
+        assertNull(viewModel.uiState.value.duplicate)
+      }
+
+  @Test
   fun theCircleChanging_updatesTheRefusal_whileTheFormIsOpen() =
       runTest(dispatcher) {
         val viewModel = loadedViewModel()
