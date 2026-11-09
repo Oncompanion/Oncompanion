@@ -36,6 +36,7 @@ import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
 import com.github.se.oncompanion.ui.auth.AccountCheckScreen
+import com.github.se.oncompanion.ui.auth.AccountSwitchViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SessionBoundary
@@ -181,7 +182,10 @@ private fun SessionNavHost(
       composable(Screen.ACCOUNT_CHECK) {
         AccountCheckScreen(
             viewModel = viewModel { StartViewModel(decided = Route.ACCOUNT_CHECK) },
+            switchViewModel = viewModel { AccountSwitchViewModel() },
+            credentialProvider = credentialProvider,
             onChecked = { route -> navigationActions.navigateAndClearBackStack(route) },
+            onSignedOut = signOut,
         )
       }
     }

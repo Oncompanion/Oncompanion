@@ -175,7 +175,7 @@
     <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
     <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
     <string name="account_check_title">Couldn\'t check your account</string>
-    <string name="account_check_body">The first time on this phone, oncompanion needs a connection to know your account. Try again once you\'re online.</string>
+    <string name="account_check_body">oncompanion couldn\'t read your account on this phone yet. If you\'re offline, connect and try again.</string>
 
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>

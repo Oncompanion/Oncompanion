@@ -77,6 +77,7 @@ object C {
     const val account_check_screen = "account_check_screen"
     const val account_check_retry = "account_check_retry"
     const val account_check_loading = "account_check_loading"
+    const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
