@@ -195,6 +195,7 @@ components:
     textColor: "{colors.on-surface}"
     rounded: "{rounded.extra-large}"
     width: "312px"
+    padding: "24px 24px 12px"
   snackbar:
     backgroundColor: "{colors.inverse-surface}"
     textColor: "{colors.inverse-on-surface}"
@@ -327,7 +328,7 @@ Material 3 navigation bar on Surface Container: Overview, Planning, Events. Acti
 Time, title, detail and a 48 dp check target. A taken dose dims (On Surface Variant) in place; rows are sorted by time and never move when their state changes.
 
 ### Dialogs, snackbars and banners
-- **Dialog**: white, Extra Large radius, 312 dp wide, over a scrim, title, message and text buttons, inline or stacked when labels are long. Only a destructive action is red. Used only for decisions (delete, remove, a duplicate prescription).
+- **Dialog**: white, Extra Large radius, 312 dp wide, 24 dp padding (12 dp at the bottom) and 12 dp between its parts, over a scrim: a Title Large title, a Body Medium message, then text buttons, inline or stacked (confirm above cancel) when labels are long. Only a destructive action is red. A failure adds a red line under the message; while the action is on its way, both buttons and Back are disabled and a small spinner sits just before Cancel. Used only for decisions (delete, remove, a duplicate prescription).
 - **Snackbar**: short-lived feedback at the bottom, with an action when it helps (Retry).
 - **Inline banner**: a lasting note at the top of the content. Neutral (information, a blocked permission) or Waiting (offline, drafted content to check).
 - **Message state**: icon, title, one line and an optional action, centered where the content would be.
