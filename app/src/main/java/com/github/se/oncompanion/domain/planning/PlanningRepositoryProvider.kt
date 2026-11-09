@@ -8,7 +8,6 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
-import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 
 /**
@@ -28,17 +27,9 @@ object PlanningRepositoryProvider {
    * [ObserveCarePlanning].
    */
   @Volatile
-  var repository: PlanningRepository =
-      object : PlanningRepository {
-        override fun observeItems(ownerUid: String, range: PlanningRange) =
-            sources().observeItems(ownerUid, range)
-
-        override fun observeItems(
-            ownerUid: String,
-            range: PlanningRange,
-            sections: Set<CarePermission>,
-        ) = sources().observeItems(ownerUid, range, sections)
-      }
+  var repository: PlanningRepository = PlanningRepository { ownerUid, range, sections ->
+    sources().observeItems(ownerUid, range, sections)
+  }
 
   /** The sources of the default [repository], built from the providers' current repositories. */
   private fun sources() =

@@ -8,6 +8,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.model.planning.observeItems
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.first

@@ -50,18 +50,18 @@ data class PlanningRange(
 fun interface PlanningRepository {
   /**
    * Observes [ownerUid]'s entries within [range], including its zone for future timed-source
-   * adapters. A source that is the same for everyone (the Ligue's events) ignores [ownerUid].
-   */
-  fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>>
-
-  /**
-   * Like the other [observeItems], with only the entries of [sections]: a caregiver gets the
-   * sections the patient shares with them (US-20), and the others are not read at all, so the
-   * server never refuses a read. A source that belongs to no section gives all its entries.
+   * adapters, with only the entries of [sections]: a caregiver gets the sections the patient shares
+   * with them (US-20), and the others are not read at all, so the server never refuses a read. A
+   * source that belongs to no section gives all its entries, and a source that is the same for
+   * everyone (the Ligue's events) ignores [ownerUid].
    */
   fun observeItems(
       ownerUid: String,
       range: PlanningRange,
       sections: Set<CarePermission>,
-  ): Flow<List<PlanningItem>> = observeItems(ownerUid, range)
+  ): Flow<List<PlanningItem>>
 }
+
+/** Every entry of [ownerUid] within [range]: the user's own planning has every section. */
+fun PlanningRepository.observeItems(ownerUid: String, range: PlanningRange) =
+    observeItems(ownerUid, range, CarePermission.entries.toSet())

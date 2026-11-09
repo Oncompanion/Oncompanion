@@ -8,6 +8,7 @@ import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.model.planning.observeItems
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -39,7 +40,9 @@ class OptionalPlanningSourceTest {
   private val chemo = item("Chemotherapy", PlanningSource.Appointment("chemo"), 9)
   private val yoga = item("Gentle yoga", PlanningSource.Event("yoga"), 14)
 
-  private fun failing() = PlanningRepository { _, _ -> flow { error("Events couldn't be read") } }
+  private fun failing() = PlanningRepository { _, _, _ ->
+    flow { error("Events couldn't be read") }
+  }
 
   @Test
   fun aWorkingSource_isLeftUnchanged() = runTest {
@@ -62,7 +65,7 @@ class OptionalPlanningSourceTest {
 
     assertEquals(
         listOf(listOf(yoga), emptyList()),
-        OptionalPlanningSource { _, _ -> events }.observeItems("alice", week).toList(),
+        OptionalPlanningSource { _, _, _ -> events }.observeItems("alice", week).toList(),
     )
   }
 

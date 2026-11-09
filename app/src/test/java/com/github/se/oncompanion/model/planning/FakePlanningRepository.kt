@@ -13,8 +13,8 @@ class FakePlanningRepository : PlanningRepository {
   val ranges = mutableListOf<PlanningRange>()
   /** Whose planning each observation asked for, in order. */
   val owners = mutableListOf<String>()
-  /** The sections each observation asked for, in order; null when it asked for every entry. */
-  val sections = mutableListOf<Set<CarePermission>?>()
+  /** The sections each observation asked for, in order. */
+  val sections = mutableListOf<Set<CarePermission>>()
   var fail = false
   var observation: ((PlanningRange) -> Flow<List<PlanningItem>>)? = null
 
@@ -24,11 +24,6 @@ class FakePlanningRepository : PlanningRepository {
       sections: Set<CarePermission>,
   ): Flow<List<PlanningItem>> {
     this.sections.add(sections)
-    return observe(ownerUid, range)
-  }
-
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> {
-    sections.add(null)
     return observe(ownerUid, range)
   }
 

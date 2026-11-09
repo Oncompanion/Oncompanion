@@ -20,10 +20,6 @@ class SectionPlanningSource(
     private val source: PlanningRepository,
 ) : PlanningRepository {
 
-  /** Every entry of [source]: the user's own planning has every section. */
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
-      source.observeItems(ownerUid, range)
-
   /** The entries of [source] when [section] is among [sections], else none, without reading it. */
   override fun observeItems(
       ownerUid: String,
