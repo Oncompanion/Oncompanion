@@ -335,6 +335,8 @@ object C {
     const val whose_care_empty = "whose_care_empty"
     const val whose_care_action = "whose_care_action"
     const val whose_care_join_another = "whose_care_join_another"
+    const val whose_care_unconfirmed = "whose_care_unconfirmed"
+    const val whose_care_secondary_action = "whose_care_secondary_action"
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"

@@ -359,6 +359,8 @@
     <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
+    <!-- Not "offline": the server may just not have answered yet -->
+    <string name="whose_care_unconfirmed_title">Your care circles will appear once this phone has synced.</string>
     <!-- After the patient removed the caregiver from their circle (#204), e.g. "You\'re no longer in Anne\'s care circle." -->
     <string name="removed_from_circle">You\'re no longer in %1$s\'s care circle.</string>
     <string name="removed_from_circle_unnamed">You\'re no longer in this care circle.</string>

@@ -23,12 +23,15 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class WhoseCareScreenTest {
@@ -150,11 +153,38 @@ class WhoseCareScreenTest {
 
   @Test
   fun content_noPatient_offersToJoin() {
-    setContent(WhoseCareUiState(isLoading = false))
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = true))
     node(C.Tag.whose_care_empty).assertIsDisplayed()
+    node(C.Tag.whose_care_unconfirmed).assertDoesNotExist()
     node(C.Tag.whose_care_join_another).assertDoesNotExist()
     node(C.Tag.whose_care_action).performClick()
     composeTestRule.runOnIdle { assertEquals(listOf("join"), events) }
+  }
+
+  @Test
+  fun content_noPatientNotConfirmed_waitsForTheSync_withRetryAndJoin() {
+    // The app doesn't know yet: never "not in a care circle anymore", and no spinner that would
+    // never end offline
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = false))
+    node(C.Tag.whose_care_unconfirmed).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.whose_care_unconfirmed_title))
+        .assertIsDisplayed()
+    node(C.Tag.whose_care_empty).assertDoesNotExist()
+    composeTestRule.onNodeWithText(string(R.string.whose_care_empty_title)).assertDoesNotExist()
+    node(C.Tag.whose_care_loading).assertDoesNotExist()
+
+    node(C.Tag.whose_care_action).performClick()
+    node(C.Tag.whose_care_secondary_action).performClick()
+    composeTestRule.runOnIdle { assertEquals(listOf("retry", "join"), events) }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun content_noPatientNotConfirmed_bothActionsFitInLandscape() {
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = false))
+    node(C.Tag.whose_care_action).assertIsFullyVisible()
+    node(C.Tag.whose_care_secondary_action).assertIsFullyVisible()
   }
 
   // --- WhoseCareScreen with a view model ---
@@ -238,6 +268,25 @@ class WhoseCareScreenTest {
       }
       composeTestRule.waitUntil(timeoutMillis = 5_000) { !viewModel.uiState.value.isLoading }
       composeTestRule.runOnIdle { assertEquals(name, emptyList<String>(), events) }
+    }
+  }
+
+  @Test
+  fun screen_onePatientConfirmed_anotherNot_isNotChosenByItself() {
+    // Right after joining Anne again while following Paul: only Paul is known so far
+    val circles = FakeCareCircleRepository()
+    val viewModel = viewModelFollowing("p-anne" to "Anne", "p-paul" to "Paul", circles = circles)
+    circles.unconfirmedMembers = setOf("p-anne" to "caregiver")
+    setScreen(viewModel, autoSelectSingle = true)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodes(hasTestTag(C.Tag.whoseCarePatient("p-paul")))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(false, viewModel.uiState.value.isConfirmed)
+      assertEquals(emptyList<String>(), events)
     }
   }
 

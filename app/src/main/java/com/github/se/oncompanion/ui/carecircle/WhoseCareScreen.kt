@@ -22,6 +22,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,7 +76,14 @@ fun WhoseCareScreen(
   var autoSelected by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(uiState) {
     val single = uiState.patients.singleOrNull()
-    if (autoSelectSingle && !autoSelected && !uiState.isLoading && single != null) {
+    // Only on a confirmed list: one patient known so far may not be the only one
+    if (
+        autoSelectSingle &&
+            !autoSelected &&
+            !uiState.isLoading &&
+            uiState.isConfirmed &&
+            single != null
+    ) {
       autoSelected = true
       onPatientChosen(single)
     }
@@ -156,6 +164,17 @@ fun WhoseCareContent(
               tag = C.Tag.whose_care_error,
               modifier = contentModifier,
           )
+      // Nobody known yet, but not confirmed: the circles may still be on their way
+      uiState.patients.isEmpty() && !uiState.isConfirmed ->
+          Message(
+              title = stringResource(R.string.whose_care_unconfirmed_title),
+              action = stringResource(R.string.whose_care_retry),
+              onAction = onRetry,
+              tag = C.Tag.whose_care_unconfirmed,
+              modifier = contentModifier,
+              secondaryAction = stringResource(R.string.whose_care_empty_join),
+              onSecondaryAction = onJoinAnother,
+          )
       uiState.patients.isEmpty() ->
           Message(
               title = stringResource(R.string.whose_care_empty_title),
@@ -209,7 +228,10 @@ private fun PatientList(
   }
 }
 
-/** A centered message with one action: the error (Retry) and the empty state (Join). */
+/**
+ * A centered message with its action: the error (Retry), the empty state (Join), and a list not
+ * confirmed yet (Retry, with Join as [secondaryAction]).
+ */
 @Composable
 private fun Message(
     title: String,
@@ -218,6 +240,8 @@ private fun Message(
     tag: String,
     modifier: Modifier,
     body: String? = null,
+    secondaryAction: String? = null,
+    onSecondaryAction: () -> Unit = {},
 ) {
   Column(
       modifier = modifier.padding(32.dp).testTag(tag),
@@ -235,6 +259,14 @@ private fun Message(
     }
     Button(onClick = onAction, modifier = Modifier.testTag(C.Tag.whose_care_action)) {
       Text(action)
+    }
+    if (secondaryAction != null) {
+      TextButton(
+          onClick = onSecondaryAction,
+          modifier = Modifier.testTag(C.Tag.whose_care_secondary_action),
+      ) {
+        Text(secondaryAction)
+      }
     }
   }
 }
