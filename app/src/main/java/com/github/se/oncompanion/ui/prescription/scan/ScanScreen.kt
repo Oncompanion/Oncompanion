@@ -505,7 +505,9 @@ private fun CheckPhoto(onUsePhoto: () -> Unit, onRetake: () -> Unit) {
 private fun Reading() {
   Column(
       modifier =
-          Modifier.navigationBarsPadding().padding(24.dp).testTag(C.Tag.prescription_scan_reading),
+          Modifier.navigationBarsPadding()
+              .padding(Spacing.xl)
+              .testTag(C.Tag.prescription_scan_reading),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     CircularProgressIndicator()
@@ -513,7 +515,7 @@ private fun Reading() {
         text = stringResource(R.string.prescription_scan_reading),
         style = MaterialTheme.typography.bodyMedium,
         textAlign = TextAlign.Center,
-        modifier = Modifier.padding(top = 16.dp),
+        modifier = Modifier.padding(top = Spacing.lg),
     )
   }
 }
