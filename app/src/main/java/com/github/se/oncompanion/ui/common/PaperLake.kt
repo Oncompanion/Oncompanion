@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.ui.common
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,9 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
@@ -43,9 +45,9 @@ fun timeOfDayAt(time: LocalTime): TimeOfDay =
 
 /**
  * The Paper lake behind the title of a main screen (Figma "Paper lake header"): the Salève, the Jet
- * d'eau, the sun and three bands of water, under a sky in the colour of [time]. At least 210 dp
- * tall and growing with [content]; in landscape or at a large font scale it becomes the 100 dp
- * [PaperLakeBand], as DESIGN.md asks, so the screen keeps room for its content.
+ * d'eau, the sun and three bands of water, with the sky and the far water in the colours of [time].
+ * At least 210 dp tall and growing with [content]; in landscape or at a large font scale it becomes
+ * the 100 dp [PaperLakeBand], as DESIGN.md asks, so the screen keeps room for its content.
  *
  * The illustration is decorative: TalkBack only reads [content].
  *
@@ -61,19 +63,16 @@ fun PaperLakeHeader(
     PaperLakeBand(time, modifier, content)
     return
   }
-  Box(
-      modifier
-          .fillMaxWidth()
-          .heightIn(min = HEADER_HEIGHT)
-          .background(MaterialTheme.lakeColors.horizonAt(time).top)
-  ) {
+  val horizon = MaterialTheme.lakeColors.horizonAt(time)
+  Box(modifier.fillMaxWidth().heightIn(min = HEADER_HEIGHT).background(horizon.top)) {
     // Scaled to cover the width, and kept on the bottom edge so the water always meets the content
-    Image(
-        painterResource(R.drawable.paper_lake_header),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        alignment = Alignment.BottomCenter,
-        modifier = Modifier.matchParentSize(),
+    LakeLayers(
+        R.drawable.paper_lake_header,
+        R.drawable.paper_lake_header_water,
+        R.drawable.paper_lake_header_front,
+        horizon.bottom,
+        ContentScale.Crop,
+        Alignment.BottomCenter,
     )
     content()
   }
@@ -81,8 +80,8 @@ fun PaperLakeHeader(
 
 /**
  * The 100 dp Paper lake band behind a top app bar (Figma "Paper lake band"): the sky in the colour
- * of [time], the Salève at the end and a waterline across the whole width. Decorative, like
- * [PaperLakeHeader].
+ * of [time], the Salève at the end and a waterline in its lake colour across the whole width.
+ * Decorative, like [PaperLakeHeader].
  *
  * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
@@ -92,12 +91,8 @@ fun PaperLakeBand(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-  Box(
-      modifier
-          .fillMaxWidth()
-          .heightIn(min = BAND_HEIGHT)
-          .background(MaterialTheme.lakeColors.horizonAt(time).top)
-  ) {
+  val horizon = MaterialTheme.lakeColors.horizonAt(time)
+  Box(modifier.fillMaxWidth().heightIn(min = BAND_HEIGHT).background(horizon.top)) {
     // Drawn at its own height and kept at the end, as in the Figma, whatever the width
     Image(
         painterResource(R.drawable.paper_lake_band),
@@ -110,7 +105,7 @@ fun PaperLakeBand(
         Modifier.align(Alignment.BottomCenter)
             .fillMaxWidth()
             .height(WATERLINE_HEIGHT)
-            .background(colorResource(R.color.paper_lake_water))
+            .background(horizon.bottom)
     )
     content()
   }
@@ -118,7 +113,7 @@ fun PaperLakeBand(
 
 /**
  * The tall Paper lake of Sign in (Figma "Paper lake scene"): the same lake as [PaperLakeHeader],
- * with a boat, under a sky in the colour of [time]. Decorative.
+ * with a boat, its sky and far water in the colours of [time]. Decorative.
  *
  * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
@@ -127,19 +122,37 @@ fun PaperLakeScene(
     time: LocalTime,
     modifier: Modifier = Modifier,
 ) {
-  Box(
-      modifier
-          .fillMaxWidth()
-          .aspectRatio(SCENE_RATIO)
-          .background(MaterialTheme.lakeColors.horizonAt(time).top)
-  ) {
-    Image(
-        painterResource(R.drawable.paper_lake_scene),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = Modifier.matchParentSize(),
+  val horizon = MaterialTheme.lakeColors.horizonAt(time)
+  Box(modifier.fillMaxWidth().aspectRatio(SCENE_RATIO).background(horizon.top)) {
+    LakeLayers(
+        R.drawable.paper_lake_scene,
+        R.drawable.paper_lake_scene_water,
+        R.drawable.paper_lake_scene_front,
+        horizon.bottom,
+        ContentScale.FillBounds,
+        Alignment.Center,
     )
   }
+}
+
+/**
+ * A Paper lake drawn in three layers with the same scaling: the shapes behind the far water, the
+ * far water in [lake] (the time's lake colour, DESIGN.md's Horizon), then the nearer water, the
+ * light and any boat in front. The drawables are split so only the far water changes colour.
+ */
+@Composable
+private fun BoxScope.LakeLayers(
+    @DrawableRes behind: Int,
+    @DrawableRes water: Int,
+    @DrawableRes front: Int,
+    lake: Color,
+    scale: ContentScale,
+    alignment: Alignment,
+) {
+  val layer = Modifier.matchParentSize()
+  Image(painterResource(behind), null, layer, alignment, scale)
+  Image(painterResource(water), null, layer, alignment, scale, colorFilter = ColorFilter.tint(lake))
+  Image(painterResource(front), null, layer, alignment, scale)
 }
 
 /** The theme's sky and lake colours at [time]. */
