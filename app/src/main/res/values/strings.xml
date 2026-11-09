@@ -320,6 +320,7 @@
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
     <!-- Under the email, when someone in the circle already has it (%1$s: their first name) -->
     <string name="care_circle_form_duplicate">%1$s is already in your care circle with this email.</string>
+    <string name="care_circle_form_duplicate_pending">%1$s already has an invitation with this email. Open it to see the code.</string>
     <string name="care_circle_form_duplicate_expired">%1$s\'s invitation with this email has expired. Open it to get a new code.</string>
     <!-- Under that message, opens their invitation -->
     <string name="care_circle_form_open_invite">Open the invitation</string>

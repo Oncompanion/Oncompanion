@@ -348,20 +348,21 @@ class CareCircleMemberFormScreenTest {
   fun duplicate_explainsWhy_refusesToSend_andOpensTheInvitationIfAny() {
     val pending = EmailAlreadyInCircle.PendingInvite("Julie", "NEWCODE234")
     val expired = EmailAlreadyInCircle.ExpiredInvite("Julie", "OLDCODE234")
-    val duplicateText = string(R.string.care_circle_form_duplicate, "Julie")
+    val memberText = string(R.string.care_circle_form_duplicate, "Julie")
+    val pendingText = string(R.string.care_circle_form_duplicate_pending, "Julie")
     val expiredText = string(R.string.care_circle_form_duplicate_expired, "Julie")
     // The form, its warning, and the invite code the link opens (none for a member)
     val cases =
         listOf(
             Triple(
                 complete.copy(duplicate = EmailAlreadyInCircle.Member("Julie")),
-                duplicateText,
+                memberText,
                 null,
             ),
-            Triple(complete.copy(duplicate = pending), duplicateText, "NEWCODE234"),
+            Triple(complete.copy(duplicate = pending), pendingText, "NEWCODE234"),
             Triple(complete.copy(duplicate = expired), expiredText, "OLDCODE234"),
             // Filling in the rest wouldn't allow sending: the form doesn't ask for it
-            Triple(CareCircleMemberFormUiState(duplicate = pending), duplicateText, "NEWCODE234"),
+            Triple(CareCircleMemberFormUiState(duplicate = pending), pendingText, "NEWCODE234"),
         )
     content(cases.first().first)
     for ((form, warning, inviteCode) in cases) {

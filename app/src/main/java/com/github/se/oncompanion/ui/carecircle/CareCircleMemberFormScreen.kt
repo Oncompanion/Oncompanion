@@ -325,10 +325,22 @@ private fun EmailField(
             when {
               uiState.isEditing -> stringResource(R.string.care_circle_form_account_email)
               uiState.invalidEmail -> stringResource(R.string.care_circle_form_invalid_email)
-              duplicate == null -> stringResource(R.string.care_circle_form_email_hint)
-              duplicate is EmailAlreadyInCircle.ExpiredInvite ->
-                  stringResource(R.string.care_circle_form_duplicate_expired, duplicate.firstName)
-              else -> stringResource(R.string.care_circle_form_duplicate, duplicate.firstName)
+              else ->
+                  when (duplicate) {
+                    null -> stringResource(R.string.care_circle_form_email_hint)
+                    is EmailAlreadyInCircle.Member ->
+                        stringResource(R.string.care_circle_form_duplicate, duplicate.firstName)
+                    is EmailAlreadyInCircle.PendingInvite ->
+                        stringResource(
+                            R.string.care_circle_form_duplicate_pending,
+                            duplicate.firstName,
+                        )
+                    is EmailAlreadyInCircle.ExpiredInvite ->
+                        stringResource(
+                            R.string.care_circle_form_duplicate_expired,
+                            duplicate.firstName,
+                        )
+                  }
             }
         )
       },
