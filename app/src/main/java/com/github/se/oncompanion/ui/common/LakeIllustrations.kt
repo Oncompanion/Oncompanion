@@ -64,16 +64,18 @@ enum class BoatTone {
   PENDING,
 }
 
-/** One boat around the user's own in [CircleOnTheLake]. */
-data class CircleBoat(val initial: String, val tone: BoatTone)
+/**
+ * One boat around the user's own in [CircleOnTheLake]: the member's first [name] and their [tone].
+ */
+data class CircleBoat(val name: String, val tone: BoatTone)
 
 /**
- * A member of the care circle as a boat with the first letter of [initial] on the sail (Figma
- * "Member boat"), so a first name can be passed as it is. Decorative: the member's name is always
- * written next to it.
+ * A member of the care circle as a boat with the first letter of their [name] on the sail (Figma
+ * "Member boat"): pass the first name as it is. Decorative: the member's name is always written
+ * next to it.
  */
 @Composable
-fun MemberBoat(initial: String, tone: BoatTone, modifier: Modifier = Modifier, height: Dp = 48.dp) {
+fun MemberBoat(name: String, tone: BoatTone, modifier: Modifier = Modifier, height: Dp = 48.dp) {
   val colors = boatColors(tone)
   val measurer = rememberTextMeasurer()
   Canvas(modifier.size(width = height * BOAT_WIDTH / BOAT_HEIGHT, height = height)) {
@@ -81,7 +83,7 @@ fun MemberBoat(initial: String, tone: BoatTone, modifier: Modifier = Modifier, h
     drawBoat(colors, scale)
     val text =
         measurer.measure(
-            boatInitial(initial),
+            boatInitial(name),
             TextStyle(
                 color = colors.initial,
                 fontSize = (INITIAL_SIZE * scale / density / fontScale).sp,
@@ -117,7 +119,7 @@ fun CircleOnTheLake(members: List<CircleBoat>, modifier: Modifier = Modifier) {
     )
     members.take(BOAT_SLOTS.size).forEachIndexed { index, member ->
       MemberBoat(
-          initial = member.initial,
+          name = member.name,
           tone = member.tone,
           height = unit * BOAT_HEIGHT,
           modifier =
