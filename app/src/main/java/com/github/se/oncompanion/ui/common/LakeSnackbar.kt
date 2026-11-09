@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,12 +68,21 @@ fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
 
 /**
  * Material's [SnackbarHost] showing our [LakeSnackbar], 16 dp from the sides as in the Figma. Every
- * screen uses it, so their messages look the same.
+ * screen uses it, so their messages look the same. As Material's snackbar, it keeps 12 dp from the
+ * button or bar below it, so it never touches an action, and stops at 600 dp wide in landscape.
  */
 @Composable
 fun LakeSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
-  SnackbarHost(hostState, modifier) { LakeSnackbar(it, Modifier.padding(horizontal = Spacing.lg)) }
+  SnackbarHost(hostState, modifier) {
+    LakeSnackbar(
+        it,
+        Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md).widthIn(max = MAX_WIDTH),
+    )
+  }
 }
 
 // The height of a one-line snackbar in the Figma
 private val MIN_HEIGHT = 48.dp
+
+// Material's widest snackbar
+private val MAX_WIDTH = 600.dp
