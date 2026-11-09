@@ -123,7 +123,8 @@ fun DeleteConfirmationDialog(
 /**
  * A dialog's buttons at its end, [dismiss] then [confirm], with [progress] before them (Figma:
  * Actions=Inline). When they don't fit on one line, [confirm] goes on top of [dismiss]
- * (Actions=Stacked), so the main action stays first.
+ * (Actions=Stacked), so the main action stays first. [progress] is always next to [dismiss], which
+ * leaves it room, so it stays in the dialog however long [confirm]'s label is.
  */
 @Composable
 private fun DialogButtons(
@@ -140,8 +141,10 @@ private fun DialogButtons(
       modifier = Modifier.fillMaxWidth(),
   ) { measurables, constraints ->
     val loose = constraints.copy(minWidth = 0, minHeight = 0)
-    val (spinner, cancel, main) = measurables.map { it.measure(loose) }
     val width = constraints.maxWidth
+    val spinner = measurables[0].measure(loose)
+    val cancel = measurables[1].measure(loose.copy(maxWidth = width - spinner.width))
+    val main = measurables[2].measure(loose)
     if (spinner.width + cancel.width + main.width <= width) {
       val height = maxOf(spinner.height, cancel.height, main.height)
       layout(width, height) {
@@ -155,8 +158,11 @@ private fun DialogButtons(
     } else {
       layout(width, main.height + cancel.height) {
         main.place(width - main.width, 0)
-        spinner.place(width - main.width - spinner.width, (main.height - spinner.height) / 2)
         cancel.place(width - cancel.width, main.height)
+        spinner.place(
+            width - cancel.width - spinner.width,
+            main.height + (cancel.height - spinner.height) / 2,
+        )
       }
     }
   }

@@ -49,7 +49,7 @@ fun NotSharedMessage(patientName: String, section: CarePermission, modifier: Mod
         shape = MaterialTheme.shapes.full,
         color = colors.surfaceContainerHigh,
         contentColor = colors.onSurface,
-        modifier = Modifier.size(64.dp).testTag(C.Tag.not_shared_icon),
+        modifier = Modifier.size(TILE_SIZE).testTag(C.Tag.not_shared_icon),
     ) {
       Box(contentAlignment = Alignment.Center) {
         Icon(painterResource(R.drawable.ic_info), contentDescription = null)
@@ -70,3 +70,6 @@ fun NotSharedMessage(patientName: String, section: CarePermission, modifier: Mod
     )
   }
 }
+
+// The round info tile of the Figma "Message state"
+private val TILE_SIZE = 64.dp

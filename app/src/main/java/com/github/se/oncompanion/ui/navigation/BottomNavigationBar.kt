@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
@@ -125,7 +126,7 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: 
   ) {
     // The ripple stays inside the indicator, as on Material's bar
     Box(
-        Modifier.size(width = 64.dp, height = 32.dp)
+        Modifier.size(INDICATOR_SIZE)
             .clip(MaterialTheme.shapes.full)
             .background(if (selected) colors.secondaryContainer else Color.Transparent)
             .indication(interactions, ripple()),
@@ -145,3 +146,6 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: 
     )
   }
 }
+
+// The pill behind the selected tab's icon in the Figma
+private val INDICATOR_SIZE = DpSize(64.dp, 32.dp)

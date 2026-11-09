@@ -38,7 +38,7 @@ internal fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
       modifier = modifier.fillMaxWidth(),
   ) {
     Row(
-        Modifier.heightIn(min = 48.dp)
+        Modifier.heightIn(min = MIN_HEIGHT)
             .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -59,3 +59,6 @@ internal fun LakeSnackbar(data: SnackbarData, modifier: Modifier = Modifier) {
     }
   }
 }
+
+// The height of a one-line snackbar in the Figma
+private val MIN_HEIGHT = 48.dp
