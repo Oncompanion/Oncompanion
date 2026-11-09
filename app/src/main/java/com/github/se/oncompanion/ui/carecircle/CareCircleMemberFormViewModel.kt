@@ -240,7 +240,10 @@ class CareCircleMemberFormViewModel(
           .collectLatest { check ->
             // Saving: the invitation being saved comes back, and isn't a duplicate
             val (email, circle) = check ?: return@collectLatest
-            repeatAtEachExpiry(clock, circle.invites.map { it.expiresAt }) { now ->
+            // Only an invitation with this email can change the result
+            val expiries =
+                circle.invites.filter { isSameEmail(it.email, email) }.map { it.expiresAt }
+            repeatAtEachExpiry(clock, expiries) { now ->
               val duplicate = emailAlreadyInCircle(email, circle.members, circle.invites, now)
               _uiState.update {
                 if (it.save == SavePhase.EDITING) it.copy(duplicate = duplicate) else it

@@ -673,6 +673,30 @@ class CareCircleMemberFormViewModelTest {
       }
 
   @Test
+  fun theExpiryTimer_followsTheEmailBeingTyped() =
+      runTest(dispatcher) {
+        val validFor = Duration.ofHours(1)
+        val createdAt = now.minus(CareCircleInvite.VALIDITY).plus(validFor)
+        invites.setInvites(listOf(inviteFor("paul@example.com", createdAt = createdAt)))
+        val viewModel = loadedViewModel()
+        typeEmail(viewModel, "someone.else@example.com")
+        assertNull(viewModel.uiState.value.duplicate)
+
+        typeEmail(viewModel, "paul@example.com")
+        assertEquals(
+            EmailAlreadyInCircle.PendingInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+
+        advanceTimeBy(validFor.toMillis() + 1)
+        runCurrent()
+        assertEquals(
+            EmailAlreadyInCircle.ExpiredInvite("Paul", "INVITEPAUL"),
+            viewModel.uiState.value.duplicate,
+        )
+      }
+
+  @Test
   fun refreshExpiry_showsAnInvitationThatExpiredWhileThePhoneSlept() =
       runTest(dispatcher) {
         invites.setInvites(listOf(inviteFor("paul@example.com")))
