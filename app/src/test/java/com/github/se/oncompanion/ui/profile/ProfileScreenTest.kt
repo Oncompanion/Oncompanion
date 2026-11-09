@@ -6,6 +6,7 @@ package com.github.se.oncompanion.ui.profile
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -20,6 +21,10 @@ import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Instant
 import java.util.TimeZone
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +33,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 private class ProfileScreenAuthRepository(private val user: AuthUser) : AuthRepository {
   override val currentUser: AuthUser?
@@ -100,6 +106,19 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_error).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_retry).performClick()
     composeTestRule.runOnIdle { assertEquals(1, retries) }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun errorState_retryIsFullyVisibleInLandscape() {
+    composeTestRule.setContent {
+      OncompanionTheme { ProfileContent(ProfileUiState.Error, {}, {}, {}, {}, {}, {}) }
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.profile_retry)
+        .assertHeightIsAtLeast(LakeButtonDefaults.MinHeight)
+        .assertIsFullyVisible()
   }
 
   @Test

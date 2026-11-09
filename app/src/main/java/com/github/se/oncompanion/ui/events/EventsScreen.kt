@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -216,10 +218,16 @@ private fun EmptyEvents(modifier: Modifier = Modifier) {
   )
 }
 
-/** Shown when the events couldn't be loaded, with a button to try again. */
+/**
+ * Shown when the events couldn't be loaded, with a button to try again. It scrolls when the space
+ * between the bars is too short for it (landscape), so Retry is never squeezed.
+ */
 @Composable
 private fun EventsError(onRetry: () -> Unit, modifier: Modifier = Modifier) {
-  Box(modifier.fillMaxSize().testTag(C.Tag.events_error), contentAlignment = Alignment.Center) {
+  Box(
+      modifier.fillMaxSize().testTag(C.Tag.events_error).verticalScroll(rememberScrollState()),
+      contentAlignment = Alignment.Center,
+  ) {
     LakeMessageState(
         title = stringResource(R.string.events_error_title),
         message = stringResource(R.string.events_error_supporting),
