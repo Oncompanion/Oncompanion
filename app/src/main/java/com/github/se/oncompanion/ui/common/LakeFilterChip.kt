@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
@@ -26,6 +29,9 @@ import com.github.se.oncompanion.ui.theme.Spacing
 /**
  * The Figma "Filter chip": 48 dp tall, a full touch target (Material's chip is 32 dp), with Medium
  * corners. White with an Outline border, or dawn with a check before its [label] once [selected].
+ *
+ * @param role what screen readers call it: a checkbox when several chips can be picked, as on
+ *   Material's chip, or [Role.RadioButton] when only one can
  */
 @Composable
 fun LakeFilterChip(
@@ -34,6 +40,7 @@ fun LakeFilterChip(
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    role: Role = Role.Checkbox,
 ) {
   val colors = MaterialTheme.colorScheme
   Surface(
@@ -44,7 +51,10 @@ fun LakeFilterChip(
       color = if (selected) colors.secondaryContainer else colors.surfaceContainerLowest,
       contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
       border = if (selected) null else BorderStroke(1.dp, colors.outline),
-      modifier = modifier.alpha(if (enabled) 1f else LakeButtonDefaults.DISABLED_ALPHA),
+      modifier =
+          modifier
+              .semantics { this.role = role }
+              .alpha(if (enabled) 1f else LakeButtonDefaults.DISABLED_ALPHA),
   ) {
     // The check takes some of the start padding, so the label moves less when it appears
     Row(

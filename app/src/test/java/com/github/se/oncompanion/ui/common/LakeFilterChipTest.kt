@@ -8,6 +8,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -116,7 +120,36 @@ class LakeFilterChipTest {
     assertEquals(0, clicks)
   }
 
+  // Material's chip was a checkbox for TalkBack; a single choice reads as a radio button
+  @Test
+  fun screenReaders_hearACheckbox_orARadioButtonForASingleChoice() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        LakeFilterChip(
+            selected = false,
+            onClick = {},
+            label = "Fatigue",
+            modifier = Modifier.testTag(CHIP),
+        )
+        LakeFilterChip(
+            selected = false,
+            onClick = {},
+            label = "Treatment",
+            role = Role.RadioButton,
+            modifier = Modifier.testTag(RADIO),
+        )
+      }
+    }
+
+    for ((tag, role) in listOf(CHIP to Role.Checkbox, RADIO to Role.RadioButton)) {
+      composeTestRule
+          .onNodeWithTag(tag)
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, role))
+    }
+  }
+
   private companion object {
     const val CHIP = "chip"
+    const val RADIO = "radio"
   }
 }

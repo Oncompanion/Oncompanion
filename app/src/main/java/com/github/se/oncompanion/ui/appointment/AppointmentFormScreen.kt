@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -241,6 +242,7 @@ fun AppointmentFormContent(
               enabled = state.editable,
               onClick = { onOffsetChange(offset) },
               label = stringResource(R.string.appointment_offset, offset.id),
+              role = Role.RadioButton,
           )
         }
       }
@@ -272,6 +274,7 @@ fun AppointmentFormContent(
             selected = state.type == type,
             enabled = state.editable,
             onClick = { onTypeChange(type) },
+            role = Role.RadioButton,
             modifier = Modifier.testTag(C.Tag.appointmentType(type.name)),
             label =
                 stringResource(
