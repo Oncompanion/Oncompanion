@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -20,8 +21,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -813,9 +817,7 @@ class AddSymptomViewModelTest {
   // ----- Caregiver mode (US-22) -----
 
   /** The form of the signed-in caregiver [uid], logging in "patient"'s journal. */
-  private fun caregiverViewModel(
-      profiles: FakeUserProfileRepository = FakeUserProfileRepository()
-  ) =
+  private fun caregiverViewModel(profiles: UserProfileRepository = FakeUserProfileRepository()) =
       AddSymptomViewModel(
           auth,
           repository,
@@ -857,6 +859,34 @@ class AddSymptomViewModelTest {
         advanceUntilIdle()
 
         assertEquals("Sam", repository.symptoms("patient").single().addedByName)
+      }
+
+  @Test
+  fun caregiver_accountChangesWhileTheNameIsRead_writesNothing() =
+      runTest(dispatcher) {
+        // The profile isn't on the phone yet: reading the name waits
+        val nameRead = CompletableDeferred<Unit>()
+        val profiles =
+            object : UserProfileRepository by FakeUserProfileRepository() {
+              override fun observeProfile(uid: String): Flow<UserProfile?> = flow {
+                nameRead.await()
+                emit(UserProfile(uid, Role.CAREGIVER, firstName = "Sam"))
+              }
+            }
+        val viewModel = caregiverViewModel(profiles)
+        viewModel.toggleType(SymptomType.NAUSEA)
+        viewModel.save()
+        advanceUntilIdle()
+
+        auth.signOut()
+        auth.onSignIn = { AuthUser(uid = "someone-else") }
+        auth.signInWithGoogle("token")
+        nameRead.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(repository.symptoms("patient").isEmpty())
+        assertEquals(SavePhase.EDITING, viewModel.state.save)
+        assertEquals(AddSymptomError.NOT_SIGNED_IN, viewModel.state.error)
       }
 
   @Test

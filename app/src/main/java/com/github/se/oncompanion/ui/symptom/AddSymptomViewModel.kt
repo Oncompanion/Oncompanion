@@ -25,6 +25,8 @@ import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -294,11 +296,18 @@ class AddSymptomViewModel(
         if (symptomId != null) symptomRepository.updateSymptom(uid, entry)
         else if (patientUid == null) symptomRepository.addSymptom(uid, entry)
         // A caregiver's symptom goes in the patient's journal, signed with who added it
-        else
-            symptomRepository.addSymptom(
-                patientUid,
-                entry.copy(addedBy = uid, addedByName = caregiverName(uid)),
-            )
+        else {
+          val signed = entry.copy(addedBy = uid, addedByName = caregiverName(uid))
+          // Reading the name can take a while: the account may have changed meanwhile
+          currentCoroutineContext().ensureActive()
+          if (authRepository.signedInUid(TAG) != uid) {
+            _uiState.update {
+              it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
+            }
+            return@launch
+          }
+          symptomRepository.addSymptom(patientUid, signed)
+        }
         _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
         throw e

@@ -22,6 +22,8 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
@@ -313,11 +315,13 @@ class AppointmentFormViewModel(
       if (appointmentId != null) repository.updateAppointment(uid, appointment)
       else if (patientUid == null) repository.addAppointment(uid, appointment)
       // A caregiver's appointment goes in the patient's planning, signed with who added it
-      else
-          repository.addAppointment(
-              patientUid,
-              appointment.copy(addedBy = uid, addedByName = caregiverName(uid)),
-          )
+      else {
+        val signed = appointment.copy(addedBy = uid, addedByName = caregiverName(uid))
+        // Reading the name can take a while: the account may have changed meanwhile
+        currentCoroutineContext().ensureActive()
+        if (!isCurrentAttempt(uid, attempt)) return
+        repository.addAppointment(patientUid, signed)
+      }
       if (isCurrentAttempt(uid, attempt))
           state.update {
             // Done only if the form still shows its appointment (e.g. it wasn't deleted meanwhile)
