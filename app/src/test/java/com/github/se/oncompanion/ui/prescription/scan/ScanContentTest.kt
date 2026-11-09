@@ -24,6 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
 import java.io.File
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
@@ -139,7 +140,8 @@ class ScanContentTest {
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsNotEnabled()
     // The preview is already there, as the camera only opens once it can draw it
     compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertExists()
-    compose.onNodeWithTag(C.Tag.prescription_scan_framing_guide).assertDoesNotExist()
+    // The guide already shows where the page goes, with the spinner inside it (Figma)
+    compose.onNodeWithTag(C.Tag.prescription_scan_framing_guide).assertIsDisplayed()
   }
 
   @Test
@@ -414,6 +416,80 @@ class ScanContentTest {
       assertEquals("close in state $s", index + 1, backs)
     }
   }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun camera_matchesTheFigma_viewfinderPanelAndRingedShutter() {
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        ScanContent(uiState = granted(), onBack = {}, onEnterManually = {}, onOpenSettings = {})
+      }
+    }
+    val screen = compose.onNodeWithTag(C.Tag.prescription_scan_screen).captureToImage().toPixelMap()
+    val viewfinder =
+        compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).fetchSemanticsNode().boundsInRoot
+    val shutter =
+        compose
+            .onNodeWithTag(C.Tag.prescription_scan_capture_button)
+            .fetchSemanticsNode()
+            .boundsInRoot
+    val density = compose.density.density
+
+    // The viewfinder's panel is darker than the screen around it (both dark, whatever the phone)
+    val panel = screen[viewfinder.left.toInt() + 4, viewfinder.top.toInt() + 4]
+    val around = screen[4, viewfinder.bottom.toInt() + 4]
+    assertEquals(SurfaceContainerLowestDark, panel)
+    assertTrue("panel $panel should be darker than $around", luminance(panel) < luminance(around))
+
+    // The shutter: a light disc in the middle, the dark screen in the gap, the light ring outside
+    val cx = shutter.center.x.toInt()
+    val cy = shutter.center.y.toInt()
+    fun at(dp: Float) = screen[cx + (dp * density).toInt(), cy]
+    assertTrue("disc", luminance(at(0f)) > 0.6)
+    assertTrue("gap", luminance(at(30f)) < 0.3)
+    assertTrue("ring", luminance(at(34f)) > 0.6)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun reading_dimsThePhoto() {
+    // A white page, so dimming shows
+    val photo =
+        temporaryFolder.newFile().apply {
+          outputStream().use {
+            Bitmap.createBitmap(40, 60, Bitmap.Config.ARGB_8888)
+                .apply { eraseColor(android.graphics.Color.WHITE) }
+                .compress(Bitmap.CompressFormat.JPEG, 90, it)
+          }
+        }
+    val reading = mutableStateOf(false)
+    val dispatcher = StandardTestDispatcher()
+    compose.setContent {
+      ScanContent(
+          uiState = granted().copy(photo = photo, isReading = reading.value),
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          photoDispatcher = dispatcher,
+      )
+    }
+    compose.waitForIdle()
+    dispatcher.scheduler.advanceUntilIdle()
+    compose.waitForIdle()
+    fun photoLuminance() =
+        compose.onNodeWithTag(C.Tag.prescription_scan_photo).captureToImage().toPixelMap().let {
+          luminance(it[it.width / 2, it.height / 2])
+        }
+    val before = photoLuminance()
+
+    reading.value = true
+    compose.waitForIdle()
+
+    assertTrue("before $before, while reading ${photoLuminance()}", photoLuminance() < before)
+  }
+
+  private fun luminance(color: androidx.compose.ui.graphics.Color) =
+      0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
