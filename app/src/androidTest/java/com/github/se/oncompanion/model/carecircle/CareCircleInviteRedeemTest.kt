@@ -120,18 +120,45 @@ class CareCircleInviteRedeemTest {
   fun observeJoinedCircles_isEmptyBeforeJoining_thenListsThePatient(): Unit = runBlocking {
     val invite = aliceInvite()
     EmulatorTestData.signIn("bob")
+    // Confirmed by the server: bob really joined nobody yet
     assertEquals(
-        emptyList<JoinedCareCircle>(),
-        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() },
+        JoinedCircles(emptyList(), isFromCache = false),
+        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first { !it.isFromCache } },
     )
 
     bobRedeems(invite.inviteCode)
 
     val joined =
-        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first { it.isNotEmpty() } }
+        withTimeout(10_000) {
+          repository.observeJoinedCircles(bobUid).first { it.circles.isNotEmpty() }.circles
+        }
     assertEquals(listOf(aliceUid), joined.map { it.patientUid })
     assertEquals("Alice", joined.single().patientFirstName)
   }
+
+  @Test
+  fun observeJoinedCircles_offline_saysTheListIsFromTheCache_untilTheServerAnswers(): Unit =
+      runBlocking {
+        val invite = aliceInvite()
+        EmulatorTestData.signIn("bob")
+        db.disableNetwork().await()
+
+        // Nothing read yet on this phone: an empty list that only the cache gives
+        assertEquals(
+            JoinedCircles(emptyList(), isFromCache = true),
+            withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() },
+        )
+
+        db.enableNetwork().await()
+        bobRedeems(invite.inviteCode)
+        val online =
+            withTimeout(10_000) {
+              repository.observeJoinedCircles(bobUid).first {
+                !it.isFromCache && it.circles.isNotEmpty()
+              }
+            }
+        assertEquals(listOf(aliceUid), online.circles.map { it.patientUid })
+      }
 
   @Test
   fun hasJoinedCircle_isTrueRightAfterJoining_offlineThenOnline(): Unit = runBlocking {

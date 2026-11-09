@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -30,8 +31,9 @@ import kotlinx.coroutines.flow.merge
  * ([redeem] needs the server, so it is never rejected that way).
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
- * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly.
- * [isOffline] makes [redeem] fail like without a connection. The caregiver's role isn't checked.
+ * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly, and
+ * [joinedCirclesFromCache] says they come from the cache only. [isOffline] makes [redeem] fail like
+ * without a connection. The caregiver's role isn't checked.
  *
  * @param circle when given, a successful [redeem] adds the member to it, so screens can watch a
  *   pending invite turn into a member
@@ -106,8 +108,20 @@ class FakeCareCircleInviteRepository(
     return joinedCircles(caregiverUid).isNotEmpty()
   }
 
-  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = observed {
-    joined.map { it[caregiverUid].orEmpty() }.distinctUntilChanged()
+  private val joinedFromCache = MutableStateFlow(false)
+
+  /** Whether [observeJoinedCircles] says the circles come from the cache only, as offline. */
+  var joinedCirclesFromCache: Boolean
+    get() = joinedFromCache.value
+    set(value) {
+      joinedFromCache.value = value
+    }
+
+  override fun observeJoinedCircles(caregiverUid: String): Flow<JoinedCircles> = observed {
+    combine(joined, joinedFromCache) { circles, fromCache ->
+          JoinedCircles(circles[caregiverUid].orEmpty(), fromCache)
+        }
+        .distinctUntilChanged()
   }
 
   /** The invite stored with [inviteCode], whatever its state, or null. */

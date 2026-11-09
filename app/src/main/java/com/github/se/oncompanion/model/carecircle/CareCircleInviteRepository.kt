@@ -80,10 +80,10 @@ interface CareCircleInviteRepository {
 
   /**
    * Emits the circles [caregiverUid] joined with [redeem], now and on every change (e.g. when a
-   * patient removes them). Works offline from the local cache. The flow fails if they can't be
-   * read.
+   * patient removes them), and whether they come from the local cache only. Works offline from the
+   * cache. The flow fails if they can't be read.
    */
-  fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>>
+  fun observeJoinedCircles(caregiverUid: String): Flow<JoinedCircles>
 
   /**
    * Whether [caregiverUid] joined at least one care circle, so the app can open the join screen for
