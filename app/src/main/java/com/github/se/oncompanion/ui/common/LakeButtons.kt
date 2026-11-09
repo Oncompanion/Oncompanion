@@ -65,8 +65,16 @@ internal fun LakeTextButton(
   }
 }
 
-/** The small spinner of the Figma (Progress/Circular, Size=Small): 24 dp, in [color]. */
+/** The small spinner of the Figma (Progress/Circular, Size=Small), in [color]. */
 @Composable
 internal fun SmallSpinner(color: Color, modifier: Modifier = Modifier) {
-  CircularProgressIndicator(color = color, strokeWidth = 2.dp, modifier = modifier.size(24.dp))
+  CircularProgressIndicator(
+      color = color,
+      strokeWidth = SMALL_SPINNER_STROKE,
+      modifier = modifier.size(SMALL_SPINNER_SIZE),
+  )
 }
+
+// The size and line width of the Figma's small spinner
+private val SMALL_SPINNER_SIZE = 24.dp
+private val SMALL_SPINNER_STROKE = 2.dp
