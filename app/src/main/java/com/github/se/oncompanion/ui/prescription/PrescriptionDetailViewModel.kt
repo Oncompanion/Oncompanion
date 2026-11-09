@@ -2,12 +2,12 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
@@ -23,9 +23,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -88,17 +85,16 @@ class PrescriptionDetailViewModel(
     private val manageMedicationSchedule: ManageMedicationSchedule =
         ManageMedicationSchedule(medicationRepository),
     private val patientUid: String? = null,
-    private val resolveSection: ResolveSectionAccess =
+    resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
 ) : ViewModel() {
+
+  private val observeSection = ObserveCareSection(resolveSection)
 
   private val _uiState = MutableStateFlow(PrescriptionDetailUiState())
   val uiState: StateFlow<PrescriptionDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
-
-  /** Follows whose prescription may be read; [observation] reads it. */
-  private var access: Job? = null
 
   private val deletion =
       DeleteConfirmation(
@@ -115,70 +111,72 @@ class PrescriptionDetailViewModel(
 
   /** Starts (or, after an error, restarts) observing the prescription. */
   fun load() {
+    _uiState.update { it.copy(isLoading = true, hasError = false) }
+    observe()
+  }
+
+  /** Observes the prescription in place of the current observation, keeping what is shown. */
+  private fun observe() {
     // Only one read at a time, so a second retry doesn't add a second listener
     observation?.cancel()
-    _uiState.update { it.copy(isLoading = true, hasError = false) }
-    access?.cancel()
-    access = viewModelScope.launch {
-      // In a flow, so that even an auth that throws right away shows the error state
-      flow { emitAll(resolveSection(CarePermission.PRESCRIPTIONS, patientUid)) }
-          .catch { e ->
-            Log.e(TAG, "Failed to check the access to the prescription $prescriptionId", e)
-            observation?.cancel()
-            // Nothing to delete without the access: the confirmation is dropped
-            _uiState.update {
-              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
-            }
+    observation = viewModelScope.launch {
+      observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
+            medicationRepository.observePrescription(ownerUid, prescriptionId)
           }
-          .collect { section ->
-            if (section is SectionAccess.Readable) {
-              _uiState.update { it.copy(isOwn = section.canEdit, isNotShared = false) }
-              observe(section.ownerUid)
-            } else {
-              // Nothing to read: not known yet, not shared, or nobody to read it for. The
-              // confirmation is dropped, so it doesn't reopen by itself once the access is back
-              observation?.cancel()
-              _uiState.update {
-                it.copy(
-                    prescription = null,
-                    isLoading = section == SectionAccess.Loading,
-                    hasError = section == SectionAccess.NoAccess,
-                    isNotShared = section == SectionAccess.NotShared,
-                    isOwn = false,
-                    delete = it.delete.afterRead(false),
-                )
-              }
-            }
-          }
+          .collect { section -> _uiState.update { it.showing(section) } }
     }
   }
 
-  /** Observes the prescription of [uid] in place of the current observation. */
-  private fun observe(uid: String) {
-    observation?.cancel()
-    observation = viewModelScope.launch {
-      medicationRepository
-          .observePrescription(uid, prescriptionId)
-          .catch { e ->
-            Log.e(TAG, "Failed to load the prescription $prescriptionId", e)
-            // Nothing to delete without the prescription: the confirmation is dropped
-            _uiState.update {
-              it.copy(isLoading = false, hasError = true, delete = it.delete.afterRead(false))
-            }
-          }
-          .collect { prescription ->
-            // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
-            _uiState.update {
-              it.copy(
-                  prescription = prescription,
-                  isLoading = false,
-                  hasError = false,
-                  delete = it.delete.afterRead(exists = prescription != null),
-              )
-            }
-          }
-    }
-  }
+  /**
+   * The detail for [section]. Without a prescription to show, the delete confirmation is dropped,
+   * so it doesn't reopen by itself once the prescription is back.
+   */
+  private fun PrescriptionDetailUiState.showing(
+      section: CareSection<Prescription?>
+  ): PrescriptionDetailUiState =
+      when (section) {
+        // What is shown stays until the prescription arrives (e.g. after a failed deletion), but
+        // not while the access itself isn't known: then nothing of it may show
+        is CareSection.Loading ->
+            if (section.accessKnown) copy(isLoading = prescription == null, isNotShared = false)
+            else
+                copy(
+                    prescription = null,
+                    isLoading = true,
+                    hasError = false,
+                    isNotShared = false,
+                    isOwn = false,
+                    delete = delete.afterRead(false),
+                )
+        // Nothing to read: not shared, or nobody to read it for
+        CareSection.NoAccess,
+        CareSection.NotShared ->
+            copy(
+                prescription = null,
+                isLoading = false,
+                hasError = section == CareSection.NoAccess,
+                isNotShared = section == CareSection.NotShared,
+                isOwn = false,
+                delete = delete.afterRead(false),
+            )
+        is CareSection.Failed ->
+            copy(
+                isLoading = false,
+                hasError = true,
+                isNotShared = false,
+                delete = delete.afterRead(false),
+            )
+        // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
+        is CareSection.Shown ->
+            copy(
+                prescription = section.data,
+                isLoading = false,
+                hasError = false,
+                isNotShared = false,
+                isOwn = section.canEdit,
+                delete = delete.afterRead(exists = section.data != null),
+            )
+      }
 
   /** Asks the user to confirm the deletion. Nothing is deleted before [confirmDelete]. */
   fun requestDelete() = deletion.request()
@@ -196,7 +194,7 @@ class PrescriptionDetailViewModel(
           signedInUid = { authRepository.signedInUid(TAG) },
           stopObserving = { observation?.cancel() },
           delete = { uid -> manageMedicationSchedule.delete(uid, prescriptionId) },
-          onFailure = ::observe,
+          onFailure = { observe() },
       )
 
   private companion object {

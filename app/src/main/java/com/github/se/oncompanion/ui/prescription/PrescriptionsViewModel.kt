@@ -2,12 +2,12 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
-import com.github.se.oncompanion.domain.carecircle.SectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
@@ -17,19 +17,10 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -84,9 +75,11 @@ class PrescriptionsViewModel(
         MedicationRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val patientUid: String? = null,
-    private val resolveSection: ResolveSectionAccess =
+    resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
 ) : ViewModel() {
+
+  private val observeSection = ObserveCareSection(resolveSection)
 
   private val _uiState = MutableStateFlow(PrescriptionsUiState(today = LocalDate.now(clock)))
   val uiState: StateFlow<PrescriptionsUiState> = _uiState.asStateFlow()
@@ -98,57 +91,35 @@ class PrescriptionsViewModel(
   }
 
   /** Starts (or, after an error, restarts) observing the prescriptions. */
-  @OptIn(ExperimentalCoroutinesApi::class)
   fun load() {
     observation?.cancel()
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     observation = viewModelScope.launch {
-      // In a flow, so that even an auth that throws right away shows the error state
-      flow { emitAll(resolveSection(CarePermission.PRESCRIPTIONS, patientUid)) }
-          // Whose prescriptions they are is known before the list: adding doesn't wait for it,
-          // and still works if it can't be read
-          .onEach { access ->
-            if (access is SectionAccess.Readable) {
-              _uiState.update { it.copy(isNotShared = false, canAdd = access.canAdd) }
-            }
+      observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
+            medicationRepository.observePrescriptions(ownerUid)
           }
-          .flatMapLatest(::prescriptionsOf)
-          .catch { e ->
-            Log.e(TAG, "Failed to load the prescriptions", e)
-            // A patient can still add one if their list fails. A caregiver can't: their access
-            // may have been taken away, and nothing would tell them once it is back
-            _uiState.update {
-              it.copy(
-                  isLoading = false,
-                  hasError = true,
-                  isNotShared = false,
-                  canAdd = it.canAdd && patientUid == null,
-              )
-            }
-          }
-          .collect { change -> _uiState.update(change) }
+          .collect { section -> _uiState.update { it.showing(section) } }
     }
   }
 
   /**
-   * How the list changes with [access]: the prescriptions it may read, or why there are none. Each
-   * access sets every flag, so nothing from the previous one stays (e.g. an error after "not
-   * shared").
+   * The list for [section]: its prescriptions, or why there are none. Every flag is set each time,
+   * so nothing from the previous access stays (e.g. an error after "not shared").
    */
-  private fun prescriptionsOf(
-      access: SectionAccess
-  ): Flow<(PrescriptionsUiState) -> PrescriptionsUiState> =
-      when (access) {
-        SectionAccess.Loading -> flowOf { it.withoutPrescriptions(isLoading = true) }
+  private fun PrescriptionsUiState.showing(
+      section: CareSection<List<Prescription>>
+  ): PrescriptionsUiState =
+      when (section) {
+        // Whose prescriptions they are is known before the list: adding doesn't wait for it
+        is CareSection.Loading ->
+            withoutPrescriptions(isLoading = true).copy(canAdd = section.canAdd)
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        SectionAccess.NoAccess -> flowOf { it.withoutPrescriptions(hasError = true) }
-        SectionAccess.NotShared -> flowOf { it.withoutPrescriptions(isNotShared = true) }
-        is SectionAccess.Readable ->
-            medicationRepository.observePrescriptions(access.ownerUid).map { prescriptions ->
-              { state: PrescriptionsUiState ->
-                state.copy(prescriptions = prescriptions, isLoading = false, hasError = false)
-              }
-            }
+        CareSection.NoAccess -> withoutPrescriptions(hasError = true)
+        CareSection.NotShared -> withoutPrescriptions(isNotShared = true)
+        // A patient can still add one if their list fails; a caregiver can't
+        is CareSection.Failed -> withoutPrescriptions(hasError = true).copy(canAdd = section.canAdd)
+        is CareSection.Shown ->
+            withoutPrescriptions().copy(prescriptions = section.data, canAdd = section.canAdd)
       }
 
   /** No prescriptions and nothing to add, for one of the reasons given. */
@@ -172,9 +143,5 @@ class PrescriptionsViewModel(
    */
   fun followToday(): Job = viewModelScope.launch {
     currentDay(clock).collect { today -> _uiState.update { it.copy(today = today) } }
-  }
-
-  private companion object {
-    const val TAG = "PrescriptionsViewModel"
   }
 }
