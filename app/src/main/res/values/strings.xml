@@ -522,6 +522,11 @@
     <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
     <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
     <string name="prescriptions_added_by_you">Added by you</string>
+    <!-- US-43: under "Added by you", where each prescription is, e.g. "Waiting for Anne" -->
+    <string name="prescriptions_waiting_for">Waiting for %1$s</string>
+    <string name="prescriptions_accepted_by">Accepted by %1$s</string>
+    <string name="prescriptions_rejected_by">Rejected by %1$s</string>
+    <string name="prescriptions_dismiss">Close</string>
     <!-- US-43: the patient reviews a prescription a caregiver added, then confirms or rejects it -->
     <string name="prescription_confirm_title">Review the prescription</string>
     <string name="prescription_confirm_notice">A caregiver added this prescription. Check each field and correct it if needed, then confirm.</string>

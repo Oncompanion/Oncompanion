@@ -2,12 +2,14 @@
 
 package com.github.se.oncompanion.ui.prescription
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.carecircle.CareSection
 import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
+import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
@@ -18,14 +20,20 @@ import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.SeenPrescriptions
+import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -41,8 +49,9 @@ import kotlinx.coroutines.launch
  *   be theirs
  * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
  * @property caregiverUid in caregiver mode, the signed-in caregiver: only the prescriptions they
- *   added are grouped while they wait for the patient. Null for the patient, who sees every
- *   caregiver's grouped.
+ *   added are grouped, with whether the patient accepted or rejected them. Null for the patient,
+ *   who sees every caregiver's grouped while they wait.
+ * @property seen in caregiver mode, the accepted prescriptions whose acceptance they closed
  */
 data class PrescriptionsUiState(
     val today: LocalDate,
@@ -52,16 +61,21 @@ data class PrescriptionsUiState(
     val canAdd: Boolean = false,
     val isNotShared: Boolean = false,
     val caregiverUid: String? = null,
+    val seen: Set<String> = emptySet(),
 ) {
   /**
-   * The prescriptions a caregiver added that wait for the patient, in the order of [prescriptions]
-   * (US-43): for the patient, every caregiver's (Figma: "Added by a caregiver"); for a caregiver,
-   * their own (Figma: "Added by you"). They show above the others.
+   * The prescriptions a caregiver added that show above the others, in the order of [prescriptions]
+   * (US-43): for the patient, every caregiver's that waits for them (Figma: "Added by a
+   * caregiver"); for a caregiver, their own, waiting, rejected, or accepted until they close it
+   * (Figma: "Added by you").
    */
   val waiting: List<Prescription>
-    get() = prescriptions.filter {
-      !it.isConfirmed && (caregiverUid == null || it.addedBy == caregiverUid)
-    }
+    get() =
+        if (caregiverUid == null) prescriptions.filter { !it.isConfirmed }
+        else
+            prescriptions.filter {
+              it.addedBy == caregiverUid && !(it.isConfirmed && it.id in seen)
+            }
 
   /**
    * The other prescriptions prescribed on or after the first day of the current month, in the order
@@ -104,6 +118,9 @@ class PrescriptionsViewModel(
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
     private val careCircleRepository: CareCircleRepository =
         CareCircleRepositoryProvider.repository,
+    private val seenPrescriptions: SeenPrescriptions = SeenPrescriptionsProvider.store,
+    private val manageMedicationSchedule: ManageMedicationSchedule =
+        ManageMedicationSchedule(medicationRepository),
 ) : ViewModel() {
 
   private val observeSection = ObserveCareSection(resolveSection)
@@ -115,6 +132,45 @@ class PrescriptionsViewModel(
 
   init {
     load()
+    followSeen()
+  }
+
+  /** In caregiver mode, follows which accepted prescriptions of the patient they closed. */
+  private fun followSeen() {
+    val patient = patientUid ?: return
+    val caregiver = runCatching { authRepository.currentUser?.uid }.getOrNull() ?: return
+    viewModelScope.launch {
+      seenPrescriptions.observe(caregiver).collect { keys ->
+        val ids = keys.filter { it.startsWith("$patient/") }.map { it.removePrefix("$patient/") }
+        _uiState.update { it.copy(seen = ids.toSet()) }
+      }
+    }
+  }
+
+  /**
+   * Closes the state of a prescription the caregiver added (US-43): an accepted one stays in the
+   * list without it, a rejected one is deleted. Works offline. Does nothing for one still waiting.
+   */
+  fun dismiss(prescriptionId: String) {
+    val patient = patientUid ?: return
+    val state = _uiState.value
+    val caregiver = state.caregiverUid ?: return
+    val prescription = state.waiting.firstOrNull { it.id == prescriptionId } ?: return
+    when (prescription.confirmation) {
+      PrescriptionConfirmation.CONFIRMED ->
+          seenPrescriptions.markSeen(caregiver, patient, prescriptionId)
+      PrescriptionConfirmation.REJECTED ->
+          viewModelScope.launch {
+            try {
+              manageMedicationSchedule.dismissRejected(patient, prescriptionId)
+            } catch (e: CancellationException) {
+              throw e
+            } catch (e: Exception) {
+              Log.e(TAG, "Failed to delete the rejected prescription $prescriptionId", e)
+            }
+          }
+      PrescriptionConfirmation.PENDING -> Unit
+    }
   }
 
   /** Starts (or, after an error, restarts) observing the prescriptions. */
@@ -129,8 +185,9 @@ class PrescriptionsViewModel(
                   list.filterNot { it.confirmation == PrescriptionConfirmation.REJECTED }
                 }
             // The patient sees the names they gave the members who added some; a caregiver the
-            // stored ones
-            if (patientUid != null) prescriptions
+            // stored ones, and those they added that the patient rejected
+            if (patientUid != null)
+                prescriptions.combine(rejectedBy(ownerUid)) { list, rejected -> list + rejected }
             else
                 prescriptions.combine(careCircleRepository.observeMemberNames(ownerUid)) {
                     list,
@@ -140,6 +197,20 @@ class PrescriptionsViewModel(
           }
           .collect { section -> _uiState.update { it.showing(section) } }
     }
+  }
+
+  /**
+   * The prescriptions the signed-in caregiver added that [ownerUid] rejected. Only a notice: if
+   * they can't be read, the list shows without them.
+   */
+  private fun rejectedBy(ownerUid: String): Flow<List<Prescription>> {
+    val caregiver = runCatching { authRepository.currentUser?.uid }.getOrNull()
+    return if (caregiver == null) flowOf(emptyList())
+    else
+        medicationRepository.observeRejectedPrescriptions(ownerUid, caregiver).catch { e ->
+          Log.w(TAG, "Couldn't read the rejected prescriptions", e)
+          emit(emptyList())
+        }
   }
 
   /**
@@ -189,5 +260,9 @@ class PrescriptionsViewModel(
    */
   fun followToday(): Job = viewModelScope.launch {
     currentDay(clock).collect { today -> _uiState.update { it.copy(today = today) } }
+  }
+
+  private companion object {
+    const val TAG = "PrescriptionsViewModel"
   }
 }

@@ -12,8 +12,11 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.SeenPrescriptions
+import com.github.se.oncompanion.model.medication.SeenPrescriptionsInMemory
 import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
@@ -24,6 +27,7 @@ import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -549,7 +553,9 @@ class PrescriptionsViewModelTest {
         val cases =
             listOf(
                 patient to Triple(listOf("sams", "leas"), listOf("confirmed"), emptyList()),
-                caregiver to Triple(listOf("sams"), listOf("confirmed"), listOf("leas")),
+                // Their accepted one stays under "Added by you" until they close it (#396)
+                caregiver to
+                    Triple(listOf("sams", "confirmed"), emptyList<String>(), listOf("leas")),
             )
         for ((viewModel, expected) in cases) {
           val state = viewModel.uiState.value
@@ -585,5 +591,138 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         for (viewModel in listOf(patient, caregiver)) assertEquals(listOf("kept"), viewModel.ids)
+      }
+
+  // ----- The caregiver sees what the patient decided (#396) -----
+
+  /** A prescription "caregiver" (or [by]) added for "patient", in [confirmation]. */
+  private fun added(
+      id: String,
+      confirmation: PrescriptionConfirmation,
+      by: String = "caregiver",
+  ) =
+      prescription(id, "2026-10-02", "Ondansetron 8 mg")
+          .copy(addedBy = by, addedByName = "Sam", confirmation = confirmation)
+
+  private fun caregiverList(
+      seen: SeenPrescriptions = SeenPrescriptionsInMemory(),
+      medications: MedicationRepository = repository,
+  ) =
+      PrescriptionsViewModel(
+          signedIn("caregiver"),
+          medications,
+          clock,
+          patientUid = "patient",
+          resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+          seenPrescriptions = seen,
+      )
+
+  @Test
+  fun caregiver_seesTheirOwnWaitingAcceptedAndRejected_andClosesTheDecidedOnes() =
+      runTest(dispatcher) {
+        repository.seed("patient", added("waiting", PrescriptionConfirmation.PENDING))
+        repository.seed("patient", added("accepted", PrescriptionConfirmation.CONFIRMED))
+        // Another caregiver's, waiting and rejected: never under "Added by you"
+        repository.seed("patient", added("leas", PrescriptionConfirmation.PENDING, by = "lea"))
+        for ((id, by) in listOf("rejected" to "caregiver", "leasRejected" to "lea")) {
+          repository.rejectPrescription("patient", added(id, PrescriptionConfirmation.PENDING, by))
+        }
+        val viewModel = caregiverList()
+        advanceUntilIdle()
+        fun waiting() = viewModel.uiState.value.waiting.map { it.id to it.confirmation }
+        assertEquals(
+            setOf(
+                "waiting" to PrescriptionConfirmation.PENDING,
+                "accepted" to PrescriptionConfirmation.CONFIRMED,
+                "rejected" to PrescriptionConfirmation.REJECTED,
+            ),
+            waiting().toSet(),
+        )
+        assertEquals(listOf("leas"), viewModel.thisMonthIds)
+
+        // Closing: nothing for one still waiting, the accepted one joins the others, the rejected
+        // one is deleted
+        for (id in listOf("waiting", "accepted", "rejected")) viewModel.dismiss(id)
+        advanceUntilIdle()
+
+        assertEquals(listOf("waiting" to PrescriptionConfirmation.PENDING), waiting())
+        assertEquals(setOf("accepted", "leas"), viewModel.thisMonthIds.toSet())
+        assertEquals(listOf("leasRejected"), repository.rejectedOf("patient").map { it.id })
+      }
+
+  @Test
+  fun caregiver_closedAcceptance_isRemembered_andRejectedOnesThatCantBeRead_leaveTheList() =
+      runTest(dispatcher) {
+        repository.seed("patient", added("accepted", PrescriptionConfirmation.CONFIRMED))
+        val seen = SeenPrescriptionsInMemory()
+        // Closed for another patient's prescription with the same ID: not this one
+        seen.markSeen("caregiver", "anotherPatient", "accepted")
+        val before = caregiverList(seen).also { advanceUntilIdle() }
+        assertEquals(listOf("accepted"), before.uiState.value.waiting.map { it.id })
+        before.dismiss("accepted")
+        // The rejected ones can't be read: the list still shows
+        val unreadable =
+            object : MedicationRepository by repository {
+              override fun observeRejectedPrescriptions(uid: String, addedBy: String) =
+                  flow<List<Prescription>> { throw IllegalStateException("denied") }
+            }
+
+        val reopened = caregiverList(seen, unreadable)
+        advanceUntilIdle()
+
+        assertFalse(reopened.uiState.value.hasError)
+        assertTrue(reopened.uiState.value.waiting.isEmpty())
+        assertEquals(listOf("accepted"), reopened.thisMonthIds)
+      }
+
+  @Test
+  fun closing_doesNothing_forThePatient_anUnknownOne_orWhenDeletingFails() =
+      runTest(dispatcher) {
+        repository.rejectPrescription(
+            "patient",
+            added("rejected", PrescriptionConfirmation.PENDING),
+        )
+        repository.seed(uid, added("own", PrescriptionConfirmation.CONFIRMED))
+        val patient = viewModel()
+        val caregiver = caregiverList()
+        advanceUntilIdle()
+
+        // The patient closes nothing; the caregiver can't close what isn't theirs to close
+        patient.dismiss("own")
+        caregiver.dismiss("missing")
+        // Deleting the rejected one fails on the device: it stays, and the list keeps working
+        repository.writeError = IllegalStateException("disk full")
+        caregiver.dismiss("rejected")
+        advanceUntilIdle()
+
+        assertEquals(listOf("own"), patient.ids)
+        assertEquals(listOf("rejected"), repository.rejectedOf("patient").map { it.id })
+        assertEquals(listOf("rejected"), caregiver.uiState.value.waiting.map { it.id })
+        assertFalse(caregiver.uiState.value.hasError)
+      }
+
+  @Test
+  fun caregiverSignedOut_seesNoRejectedOnesNorClosedOnes() =
+      runTest(dispatcher) {
+        repository.rejectPrescription(
+            "patient",
+            added("rejected", PrescriptionConfirmation.PENDING),
+        )
+        val viewModel =
+            PrescriptionsViewModel(
+                FakeAuthRepository(),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+                seenPrescriptions = SeenPrescriptionsInMemory(),
+            )
+        advanceUntilIdle()
+
+        viewModel.dismiss("rejected")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.waiting.isEmpty())
+        assertEquals(listOf("rejected"), repository.rejectedOf("patient").map { it.id })
       }
 }
