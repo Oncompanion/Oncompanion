@@ -16,7 +16,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -28,7 +32,7 @@ class DialogTags(
     val dialog: String,
     val confirm: String,
     val cancel: String,
-    val error: String,
+    val error: String = "",
 )
 
 /**
@@ -38,6 +42,8 @@ class DialogTags(
  *
  * @param error shown in red under [message] when not null, e.g. after a failed deletion
  * @param isDestructive makes [confirmLabel] red, for an action that can't be undone
+ * @param focusCancel puts the focus on [cancelLabel] first, when it is the safer choice (e.g.
+ *   staying signed in with changes not yet saved online)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,8 +58,11 @@ fun LakeDialog(
     isDestructive: Boolean = false,
     isWorking: Boolean = false,
     error: String? = null,
+    focusCancel: Boolean = false,
 ) {
   val colors = MaterialTheme.colorScheme
+  val cancelFocus = remember { FocusRequester() }
+  LaunchedEffect(focusCancel) { if (focusCancel) cancelFocus.requestFocus() }
   BasicAlertDialog(onDismissRequest = { if (!isWorking) onCancel() }) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
@@ -101,7 +110,7 @@ fun LakeDialog(
                   onClick = onCancel,
                   style = LakeButtonStyle.Text,
                   enabled = !isWorking,
-                  modifier = Modifier.testTag(tags.cancel),
+                  modifier = Modifier.testTag(tags.cancel).focusRequester(cancelFocus),
               )
             },
             confirm = {

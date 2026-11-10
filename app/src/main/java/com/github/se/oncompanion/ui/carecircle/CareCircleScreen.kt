@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -50,6 +49,8 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -325,31 +326,24 @@ private fun EmptyState(onAddMember: () -> Unit, modifier: Modifier) {
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,
       )
-      Button(
+      LakeButton(
+          text = stringResource(R.string.care_circle_empty_add_member),
           onClick = onAddMember,
           modifier = Modifier.testTag(C.Tag.care_circle_empty_add_button),
-      ) {
-        Text(stringResource(R.string.care_circle_empty_add_member))
-      }
+      )
     }
   }
 }
 
 @Composable
 private fun ErrorState(onRetry: () -> Unit, modifier: Modifier) {
-  Column(
-      modifier = modifier.padding(32.dp).testTag(C.Tag.care_circle_error),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-  ) {
-    Text(
-        text = stringResource(R.string.care_circle_error),
-        style = MaterialTheme.typography.bodyLarge,
-        textAlign = TextAlign.Center,
+  Box(modifier.testTag(C.Tag.care_circle_error), contentAlignment = Alignment.Center) {
+    LakeMessageState(
+        title = stringResource(R.string.care_circle_error),
+        actionLabel = stringResource(R.string.care_circle_retry),
+        onAction = onRetry,
+        actionTestTag = C.Tag.care_circle_retry_button,
     )
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.care_circle_retry_button)) {
-      Text(stringResource(R.string.care_circle_retry))
-    }
   }
 }
 

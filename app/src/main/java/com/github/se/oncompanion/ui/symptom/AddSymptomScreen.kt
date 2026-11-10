@@ -31,10 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
@@ -75,7 +73,10 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeFilterChip
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
@@ -205,7 +206,7 @@ fun AddSymptomContent(
       topBar = {
         if (!scrollsEverything || !uiState.isFormShown) FormTopBar(uiState, caregiverOf, onBack)
       },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = {
         if (!scrollsEverything && uiState.isFormShown) FormSaveButton(uiState, onSave)
@@ -413,12 +414,12 @@ private fun IntensitySlider(
         modifier = Modifier.weight(1f).testTag(C.Tag.symptom_add_intensity_value),
     )
     if (intensity != null) {
-      TextButton(
+      LakeButton(
+          text = stringResource(R.string.symptom_add_intensity_clear),
           onClick = onClear,
+          style = LakeButtonStyle.Text,
           modifier = Modifier.testTag(C.Tag.symptom_add_intensity_clear),
-      ) {
-        Text(stringResource(R.string.symptom_add_intensity_clear))
-      }
+      )
     }
   }
 
@@ -619,20 +620,20 @@ private fun TimePickerDialogFor(
   AlertDialog(
       onDismissRequest = onDismiss,
       confirmButton = {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.symptom_add_picker_confirm),
             onClick = { onConfirm(LocalTime.of(pickerState.hour, pickerState.minute)) },
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.symptom_add_picker_confirm),
-        ) {
-          Text(stringResource(R.string.symptom_add_picker_confirm))
-        }
+        )
       },
       dismissButton = {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.symptom_add_picker_cancel),
             onClick = onDismiss,
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.symptom_add_picker_cancel),
-        ) {
-          Text(stringResource(R.string.symptom_add_picker_cancel))
-        }
+        )
       },
       text = {
         // A short window (a phone held sideways) types the time: the clock has a fixed size and

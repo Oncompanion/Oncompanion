@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -49,6 +48,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -320,15 +320,15 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
   CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
-    MessageTexts(
+    LakeMessageState(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
                 ?: stringResource(R.string.prescriptions_error_title),
-        hint = stringResource(R.string.prescriptions_error_hint),
+        message = stringResource(R.string.prescriptions_error_hint),
+        actionLabel = stringResource(R.string.prescriptions_retry),
+        onAction = onRetry,
+        actionTestTag = C.Tag.prescriptions_retry_button,
     )
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.prescriptions_retry_button)) {
-      Text(stringResource(R.string.prescriptions_retry))
-    }
   }
 }
 

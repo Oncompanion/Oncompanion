@@ -3,17 +3,19 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -99,17 +102,18 @@ fun HospitalFieldContent(
         supportingText = { Text(stringResource(R.string.hospital_field_hint)) },
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.hospital_field),
     )
-    Button(
+    // Tonal: Save stays the screen's one filled button
+    LakeButton(
+        text = stringResource(R.string.hospital_search),
         onClick = { if (searchEnabled) onSearch() },
+        style = LakeButtonStyle.Tonal,
         enabled =
             enabled &&
                 searchEnabled &&
                 value.isNotBlank() &&
                 uiState != HospitalFieldUiState.Loading,
         modifier = Modifier.testTag(C.Tag.hospital_search),
-    ) {
-      Text(stringResource(R.string.hospital_search))
-    }
+    )
     if (enabled && searchEnabled)
         HospitalSearchFeedback(uiState) { hospital ->
           onValueChange(hospital.name)
@@ -137,37 +141,65 @@ private fun HospitalSearchFeedback(
       if (uiState.hospitals.isEmpty()) {
         Text(stringResource(R.string.hospital_search_empty), Modifier.testTag(C.Tag.hospital_empty))
       } else {
-        // Bound the list so it can fit inside either a scrolling form or a dialog.
-        Column(
-            Modifier.fillMaxWidth()
-                .heightIn(max = 240.dp)
-                .verticalScroll(rememberScrollState())
-                .testTag(C.Tag.hospital_results)
+        // The results as rows of one card, as lists are (Figma: "Edit profile – Hospital results")
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-          uiState.hospitals.forEach { hospital ->
-            TextButton(
-                onClick = { onHospitalSelected(hospital) },
-                modifier = Modifier.fillMaxWidth().testTag(C.Tag.hospital_result),
-            ) {
-              Column(Modifier.fillMaxWidth()) {
-                Text(hospital.name)
-                Text(hospital.address, style = MaterialTheme.typography.bodySmall)
+          // Bound the list so it can fit inside either a scrolling form or a dialog.
+          Column(
+              Modifier.heightIn(max = 240.dp)
+                  .verticalScroll(rememberScrollState())
+                  .testTag(C.Tag.hospital_results)
+          ) {
+            uiState.hospitals.forEachIndexed { index, hospital ->
+              if (index > 0) {
+                HorizontalDivider(
+                    Modifier.padding(horizontal = Spacing.lg),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
               }
+              HospitalResult(hospital) { onHospitalSelected(hospital) }
             }
           }
         }
       }
       // Credit accompanies successful lookups, including empty or cached responses.
       val uriHandler = LocalUriHandler.current
-      TextButton(
+      LakeButton(
+          text = stringResource(R.string.hospital_attribution),
           onClick = { uriHandler.openUri(HospitalRepository.ATTRIBUTION_URL) },
+          style = LakeButtonStyle.Text,
           modifier = Modifier.testTag(C.Tag.hospital_attribution),
-      ) {
-        Text(stringResource(R.string.hospital_attribution))
-      }
+      )
     }
   }
 }
+
+/** One result: the hospital's name above its address, the whole row tappable. */
+@Composable
+private fun HospitalResult(hospital: Hospital, onClick: () -> Unit) {
+  Column(
+      Modifier.fillMaxWidth()
+          .heightIn(min = RESULT_HEIGHT)
+          .clickable(role = Role.Button, onClick = onClick)
+          // A name that wraps keeps some room from the row's edges
+          .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+          .testTag(C.Tag.hospital_result),
+      verticalArrangement = Arrangement.Center,
+  ) {
+    Text(hospital.name, style = MaterialTheme.typography.titleMedium)
+    Text(
+        hospital.address,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+}
+
+// The height of a result row in the Figma
+private val RESULT_HEIGHT = 64.dp
 
 @Preview
 @Composable

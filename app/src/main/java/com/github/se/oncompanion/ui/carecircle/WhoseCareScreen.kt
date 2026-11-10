@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -22,7 +21,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 
 /**
  * "Whose care?" (US-20, Figma: "US-20 / Whose care?"): the patients a caregiver follows, with what
@@ -257,16 +257,18 @@ private fun Message(
           textAlign = TextAlign.Center,
       )
     }
-    Button(onClick = onAction, modifier = Modifier.testTag(C.Tag.whose_care_action)) {
-      Text(action)
-    }
+    LakeButton(
+        text = action,
+        onClick = onAction,
+        modifier = Modifier.testTag(C.Tag.whose_care_action),
+    )
     if (secondaryAction != null) {
-      TextButton(
+      LakeButton(
+          text = secondaryAction,
           onClick = onSecondaryAction,
           modifier = Modifier.testTag(C.Tag.whose_care_secondary_action),
-      ) {
-        Text(secondaryAction)
-      }
+          style = LakeButtonStyle.Text,
+      )
     }
   }
 }

@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -31,14 +32,19 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleScreenTest {
@@ -199,6 +205,19 @@ class CareCircleScreenTest {
         )
         .performClick()
     composeTestRule.runOnIdle { assertEquals(1, events.retryClicks) }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun error_retryIsFullyVisibleInLandscape() {
+    composeTestRule.setContent {
+      OncompanionTheme { CareCircleContent(CareCircleUiState.Error, {}, {}, {}, {}, {}) }
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_retry_button)
+        .assertHeightIsAtLeast(LakeButtonDefaults.MinHeight)
+        .assertIsFullyVisible()
   }
 
   // ---- members ----

@@ -359,7 +359,7 @@ Circular progress, 48 dp, centered where the content will appear; the small on-p
 - **Gone**: something deleted elsewhere says so ("This event doesn't exist anymore") with a way back.
 
 ### Drafted content
-Anything the app drafts (a scanned prescription, what voice picked up) lands in the normal form, marked *please check*, with a Waiting banner. Nothing is saved until the patient taps Save.
+Anything the app drafts (a scanned prescription, what voice picked up) lands in the normal form, marked *please check*, with a notice at the top saying what to check (for a scan, on the Primary Container). Nothing is saved until the patient taps Save.
 
 ### Permissions
 Camera, microphone and notifications are asked for when first needed. When refused, the screen explains it in one sentence, offers **Open settings**, and always a way without it (Enter manually, Type instead).

@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
@@ -40,6 +41,8 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -306,6 +309,19 @@ class PrescriptionsScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).performClick()
     assertEquals(1, retries)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun error_retryIsFullyVisibleInLandscape() {
+    composeTestRule.setContent {
+      OncompanionTheme { PrescriptionsContent(loaded.copy(hasError = true), {}, {}, {}, {}, {}) }
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptions_retry_button)
+        .assertHeightIsAtLeast(LakeButtonDefaults.MinHeight)
+        .assertIsFullyVisible()
   }
 
   @Test
