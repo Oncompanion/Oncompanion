@@ -443,6 +443,15 @@ object C {
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
 
+    // Medication detail (US-35)
+    const val medication_detail_screen = "medication_detail_screen"
+    const val medication_detail_back = "medication_detail_back"
+    const val medication_detail_content = "medication_detail_content"
+    const val medication_detail_prescription = "medication_detail_prescription"
+    const val medication_detail_loading = "medication_detail_loading"
+    const val medication_detail_feedback = "medication_detail_feedback"
+    const val medication_detail_retry = "medication_detail_retry"
+
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
     const val prescription_scan_close_button = "prescription_scan_close_button"
