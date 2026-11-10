@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
-// Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion
 
@@ -148,9 +148,11 @@ class M1EndToEndTest {
 
   private fun SemanticsNodeInteraction.fullyVisible() {
     val node = fetchSemanticsNode()
+    val size = node.size
+    assertTrue("The control must have drawable area", size.width > 0 && size.height > 0)
     assertTrue(
         "The whole control must fit in the viewport",
-        node.boundsInRoot.height >= node.size.height,
+        node.boundsInRoot.width >= size.width && node.boundsInRoot.height >= size.height,
     )
   }
 
