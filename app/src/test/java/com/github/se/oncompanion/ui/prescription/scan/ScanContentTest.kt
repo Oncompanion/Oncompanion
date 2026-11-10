@@ -4,10 +4,12 @@ package com.github.se.oncompanion.ui.prescription.scan
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -23,10 +25,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
 import com.github.se.oncompanion.ui.theme.PrimaryDark
@@ -637,6 +641,69 @@ class ScanContentTest {
     button(C.Tag.prescription_scan_open_settings_button).assertDoesNotExist()
     assertEquals(PrimaryDark, colorOf(C.Tag.prescription_scan_enter_manually_button))
   }
+
+  /**
+   * At 200% font scale, what the patient acts on in each state stays whole on screen: the shutter,
+   * even when the viewfinder takes the space, the buttons, and the reading message.
+   */
+  private fun eachState_staysWholeAtTwiceTheFontSize() {
+    val photo = photoFile(300, 424)
+    val cases =
+        listOf(
+            granted() to listOf(C.Tag.prescription_scan_capture_button),
+            granted().copy(photo = photo) to
+                listOf(
+                    C.Tag.prescription_scan_use_photo_button,
+                    C.Tag.prescription_scan_retake_button,
+                ),
+            granted().copy(photo = photo, isReading = true) to
+                listOf(C.Tag.prescription_scan_reading),
+            granted().copy(photo = photo, nothingRead = NothingRead.NOT_A_PRESCRIPTION) to
+                listOf(
+                    C.Tag.prescription_scan_nothing_read_enter_manually_button,
+                    C.Tag.prescription_scan_nothing_read_retake_button,
+                ),
+            ScanUiState(permission = CameraPermission.REFUSED) to
+                listOf(
+                    C.Tag.prescription_scan_open_settings_button,
+                    C.Tag.prescription_scan_enter_manually_button,
+                ),
+        )
+    var state by mutableStateOf(cases.first().first)
+    compose.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+        ScanContent(
+            uiState = state,
+            onBack = {},
+            onEnterManually = {},
+            onOpenSettings = {},
+            viewfinder = { camera.Viewfinder(it) },
+        )
+      }
+    }
+    val screen = compose.onNodeWithTag(C.Tag.prescription_scan_screen).fetchSemanticsNode()
+    cases.forEach { (case, tags) ->
+      state = case
+      compose.waitForIdle()
+      tags.forEach { tag ->
+        val node = compose.onNodeWithTag(tag).fetchSemanticsNode()
+        val bounds = node.boundsInRoot
+        // Not squeezed away, not cut by the screen's edges, and its whole height drawn
+        assertTrue("$tag has no height", node.size.height > 0)
+        assertTrue("$tag at $bounds is off the screen", bounds.bottom <= screen.size.height)
+        assertEquals("$tag is cut", node.size.height.toFloat(), bounds.height, 1f)
+      }
+    }
+  }
+
+  @Test
+  fun atTwiceTheFontSize_eachStateStaysWhole_inPortrait() = eachState_staysWholeAtTwiceTheFontSize()
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun atTwiceTheFontSize_eachStateStaysWhole_inLandscape() =
+      eachState_staysWholeAtTwiceTheFontSize()
 
   private fun luminance(color: androidx.compose.ui.graphics.Color) =
       0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue
