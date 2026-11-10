@@ -35,6 +35,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -159,6 +160,8 @@ fun PlanningContent(
         )
       }
       actions.onAddAppointment?.let { onAdd ->
+        // A caregiver only gets "+" when the patient lets them add appointments (US-41)
+        if (!state.canAdd) return@let
         val addLabel = stringResource(R.string.planning_add)
         FloatingActionButton(
             onClick = { onAdd(state.selectedDate) },
@@ -474,7 +477,17 @@ private fun PlanningRow(
         Icon(painterResource(icon), contentDescription = stringResource(typeLabel))
       },
       headlineContent = { Text(item.title) },
-      supportingContent = supportingText?.let { text -> { Text(text) } },
+      supportingContent =
+          if (supportingText == null && item.addedByName == null) null
+          else {
+            {
+              Column {
+                supportingText?.let { Text(it) }
+                // An appointment a caregiver added for the patient says who did (US-41)
+                item.addedByName?.let { AddedBy(it) }
+              }
+            }
+          },
       trailingContent =
           timed?.let { value ->
             {

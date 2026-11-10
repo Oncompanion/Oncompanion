@@ -710,31 +710,39 @@ class CareCircleMemberFormScreenTest {
     compose.runOnIdle { assertEquals(1, backs) }
   }
 
-  // ---- adding symptoms (US-22) ----
+  // ---- adding symptoms (US-22) and appointments (US-41) ----
 
   @Test
-  fun allowAddingSymptoms_isGreyedOut_untilSymptomsAreShared() {
+  fun allowAdding_isGreyedOut_untilItsSectionIsShared() {
     content(complete)
-    val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(CarePermission.SYMPTOMS.name))
+    val allowed = mutableSetOf<CarePermission>()
+    for (section in listOf(CarePermission.SYMPTOMS, CarePermission.PLANNING)) {
+      val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name))
 
-    canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
+      canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
 
-    compose
-        .onNodeWithTag(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
-        .performScrollTo()
-        .performClick()
-    canAdd.performScrollTo().assertIsEnabled().performClick()
+      compose
+          .onNodeWithTag(C.Tag.careCircleFormPermission(section.name))
+          .performScrollTo()
+          .performClick()
+      canAdd.performScrollTo().assertIsEnabled().performClick()
 
-    canAdd.assertIsOn()
-    assertEquals(setOf(CarePermission.SYMPTOMS), state.canAdd)
+      canAdd.assertIsOn()
+      allowed += section
+      assertEquals(allowed, state.canAdd)
+    }
   }
 
   @Test
-  fun allowAdding_isOnlyOfferedUnderSymptoms() {
+  fun allowAdding_isOfferedUnderPlanningAndSymptomsOnly() {
     content(complete)
 
-    for (section in CarePermission.entries - CarePermission.SYMPTOMS) {
+    for (section in listOf(CarePermission.EVENTS, CarePermission.PRESCRIPTIONS)) {
       compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name)).assertDoesNotExist()
     }
+    compose
+        .onNodeWithTag(C.Tag.careCircleFormCanAdd(CarePermission.PLANNING.name))
+        .performScrollTo()
+        .assertTextContains("Allow adding appointments", substring = true)
   }
 }

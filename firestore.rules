@@ -34,8 +34,8 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
     // Who added an entry: nothing when the patient did, or the signed-in caregiver's uid and first
-    // name when a caregiver did (US-22), so nobody can add one in someone else's name.
-    // Keep in sync with SymptomEntry.MAX_ADDED_BY_NAME_LENGTH.
+    // name when a caregiver did (US-22, US-41), so nobody can add one in someone else's name.
+    // Keep in sync with SymptomEntry and Appointment (MAX_ADDED_BY_NAME_LENGTH).
     function isValidAttribution(ownerUid, data) {
       return isOwner(ownerUid)
           ? !data.keys().hasAny(['addedBy', 'addedByName'])
@@ -95,7 +95,8 @@ service cloud.firestore {
     // ---------- Appointments ----------
     // Schema: title (required nonblank string, at most 100), scheduledAt (timestamp),
     // type (recorded category), location (optional string, 200), notes (optional string, 1000),
-    // createdAt (server timestamp). Identity and ownership come from the document path.
+    // createdAt (server timestamp), and addedBy/addedByName for a caregiver's appointment (see
+    // isValidAttribution). Identity and ownership come from the document path.
     function hasAppointmentTitleText(title) {
       // Match Kotlin Char.isWhitespace, including Unicode spaces that Rules trim() preserves.
       return title.matches('(?s).*[^\\x{0009}-\\x{000D}\\x{001C}-\\x{0020}\\x{00A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}].*');
@@ -103,7 +104,8 @@ service cloud.firestore {
 
     // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
     function isValidAppointment(data) {
-      return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt'])
+      return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt',
+                                  'addedBy', 'addedByName'])
           && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
           && data.title is string
           && hasAppointmentTitleText(data.title)
@@ -242,15 +244,19 @@ service cloud.firestore {
 
       // ---------- Appointments ----------
       // /users/{uid}/appointments/{appointmentId}: read by the owner and by members the owner
-      // shares Planning with; validated writes and deletion by the owner only.
+      // shares Planning with. Created by the owner, or by a member the owner lets add to Planning
+      // (US-41), signed with their uid; edited and deleted by the owner only, who keeps who added
+      // it.
       match /appointments/{appointmentId} {
         allow read: if canRead(uid, 'PLANNING');
         allow delete: if isOwner(uid);
-        allow create: if isOwner(uid)
+        allow create: if canAddTo(uid, 'PLANNING')
                       && isValidAppointment(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data)
                       && request.resource.data.createdAt == request.time;
         allow update: if isOwner(uid)
                       && isValidAppointment(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 

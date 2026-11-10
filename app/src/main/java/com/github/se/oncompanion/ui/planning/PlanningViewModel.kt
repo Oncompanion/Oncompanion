@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
  * Selected calendar day and the agenda currently available for it.
  *
  * @property isNotShared in caregiver mode, the patient doesn't share their planning: no entries
+ * @property canAdd whether adding an appointment is offered: always in the user's own planning, and
+ *   in caregiver mode once the patient's planning shows and they let the caregiver add (US-41)
  */
 data class PlanningUiState(
     val selectedDate: LocalDate,
@@ -39,6 +41,7 @@ data class PlanningUiState(
     val hasError: Boolean = false,
     val today: LocalDate = selectedDate,
     val isNotShared: Boolean = false,
+    val canAdd: Boolean = true,
 ) {
   /** The complete agenda in section order, derived from the two displayed sections. */
   val items: List<PlanningItem>
@@ -69,7 +72,14 @@ class PlanningViewModel(
         runCatching { LocalDate.parse(it) }.getOrNull()?.takeIf(PlanningDates::isSupported)
       } ?: today
   private val mutableState =
-      MutableStateFlow(PlanningUiState(initialDate, mondayOf(initialDate), today = today))
+      MutableStateFlow(
+          PlanningUiState(
+              initialDate,
+              mondayOf(initialDate),
+              today = today,
+              canAdd = patientUid == null,
+          )
+      )
   val uiState: StateFlow<PlanningUiState> = mutableState.asStateFlow()
   private var weekItems: List<PlanningItem> = emptyList()
   private var observation: Job? = null
@@ -157,6 +167,8 @@ class PlanningViewModel(
                   isLoading = planning is CarePlanning.Loading,
                   hasError = planning is CarePlanning.Failed,
                   isNotShared = planning is CarePlanning.NotShared,
+                  // A caregiver only gets "Add" with the patient's planning on screen
+                  canAdd = patientUid == null || (planning as? CarePlanning.Shown)?.canAdd == true,
               )
           publishItems()
         }

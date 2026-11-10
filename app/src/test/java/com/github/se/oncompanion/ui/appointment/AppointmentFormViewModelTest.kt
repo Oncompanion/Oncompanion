@@ -4,11 +4,17 @@
 package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.model.appointment.*
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
 import java.time.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.*
@@ -231,5 +237,78 @@ class AppointmentFormViewModelTest {
               oldAppointments
           com.github.se.oncompanion.model.auth.AuthRepositoryProvider.repository = oldAuth
         }
+      }
+
+  /**
+   * A caregiver the patient lets add appointments (US-41) adds one to the patient's planning,
+   * signed with their uid and first name; nothing goes in their own planning.
+   */
+  @Test
+  fun caregiver_addsToThePatientsPlanning_signedWithTheirUidAndFirstName() =
+      runTest(dispatcher) {
+        val profiles =
+            FakeUserProfileRepository().apply {
+              seed(UserProfile("uid-patient", Role.CAREGIVER, firstName = "Sam"))
+            }
+        val form =
+            AppointmentFormViewModel(
+                day,
+                ZoneId.of("Europe/Zurich"),
+                repo,
+                auth,
+                patientUid = "anne",
+                profileRepository = profiles,
+            )
+        advanceUntilIdle()
+        form.onTitleChange("Oncology check-up")
+        form.onTimeChange(LocalTime.of(9, 0))
+
+        form.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, form.uiState.value.save)
+        assertTrue(repo.appointments("uid-patient").isEmpty())
+        val added = repo.appointments("anne").single()
+        assertEquals("Oncology check-up", added.title)
+        assertEquals("uid-patient", added.addedBy)
+        assertEquals("Sam", added.addedByName)
+      }
+
+  /**
+   * The account changes while the caregiver's name is being read (e.g. the profile isn't on the
+   * phone yet): the old account's appointment is never written.
+   */
+  @Test
+  fun caregiver_accountChangesWhileTheNameIsRead_writesNothing() =
+      runTest(dispatcher) {
+        val nameRead = CompletableDeferred<Unit>()
+        val profiles =
+            object : UserProfileRepository by FakeUserProfileRepository() {
+              override fun observeProfile(uid: String): Flow<UserProfile?> = flow {
+                nameRead.await()
+                emit(UserProfile(uid, Role.CAREGIVER, firstName = "Sam"))
+              }
+            }
+        val form =
+            AppointmentFormViewModel(
+                day,
+                ZoneId.of("Europe/Zurich"),
+                repo,
+                auth,
+                patientUid = "anne",
+                profileRepository = profiles,
+            )
+        advanceUntilIdle()
+        form.onTitleChange("Oncology check-up")
+        form.onTimeChange(LocalTime.of(9, 0))
+        form.save()
+        advanceUntilIdle()
+
+        auth.signOut()
+        auth.signInWithGoogle("someone-else")
+        nameRead.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(repo.appointments("anne").isEmpty())
       }
 }

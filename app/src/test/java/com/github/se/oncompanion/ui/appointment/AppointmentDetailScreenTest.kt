@@ -75,6 +75,20 @@ class AppointmentDetailScreenTest {
     compose.onNodeWithText("Long note ".repeat(100)).performScrollTo().assertIsDisplayed()
   }
 
+  /** An appointment a caregiver added says who did (US-41); the patient's own says nothing. */
+  @Test
+  fun addedByACaregiver_saysWhoAddedIt() {
+    var state by
+        mutableStateOf<AppointmentDetailUiState>(
+            AppointmentDetailUiState.Loaded(appointment, addedByName = "Sam")
+        )
+    compose.setContent { AppointmentDetailContent(state, {}, {}, ZoneId.of("Europe/Zurich")) }
+    compose.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
+
+    compose.runOnIdle { state = AppointmentDetailUiState.Loaded(appointment) }
+    compose.onNodeWithTag(C.Tag.added_by).assertDoesNotExist()
+  }
+
   /** Loading, unavailable, error and retry remain distinct and Back always works. */
   @Test
   fun feedbackAndCallbacks() {

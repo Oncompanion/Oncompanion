@@ -36,6 +36,7 @@ class AppointmentFormScreenTest {
       dateChanged: (LocalDate) -> Unit = {},
       timeChanged: (LocalTime) -> Unit = {},
       typeChanged: (AppointmentType) -> Unit = {},
+      caregiverOf: String? = null,
   ) {
     compose.setContent {
       AppointmentFormContent(
@@ -50,6 +51,7 @@ class AppointmentFormScreenTest {
           saved,
           {},
           back,
+          caregiverOf = caregiverOf,
       )
     }
   }
@@ -288,7 +290,9 @@ class AppointmentFormScreenTest {
   @Test
   @org.robolectric.annotation.Config(qualifiers = SMALL_LANDSCAPE_PHONE)
   fun smallLandscapeKeyboardKeepsFieldsAndSaveReachable() {
-    show(state().copy(title = "Visit", time = LocalTime.NOON))
+    // A caregiver's form has the longest title (US-41)
+    show(state().copy(title = "Visit", time = LocalTime.NOON), caregiverOf = "Anne")
+    compose.onNodeWithText("Add an appointment for Anne").assertIsDisplayed()
     compose.showKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().apply {
       assertIsAboveKeyboard(280)
@@ -298,5 +302,13 @@ class AppointmentFormScreenTest {
       assertIsAboveKeyboard(280)
       assertIsFullyVisible()
     }
+  }
+
+  /** A caregiver's form says whose planning the appointment goes in (US-41). */
+  @Test
+  fun caregiversFormSaysWhosePlanningItIs() {
+    show(state(), caregiverOf = "Anne")
+    compose.onNodeWithText("Add an appointment for Anne").assertIsDisplayed()
+    compose.onNodeWithText("Add appointment").assertDoesNotExist()
   }
 }

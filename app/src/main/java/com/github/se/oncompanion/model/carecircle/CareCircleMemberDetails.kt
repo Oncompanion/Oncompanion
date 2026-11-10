@@ -51,8 +51,9 @@ data class CareCircleMemberDetails(
 
     /**
      * The sections the patient can let a member add to: one per story that lets a caregiver write
-     * (US-22 for symptoms). The forms only offer these.
+     * (US-22 for symptoms, US-41 for appointments). The forms only offer these.
      */
-    val ADDABLE_SECTIONS: Set<CarePermission> = setOf(CarePermission.SYMPTOMS)
+    val ADDABLE_SECTIONS: Set<CarePermission> =
+        setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS)
   }
 }

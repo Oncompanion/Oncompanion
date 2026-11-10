@@ -26,6 +26,7 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
@@ -124,7 +125,7 @@ fun AppointmentDetailContent(
                 )
               },
           ) {
-            AppointmentFields(state.appointment, zoneId)
+            AppointmentFields(state.appointment, zoneId, state.addedByName)
           }
       else ->
           Column(Modifier.fillMaxSize().padding(padding)) {
@@ -179,7 +180,7 @@ private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
+private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId, addedByName: String?) {
   val type =
       when (appointment.type) {
         AppointmentType.TREATMENT -> R.string.appointment_treatment
@@ -196,6 +197,8 @@ private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
         style = MaterialTheme.typography.titleSmall,
     )
     Text(appointment.title, style = MaterialTheme.typography.headlineMedium)
+    // An appointment a caregiver added for the patient says who did (US-41)
+    addedByName?.let { AddedBy(it) }
   }
   // Appointments record a start instant only; display it using the English UI language and the
   // phone's clock format.
