@@ -490,14 +490,14 @@ class EventDetailViewModelTest {
   }
 
   @Test
-  fun caregiver_eventsNotShared_seesNothing_andReadsNoRegistration() {
+  fun caregiver_eventsNotShared_isToldSo_andReadsNoRegistration() {
     // A read would fail and show an error instead of nothing
     registrations.observeError = IllegalStateException("must not be read")
 
     val state = caregiverViewModel(FollowedPatient(CarePermission.PLANNING)).uiState.value
 
     assertEquals(yoga, state.event)
-    assertEquals(RegistrationStatus.HIDDEN, state.registration)
+    assertEquals(RegistrationStatus.NOT_SHARED, state.registration)
   }
 
   @Test
@@ -510,7 +510,7 @@ class EventDetailViewModelTest {
     // The patient stops sharing Events, then shares it again, then removes the caregiver
     val steps =
         listOf(
-            { patient.shares(CarePermission.PLANNING) } to RegistrationStatus.HIDDEN,
+            { patient.shares(CarePermission.PLANNING) } to RegistrationStatus.NOT_SHARED,
             { patient.shares(CarePermission.EVENTS) } to RegistrationStatus.CONFIRMED,
             { patient.removesTheCaregiver() } to RegistrationStatus.HIDDEN,
         )
@@ -522,7 +522,7 @@ class EventDetailViewModelTest {
   }
 
   @Test
-  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsHidden() {
+  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsNotShared() {
     // The patient stops sharing Events: the server refuses the open read before the access change
     // arrives
     registrations.observeError = IllegalStateException("permission denied")
@@ -533,7 +533,7 @@ class EventDetailViewModelTest {
     patient.shares(CarePermission.PLANNING)
     ShadowLooper.idleMainLooper()
 
-    assertEquals(RegistrationStatus.HIDDEN, viewModel.uiState.value.registration)
+    assertEquals(RegistrationStatus.NOT_SHARED, viewModel.uiState.value.registration)
   }
 
   @Test
