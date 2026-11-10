@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,6 +45,7 @@ import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -159,12 +159,11 @@ fun PrescriptionDetailContent(
                 title = stringResource(R.string.prescription_detail_error_title),
                 hint = stringResource(R.string.prescription_detail_error_hint),
             ) {
-              Button(
+              LakeButton(
+                  text = stringResource(R.string.prescription_detail_retry),
                   onClick = onRetry,
                   modifier = Modifier.testTag(C.Tag.prescription_detail_retry_button),
-              ) {
-                Text(stringResource(R.string.prescription_detail_retry))
-              }
+              )
             }
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         uiState.isNotShared && caregiverOf != null ->

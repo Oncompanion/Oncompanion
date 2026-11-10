@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.model.event
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -13,9 +15,13 @@ import kotlinx.coroutines.flow.update
 /**
  * In-memory [EventRegistrationRepository] shared by unit tests, separated by uid. Like Firestore,
  * confirming twice keeps one confirmation. It doesn't check whether the event has started: that is
- * the rules' job, tested on the emulator.
+ * the rules' job, tested on the emulator. [serverRejectsWrites] and [rejectPendingWrites] simulate
+ * a server that rejects writes after they returned.
+ *
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeEventRegistrationRepository : EventRegistrationRepository {
+class FakeEventRegistrationRepository(rejectedWrites: RejectedWrites = RejectedWrites()) :
+    EventRegistrationRepository {
   private val store = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
 
   /** When set, observing fails with this exception when collection starts. */
@@ -23,6 +29,16 @@ class FakeEventRegistrationRepository : EventRegistrationRepository {
 
   /** When set, confirming and removing fail with this exception without changing anything. */
   var writeError: Exception? = null
+
+  private val server = RejectingServer<Map<String, Set<String>>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** The events [uid] confirmed, for assertions. */
   fun registeredEventIds(uid: String): Set<String> = store.value[uid].orEmpty()
@@ -48,6 +64,7 @@ class FakeEventRegistrationRepository : EventRegistrationRepository {
     requirePathSegment(uid)
     requirePathSegment(eventId)
     writeError?.let { throw it }
+    server.saving(store.value)
     store.update { it + (uid to (it[uid].orEmpty() + eventId)) }
   }
 
@@ -55,6 +72,7 @@ class FakeEventRegistrationRepository : EventRegistrationRepository {
     requirePathSegment(uid)
     requirePathSegment(eventId)
     writeError?.let { throw it }
+    server.saving(store.value)
     store.update { it + (uid to (it[uid].orEmpty() - eventId)) }
   }
 

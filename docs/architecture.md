@@ -6,13 +6,18 @@
 
 Oncompanion follows MVVM with three layers. Arrows point from the caller to what it depends on: the UI calls the domain layer (or the data layer directly when there is no logic to share), and nothing below ever calls up.
 
-The overview shows the core flows of the app, with arrows between its layers (#264). Each feature then has its own diagram below, read from its screens (top) down to the backend (bottom).
+The overview shows how the app fits together, with the calls between its layers (#264). Each feature then has its own diagram below, with its classes, read from its screens (top) down to the backend (bottom).
 
 ![Oncompanion architecture overview](architecture-overview.svg)
 
-Solid green = in the code, dashed green = partly built, grey dotted = a fake or empty stand-in for now, dashed white = planned. In the feature diagrams, solid arrows are calls the code makes today and dotted arrows are planned ones.
+Every diagram names its four layers and gives each one colour: screens and ViewModels in violet, use cases in yellow, repositories and device services in green, Firebase and the SDKs in grey. Arrows are calls and go down. Planned parts are grey dashed boxes that say "(planned)", and dotted arrows are planned calls. The overview follows two core flows, numbered on their arrows:
 
-To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and update the markings when something planned gets built.
+1. **A write works offline.** A screen writes through its repository to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
+2. **A caregiver only sees what is shared.** A screen showing a section of a patient's data reads it through `ObserveCareSection` (Planning and the Overview through `ObserveCarePlanning`), which asks `ResolveSectionAccess`; that uses `ResolveCareCircleAccess` and the care circle to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
+
+The overview also shows the large planned areas (the voice journal, reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
+
+To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
 ## Layers
 
@@ -159,8 +164,8 @@ navigation, patient data or persistence. Profile supplies the stateful HospitalF
 Add Appointment integration remains a separate task. The deployment prerequisite for a configurable, aggregate-rate-limited proxy
 from #142 still applies.
 
-The overview and Account/Appointment diagrams show the reusable HospitalField →
-HospitalFieldViewModel → HospitalRepository path. Edit Profile's search ViewModel connection is implemented behind provider configuration;
+The Account and Appointments diagrams show the reusable HospitalField (with its
+HospitalFieldViewModel) → HospitalRepositoryProxy path; the overview shows it from the profile. Edit Profile's search ViewModel connection is implemented behind provider configuration;
 Add Appointment integration remains planned.
 
 ## Optional profile hospital (issue #144)
@@ -218,11 +223,15 @@ remain separate work.
 
 ![Ligue events and directory](architecture-ligue.svg)
 
+### Reminders (planned)
+
+![Reminders (planned)](architecture-reminders.svg)
+
 ## Offline mode
 
 Firestore's local cache is the offline store: writes are applied locally right away and synced when the connection returns, and repositories expose `Flow`s from snapshot listeners so the UI updates either way. No separate Room database is needed. Text recognition, reminders and on-device speech work without a network.
 
-**Rejected writes (#248).** Because writes return once saved on the device, the server can still reject one later (security rules, revoked access). Firestore then undoes it on the device: a deleted item comes back, an edit is reverted. The symptom, medication and appointment repositories report each rejection to `RejectedWrites` (`model/session/`, held by `RejectedWritesProvider`), a count of rejections the user hasn't been told about. `RejectedWriteSnackbar` (`ui/common/`), placed once over the navigation graph in `AppNavHost`, shows "A change couldn't be saved and was undone" while that count is above zero, then acknowledges what it showed. A count rather than an event stream means a rejection that arrives while the app is in the background, or while the message is showing, isn't lost. The count is cleared at sign-out, so the next account never sees it.
+**Rejected writes (#248).** Because writes return once saved on the device, the server can still reject one later (security rules, revoked access). Firestore then undoes it on the device: a deleted item comes back, an edit is reverted. Every repository that writes this way (symptoms, medications, appointments, the user profile, the care circle, its invites and event registrations) reports each rejection to `RejectedWrites` (`model/session/`, held by `RejectedWritesProvider`), a count of rejections the user hasn't been told about. Redeeming an invite (`CareCircleInviteRepository.redeem()`) doesn't report: it is a transaction that only runs on the server, so nothing was saved on the device to undo, and its failure is shown directly on the join screen. `RejectedWriteSnackbar` (`ui/common/`), placed once over the navigation graph in `AppNavHost`, shows "A change couldn't be saved and was undone" while that count is above zero, then acknowledges what it showed. A count rather than an event stream means a rejection that arrives while the app is in the background, or while the message is showing, isn't lost. The count is cleared at sign-out, so the next account never sees it.
 
 ## Appointment form (issues #147 and #206)
 
@@ -323,7 +332,7 @@ Reading a prescription from those lines is plain Kotlin in `model/medication/sca
 
 The rule the tests hold it to, on the sheets: **every detail is right or to check**. `ScanAccuracyTest` also counts, sheet by sheet, the details read right, flagged, wrong without a flag and missed, and fails if the score gets worse. Sheets 01–06 were read while the parser was written and 07–11 later, with their answers written before they were read; since fixes were then made on 07–10, a new batch never fixed against is what measures real accuracy. A wrong detail that isn't flagged is the one the patient would trust. The sheets read right have nothing to check, so flagging everything doesn't pass either, and shuffled lines, unsure readings and digits read as letters must keep the rule.
 
-The patient reviews the draft in the prescription form, which starts from the `ScannedPrescription` the handoff holds. The details to check are shown in amber, with why ("it may not be what's on the paper", or "not found on the scan"), and an icon so they don't rely on the color alone. Amber is the theme's `warning` color, which Material 3 doesn't have: red stays for what blocks Save, and a detail to check doesn't, since the patient may find it right. A detail is no longer to check once the patient edits it; a removed medication takes its details with it. The form view model only keeps this set beside the draft: nothing about the scan is saved with the prescription.
+The patient reviews the draft in the prescription form, which starts from the `ScannedPrescription` the handoff holds. Each detail to check is a field in its Check state (`LakeTextField`'s `isCheck`): a dawn box with a secondary border, with why below it ("it may not be what's on the paper", or "not found on the scan"), and an icon so it doesn't rely on the color alone. Red stays for what blocks Save, and a detail to check doesn't, since the patient may find it right. A detail is no longer to check once the patient edits it; a removed medication takes its details with it. The form view model only keeps this set beside the draft: nothing about the scan is saved with the prescription.
 
 ## Care circle invitations
 
@@ -354,8 +363,11 @@ There are two emails: `invites/{inviteCode}.email` is where the patient sends th
 
 **Removing a member** is one batch written by the patient: it deletes `circle/{memberUid}` and the caregiver's `patients/{patientUid}` doc, so no stale link is left behind (the invite was already deleted when they joined). This is the only write a patient makes into another user's data, allowed because a patient must always be able to take themselves off a caregiver's list: the rules let a patient delete exactly the `patients/{patientUid}` doc about themselves, nothing else. A caregiver leaves a circle the same way: one batch deleting their `circle/{caregiverUid}` doc in the patient's circle and their own `patients/{patientUid}` doc. Cancelling a pending invite deletes it; renewing an expired one creates a new invite with the same details and deletes the old one.
 
+**Inviting the same person twice** (#257). The add form compares the typed email with the circle's members (their account email) and pending invitations, trimmed and ignoring case, using the same listeners as the rest of the app, so it works from the cache when offline. A match refuses the invitation, and the form never writes for it: for an invitation, pending or expired, it links to the invite code screen, which shows the access already given and renews an expired code. Among several matching invitations (made before this check existed), it picks the newest. An invitation that expires while the form is open is shown as expired at once, as on the circle's list. People without an email are never matched. The patient's own account email is refused as well: a patient account can't join a circle, so that invitation could never be used. This check is on the phone only: invite codes are random, so the rules can't cheaply detect a duplicate.
+
 Known limitations:
 - Revoking access while the patient is offline only takes effect once their phone syncs.
+- The duplicate check can miss someone: two phones can invite the same email at once, and nothing is checked if the circle can't be read, since not being able to check must not stop an invitation. Sending waits for the circle's first read, from the cache when offline, for 3 seconds at most: a slower read sends without the check. A read error stops the check of that list until the form is reopened: Firestore reconnects by itself after a network drop, so only rare errors, such as a permission error, do this. The result is an extra invitation, which the patient can cancel. If the person uses it with the account they already joined with, `AlreadyMember` refuses it; with another Google account, they join as a second member, whom the patient can remove.
 - If the patient changes their first name, caregivers keep the old one: a patient makes no other writes into caregivers' data, so the new name isn't pushed into each caregiver's `patients` list.
 - Someone with a patient account can't join a circle; they would need to sign in with another Google account.
 - An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.
@@ -456,7 +468,7 @@ now; a supported replacement/migration strategy can be reviewed separately after
 Generated Excalidraw/SVG changes are required architecture artifacts. No unrelated feature changes
 or coverage exclusions are included.
 
-The Account and overview diagrams include `SignOut` and `LocalSessionRepository`. No dependencies,
+The Account diagram includes `SignOut` and `LocalSessionRepository`; the overview shows `SignOut` and the session. No dependencies,
 Firebase rules or normal persistence settings change. Future Firestore repositories must use
 `SessionAccess.operation`, `snapshots` and the shared instance accessor. Server transactions must
 also use the tracker; non-suspending local enqueues use `immediate`, under the same gate lock.
@@ -513,4 +525,4 @@ calendar header in the agenda's lazy list on compact windows; Profile lets its t
 and actions share one scroll instead of pinning them around a small details viewport. Portrait
 keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
 use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
-feature diagrams document the layout behavior; the overview's core flows are unchanged.
+feature diagrams document the layout behavior; the overview is unchanged.

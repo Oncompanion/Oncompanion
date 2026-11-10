@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,9 +29,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
@@ -44,6 +47,7 @@ import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
+import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -73,6 +77,7 @@ class CareCircleMemberFormScreenTest {
   private var state by mutableStateOf(CareCircleMemberFormUiState())
   private var saves = 0
   private var backs = 0
+  private val openedInvites = mutableListOf<String>()
   private val permissionChanges = mutableListOf<Pair<CarePermission, Boolean>>()
 
   /** Shows the content; every change updates [state] like the ViewModel would. */
@@ -100,6 +105,7 @@ class CareCircleMemberFormScreenTest {
             state =
                 state.copy(canAdd = if (allowed) state.canAdd + section else state.canAdd - section)
           },
+          onOpenInvite = { openedInvites += it },
       )
     }
   }
@@ -326,6 +332,176 @@ class CareCircleMemberFormScreenTest {
     node(C.Tag.care_circle_form_back_button).performScrollTo().assertIsFullyVisible()
   }
 
+  // ---- inviting someone already in the circle (#257) ----
+
+  private val expiredInvite =
+      CareCircleInvite(
+          inviteCode = "OLDCODE234",
+          ownerUid = "owner",
+          ownerFirstName = "Anne",
+          details = CareCircleMemberDetails("Julie", relationship = Relationship.DAUGHTER),
+          email = "julie@example.com",
+          createdAt = Instant.EPOCH,
+      )
+
+  @Test
+  fun duplicate_explainsWhy_refusesToSend_andOpensTheInvitationIfAny() {
+    val pending = EmailAlreadyInCircle.PendingInvite("Julie", "NEWCODE234")
+    val expired = EmailAlreadyInCircle.ExpiredInvite("Julie", "OLDCODE234")
+    val memberText = string(R.string.care_circle_form_duplicate, "Julie")
+    val pendingText = string(R.string.care_circle_form_duplicate_pending, "Julie")
+    val expiredText = string(R.string.care_circle_form_duplicate_expired, "Julie")
+    val ownEmail = complete.copy(accountEmail = complete.email)
+    val ownText = string(R.string.care_circle_form_own_email)
+    // The form, its warning, and the invite code the link opens (none for a member)
+    val cases =
+        listOf(
+            Triple(
+                complete.copy(duplicate = EmailAlreadyInCircle.Member("Julie")),
+                memberText,
+                null,
+            ),
+            Triple(complete.copy(duplicate = pending), pendingText, "NEWCODE234"),
+            Triple(complete.copy(duplicate = expired), expiredText, "OLDCODE234"),
+            // Filling in the rest wouldn't allow sending: the form doesn't ask for it
+            Triple(CareCircleMemberFormUiState(duplicate = pending), pendingText, "NEWCODE234"),
+            Triple(ownEmail, ownText, null),
+            // Filling in the rest wouldn't allow sending: the form doesn't ask for it
+            Triple(
+                CareCircleMemberFormUiState(email = complete.email, accountEmail = complete.email),
+                ownText,
+                null,
+            ),
+            // An invitation already sent to their own email: nothing there to open
+            Triple(ownEmail.copy(duplicate = pending), ownText, null),
+        )
+    content(cases.first().first)
+    for ((form, warning, inviteCode) in cases) {
+      state = form
+      node(C.Tag.care_circle_form_email)
+          .performScrollTo()
+          .assert(isError)
+          .assertTextContains(warning)
+      node(C.Tag.care_circle_form_save_button)
+          .performScrollTo()
+          .assertIsNotEnabled()
+          .assertTextEquals(string(R.string.care_circle_form_send_invitation))
+      node(C.Tag.care_circle_form_missing).assertDoesNotExist()
+      if (inviteCode == null) {
+        node(C.Tag.care_circle_form_open_invite).assertDoesNotExist()
+      } else {
+        node(C.Tag.care_circle_form_open_invite)
+            .performScrollTo()
+            .assertTextEquals(string(R.string.care_circle_form_open_invite))
+            .performClick()
+        compose.runOnIdle { assertEquals(inviteCode, openedInvites.last()) }
+      }
+    }
+    compose.runOnIdle { assertEquals(0, saves) }
+  }
+
+  @Test
+  fun duplicate_whileSaving_hidesTheLink() {
+    content(
+        complete.copy(
+            duplicate = EmailAlreadyInCircle.PendingInvite("Julie", "NEWCODE234"),
+            save = SavePhase.SAVING,
+        )
+    )
+    node(C.Tag.care_circle_form_open_invite).assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun duplicate_landscape_showsTheWarningAndTheLinkInFull() {
+    content(complete.copy(duplicate = EmailAlreadyInCircle.ExpiredInvite("Julie", "OLDCODE234")))
+    node(C.Tag.care_circle_form_email).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.care_circle_form_open_invite).performScrollTo().assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun duplicate_landscapeKeyboardOpen_keepsTheWarningAndTheLinkAboveIt() {
+    content(complete.copy(duplicate = EmailAlreadyInCircle.ExpiredInvite("Julie", "OLDCODE234")))
+    val keyboardHeight = 500
+    node(C.Tag.care_circle_form_email).performScrollTo().requestFocus()
+    compose.showKeyboard(keyboardHeight)
+
+    node(C.Tag.care_circle_form_email).performScrollTo().assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.care_circle_form_open_invite).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.care_circle_form_open_invite).assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  /** The add form wired to a ViewModel, in a circle holding [invites]. */
+  private fun addFormViewModel(
+      invites: FakeCareCircleInviteRepository,
+      members: List<CareCircleMember> = emptyList(),
+  ): CareCircleMemberFormViewModel {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val circle = FakeCareCircleRepository().apply { setMembers("owner", members) }
+    return CareCircleMemberFormViewModel(invites, FakeUserProfileRepository(), auth, circle)
+  }
+
+  @Test
+  fun screen_typingAMembersEmail_warns_andTheWarningSurvivesRotation() {
+    val members =
+        listOf(CareCircleMember(uid = "marc", firstName = "Marc", email = "marc@example.com"))
+    val invites = FakeCareCircleInviteRepository()
+    val viewModel = addFormViewModel(invites, members)
+    val show = {
+      compose.activity.setContent {
+        CareCircleMemberFormScreen(
+            onBack = {},
+            onSaved = {},
+            onOpenInvite = {},
+            viewModel = viewModel,
+        )
+      }
+    }
+    compose.runOnUiThread(show)
+
+    node(C.Tag.care_circle_form_email).performScrollTo().performTextInput(" MARC@example.com")
+    val warning = string(R.string.care_circle_form_duplicate, "Marc")
+    node(C.Tag.care_circle_form_email).assertTextContains(warning)
+
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread(show)
+
+    node(C.Tag.care_circle_form_email)
+        .performScrollTo()
+        .assertTextContains(" MARC@example.com")
+        .assertTextContains(warning)
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsNotEnabled()
+    compose.runOnIdle { assertTrue(invites.created.isEmpty()) }
+  }
+
+  @Test
+  fun screen_anExpiredInvitation_isOpened_notRenewedByTheForm() {
+    val invites = FakeCareCircleInviteRepository().apply { setInvites(listOf(expiredInvite)) }
+    val viewModel = addFormViewModel(invites)
+    val opened = mutableListOf<String>()
+    compose.setContent {
+      CareCircleMemberFormScreen(
+          onBack = {},
+          onSaved = {},
+          onOpenInvite = { opened += it },
+          viewModel = viewModel,
+      )
+    }
+
+    node(C.Tag.care_circle_form_email).performScrollTo().performTextInput("julie@example.com")
+    node(C.Tag.care_circle_form_email)
+        .assertTextContains(string(R.string.care_circle_form_duplicate_expired, "Julie"))
+    node(C.Tag.care_circle_form_open_invite).performScrollTo().performClick()
+
+    compose.runOnIdle {
+      assertEquals(listOf("OLDCODE234"), opened)
+      assertEquals(expiredInvite, invites.invite(expiredInvite.inviteCode))
+      assertTrue(invites.created.isEmpty())
+    }
+  }
+
   // ---- editing a member ----
 
   /** Marc as in the Figma "US-14 / Edit member (email read-only)". */
@@ -466,7 +642,12 @@ class CareCircleMemberFormScreenTest {
         )
     val savedCodes = mutableListOf<String?>()
     compose.setContent {
-      CareCircleMemberFormScreen(onBack = {}, onSaved = { savedCodes += it }, viewModel = viewModel)
+      CareCircleMemberFormScreen(
+          onBack = {},
+          onSaved = { savedCodes += it },
+          onOpenInvite = {},
+          viewModel = viewModel,
+      )
     }
 
     node(C.Tag.care_circle_form_email).assertTextContains("marc.dubois@email.com")
@@ -491,12 +672,14 @@ class CareCircleMemberFormScreenTest {
         FakeUserProfileRepository().apply {
           seed(UserProfile(uid = "owner", role = Role.PATIENT, firstName = "Anne"))
         }
-    val viewModel = CareCircleMemberFormViewModel(invites, profiles, auth)
+    val viewModel =
+        CareCircleMemberFormViewModel(invites, profiles, auth, FakeCareCircleRepository())
     val savedCodes = mutableListOf<String?>()
     compose.setContent {
       CareCircleMemberFormScreen(
           onBack = { backs++ },
           onSaved = { savedCodes += it },
+          onOpenInvite = {},
           viewModel = viewModel,
       )
     }

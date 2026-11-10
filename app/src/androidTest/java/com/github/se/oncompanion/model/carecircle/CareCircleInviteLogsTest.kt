@@ -4,6 +4,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryFirestore.Companion.COLLECTION
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import java.text.SimpleDateFormat
@@ -33,7 +34,8 @@ class CareCircleInviteLogsTest {
   private val db
     get() = FirebaseEmulator.firestore
 
-  private val repository by lazy { CareCircleInviteRepositoryFirestore(db) }
+  // Its own count: the app-wide one would show the rejections in later tests' snackbar
+  private val repository by lazy { CareCircleInviteRepositoryFirestore(db, RejectedWrites()) }
   private lateinit var aliceUid: String
   private lateinit var logsSince: String
 

@@ -120,6 +120,11 @@ typography:
     fontWeight: 500
     lineHeight: "16px"
     letterSpacing: "0.025em"
+  button-label:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "17px"
+    fontWeight: 600
+    lineHeight: "20px"
 rounded:
   small: "8px"
   medium: "12px"
@@ -138,14 +143,28 @@ components:
   button-filled:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label-large}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.full}"
     padding: "0 24px"
     height: "56px"
   button-tonal:
     backgroundColor: "{colors.primary-container}"
     textColor: "{colors.on-primary-container}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.full}"
+    padding: "0 24px"
+    height: "56px"
+  button-outlined:
+    textColor: "{colors.primary-text}"
+    typography: "{typography.button-label}"
+    rounded: "{rounded.full}"
+    padding: "0 24px"
+    height: "56px"
+  button-text:
+    textColor: "{colors.primary-text}"
+    typography: "{typography.button-label}"
+    rounded: "{rounded.full}"
+    padding: "0 24px"
     height: "56px"
   chip-selected:
     backgroundColor: "{colors.secondary-container}"
@@ -176,6 +195,21 @@ components:
     textColor: "{colors.on-surface}"
     rounded: "{rounded.extra-large}"
     width: "312px"
+    padding: "24px 24px 12px"
+  banner-neutral:
+    backgroundColor: "{colors.surface-container-high}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body-medium}"
+    rounded: "{rounded.medium}"
+    padding: "4px 8px 4px 12px"
+    height: "48px"
+  banner-waiting:
+    backgroundColor: "{colors.secondary-container}"
+    textColor: "{colors.on-secondary-container}"
+    typography: "{typography.body-medium}"
+    rounded: "{rounded.medium}"
+    padding: "4px 8px 4px 12px"
+    height: "48px"
   snackbar:
     backgroundColor: "{colors.inverse-surface}"
     textColor: "{colors.inverse-on-surface}"
@@ -249,7 +283,7 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 - **Title Medium** (600, 17/24): list titles, times, form questions, section headings.
 - **Title Small** (600, 15/20): group headers in lists ("This month", "Scheduled", the week range).
 - **Body Large** (400, 17/26): field values and the date under the greeting. **Body Medium** (15/22): details. **Body Small** (13/18): helper text.
-- **Label Large** (600, 15/20): buttons and chips. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
+- **Button label** (600, 17/20): every button, one step above Label Large as in the Figma buttons. **Label Large** (600, 15/20): chips, and the actions of snackbars and banners. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
 
 **The 200% Rule.** All text is sp and must reflow at 200% font scale: no fixed-height text containers, no truncated labels.
 
@@ -287,16 +321,16 @@ The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* compo
 ## Components
 
 ### Buttons
-Pills 56 dp tall, 24 dp side padding. Filled for the one main action, Tonal for a strong secondary, Outlined or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
+Pills 56 dp tall, 24 dp side padding, with an optional 24 dp leading icon 8 dp before the label. Filled for the one main action, Tonal for a strong secondary, Outlined (a 1.5 dp Outline border) or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
 
 ### Chips
-Filter chips 48 dp tall (full touch target). Selected: dawn container with a check icon.
+Filter chips 48 dp tall (full touch target), 16 dp side padding. Selected: dawn container with a check icon, 8 dp before the label.
 
 ### Cards / Containers
 White on the warm ground, Large radius, no border. Lists live in one card with 1 dp Outline Variant dividers inset 16 dp. A row shows its value above its label (Body Large, then Body Small).
 
 ### Inputs / Fields
-Outlined, Medium radius, 56 dp, label inside above the value, trailing icon in a 48 dp target. States: empty, filled, error (red border and message) and *check*: a value the app drafted uses the dawn container, a 1.5 dp secondary border and the label "… · please check".
+Outlined, Medium radius, 58 dp in every state, label inside above the value, trailing icon in a 48 dp target. States: empty, filled, error (1.5 dp red border and message), focused (2 dp primary border while typing) and *check*: a value the app drafted uses the dawn container and a 1.5 dp secondary border, and its helper text says what to check ("Please check: the date was hard to read").
 
 ### Switches
 Material switches in a card row: name and one-line description on the left, switch on the right (e.g. what a member can see, notifications).
@@ -308,10 +342,10 @@ Material 3 navigation bar on Surface Container: Overview, Planning, Events. Acti
 Time, title, detail and a 48 dp check target. A taken dose dims (On Surface Variant) in place; rows are sorted by time and never move when their state changes.
 
 ### Dialogs, snackbars and banners
-- **Dialog**: white, Extra Large radius, 312 dp wide, over a scrim, title, message and text buttons, inline or stacked when labels are long. Only a destructive action is red. Used only for decisions (delete, remove, a duplicate prescription).
+- **Dialog**: white, Extra Large radius, 312 dp wide, 24 dp padding (12 dp at the bottom) and 12 dp between its parts, over a scrim: a Title Large title, a Body Medium message, then text buttons, inline or stacked (confirm above cancel) when labels are long. Only a destructive action is red. A failure adds a red line under the message; while the action is on its way, both buttons and Back are disabled and a small spinner sits just before Cancel. Used only for decisions (delete, remove, a duplicate prescription).
 - **Snackbar**: short-lived feedback at the bottom, with an action when it helps (Retry).
-- **Inline banner**: a lasting note at the top of the content. Neutral (information, a blocked permission) or Waiting (offline, drafted content to check).
-- **Message state**: icon, title, one line and an optional action, centered where the content would be.
+- **Inline banner**: a lasting note at the top of the content: the info icon (a neutral notice, never a red warning), one Body Medium line, and an optional Label Large action such as Retry, 48 dp tall with Medium corners. Neutral for a notice (e.g. a blocked permission, a failed refresh); Waiting for something that isn't final yet (e.g. not synced, a draft to check, a list saved earlier). Never a banner only because the phone is offline: reads use the cache.
+- **Message state**: icon, title, an optional line and an optional action, centered where the content would be.
 
 ### Progress
 Circular progress, 48 dp, centered where the content will appear; the small on-primary variant sits inside a button ("Signing you in…").
@@ -325,7 +359,7 @@ Circular progress, 48 dp, centered where the content will appear; the small on-p
 - **Gone**: something deleted elsewhere says so ("This event doesn't exist anymore") with a way back.
 
 ### Drafted content
-Anything the app drafts (a scanned prescription, what voice picked up) lands in the normal form, marked *please check*, with a Waiting banner. Nothing is saved until the patient taps Save.
+Anything the app drafts (a scanned prescription, what voice picked up) lands in the normal form, marked *please check*, with a notice at the top saying what to check (for a scan, on the Primary Container). Nothing is saved until the patient taps Save.
 
 ### Permissions
 Camera, microphone and notifications are asked for when first needed. When refused, the screen explains it in one sentence, offers **Open settings**, and always a way without it (Enter manually, Type instead).

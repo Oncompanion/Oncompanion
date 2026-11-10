@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 
 /**
  * Sign-in screen (Figma "US-01 / Login"): the only way in is "Continue with Google". The first
@@ -101,7 +101,7 @@ fun SignInContent(
 
   Scaffold(
       modifier = modifier.testTag(C.Tag.sign_in_screen),
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     Column(
         modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),

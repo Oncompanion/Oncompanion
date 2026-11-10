@@ -17,17 +17,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +45,9 @@ import com.github.se.oncompanion.ui.common.HospitalField
 import com.github.se.oncompanion.ui.common.HospitalFieldContent
 import com.github.se.oncompanion.ui.common.HospitalFieldUiState
 import com.github.se.oncompanion.ui.common.HospitalFieldViewModel
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
@@ -136,7 +136,7 @@ fun EditProfileContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
           val missing = state.firstName.isBlank()
-          OutlinedTextField(
+          LakeTextField(
               value = state.firstName,
               onValueChange = onFirstNameChange,
               enabled = state.canEdit,
@@ -158,7 +158,7 @@ fun EditProfileContent(
                   ),
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_first_name),
           )
-          OutlinedTextField(
+          LakeTextField(
               value = state.familyName,
               onValueChange = onFamilyNameChange,
               enabled = state.canEdit,
@@ -188,22 +188,21 @@ fun EditProfileContent(
                 modifier = Modifier.testTag(C.Tag.edit_profile_save_error),
             )
           }
-          Button(
+          LakeButton(
+              text = stringResource(R.string.edit_profile_save),
               onClick = onSave,
               enabled = state.canSave,
+              isWorking = state.save == SavePhase.SAVING,
+              workingTestTag = C.Tag.edit_profile_saving,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_save),
-          ) {
-            if (state.save == SavePhase.SAVING)
-                CircularProgressIndicator(modifier = Modifier.testTag(C.Tag.edit_profile_saving))
-            else Text(stringResource(R.string.edit_profile_save))
-          }
-          TextButton(
+          )
+          LakeButton(
+              text = stringResource(R.string.edit_profile_cancel),
               onClick = onBack,
+              style = LakeButtonStyle.Text,
               enabled = state.save != SavePhase.SAVING,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_cancel),
-          ) {
-            Text(stringResource(R.string.edit_profile_cancel))
-          }
+          )
         }
       }
     } else {
@@ -230,9 +229,11 @@ fun EditProfileContent(
                     stringResource(R.string.profile_error),
                     Modifier.testTag(C.Tag.edit_profile_load_error),
                 )
-                Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.edit_profile_retry)) {
-                  Text(stringResource(R.string.profile_retry))
-                }
+                LakeButton(
+                    text = stringResource(R.string.profile_retry),
+                    onClick = onRetry,
+                    modifier = Modifier.testTag(C.Tag.edit_profile_retry),
+                )
               }
           EditProfileStatus.READY -> Unit
         }

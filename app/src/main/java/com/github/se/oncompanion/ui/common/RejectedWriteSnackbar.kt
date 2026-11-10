@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,7 +56,7 @@ fun RejectedWriteSnackbarContent(
     }
   }
   // Raised by the height of the bottom navigation bar, so the message never covers the tabs
-  SnackbarHost(
+  LakeSnackbarHost(
       hostState,
       modifier
           .navigationBarsPadding()

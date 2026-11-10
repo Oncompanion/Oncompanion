@@ -2,25 +2,19 @@
 
 package com.github.se.oncompanion.ui.common
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
- * The Save button at the bottom of a form, as the form's bottom bar. While [isSaving], a spinner
- * tagged [savingTestTag] replaces [text], so the user sees the tap was taken into account.
+ * The Save button at the bottom of a form, as the form's bottom bar (Figma: "Button", Style=Filled,
+ * pinned 16 dp from the sides and 24 dp from the bottom). While [isSaving], a spinner tagged
+ * [savingTestTag] replaces [text] on the full teal button, so the user sees the tap was taken into
+ * account; otherwise a disabled button fades.
  */
 @Composable
 fun SaveButton(
@@ -32,27 +26,18 @@ fun SaveButton(
     savingTestTag: String,
     modifier: Modifier = Modifier,
 ) {
-  Button(
+  LakeButton(
+      text = text,
       onClick = onClick,
       enabled = enabled,
+      isWorking = isSaving,
+      workingTestTag = savingTestTag,
       modifier =
           modifier
               .fillMaxWidth()
               // Keeps the button above the system navigation bar (the app draws edge to edge)
               .navigationBarsPadding()
-              .padding(horizontal = 24.dp, vertical = 16.dp)
-              .heightIn(min = 56.dp)
+              .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md, bottom = Spacing.xl)
               .testTag(testTag),
-  ) {
-    if (isSaving) {
-      Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(
-            strokeWidth = 2.dp,
-            modifier = Modifier.fillMaxSize().testTag(savingTestTag),
-        )
-      }
-    } else {
-      Text(text)
-    }
-  }
+  )
 }

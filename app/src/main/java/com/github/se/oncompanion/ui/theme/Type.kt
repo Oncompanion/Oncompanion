@@ -58,3 +58,10 @@ val Typography =
         labelMedium = figtree(13, FontWeight.SemiBold, 16, 0.015),
         labelSmall = figtree(12, FontWeight.Medium, 16, 0.025),
     )
+
+/**
+ * The label of every button (Figma "Button": Figtree SemiBold 17/20), a step larger than Label
+ * Large so the main actions read easily through fatigue. Read as `MaterialTheme.typography`.
+ */
+val Typography.buttonLabel: TextStyle
+  get() = labelLarge.copy(fontSize = 17.sp, lineHeight = 20.sp)

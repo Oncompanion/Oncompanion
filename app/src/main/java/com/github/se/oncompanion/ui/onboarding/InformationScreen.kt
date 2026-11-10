@@ -3,7 +3,6 @@
 package com.github.se.oncompanion.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,16 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +25,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -44,6 +37,9 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 
 /**
@@ -111,7 +107,7 @@ fun InformationContent(
   Scaffold(
       // Ends the screen at the keyboard (the activity is adjustResize): Continue can be scrolled to
       modifier = modifier.testTag(C.Tag.onboarding_information_screen).imePadding(),
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     Column(
         modifier =
@@ -136,7 +132,7 @@ fun InformationContent(
       Spacer(Modifier.height(32.dp))
       Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // First name (required): "*Required" below it, or an error once it's been cleared
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.firstName,
             onValueChange = {
               firstNameEdited = true
@@ -161,7 +157,7 @@ fun InformationContent(
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_first_name_field),
         )
         // Family name (optional)
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.familyName,
             onValueChange = onFamilyNameChange,
             label = { Text(stringResource(R.string.onboarding_family_name)) },
@@ -185,24 +181,14 @@ fun InformationContent(
       // Pushes Continue to the bottom of the screen when there's room
       Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
       // Continue saves the profile; enabled when a first name is filled in and nothing is saving
-      Button(
+      LakeButton(
+          text = stringResource(R.string.onboarding_continue),
           onClick = onContinue,
           enabled = uiState.canSave,
-          modifier =
-              Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(C.Tag.onboarding_save_button),
-      ) {
-        // While saving: a spinner instead of the text, same button size
-        if (uiState.save == SavePhase.SAVING) {
-          Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                strokeWidth = 2.dp,
-                modifier = Modifier.fillMaxSize().testTag(C.Tag.onboarding_saving),
-            )
-          }
-        } else {
-          Text(stringResource(R.string.onboarding_continue))
-        }
-      }
+          isWorking = uiState.save == SavePhase.SAVING,
+          workingTestTag = C.Tag.onboarding_saving,
+          modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_save_button),
+      )
       Spacer(Modifier.height(8.dp))
       SignedInAs(uiState.email, uiState.canSwitchAccount, onUseAnotherAccount)
     }

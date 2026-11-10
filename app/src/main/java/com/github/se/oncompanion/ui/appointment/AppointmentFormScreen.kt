@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -136,7 +137,7 @@ fun AppointmentFormContent(
   // Short windows let the header scroll too, leaving room for the focused field.
   Scaffold(
       modifier = modifier.imePadding().testTag(C.Tag.appointment_screen),
-      snackbarHost = { SnackbarHost(snackbar) },
+      snackbarHost = { LakeSnackbarHost(snackbar) },
       topBar = { if (!compact) topBar() },
   ) { padding ->
     if (state.load != AppointmentFormLoad.READY) {
@@ -161,9 +162,12 @@ fun AppointmentFormContent(
           )
           if (state.load == AppointmentFormLoad.FAILED)
               onRetry?.let { retry ->
-                TextButton(retry, Modifier.testTag(C.Tag.appointment_form_retry)) {
-                  Text(stringResource(R.string.appointment_detail_retry))
-                }
+                LakeButton(
+                    text = stringResource(R.string.appointment_detail_retry),
+                    onClick = retry,
+                    style = LakeButtonStyle.Text,
+                    modifier = Modifier.testTag(C.Tag.appointment_form_retry),
+                )
               }
         }
       }
@@ -177,7 +181,7 @@ fun AppointmentFormContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
       if (compact) topBar()
-      OutlinedTextField(
+      LakeTextField(
           state.title,
           onTitleChange,
           enabled = state.editable,
@@ -234,17 +238,18 @@ fun AppointmentFormContent(
       if (state.offsets.size > 1) {
         Text(stringResource(R.string.appointment_repeated_time))
         state.offsets.forEach { offset ->
-          FilterChip(
+          LakeFilterChip(
               selected = state.chosenOffset == offset,
               enabled = state.editable,
               onClick = { onOffsetChange(offset) },
-              label = { Text(stringResource(R.string.appointment_offset, offset.id)) },
+              label = stringResource(R.string.appointment_offset, offset.id),
+              role = Role.RadioButton,
           )
         }
       }
       // Temporary manual entry: hospital search is deferred until its service is configured.
       Column {
-        OutlinedTextField(
+        LakeTextField(
             state.location,
             onLocationChange,
             enabled = state.editable,
@@ -266,25 +271,23 @@ fun AppointmentFormContent(
       Text(stringResource(R.string.appointment_type))
       // Separate choices remain readable with large fonts or a narrow window.
       AppointmentType.entries.forEach { type ->
-        FilterChip(
+        LakeFilterChip(
             selected = state.type == type,
             enabled = state.editable,
             onClick = { onTypeChange(type) },
+            role = Role.RadioButton,
             modifier = Modifier.testTag(C.Tag.appointmentType(type.name)),
-            label = {
-              Text(
-                  stringResource(
-                      when (type) {
-                        AppointmentType.TREATMENT -> R.string.appointment_treatment
-                        AppointmentType.CONSULTATION -> R.string.appointment_consultation
-                        AppointmentType.OTHER -> R.string.appointment_other
-                      }
-                  )
-              )
-            },
+            label =
+                stringResource(
+                    when (type) {
+                      AppointmentType.TREATMENT -> R.string.appointment_treatment
+                      AppointmentType.CONSULTATION -> R.string.appointment_consultation
+                      AppointmentType.OTHER -> R.string.appointment_other
+                    }
+                ),
         )
       }
-      OutlinedTextField(
+      LakeTextField(
           state.notes,
           onNotesChange,
           enabled = state.editable,
@@ -343,20 +346,23 @@ fun AppointmentFormContent(
         title = { Text(stringResource(R.string.appointment_pick_time)) },
         text = { TimeInput(picker) },
         confirmButton = {
-          TextButton(
-              {
+          LakeButton(
+              text = stringResource(R.string.appointment_confirm),
+              onClick = {
                 onTimeChange(LocalTime.of(picker.hour, picker.minute))
                 timeOpen = false
               },
-              Modifier.testTag(C.Tag.appointment_confirm),
-          ) {
-            Text(stringResource(R.string.appointment_confirm))
-          }
+              style = LakeButtonStyle.Text,
+              modifier = Modifier.testTag(C.Tag.appointment_confirm),
+          )
         },
         dismissButton = {
-          TextButton({ timeOpen = false }, Modifier.testTag(C.Tag.appointment_cancel)) {
-            Text(stringResource(R.string.appointment_cancel))
-          }
+          LakeButton(
+              text = stringResource(R.string.appointment_cancel),
+              onClick = { timeOpen = false },
+              style = LakeButtonStyle.Text,
+              modifier = Modifier.testTag(C.Tag.appointment_cancel),
+          )
         },
     )
   }

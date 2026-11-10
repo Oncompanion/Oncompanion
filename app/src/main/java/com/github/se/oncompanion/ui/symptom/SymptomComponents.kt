@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
 
 /** The top bar's back arrow, shared by the symptom screens. */
 @Composable
@@ -62,9 +62,11 @@ internal fun SymptomMessage(
         textAlign = TextAlign.Center,
     )
     if (onRetry != null) {
-      Button(onClick = onRetry, modifier = Modifier.testTag(retryTestTag)) {
-        Text(stringResource(R.string.symptom_retry))
-      }
+      LakeButton(
+          text = stringResource(R.string.symptom_retry),
+          onClick = onRetry,
+          modifier = Modifier.testTag(retryTestTag),
+      )
     }
   }
 }
