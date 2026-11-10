@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -52,11 +53,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.EmailAlreadyInCircle
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeTextField
@@ -68,7 +71,8 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 /**
  * Adds someone to the care circle (#79), following the Figma "US-13 / Add member": their name,
  * relationship, an optional email and what they can see, all off by default. Saving creates their
- * invitation, then calls [onSaved] with its invite code.
+ * invitation, then calls [onSaved] with its invite code. An email that already has an invitation
+ * can't be invited again: [onOpenInvite] opens that invitation instead, with its invite code.
  *
  * With a member to edit (#75, Figma "US-14 / Edit member"), the same form shows their details and
  * account email, which can't be changed; saving updates them, then calls [onSaved] with null.
@@ -77,9 +81,15 @@ import com.github.se.oncompanion.ui.theme.OncompanionTheme
 fun CareCircleMemberFormScreen(
     onBack: () -> Unit,
     onSaved: (inviteCode: String?) -> Unit,
+    onOpenInvite: (inviteCode: String) -> Unit,
     viewModel: CareCircleMemberFormViewModel = viewModel { CareCircleMemberFormViewModel() },
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  // An invitation with the typed email may have expired while the phone slept
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshExpiry()
+    onPauseOrDispose {}
+  }
   // Leaves once per save, even if the screen recomposes before it is gone
   LaunchedEffect(uiState.save) {
     if (uiState.save == SavePhase.SAVED) {
@@ -98,6 +108,7 @@ fun CareCircleMemberFormScreen(
       onSave = viewModel::save,
       onBack = onBack,
       onCanAddChange = viewModel::onCanAddChange,
+      onOpenInvite = onOpenInvite,
   )
 }
 
@@ -115,6 +126,7 @@ fun CareCircleMemberFormContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onCanAddChange: (CarePermission, Boolean) -> Unit = { _, _ -> },
+    onOpenInvite: (inviteCode: String) -> Unit = {},
 ) {
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
   // keyboard open, a fixed one would leave no room for the field being typed. The loading and
@@ -141,7 +153,7 @@ fun CareCircleMemberFormContent(
       ) {
         NameRow(uiState, onFirstNameChange, onFamilyNameChange)
         RelationshipField(uiState.relationship, uiState.canEdit, onRelationshipChange)
-        EmailField(uiState, onEmailChange)
+        EmailField(uiState, onEmailChange, onOpenInvite)
       }
       PermissionSwitches(uiState, onPermissionChange, onCanAddChange)
       SaveSection(uiState, onSave)
@@ -287,12 +299,18 @@ private fun RelationshipField(
 }
 
 /**
- * The optional email the invitation is sent to, with an error once it doesn't look like one. When
+ * The optional email the invitation is sent to, with an error once it doesn't look like one or
+ * someone in the circle already has it; under it, a link to their invitation if they have one. When
  * editing, the member's account email, which can't be changed (hidden if their account has none).
  */
 @Composable
-private fun EmailField(uiState: CareCircleMemberFormUiState, onEmailChange: (String) -> Unit) {
+private fun EmailField(
+    uiState: CareCircleMemberFormUiState,
+    onEmailChange: (String) -> Unit,
+    onOpenInvite: (inviteCode: String) -> Unit,
+) {
   if (uiState.isEditing && uiState.email.isBlank()) return
+  val duplicate = uiState.duplicate
   LakeTextField(
       value = uiState.email,
       onValueChange = onEmailChange,
@@ -304,21 +322,44 @@ private fun EmailField(uiState: CareCircleMemberFormUiState, onEmailChange: (Str
           } else null,
       supportingText = {
         Text(
-            stringResource(
-                when {
-                  uiState.isEditing -> R.string.care_circle_form_account_email
-                  uiState.invalidEmail -> R.string.care_circle_form_invalid_email
-                  else -> R.string.care_circle_form_email_hint
-                }
-            )
+            when {
+              uiState.isEditing -> stringResource(R.string.care_circle_form_account_email)
+              uiState.invalidEmail -> stringResource(R.string.care_circle_form_invalid_email)
+              uiState.isOwnEmail -> stringResource(R.string.care_circle_form_own_email)
+              else ->
+                  when (duplicate) {
+                    null -> stringResource(R.string.care_circle_form_email_hint)
+                    is EmailAlreadyInCircle.Member ->
+                        stringResource(R.string.care_circle_form_duplicate, duplicate.firstName)
+                    is EmailAlreadyInCircle.PendingInvite ->
+                        stringResource(
+                            R.string.care_circle_form_duplicate_pending,
+                            duplicate.firstName,
+                        )
+                    is EmailAlreadyInCircle.ExpiredInvite ->
+                        stringResource(
+                            R.string.care_circle_form_duplicate_expired,
+                            duplicate.firstName,
+                        )
+                  }
+            }
         )
       },
-      isError = uiState.invalidEmail,
+      isError = uiState.invalidEmail || uiState.emailRefused,
       singleLine = true,
       keyboardOptions =
           KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
       modifier = Modifier.fillMaxWidth().testTag(C.Tag.care_circle_form_email),
   )
+  // Their invitation already holds the access to give and the code to send, or to renew
+  if (duplicate is EmailAlreadyInCircle.Invite && uiState.canEdit && !uiState.isOwnEmail) {
+    TextButton(
+        onClick = { onOpenInvite(duplicate.inviteCode) },
+        modifier = Modifier.testTag(C.Tag.care_circle_form_open_invite),
+    ) {
+      Text(stringResource(R.string.care_circle_form_open_invite))
+    }
+  }
 }
 
 /**
@@ -448,6 +489,8 @@ private fun SaveSection(uiState: CareCircleMemberFormUiState, onSave: () -> Unit
 private fun missingText(uiState: CareCircleMemberFormUiState): Int? =
     when {
       !uiState.canEdit -> null
+      // The email has its own message, and filling in the rest wouldn't allow sending
+      uiState.emailRefused -> null
       // A member always has a relationship: only the first name can be missing
       uiState.isEditing ->
           R.string.care_circle_form_missing_first_name_edit.takeIf { uiState.missingFirstName }

@@ -47,13 +47,16 @@ interface AuthRepository {
 }
 
 /**
- * The signed-in user's uid, or `null` if nobody is signed in or the user can't be read (logged with
+ * The signed-in user, or `null` if nobody is signed in or the user can't be read (logged with
  * [tag]). For screens that are only reachable after signing in, where `null` is an error.
  */
-fun AuthRepository.signedInUid(tag: String): String? =
+fun AuthRepository.signedInUser(tag: String): AuthUser? =
     try {
-      currentUser?.uid
+      currentUser
     } catch (e: Exception) {
       Log.w(tag, "Couldn't read the signed-in user", e)
       null
     }
+
+/** The uid of [signedInUser], for the same screens. */
+fun AuthRepository.signedInUid(tag: String): String? = signedInUser(tag)?.uid
