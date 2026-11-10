@@ -90,6 +90,11 @@
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
+    <!-- US-43: on the Prescriptions shortcut, read by screen readers, e.g. "1 prescription to confirm" -->
+    <plurals name="overview_prescriptions_to_confirm">
+        <item quantity="one">%1$d prescription to confirm</item>
+        <item quantity="other">%1$d prescriptions to confirm</item>
+    </plurals>
 
     <!-- Symptoms -->
     <string name="symptom_type_fatigue">Fatigue</string>

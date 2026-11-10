@@ -15,6 +15,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -41,6 +42,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -605,5 +607,53 @@ class OverviewViewModelTest {
             .value
             .sharedSections,
     )
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun prescriptionsToConfirm_countsThoseACaregiverAddedThatWait() = runTest {
+    Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    try {
+      val auth = signedIn(AuthUser("patient"))
+      val medications = FakeMedicationRepository()
+      val date = now.toLocalDate()
+      fun prescription(id: String, confirmation: PrescriptionConfirmation) =
+          Prescription(
+              id = id,
+              prescribedOn = date,
+              medications =
+                  listOf(
+                      Medication(id = "$id-1", prescriptionId = id, name = id, startDate = date)
+                  ),
+              addedBy = "sam",
+              addedByName = "Sam",
+              confirmation = confirmation,
+          )
+      listOf(
+              prescription("waiting", PrescriptionConfirmation.PENDING),
+              prescription("alsoWaiting", PrescriptionConfirmation.PENDING),
+              prescription("confirmed", PrescriptionConfirmation.CONFIRMED),
+              prescription("rejected", PrescriptionConfirmation.REJECTED),
+          )
+          .forEach { medications.seed("patient", it) }
+      val vm =
+          OverviewViewModel(
+              auth,
+              FakeUserProfileRepository(),
+              ownPlanning(FakePlanningRepository()),
+              TestClock(now),
+              zone,
+              medicationRepository = medications,
+          )
+      advanceUntilIdle()
+      assertEquals(2, vm.uiState.value.prescriptionsToConfirm)
+
+      // The patient confirms one: the count follows
+      medications.seed("patient", prescription("waiting", PrescriptionConfirmation.CONFIRMED))
+      advanceUntilIdle()
+      assertEquals(1, vm.uiState.value.prescriptionsToConfirm)
+    } finally {
+      Dispatchers.resetMain()
+    }
   }
 }

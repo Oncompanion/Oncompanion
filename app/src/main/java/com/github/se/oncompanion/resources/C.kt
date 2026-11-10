@@ -106,6 +106,7 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
