@@ -33,7 +33,7 @@ colors:
   inverse-on-surface: "#F2EEE9"
   inverse-primary: "#9AD0DC"
   horizon-dawn-top: "#F6D2B8"
-  horizon-dawn-bottom: "#EFB892"
+  horizon-dawn-bottom: "#C9D7DE"
   horizon-day-top: "#CFE5EA"
   horizon-day-bottom: "#A9CFD8"
   horizon-dusk-top: "#E3D9F0"
