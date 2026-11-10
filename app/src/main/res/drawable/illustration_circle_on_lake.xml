@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The care circle on the lake, around the user's boat; the members' boats are drawn in Compose (MemberBoat), exported from the Figma (page M2). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="179dp"
+    android:height="84dp"
+    android:viewportWidth="358"
+    android:viewportHeight="168">
+    <path
+        android:fillColor="#F6D2B8"
+        android:pathData="M0 20C0 8.95431 8.9543 0 20 0H338C349.046 0 358 8.95431 358 20V148C358 159.046 349.046 168 338 168H20C8.95431 168 0 159.046 0 148V20Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M262,56A22,22 0 1,0 306,56A22,22 0 1,0 262,56Z" />
+    <path
+        android:fillColor="#C3B5E0"
+        android:pathData="M0 78L70 48L128 66L204 34L280 64L358 42V78H0Z" />
+    <path
+        android:fillColor="#CFE5EA"
+        android:pathData="M0,78H358V168H0Z" />
+    <path
+        android:fillColor="#A9CFD8"
+        android:pathData="M0,126H358V168H0Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.55"
+        android:pathData="M179 76.75C223.138 76.75 263.07 81.4474 291.946 89.0273C306.39 92.8188 318.025 97.3204 326.031 102.289C334.077 107.283 338.25 112.612 338.25 118C338.25 123.388 334.077 128.717 326.031 133.711C318.025 138.68 306.39 143.181 291.946 146.973C263.07 154.553 223.138 159.25 179 159.25C134.862 159.25 94.9297 154.553 66.0537 146.973C51.6101 143.181 39.9747 138.68 31.9688 133.711C23.9225 128.717 19.75 123.388 19.75 118C19.75 112.612 23.9225 107.283 31.9688 102.289C39.9747 97.3204 51.6101 92.8188 66.0537 89.0273C94.9297 81.4474 134.862 76.75 179 76.75Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.75"
+        android:pathData="M179 90.75C208.779 90.75 235.713 93.8798 255.18 98.9268C264.919 101.452 272.746 104.446 278.121 107.74C283.539 111.061 286.25 114.55 286.25 118C286.25 121.45 283.539 124.939 278.121 128.26C272.746 131.554 264.919 134.548 255.18 137.073C235.713 142.12 208.779 145.25 179 145.25C149.221 145.25 122.287 142.12 102.82 137.073C93.0815 134.548 85.2538 131.554 79.8789 128.26C74.4611 124.939 71.75 121.45 71.75 118C71.75 114.55 74.4611 111.061 79.8789 107.74C85.2538 104.446 93.0815 101.452 102.82 98.9268C122.287 93.8798 149.221 90.75 179 90.75Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M179 103.75C194.418 103.75 208.35 105.425 218.404 108.118C223.437 109.466 227.456 111.058 230.198 112.795C232.978 114.555 234.25 116.333 234.25 118C234.25 119.667 232.978 121.445 230.198 123.205C227.456 124.942 223.437 126.534 218.404 127.882C208.35 130.575 194.418 132.25 179 132.25C163.582 132.25 149.65 130.575 139.596 127.882C134.563 126.534 130.544 124.942 127.802 123.205C125.022 121.445 123.75 119.667 123.75 118C123.75 116.333 125.022 114.555 127.802 112.795C130.544 111.058 134.563 109.466 139.596 108.118C149.65 105.425 163.582 103.75 179 103.75Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M171 110H187L174 88L171 110Z" />
+    <path
+        android:fillColor="#1F2A30"
+        android:pathData="M157 112H201L193 121H165L157 112Z" />
+</vector>
