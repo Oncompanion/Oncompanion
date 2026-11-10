@@ -478,6 +478,16 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <!-- Medication detail (US-35) -->
+    <string name="medication_detail_title">Medication</string>
+    <string name="medication_detail_view_prescription">View prescription</string>
+    <string name="medication_detail_prescription_date">Prescription date</string>
+    <string name="medication_detail_pending">Not confirmed</string>
+    <string name="medication_detail_error">Couldn\'t load this medication</string>
+    <string name="medication_detail_error_hint">Please try again.</string>
+    <string name="medication_detail_unavailable">This medication is unavailable</string>
+    <string name="medication_detail_unavailable_hint">It may have been removed, or its prescription may not be saved on this device.</string>
+
     <string name="prescription_detail_title">Prescription</string>
     <string name="prescription_detail_back">Back</string>
     <string name="prescription_detail_prescribed_by">Prescribed by</string>
