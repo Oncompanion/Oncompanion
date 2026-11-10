@@ -20,8 +20,8 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
-import com.github.se.oncompanion.ui.common.DeleteState
-import com.github.se.oncompanion.ui.common.HasDeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
+import com.github.se.oncompanion.ui.common.HasDeletePhase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,11 +48,11 @@ data class SymptomDetailUiState(
     val entry: SymptomEntry? = null,
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
-    override val delete: DeleteState = DeleteState(),
+    override val delete: DeletePhase = DeletePhase.IDLE,
     val canEdit: Boolean = true,
     val isNotShared: Boolean = false,
     val addedByName: String? = null,
-) : HasDeleteState {
+) : HasDeletePhase {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
     get() =
@@ -60,8 +60,8 @@ data class SymptomDetailUiState(
             entry != null &&
             !isLoading &&
             !hasError &&
-            !delete.isDeleting &&
-            !delete.isDeleted
+            delete != DeletePhase.DELETING &&
+            delete != DeletePhase.DELETED
 
   /** The symptom doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean

@@ -17,8 +17,8 @@ import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
-import com.github.se.oncompanion.ui.common.DeleteState
-import com.github.se.oncompanion.ui.common.HasDeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
+import com.github.se.oncompanion.ui.common.HasDeletePhase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,10 +41,10 @@ data class PrescriptionDetailUiState(
     val prescription: Prescription? = null,
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
-    override val delete: DeleteState = DeleteState(),
+    override val delete: DeletePhase = DeletePhase.IDLE,
     val isOwn: Boolean = true,
     val isNotShared: Boolean = false,
-) : HasDeleteState {
+) : HasDeletePhase {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
     get() = !isLoading && !hasError && !isNotShared && prescription == null
@@ -59,8 +59,8 @@ data class PrescriptionDetailUiState(
             prescription != null &&
             !isLoading &&
             !hasError &&
-            !delete.isDeleting &&
-            !delete.isDeleted
+            delete != DeletePhase.DELETING &&
+            delete != DeletePhase.DELETED
 
   /** The prescription is shown and can be deleted. */
   override val canDelete: Boolean

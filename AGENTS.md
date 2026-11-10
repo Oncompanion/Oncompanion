@@ -41,6 +41,7 @@ com.github.se.oncompanion/
   - Repositories access Firebase **lazily** (`by lazy`), never in their constructor: each provider builds its repository once, the first time it is used (e.g. by a ViewModel default), and Firebase isn't initialized in Robolectric tests.
 - **ViewModel**: exposes UI state as one `StateFlow<XUiState>`, takes its repositories in the constructor, no Android `Context` and no Compose imports.
   - A form tracks its save with one `SavePhase` (`ui/common`): `EDITING`, `SAVING`, then `SAVED`. Never two `isSaving` / `isSaved` Booleans, which could both be true.
+  - A detail screen that deletes its item tracks it with one `DeletePhase` (`ui/common`): `IDLE`, `CONFIRMING` (or `FAILED`), `DELETING`, then `DELETED`, through the shared `DeleteConfirmation`. Never separate Booleans for each step.
 - **View**: each screen is split in two:
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
