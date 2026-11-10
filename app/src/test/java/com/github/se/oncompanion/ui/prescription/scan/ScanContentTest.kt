@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -34,6 +35,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
@@ -517,6 +519,83 @@ class ScanContentTest {
     state.value = granted().copy(isCapturing = true)
     compose.waitForIdle()
     assertEquals(ready, disc(), 0.05)
+  }
+
+  /** The node's bounds in dp, to compare with the Figma. */
+  private fun boundsDp(node: SemanticsNodeInteraction) =
+      node.fetchSemanticsNode().boundsInRoot.let {
+        val d = compose.density.density
+        androidx.compose.ui.geometry.Rect(it.left / d, it.top / d, it.right / d, it.bottom / d)
+      }
+
+  @Test
+  @Config(qualifiers = "w390dp-h844dp-xhdpi")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun photoStates_layOutAsInTheFigma() {
+    // An A4 page, as the Figma's placeholder
+    val photo = photoFile(300, 424)
+    // Each state: what is under the photo, how far under it, and the two buttons (or none)
+    data class Case(
+        val state: ScanUiState,
+        val under: () -> SemanticsNodeInteraction,
+        val gap: Float,
+        val buttons: Pair<String, String>?,
+    )
+    val cases =
+        listOf(
+            Case(
+                granted().copy(photo = photo),
+                { compose.onNodeWithText(string(R.string.prescription_scan_check_hint)) },
+                16f,
+                C.Tag.prescription_scan_use_photo_button to C.Tag.prescription_scan_retake_button,
+            ),
+            Case(
+                granted().copy(photo = photo, nothingRead = NothingRead.NO_TEXT),
+                { compose.onNodeWithText(string(R.string.prescription_scan_nothing_read)) },
+                16f,
+                C.Tag.prescription_scan_nothing_read_enter_manually_button to
+                    C.Tag.prescription_scan_nothing_read_retake_button,
+            ),
+            Case(
+                granted().copy(photo = photo, isReading = true),
+                { compose.onNodeWithTag(C.Tag.prescription_scan_reading) },
+                52f,
+                null,
+            ),
+        )
+    var state by mutableStateOf(cases.first().state)
+    val dispatcher = StandardTestDispatcher()
+    compose.setContent {
+      ScanContent(
+          uiState = state,
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          photoDispatcher = dispatcher,
+      )
+    }
+    val screen = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_screen))
+    cases.forEach { case ->
+      state = case.state
+      compose.waitForIdle()
+      dispatcher.scheduler.advanceUntilIdle()
+      compose.waitForIdle()
+      val content = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_photo_preview))
+      val image = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_photo))
+      // 45 dp from each side, 12 dp under the top bar
+      assertEquals(45f, image.left, 1f)
+      assertEquals(screen.right - 45f, image.right, 1f)
+      assertEquals(content.top + 12f, image.top, 1f)
+      assertEquals(image.bottom + case.gap, boundsDp(case.under()).top, 1f)
+      case.buttons?.let { (primary, secondary) ->
+        val first = boundsDp(compose.onNodeWithTag(primary))
+        val second = boundsDp(compose.onNodeWithTag(secondary))
+        // Stacked at the bottom, 8 dp apart, 16 dp from the edges
+        assertEquals(16f, first.left, 1f)
+        assertEquals(first.bottom + 8f, second.top, 1f)
+        assertEquals(screen.bottom - 16f, second.bottom, 1f)
+      }
+    }
   }
 
   private fun luminance(color: androidx.compose.ui.graphics.Color) =
