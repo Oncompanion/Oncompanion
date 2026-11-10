@@ -16,22 +16,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +47,11 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.webLinkOrNull
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DialogTags
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeDialog
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -133,7 +132,7 @@ fun EventDetailContent(
             },
         )
       },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     val contentModifier = Modifier.padding(innerPadding)
     val event = uiState.event
@@ -147,9 +146,11 @@ fun EventDetailContent(
               text = stringResource(R.string.event_detail_error),
               modifier = contentModifier.testTag(C.Tag.event_detail_error),
           ) {
-            Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.event_detail_retry)) {
-              Text(stringResource(R.string.events_retry))
-            }
+            LakeButton(
+                text = stringResource(R.string.events_retry),
+                onClick = onRetry,
+                modifier = Modifier.testTag(C.Tag.event_detail_retry),
+            )
           }
       event == null -> MissingEvent(onBack, contentModifier)
       else -> {
@@ -316,13 +317,14 @@ private fun RegistrationActions(
         }
         Unit
       }
-      val websiteModifier = Modifier.fillMaxWidth().testTag(C.Tag.event_detail_visit_website)
-      val websiteText = @Composable { Text(stringResource(R.string.event_detail_visit_website)) }
-      if (registration == RegistrationStatus.CONFIRMED) {
-        OutlinedButton(onClick = openWebsite, modifier = websiteModifier) { websiteText() }
-      } else {
-        Button(onClick = openWebsite, modifier = websiteModifier) { websiteText() }
-      }
+      LakeButton(
+          text = stringResource(R.string.event_detail_visit_website),
+          onClick = openWebsite,
+          style =
+              if (registration == RegistrationStatus.CONFIRMED) LakeButtonStyle.Outlined
+              else LakeButtonStyle.Filled,
+          modifier = Modifier.fillMaxWidth().testTag(C.Tag.event_detail_visit_website),
+      )
     }
     // The website stays open to a caregiver; confirming the registration is the patient's
     if (readOnly) return@Column
@@ -334,18 +336,14 @@ private fun RegistrationActions(
       RegistrationStatus.CAN_CONFIRM,
       RegistrationStatus.CLOSED -> {
         val canConfirm = registration == RegistrationStatus.CAN_CONFIRM
-        val confirmModifier = Modifier.fillMaxWidth().testTag(C.Tag.event_detail_confirm)
-        val confirmText = @Composable { Text(stringResource(R.string.event_detail_registered)) }
         // The main action when there is no website to visit first (Figma: "No website link")
-        if (link == null) {
-          Button(onClick = onConfirm, enabled = canConfirm, modifier = confirmModifier) {
-            confirmText()
-          }
-        } else {
-          OutlinedButton(onClick = onConfirm, enabled = canConfirm, modifier = confirmModifier) {
-            confirmText()
-          }
-        }
+        LakeButton(
+            text = stringResource(R.string.event_detail_registered),
+            onClick = onConfirm,
+            style = if (link == null) LakeButtonStyle.Filled else LakeButtonStyle.Outlined,
+            enabled = canConfirm,
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.event_detail_confirm),
+        )
         Note(
             text =
                 stringResource(
@@ -358,12 +356,12 @@ private fun RegistrationActions(
         )
       }
       RegistrationStatus.CONFIRMED ->
-          TextButton(
+          LakeButton(
+              text = stringResource(R.string.event_detail_remove),
               onClick = onRequestRemoval,
+              style = LakeButtonStyle.Text,
               modifier = Modifier.testTag(C.Tag.event_detail_remove),
-          ) {
-            Text(stringResource(R.string.event_detail_remove))
-          }
+          )
       RegistrationStatus.ERROR -> {
         Text(
             text = stringResource(R.string.event_detail_registration_error),
@@ -372,12 +370,12 @@ private fun RegistrationActions(
             textAlign = TextAlign.Center,
             modifier = Modifier.testTag(C.Tag.event_detail_registration_error),
         )
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.events_retry),
             onClick = onRetry,
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.event_detail_registration_retry),
-        ) {
-          Text(stringResource(R.string.events_retry))
-        }
+        )
       }
     }
   }
@@ -397,29 +395,20 @@ private fun Note(text: String, testTag: String) {
 /** Asks to confirm the removal, saying it doesn't cancel anything with the organizer. */
 @Composable
 private fun RemoveDialog(onConfirm: () -> Unit, onCancel: () -> Unit) {
-  AlertDialog(
-      onDismissRequest = onCancel,
-      modifier = Modifier.testTag(C.Tag.event_detail_remove_dialog),
-      title = { Text(stringResource(R.string.event_detail_remove_title)) },
-      text = { Text(stringResource(R.string.event_detail_remove_message)) },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.event_detail_remove_confirm),
-        ) {
-          Text(stringResource(R.string.event_detail_remove_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onCancel,
-            modifier = Modifier.testTag(C.Tag.event_detail_remove_cancel),
-        ) {
-          Text(stringResource(R.string.event_detail_remove_cancel))
-        }
-      },
+  LakeDialog(
+      title = stringResource(R.string.event_detail_remove_title),
+      message = stringResource(R.string.event_detail_remove_message),
+      confirmLabel = stringResource(R.string.event_detail_remove_confirm),
+      cancelLabel = stringResource(R.string.event_detail_remove_cancel),
+      onConfirm = onConfirm,
+      onCancel = onCancel,
+      tags =
+          DialogTags(
+              dialog = C.Tag.event_detail_remove_dialog,
+              confirm = C.Tag.event_detail_remove_confirm,
+              cancel = C.Tag.event_detail_remove_cancel,
+          ),
+      isDestructive = true,
   )
 }
 
@@ -432,9 +421,11 @@ private fun MissingEvent(onBack: () -> Unit, modifier: Modifier = Modifier) {
       icon = R.drawable.ic_event,
       supportingText = stringResource(R.string.event_detail_not_found_hint),
   ) {
-    Button(onClick = onBack, modifier = Modifier.testTag(C.Tag.event_detail_go_back)) {
-      Text(stringResource(R.string.event_detail_go_back))
-    }
+    LakeButton(
+        text = stringResource(R.string.event_detail_go_back),
+        onClick = onBack,
+        modifier = Modifier.testTag(C.Tag.event_detail_go_back),
+    )
   }
 }
 

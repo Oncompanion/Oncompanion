@@ -16,14 +16,9 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -211,17 +206,11 @@ class CareCircleInviteViewModel(
             }
             // New data or a refresh cancels the wait below and starts again
             .collectLatest { (invite, member) ->
-              while (true) {
-                val now = clock.instant()
+              // Shown again when it expires, so it never looks valid after that; a used one
+              // doesn't expire
+              val expiresAt = invite?.expiresAt?.takeIf { member == null }
+              repeatAtEachExpiry(clock, listOf(expiresAt)) { now ->
                 _uiState.value = toUiState(invite, member, now)
-                // Show the invitation again when it expires, so it never looks valid after that
-                val expiresAt = invite?.expiresAt?.takeIf { member == null && it > now } ?: break
-                // Rounded up, so it wakes up at or after the expiry, never just before
-                delay(
-                    Duration.between(now, expiresAt)
-                        .toMillis()
-                        .toDuration(DurationUnit.MILLISECONDS) + 1.milliseconds
-                )
               }
             }
       } catch (e: CancellationException) {

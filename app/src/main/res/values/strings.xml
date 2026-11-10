@@ -301,6 +301,8 @@
     <!-- Letting a member add to a section they see (US-22), under that section's switch -->
     <string name="permission_symptoms_add">Allow adding symptoms</string>
     <string name="permission_symptoms_add_description">They can log a symptom for you</string>
+    <string name="permission_planning_add">Allow adding appointments</string>
+    <string name="permission_planning_add_description">They can add an appointment to your planning. It shows right away, with their name.</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>
@@ -320,6 +322,14 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+    <!-- Under the email, when someone in the circle already has it (%1$s: their first name) -->
+    <string name="care_circle_form_duplicate">%1$s is already in your care circle with this email.</string>
+    <string name="care_circle_form_duplicate_pending">%1$s already has an invitation with this email. Open it to see the code.</string>
+    <string name="care_circle_form_duplicate_expired">%1$s\'s invitation with this email has expired. Open it to get a new code.</string>
+    <!-- Under that message, opens their invitation -->
+    <string name="care_circle_form_open_invite">Open the invitation</string>
+    <!-- Under the email, when the patient typed their own -->
+    <string name="care_circle_form_own_email">This is your own email. Enter the email of the person you want to invite.</string>
     <!-- Edit a care circle member (#75) -->
     <string name="care_circle_form_edit_title">Edit member</string>
     <string name="care_circle_form_account_email">Account email. It can\'t be changed.</string>
@@ -607,7 +617,18 @@
     <string name="appointment_edit">Edit appointment</string>
     <string name="appointment_save_changes">Save changes</string>
     <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
+    <!-- A caregiver adds an appointment for the patient (US-41), e.g. "Add an appointment for Anne" -->
+    <string name="appointment_add_for">Add an appointment for %1$s</string>
 
     <!-- A change the server rejected and was undone, shown over every screen -->
     <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>
+
+    <!-- Shared day picker, above the selected day -->
+    <string name="day_picker_title">Select date</string>
+
+    <!-- Shared snackbar: closes the message before it goes away on its own -->
+    <string name="snackbar_dismiss">Dismiss</string>
+
+    <!-- Shared text field: what screen readers say about a field in error -->
+    <string name="field_error">Invalid input</string>
 </resources>

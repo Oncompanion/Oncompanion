@@ -8,18 +8,22 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 private const val TAG = "CareCircleMemberNames"
 
 /**
  * Emits the first name [ownerUid] gave each member of their circle, by uid, now and every time it
- * changes. If the circle can't be read, emits no names instead of failing, so an entry a caregiver
- * added falls back to the name stored with it rather than hiding the list it is shown in.
+ * changes. Starts with no names, so a screen that combines them with its entries never waits for
+ * the circle: offline, a circle never read on this device may not answer at all. If the circle
+ * can't be read, emits no names instead of failing. Either way, an entry a caregiver added shows
+ * the name stored with it rather than hiding the list it is shown in.
  */
 fun CareCircleRepository.observeMemberNames(ownerUid: String): Flow<Map<String, String>> = flow {
   emitAll(observeMembers(ownerUid))
 }
     .map { members -> members.associate { it.uid to it.firstName } }
+    .onStart { emit(emptyMap()) }
     .catch { e ->
       Log.w(TAG, "Failed to read the care circle's names: ${e.javaClass.simpleName}")
       emit(emptyMap())

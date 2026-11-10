@@ -26,11 +26,14 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -122,7 +125,7 @@ fun AppointmentDetailContent(
                 )
               },
           ) {
-            AppointmentFields(state.appointment, zoneId)
+            AppointmentFields(state.appointment, zoneId, state.addedByName)
           }
       else ->
           Column(Modifier.fillMaxSize().padding(padding)) {
@@ -167,14 +170,17 @@ fun AppointmentDetailContent(
 private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
   Column(Modifier.padding(16.dp).testTag(C.Tag.appointment_detail_feedback)) {
     Text(stringResource(message))
-    TextButton(onRetry, Modifier.testTag(C.Tag.appointment_detail_retry)) {
-      Text(stringResource(R.string.appointment_detail_retry))
-    }
+    LakeButton(
+        text = stringResource(R.string.appointment_detail_retry),
+        onClick = onRetry,
+        style = LakeButtonStyle.Text,
+        modifier = Modifier.testTag(C.Tag.appointment_detail_retry),
+    )
   }
 }
 
 @Composable
-private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
+private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId, addedByName: String?) {
   val type =
       when (appointment.type) {
         AppointmentType.TREATMENT -> R.string.appointment_treatment
@@ -191,6 +197,8 @@ private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
         style = MaterialTheme.typography.titleSmall,
     )
     Text(appointment.title, style = MaterialTheme.typography.headlineMedium)
+    // An appointment a caregiver added for the patient says who did (US-41)
+    addedByName?.let { AddedBy(it) }
   }
   // Appointments record a start instant only; display it using the English UI language and the
   // phone's clock format.

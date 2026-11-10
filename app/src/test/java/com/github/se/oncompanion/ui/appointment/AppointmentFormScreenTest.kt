@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.ui.appointment
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -34,6 +36,7 @@ class AppointmentFormScreenTest {
       dateChanged: (LocalDate) -> Unit = {},
       timeChanged: (LocalTime) -> Unit = {},
       typeChanged: (AppointmentType) -> Unit = {},
+      caregiverOf: String? = null,
   ) {
     compose.setContent {
       AppointmentFormContent(
@@ -48,6 +51,7 @@ class AppointmentFormScreenTest {
           saved,
           {},
           back,
+          caregiverOf = caregiverOf,
       )
     }
   }
@@ -209,6 +213,17 @@ class AppointmentFormScreenTest {
     assertEquals(AppointmentType.entries, selected)
   }
 
+  /** Only one type can be chosen, so screen readers hear radio buttons, not checkboxes. */
+  @Test
+  fun typeChips_areRadioButtons() {
+    show(state())
+    AppointmentType.entries.forEach {
+      compose
+          .onNodeWithTag(C.Tag.appointmentType(it.name))
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
+  }
+
   /** Nonexistent and repeated local times show why the form cannot yet save. */
   @Test
   fun clockGapShowsCorrectionMessage() {
@@ -275,7 +290,9 @@ class AppointmentFormScreenTest {
   @Test
   @org.robolectric.annotation.Config(qualifiers = SMALL_LANDSCAPE_PHONE)
   fun smallLandscapeKeyboardKeepsFieldsAndSaveReachable() {
-    show(state().copy(title = "Visit", time = LocalTime.NOON))
+    // A caregiver's form has the longest title (US-41)
+    show(state().copy(title = "Visit", time = LocalTime.NOON), caregiverOf = "Anne")
+    compose.onNodeWithText("Add an appointment for Anne").assertIsDisplayed()
     compose.showKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().apply {
       assertIsAboveKeyboard(280)
@@ -285,5 +302,13 @@ class AppointmentFormScreenTest {
       assertIsAboveKeyboard(280)
       assertIsFullyVisible()
     }
+  }
+
+  /** A caregiver's form says whose planning the appointment goes in (US-41). */
+  @Test
+  fun caregiversFormSaysWhosePlanningItIs() {
+    show(state(), caregiverOf = "Anne")
+    compose.onNodeWithText("Add an appointment for Anne").assertIsDisplayed()
+    compose.onNodeWithText("Add appointment").assertDoesNotExist()
   }
 }

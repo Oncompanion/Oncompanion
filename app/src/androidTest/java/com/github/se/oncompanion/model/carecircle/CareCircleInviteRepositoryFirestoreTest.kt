@@ -4,8 +4,10 @@ package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleInviteRepositoryFirestore.Companion.COLLECTION
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertEachRejectionIsReported
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CompletableDeferred
@@ -36,6 +38,7 @@ import org.junit.runner.RunWith
 class CareCircleInviteRepositoryFirestoreTest {
 
   private lateinit var repository: CareCircleInviteRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
 
   private val db
@@ -55,7 +58,8 @@ class CareCircleInviteRepositoryFirestoreTest {
     EmulatorTestData.signOut()
     db.enableNetwork().await()
     aliceUid = EmulatorTestData.createUser("alice")
-    repository = CareCircleInviteRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = CareCircleInviteRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -117,6 +121,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertNotNull(doc.getTimestamp("createdAt"))
     assertTrue(doc.contains("redeemerUid"))
     assertNull(doc.get("redeemerUid"))
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -237,6 +242,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertEquals(emptyList<String>(), doc.get("permissions"))
     assertNull(doc.get("email"))
     assertEquals("Alice", doc.getString("ownerFirstName"))
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -255,6 +261,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertNull(
         withTimeout(10_000) { repository.observeInvite(aliceUid, invite.inviteCode).first() }
     )
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -270,6 +277,7 @@ class CareCircleInviteRepositoryFirestoreTest {
     val doc = serverDoc(renewed.inviteCode)!!
     assertEquals("Julie", doc.getString("firstName"))
     assertNotNull(doc.getTimestamp("createdAt"))
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -279,6 +287,37 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertRefused { create(CareCircleMemberDetails(tooLong)) }
     assertRefused { create(email = "julie") }
     assertRefused { repository.updateInvite("ABCDEFGHJK", julie, "not an email") }
+  }
+
+  @Test
+  fun everyWriteTheServerRejects_isReported(): Unit = runBlocking {
+    // An invite of another patient: alice can't create, change, cancel or renew it
+    val othersCode = CareCircleInvite.generateInviteCode()
+    EmulatorTestData.createRawDocument(
+        COLLECTION,
+        othersCode,
+        """{"ownerUid": {"stringValue": "someone-else"}, "ownerFirstName": {"stringValue": "Eve"},
+            "firstName": {"stringValue": "Julie"}, "relationship": {"stringValue": "DAUGHTER"},
+            "permissions": {"arrayValue": {"values": []}}, "redeemerUid": {"nullValue": null}}""",
+    )
+    val othersInvite = CareCircleInvite(othersCode, "someone-else", "Eve", julie)
+
+    assertEachRejectionIsReported(
+        db,
+        rejectedWrites,
+        listOf(
+            "the creation of an invite for someone else" to
+                {
+                  repository.createInvite("someone-else", "Eve", julie, null)
+                },
+            "the update of someone else's invite" to
+                {
+                  repository.updateInvite(othersCode, julie.copy(firstName = "Jules"), null)
+                },
+            "the cancellation of someone else's invite" to { repository.cancelInvite(othersCode) },
+            "the renewal of someone else's invite" to { repository.renewInvite(othersInvite) },
+        ),
+    )
   }
 
   private suspend fun assertRefused(block: suspend () -> Unit) {

@@ -427,7 +427,7 @@ class AppNavHostTest {
         .assertTextContains(context.getString(R.string.overview_care_of, "Anne"))
     composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
 
-    // Only the patient adds appointments
+    // Without the patient's permission, a caregiver can't add appointments
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
@@ -548,6 +548,49 @@ class AppNavHostTest {
     composeTestRule.runOnIdle {
       assertEquals("caregiver", symptoms.symptoms("p-anne").single().addedBy)
       assertTrue(symptoms.symptoms("caregiver").isEmpty())
+    }
+  }
+
+  @Test
+  fun caregiverMode_allowedToAdd_addsTheAppointmentToThePatientsPlanning() {
+    val planningOnly = setOf(CarePermission.PLANNING)
+    val (auth, invites, circles) =
+        followingCaregiver("p-anne" to "Anne", shared = planningOnly, canAdd = planningOnly)
+    val appointments = FakeAppointmentRepository()
+    AppointmentRepositoryProvider.repository = appointments
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(Tab.PLANNING.testTag).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.planning_add).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.planning_add).performClick()
+    // The form says whose planning the appointment goes in
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.appointment_add_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.appointment_title).performTextInput("Oncology check-up")
+    composeTestRule.onNodeWithTag(C.Tag.appointment_time).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.appointment_confirm).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
+
+    // Back on Anne's planning: the appointment is hers, signed by the caregiver
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithTag(C.Tag.planning_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      val added = appointments.appointments("p-anne").single()
+      assertEquals("Oncology check-up", added.title)
+      assertEquals("caregiver", added.addedBy)
+      assertTrue(appointments.appointments("caregiver").isEmpty())
     }
   }
 
@@ -1023,6 +1066,39 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.careCircleMember("julie-uid")).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.careCircleInvite("JJJJJ23456")).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
+  }
+
+  @Test
+  fun careCircleForm_emailAlreadyInvited_opensThatInvitation_andBackReturnsToTheForm() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository()
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "JJJJJ23456",
+                ownerUid = "owner",
+                ownerFirstName = "Anne",
+                details = CareCircleMemberDetails(firstName = "Julie"),
+                email = "julie@example.com",
+            )
+        )
+    )
+    setNavHost(Route.CARE_CIRCLE, careCircleInviteRepository = invites, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_email)
+        .performTextInput("julie@example.com")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_open_invite).performClick()
+
+    // Julie's invitation, with the access she was given and her code
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("JJJJJ-23456")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_ADD, NavigationActions(navController).currentRoute())
+    }
   }
 
   @Test

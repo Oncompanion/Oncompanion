@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.events
 
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
@@ -23,16 +25,23 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalDate
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class EventsScreenTest {
@@ -169,6 +178,32 @@ class EventsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.events_retry).performClick()
 
     composeTestRule.runOnIdle { assertEquals(1, retries) }
+  }
+
+  // The message state is taller than the old message: Retry must stay above the bottom bar
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun errorState_retryIsFullyVisibleInLandscape_aboveTheBottomBar() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        EventsContent(
+            uiState = EventsUiState(isLoading = false, hasError = true),
+            onRetry = {},
+            bottomBar = { BottomNavigationBar(Tab.EVENTS, {}) },
+        )
+      }
+    }
+
+    val retry = composeTestRule.onNodeWithTag(C.Tag.events_retry).performScrollTo()
+    // Not squeezed by a space too short for it either
+    retry.assertHeightIsAtLeast(LakeButtonDefaults.MinHeight).assertIsFullyVisible()
+    // Nothing clips content under the bottom bar, so check it's above the bar too
+    val bar = composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).fetchSemanticsNode()
+    val bottom = retry.fetchSemanticsNode().boundsInRoot.bottom
+    assertTrue(
+        "Retry ends at $bottom, the bar starts at ${bar.boundsInRoot.top}",
+        bottom <= bar.boundsInRoot.top,
+    )
   }
 
   @Test

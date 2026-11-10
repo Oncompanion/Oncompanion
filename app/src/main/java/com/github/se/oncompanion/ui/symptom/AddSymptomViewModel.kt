@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.symptom
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CaregiverName
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
@@ -24,6 +25,8 @@ import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -153,6 +156,9 @@ class AddSymptomViewModel(
     private val patientUid: String? = null,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
+
+  /** The first name a caregiver's symptom is signed with. */
+  private val caregiverName = CaregiverName(profileRepository, authRepository)
 
   private val _uiState =
       MutableStateFlow(
@@ -290,11 +296,18 @@ class AddSymptomViewModel(
         if (symptomId != null) symptomRepository.updateSymptom(uid, entry)
         else if (patientUid == null) symptomRepository.addSymptom(uid, entry)
         // A caregiver's symptom goes in the patient's journal, signed with who added it
-        else
-            symptomRepository.addSymptom(
-                patientUid,
-                entry.copy(addedBy = uid, addedByName = caregiverName(uid)),
-            )
+        else {
+          val signed = entry.copy(addedBy = uid, addedByName = caregiverName(uid))
+          // Reading the name can take a while: the account may have changed meanwhile
+          currentCoroutineContext().ensureActive()
+          if (authRepository.signedInUid(TAG) != uid) {
+            _uiState.update {
+              it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
+            }
+            return@launch
+          }
+          symptomRepository.addSymptom(patientUid, signed)
+        }
         _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
         throw e
@@ -304,18 +317,6 @@ class AddSymptomViewModel(
       }
     }
   }
-
-  /**
-   * The caregiver's first name, from their profile (in the local cache, also offline), or else from
-   * their Google account.
-   */
-  private suspend fun caregiverName(uid: String): String =
-      runCatching { profileRepository.observeProfile(uid).first()?.firstName }
-          .getOrNull()
-          ?.takeIf { it.isNotBlank() }
-          ?.take(SymptomEntry.MAX_ADDED_BY_NAME_LENGTH)
-          ?: runCatching { authRepository.currentUser?.firstNameGuess() }.getOrNull()
-          ?: DEFAULT_CAREGIVER_NAME
 
   /** The error has been shown. */
   fun clearError() {
@@ -349,12 +350,6 @@ class AddSymptomViewModel(
 
   private companion object {
     const val TAG = "AddSymptomViewModel"
-
-    /**
-     * Stored as the name of a caregiver with neither a profile name nor a Google name, which
-     * onboarding prevents: the rules need a name, and the uid still says who it was.
-     */
-    const val DEFAULT_CAREGIVER_NAME = "Caregiver"
   }
 }
 

@@ -2,6 +2,9 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,9 +13,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.hospital.*
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.assertTextStyle
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -405,6 +412,27 @@ class HospitalFieldTest {
     node(C.Tag.hospital_error).assertDoesNotExist()
     node(C.Tag.hospital_empty).assertDoesNotExist()
     node(C.Tag.hospital_loading).assertDoesNotExist()
+  }
+
+  /** The location field looks like every other field of a form (Figma: "Text field"). */
+  @Test
+  fun fieldShowsItsLabelSmallAboveTheTypedLocation() {
+    lateinit var colors: ColorScheme
+    lateinit var typography: Typography
+    compose.setContent {
+      OncompanionTheme {
+        colors = MaterialTheme.colorScheme
+        typography = MaterialTheme.typography
+        HospitalFieldContent("HUG", {}, HospitalFieldUiState.Idle, {}, {})
+      }
+    }
+    val label =
+        ApplicationProvider.getApplicationContext<android.content.Context>()
+            .getString(R.string.hospital_field_label)
+
+    compose
+        .onNodeWithText(label, useUnmergedTree = true)
+        .assertTextStyle(typography.bodySmall, colors.onSurfaceVariant)
   }
 
   /** Disabling Search keeps manual entry usable and prevents all repository calls. */

@@ -554,6 +554,37 @@ class AppointmentRepositoryFirestoreTest {
     }
   }
 
+  /**
+   * A caregiver the patient lets add to Planning (US-41) adds an appointment signed with their uid
+   * and first name; the patient reads who added it, and keeps it when correcting the appointment.
+   */
+  @Test
+  fun caregiversAppointmentKeepsWhoAddedIt(): Unit = runBlocking {
+    val carolUid = EmulatorTestData.createUser("appointment-carol") // carol is signed in
+    EmulatorTestData.replaceRawDocument(
+        "users/$uid/circle",
+        carolUid,
+        """{"firstName": {"stringValue": "Carol"},
+            "relationship": {"stringValue": "SISTER"},
+            "permissions": {"arrayValue": {"values": [{"stringValue": "PLANNING"}]}},
+            "canAdd": {"arrayValue": {"values": [{"stringValue": "PLANNING"}]}},
+            "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
+    )
+    val added = appointment().copy(addedBy = carolUid, addedByName = "Carol")
+    val id = repository.addAppointment(uid, added)
+    acknowledgeWrites()
+
+    EmulatorTestData.signIn("appointment-owner")
+    assertContent(added, storedAppointment(id))
+
+    repository.updateAppointment(uid, added.copy(id = id, location = "HUG, building B"))
+    acknowledgeWrites()
+    val corrected = serverDocument(id)
+    assertEquals("HUG, building B", corrected.getString("location"))
+    assertEquals(carolUid, corrected.getString("addedBy"))
+    assertEquals("Carol", corrected.getString("addedByName"))
+  }
+
   /** Exercises deferred server refusal while proving add does not wait for acknowledgement. */
   @Test
   fun rejectedWriteIsAbsentAfterReconnecting(): Unit = runBlocking {

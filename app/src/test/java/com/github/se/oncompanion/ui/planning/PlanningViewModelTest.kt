@@ -705,4 +705,40 @@ class PlanningViewModelTest {
         assertFalse(vm.uiState.value.hasError)
         assertTrue(repository.owners.isEmpty())
       }
+
+  // ----- A caregiver adding appointments (US-41) -----
+
+  @Test
+  fun addIsOffered_inTheUsersOwnPlanning_andToACaregiverOnlyWhenThePatientLetsThem() =
+      runTest(dispatcher) {
+        val repository = FakePlanningRepository()
+        val own = PlanningViewModel(ownPlanning(repository), clock, zone, SavedStateHandle())
+        drain()
+        assertTrue(own.uiState.value.canAdd)
+
+        val cases =
+            listOf(
+                emptySet<CarePermission>() to false,
+                setOf(CarePermission.SYMPTOMS) to false,
+                setOf(CarePermission.PLANNING) to true,
+            )
+        for ((canAdd, expected) in cases) {
+          val vm =
+              PlanningViewModel(
+                  followedPlanning(
+                      repository,
+                      setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+                      canAdd,
+                  ),
+                  clock,
+                  zone,
+                  SavedStateHandle(),
+                  patientUid = "patient",
+              )
+          // Not before the patient's planning shows
+          assertFalse(vm.uiState.value.canAdd)
+          drain()
+          assertEquals("$canAdd", expected, vm.uiState.value.canAdd)
+        }
+      }
 }

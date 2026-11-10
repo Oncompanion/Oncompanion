@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import java.time.Instant
@@ -97,6 +99,23 @@ class AppointmentTest {
             .copy(scheduledAt = Instant.parse("9999-12-31T23:59:59.999999999Z").plusNanos(1))
             .isValid()
     )
+  }
+
+  /** A caregiver's appointment says who added it (US-41); the patient's own says nothing. */
+  @Test
+  fun caregiversAppointmentNeedsTheirName() {
+    val cases =
+        listOf(
+            appointment to true,
+            appointment.copy(addedBy = "carol", addedByName = "Carol") to true,
+            appointment.copy(addedBy = "carol", addedByName = "a".repeat(50)) to true,
+            appointment.copy(addedBy = "carol", addedByName = "a".repeat(51)) to false,
+            appointment.copy(addedBy = "carol", addedByName = null) to false,
+            appointment.copy(addedBy = "carol", addedByName = "  ") to false,
+        )
+    for ((input, expected) in cases) {
+      assertEquals(input.addedByName, expected, input.isValid())
+    }
   }
 
   /** Leaves identity and creation time assignment to the repository. */

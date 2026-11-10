@@ -224,7 +224,6 @@ object C {
     const val profile_sign_out_confirm = "profile_sign_out_confirm"
     const val profile_sign_out_cancel = "profile_sign_out_cancel"
     const val profile_sign_out_error = "profile_sign_out_error"
-    const val profile_signing_out = "profile_signing_out"
     const val profile_hospital = "profile_hospital"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
@@ -312,6 +311,9 @@ object C {
 
     /** The switch letting the member add to [permissionName], e.g. "SYMPTOMS". */
     fun careCircleFormCanAdd(permissionName: String) = "care_circle_form_can_add_$permissionName"
+
+    /** Under the email warning: opens the invitation that already has this email (#257). */
+    const val care_circle_form_open_invite = "care_circle_form_open_invite"
 
     // Join a care circle
     const val join_circle_screen = "join_circle_screen"
@@ -466,5 +468,14 @@ object C {
 
     // A change the server rejected and was undone
     const val rejected_write_snackbar = "rejected_write_snackbar"
+
+    // Shared dialog: the spinner while its action is on its way
+    const val dialog_progress = "dialog_progress"
+
+    // Shared message state: its round info tile
+    const val message_state_icon = "message_state_icon"
+
+    // Shared filter chip: the check of a selected chip
+    const val filter_chip_check = "filter_chip_check"
   }
 }

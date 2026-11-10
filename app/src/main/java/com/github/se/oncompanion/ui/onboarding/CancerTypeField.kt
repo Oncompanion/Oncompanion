@@ -6,7 +6,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +23,7 @@ import androidx.compose.ui.text.withStyle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.cancer.CancerTypes
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeTextField
 
 /**
  * Text field for the cancer type, with suggestions while typing (see [CancerTypes.suggest]).
@@ -52,7 +52,7 @@ fun CancerTypeField(
       onExpandedChange = { open = it },
       modifier = modifier,
   ) {
-    OutlinedTextField(
+    LakeTextField(
         value = value,
         enabled = enabled,
         onValueChange = {

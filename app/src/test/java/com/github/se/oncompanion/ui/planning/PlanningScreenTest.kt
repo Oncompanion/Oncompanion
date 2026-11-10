@@ -424,4 +424,23 @@ class PlanningScreenTest {
 
     compose.onNodeWithTag(C.Tag.not_shared).performScrollTo().assertIsFullyVisible()
   }
+
+  // ----- A caregiver adding appointments (US-41) -----
+
+  @Test
+  fun add_isHidden_whenTheCaregiverMayNotAdd() {
+    // An add action is given, but the state says it can't be used
+    render(state().copy(canAdd = false))
+    compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun appointmentAddedByACaregiver_saysWhoAddedIt() {
+    render(state(listOf(item.copy(addedBy = "sam", addedByName = "Sam"))))
+
+    compose
+        .onNodeWithTag(C.Tag.planningItem(item.key))
+        .assertTextContains("Room 3", substring = true)
+        .assertTextContains("Added by Sam", substring = true)
+  }
 }

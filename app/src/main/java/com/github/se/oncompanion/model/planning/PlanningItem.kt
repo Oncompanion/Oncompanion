@@ -6,13 +6,20 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** A display occurrence derived from an owning feature; never a separate stored record. */
+/**
+ * A display occurrence derived from an owning feature; never a separate stored record.
+ *
+ * @property addedBy the uid of the caregiver who added it for the patient (US-41), or `null`
+ * @property addedByName who added it, shown as "Added by Sam"
+ */
 data class PlanningItem(
     val source: PlanningSource,
     val timing: PlanningTiming,
     val title: String,
     val subtitle: String? = null,
     val frequency: String? = null,
+    val addedBy: String? = null,
+    val addedByName: String? = null,
 ) {
   init {
     require((source is PlanningSource.Medication) == (timing is PlanningTiming.DateOnly)) {

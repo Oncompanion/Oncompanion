@@ -11,6 +11,7 @@ import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
@@ -42,7 +43,8 @@ class EventDetailViewModelTest {
           description = "Description",
       )
 
-  private val registrations = FakeEventRegistrationRepository()
+  private val rejectedWrites = RejectedWrites()
+  private val registrations = FakeEventRegistrationRepository(rejectedWrites)
 
   private fun signedIn(uid: String = "alice") =
       FakeAuthRepository(onSignIn = { AuthUser(uid = uid) }).also {
@@ -172,6 +174,26 @@ class EventDetailViewModelTest {
 
     assertEquals(setOf("yoga"), registrations.registeredEventIds("alice"))
     assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun confirmingRejectedLaterByTheServer_offersToConfirmAgainAndTellsTheUser() {
+    registrations.serverRejectsWrites = true
+    val viewModel = viewModel()
+
+    viewModel.confirmRegistration()
+    ShadowLooper.idleMainLooper()
+
+    // Done without waiting for the server
+    assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    registrations.rejectPendingWrites()
+    ShadowLooper.idleMainLooper()
+
+    assertEquals(emptySet<String>(), registrations.registeredEventIds("alice"))
+    assertEquals(RegistrationStatus.CAN_CONFIRM, viewModel.uiState.value.registration)
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test

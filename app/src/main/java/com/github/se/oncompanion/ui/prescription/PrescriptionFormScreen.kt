@@ -7,14 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +21,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,13 +28,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -51,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,6 +62,10 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -181,7 +179,7 @@ fun PrescriptionFormContent(
       modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
       // Without fields there is no keyboard, so the top bar can stay fixed
       topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose) },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
   ) { innerPadding ->
@@ -206,15 +204,13 @@ fun PrescriptionFormContent(
 
         // What the medications share: the doctor (optional) and the date of the prescription
         val prescribedByCheck = uiState.checkOf(ScannedField.PrescribedBy, "prescribed_by")
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.draft.prescribedBy,
             onValueChange = onPrescribedByChange,
             label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
             supportingText = prescribedByCheck?.let { { CheckReason(it) } },
             trailingIcon = prescribedByCheck?.let { { CheckIcon() } },
-            colors =
-                if (prescribedByCheck != null) checkColors()
-                else OutlinedTextFieldDefaults.colors(),
+            isCheck = prescribedByCheck != null,
             singleLine = true,
             keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
@@ -259,15 +255,14 @@ fun PrescriptionFormContent(
           }
         }
 
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_add_medication),
             onClick = onAddMedication,
+            style = LakeButtonStyle.Text,
             enabled = uiState.canAddMedication,
+            icon = rememberVectorPainter(Icons.Default.Add),
             modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
-        ) {
-          Icon(Icons.Default.Add, contentDescription = null)
-          Spacer(Modifier.width(8.dp))
-          Text(stringResource(R.string.prescription_form_add_medication))
-        }
+        )
       }
       if (scrollsEverything) FormSaveButton(uiState, onSave)
     }
@@ -345,12 +340,11 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
             R.string.prescription_form_load_error_title,
             R.string.prescription_form_load_error_hint,
         )
-        Button(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_retry),
             onClick = onRetry,
             modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_retry))
-        }
+        )
       }
       // The fields are shown instead
       PrescriptionFormLoad.READY -> Unit
@@ -398,12 +392,12 @@ private fun OpenMedication(
           modifier = Modifier.weight(1f).testTag(C.Tag.prescription_form_medication_title),
       )
       if (canRemove) {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_remove_medication),
             onClick = onRemove,
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.prescription_form_remove_medication_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_remove_medication))
-        }
+        )
       }
     }
 
@@ -411,7 +405,7 @@ private fun OpenMedication(
     val nameMissing = nameTouched && medication.name.isBlank()
     // A missing name blocks Save: its red warning comes before a detail to check
     val nameCheck = checks[MedicationDetail.NAME]?.takeUnless { nameMissing }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.name,
         onValueChange = onNameChange,
         label = { Text(stringResource(R.string.prescription_form_medication_name)) },
@@ -428,31 +422,31 @@ private fun OpenMedication(
         },
         trailingIcon = nameCheck?.let { { CheckIcon() } },
         isError = nameMissing,
-        colors = if (nameCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = nameCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_medication_name_field),
     )
     val dosageCheck = checks[MedicationDetail.DOSAGE]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.dosage,
         onValueChange = onDosageChange,
         label = { Text(stringResource(R.string.prescription_form_dosage)) },
         supportingText = dosageCheck?.let { { CheckReason(it) } },
         trailingIcon = dosageCheck?.let { { CheckIcon() } },
-        colors = if (dosageCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = dosageCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.None),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_dosage_field),
     )
     val frequencyCheck = checks[MedicationDetail.FREQUENCY]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.frequency,
         onValueChange = onFrequencyChange,
         label = { Text(stringResource(R.string.prescription_form_frequency)) },
         supportingText = frequencyCheck?.let { { CheckReason(it) } },
         trailingIcon = frequencyCheck?.let { { CheckIcon() } },
-        colors = if (frequencyCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = frequencyCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_frequency_field),
@@ -468,7 +462,7 @@ private fun OpenMedication(
     val durationInvalid = !Medication.isValidDuration(medication.durationDays)
     // A duration that can't be saved: its red warning comes before a detail to check
     val durationCheck = checks[MedicationDetail.DURATION]?.takeUnless { durationInvalid }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.durationDays?.toString().orEmpty(),
         onValueChange = onDurationChange,
         label = { Text(stringResource(R.string.prescription_form_duration)) },
@@ -489,7 +483,7 @@ private fun OpenMedication(
             } else durationCheck?.let { { CheckReason(it) } },
         trailingIcon = durationCheck?.let { { CheckIcon() } },
         isError = durationInvalid,
-        colors = if (durationCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = durationCheck != null,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_duration_field),
@@ -598,7 +592,7 @@ private fun DateField(
               )
             }
           },
-      colors = if (check != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+      isCheck = check != null,
   )
 
   if (pickerOpen) {
