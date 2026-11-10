@@ -180,6 +180,12 @@ class EventDetailViewModel(
     signing = viewModelScope.launch {
       val caregiverUid = authRepository.currentUser?.uid
       val by = caregiverUid?.let { EventRegistration(it, caregiverName(it)) }
+      // The patient may have taken the permission away, or confirmed it, while the name was read
+      refreshStatus()
+      if (
+          confirmableOwner != owner || _uiState.value.registration != RegistrationStatus.CAN_CONFIRM
+      )
+          return@launch
       changeRegistration("confirm", owner) { uid ->
         registrationRepository.confirm(uid, eventId, by ?: error("Nobody is signed in"))
       }

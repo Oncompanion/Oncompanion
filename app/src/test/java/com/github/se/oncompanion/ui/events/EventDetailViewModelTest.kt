@@ -639,6 +639,38 @@ class EventDetailViewModelTest {
   }
 
   @Test
+  fun caregiver_changesWhileTheirNameIsRead_areKept() {
+    // What happens on the patient's side while the caregiver's name is still being read
+    val cases =
+        listOf<Pair<(FollowedPatient) -> Unit, EventRegistration?>>(
+            // The patient stops letting them confirm: nothing is saved
+            { p: FollowedPatient -> p.shares(CarePermission.EVENTS) } to null,
+            // The patient confirms it themselves: their confirmation is kept, unsigned
+            { _: FollowedPatient ->
+              registrations.confirm("patient", "yoga")
+            } to EventRegistration(),
+        )
+    for ((change, expected) in cases) {
+      registrations.remove("patient", "yoga")
+      val patient = FollowedPatient(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
+      val counting = CountingRegistrations(registrations)
+      val slowProfiles = SlowProfiles(patient.profiles)
+      val viewModel =
+          caregiverViewModel(patient, registrationRepository = counting, profiles = slowProfiles)
+
+      viewModel.confirmRegistration()
+      change(patient)
+      ShadowLooper.idleMainLooper()
+      slowProfiles.release.complete(Unit)
+      ShadowLooper.idleMainLooper()
+
+      assertEquals(0, counting.confirms)
+      assertEquals(expected, registrations.registration("patient", "yoga"))
+      assertNull(viewModel.uiState.value.addedByName)
+    }
+  }
+
+  @Test
   fun caregiver_allowedToConfirm_cantConfirmAnEventThatStarted() {
     val patient = FollowedPatient(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
     val viewModel = caregiverViewModel(patient, now = yoga.startDateTime.plusMinutes(1))
