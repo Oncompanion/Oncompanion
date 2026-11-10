@@ -546,6 +546,11 @@
     <string name="prescription_scan_photo_description">Photo of the prescription</string>
     <string name="prescription_scan_photo_unreadable">Couldn\'t show the photo. Please retake it.</string>
     <string name="prescription_scan_capture_failed">Couldn\'t take the photo. Please try again.</string>
+    <!-- #356: the tip shown before the camera opens -->
+    <string name="prescription_scan_tip_title">Hold your phone upright</string>
+    <string name="prescription_scan_tip_message">Take the photo with the phone upright and the prescription the right way up. A prescription photographed sideways is read less well, and its lines can come out in the wrong order.</string>
+    <string name="prescription_scan_tip_dont_show_again">Don\'t show this again</string>
+    <string name="prescription_scan_tip_got_it">Got it</string>
 
     <!-- US-10: reviewing the prescription read from a scan, in the prescription form -->
     <string name="prescription_review_title">Review prescription</string>

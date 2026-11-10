@@ -106,6 +106,69 @@ class ScanScreenTest {
     compose.waitForIdle()
   }
 
+  // ---- the tip to hold the phone upright (#356) ----
+
+  /** The tip shows before anything else; "Got it" then asks for the camera, or turns it on. */
+  private fun tip_comesFirst(allowed: Boolean) {
+    tips.showUprightTip = true
+    if (allowed) grantCamera()
+    showScreen()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip).assertIsDisplayed()
+    assertNull(shadowOf(compose.activity).lastRequestedPermission)
+    assertEquals(0, camera.starts)
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip).assertDoesNotExist()
+    if (allowed) assertEquals(1, camera.starts)
+    else assertNotNull(shadowOf(compose.activity).lastRequestedPermission)
+    // Not ticked: it shows again on the next scan
+    assertTrue(tips.showUprightTip)
+  }
+
+  @Test fun tip_comesBeforeTheCameraIsAskedFor() = tip_comesFirst(allowed = false)
+
+  @Test fun tip_comesBeforeTheAllowedCameraIsTurnedOn() = tip_comesFirst(allowed = true)
+
+  @Test
+  fun tip_dontShowThisAgain_hidesItForGood() {
+    tips.showUprightTip = true
+    showScreen()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_dont_show_again).performClick()
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
+    compose.waitForIdle()
+
+    assertFalse(tips.showUprightTip)
+  }
+
+  @Test
+  fun phoneRotated_withTheTipOpen_keepsIt_andStillAsksNothing() {
+    tips.showUprightTip = true
+    showScreen()
+
+    // Rotating recreates the activity, but the screen's ViewModel survives it
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread {
+      compose.activity.setContent {
+        ScanScreen(
+            onEnterManually = {},
+            onBack = {},
+            onRead = {},
+            viewModel = viewModel,
+            camera = camera,
+        )
+      }
+    }
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip).assertIsDisplayed()
+    assertNull(shadowOf(compose.activity).lastRequestedPermission)
+    assertEquals(0, camera.starts)
+  }
+
   // ---- permission ----
 
   @Test

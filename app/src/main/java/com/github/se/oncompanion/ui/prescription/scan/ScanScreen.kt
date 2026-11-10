@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,10 +31,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,12 +47,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -63,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -78,9 +86,11 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.PreferencesScanTipSettings
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DialogTags
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeDialog
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -129,8 +139,10 @@ fun ScanScreen(
         if (granted) viewModel.onPermissionGranted() else viewModel.onPermissionRefused()
       }
 
-  // Shows the dialog once, when the camera isn't allowed yet
-  LaunchedEffect(Unit) {
+  // Shows the dialog once, when the camera isn't allowed yet, after the tip to hold the phone
+  // upright so the two don't show at once
+  LaunchedEffect(uiState.showUprightTip) {
+    if (uiState.showUprightTip) return@LaunchedEffect
     if (!context.hasCameraPermission() && !viewModel.uiState.value.permissionRequested) {
       viewModel.onPermissionRequested()
       permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -158,8 +170,9 @@ fun ScanScreen(
 
   // Turns the camera on once it's allowed and passes on what it reports; leaving the screen stops
   // the collection, which turns the camera off. A new camera (e.g. after a rotation) starts again
-  // from "starting", so no photo can be taken before it's open
-  if (uiState.permission == CameraPermission.GRANTED) {
+  // from "starting", so no photo can be taken before it's open. Not before the tip is closed: it
+  // shows before the camera opens
+  if (uiState.permission == CameraPermission.GRANTED && !uiState.showUprightTip) {
     LaunchedEffect(camera) {
       try {
         camera.open(context, lifecycleOwner).collect { status ->
@@ -193,6 +206,7 @@ fun ScanScreen(
       onMessageShown = viewModel::onMessageShown,
       onRetake = viewModel::retake,
       onUsePhoto = viewModel::usePhoto,
+      onUprightTipDismissed = viewModel::onUprightTipDismissed,
       viewfinder = { camera.Viewfinder(it) },
       modifier = modifier,
   )
@@ -224,6 +238,8 @@ private const val SCAN_SETTINGS = "scan_settings"
  *   allowed after it was refused
  * @param onCapture takes a photo
  * @param onMessageShown called once the message about the failed photo is gone
+ * @param onUprightTipDismissed closes the tip to hold the phone upright, never to show again when
+ *   its checkbox is ticked
  * @param onRetake deletes the photo being checked and shows the camera again
  * @param onUsePhoto uses the photo being checked
  * @param viewfinder what the camera sees
@@ -242,6 +258,7 @@ fun ScanContent(
     onMessageShown: () -> Unit = {},
     onRetake: () -> Unit = {},
     onUsePhoto: () -> Unit = {},
+    onUprightTipDismissed: (dontShowAgain: Boolean) -> Unit = {},
     viewfinder: @Composable (Modifier) -> Unit = {},
     photoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -262,6 +279,7 @@ fun ScanContent(
   // A camera screen stays dark whatever the phone's theme, as in the mockup: the photo is easier to
   // judge on a dark background
   OncompanionTheme(darkTheme = true) {
+    if (uiState.showUprightTip) UprightTip(onUprightTipDismissed)
     Scaffold(
         modifier = modifier.testTag(C.Tag.prescription_scan_screen),
         snackbarHost = { LakeSnackbarHost(snackbarHostState) },
@@ -308,8 +326,9 @@ fun ScanContent(
     ) { padding ->
       val content = Modifier.fillMaxSize().padding(padding)
       when {
-        // Android's dialog is on top: nothing to show behind it
-        uiState.permission == CameraPermission.UNKNOWN ->
+        // Android's dialog is on top: nothing to show behind it. Behind the tip, the camera
+        // being turned on, as in the Figma
+        uiState.permission == CameraPermission.UNKNOWN && !uiState.showUprightTip ->
             Box(content.testTag(C.Tag.prescription_scan_permission_pending))
         uiState.permission == CameraPermission.REFUSED ->
             CameraOff(
@@ -349,6 +368,53 @@ fun ScanContent(
             )
         else -> CameraView(uiState, onCapture, viewfinder, content)
       }
+    }
+  }
+}
+
+/**
+ * Before the camera opens (Figma "US-10 / Scan – Hold the phone upright"): a prescription
+ * photographed sideways is read less well, so the user is asked to hold the phone upright, with a
+ * way to not be told again. Back and a tap outside close it like "Got it".
+ */
+@Composable
+private fun UprightTip(onDismiss: (dontShowAgain: Boolean) -> Unit) {
+  // Kept when the phone is rotated, like the dialog itself (the view model keeps it shown)
+  var dontShowAgain by rememberSaveable { mutableStateOf(false) }
+  LakeDialog(
+      title = stringResource(R.string.prescription_scan_tip_title),
+      message = stringResource(R.string.prescription_scan_tip_message),
+      confirmLabel = stringResource(R.string.prescription_scan_tip_got_it),
+      cancelLabel = null,
+      onConfirm = { onDismiss(dontShowAgain) },
+      onCancel = { onDismiss(dontShowAgain) },
+      tags =
+          DialogTags(
+              dialog = C.Tag.prescription_scan_tip,
+              confirm = C.Tag.prescription_scan_tip_got_it,
+              cancel = "",
+          ),
+  ) {
+    // The whole line toggles the box, and is read as one checkbox
+    Row(
+        modifier =
+            Modifier.fillMaxWidth()
+                .minimumInteractiveComponentSize()
+                .toggleable(
+                    value = dontShowAgain,
+                    role = Role.Checkbox,
+                    onValueChange = { dontShowAgain = it },
+                )
+                .testTag(C.Tag.prescription_scan_tip_dont_show_again),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+      Checkbox(checked = dontShowAgain, onCheckedChange = null)
+      Text(
+          text = stringResource(R.string.prescription_scan_tip_dont_show_again),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurface,
+      )
     }
   }
 }

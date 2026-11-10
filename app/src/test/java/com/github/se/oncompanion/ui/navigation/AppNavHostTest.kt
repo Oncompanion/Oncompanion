@@ -1906,7 +1906,8 @@ class AppNavHostTest {
 
   /** Refuses the camera in Android's permission dialog, which the scan screen opened. */
   private fun refuseCamera() {
-    // The scan screen asks once it is shown
+    // The scan screen asks once its tip to hold the phone upright is closed
+    composeTestRule.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
     composeTestRule.waitForIdle()
     val request = shadowOf(activity).lastRequestedPermission
     assertNotNull("the scan screen should have asked for the camera", request)
