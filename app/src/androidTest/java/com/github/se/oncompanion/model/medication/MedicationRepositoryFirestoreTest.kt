@@ -273,27 +273,36 @@ class MedicationRepositoryFirestoreTest {
   }
 
   @Test
-  fun aCaregiversPrescription_thePatientRejectsIt_andItIsNeverReminded(): Unit = runBlocking {
-    carolAddsAPrescriptionForAlice()
+  fun aCaregiversPrescription_thePatientRejectsIt_onlyTheCaregiverSeesIt_untilTheyDeleteIt(): Unit =
+      runBlocking {
+        val carols = carolAddsAPrescriptionForAlice()
 
-    assertTrue(ManageMedicationSchedule(repository).reject(aliceUid, "presc-1"))
-    awaitServerAck()
+        assertTrue(ManageMedicationSchedule(repository).reject(aliceUid, "presc-1"))
+        awaitServerAck()
 
-    assertEquals("the server accepted the rejection", 0, rejectedWrites.unseen.value)
-    val rejected =
-        repository.observePrescription(aliceUid, "presc-1").awaitFirst {
-          it?.confirmation == PrescriptionConfirmation.REJECTED
-        }
-    assertEquals("Carol", rejected!!.addedByName)
-    assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
-    // A rejected prescription stays rejected: it can't be confirmed afterwards
-    repository.updatePrescription(
-        aliceUid,
-        rejected.copy(confirmation = PrescriptionConfirmation.CONFIRMED),
-    )
-    awaitServerAck()
-    awaitRejectionReported()
-  }
+        // Gone from her prescriptions, and never reminded
+        assertEquals("the server accepted the rejection", 0, rejectedWrites.unseen.value)
+        assertNull(repository.observePrescription(aliceUid, "presc-1").awaitFirst { it == null })
+        assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
+
+        // Carol sees it was rejected, then deletes it once seen
+        EmulatorTestData.signIn("presc-repo-carol")
+        val seen =
+            repository.observeRejectedPrescriptions(aliceUid, carols.addedBy!!).awaitFirst {
+              it.isNotEmpty()
+            }
+        assertEquals(PrescriptionConfirmation.REJECTED, seen.single().confirmation)
+        assertEquals("Carol", seen.single().addedByName)
+        repository.deleteRejectedPrescription(aliceUid, "presc-1")
+        awaitServerAck()
+        assertEquals(0, rejectedWrites.unseen.value)
+        assertTrue(
+            repository
+                .observeRejectedPrescriptions(aliceUid, carols.addedBy)
+                .awaitFirst { it.isEmpty() }
+                .isEmpty()
+        )
+      }
 
   @Test
   fun aPrescriptionSavedBeforeUs43_readsAsThePatientsOwn_confirmed(): Unit = runBlocking {

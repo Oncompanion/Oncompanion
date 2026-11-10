@@ -61,4 +61,23 @@ interface MedicationRepository {
    * Deletes the prescription [id] of [uid] and its medications. Does nothing if it doesn't exist.
    */
   suspend fun deletePrescription(uid: String, id: String)
+
+  /**
+   * Rejects [prescription], one a caregiver added that waits for [uid] (US-43): in one write, it
+   * leaves [uid]'s prescriptions and is kept apart as [PrescriptionConfirmation.REJECTED], where
+   * only [uid] and the caregiver who added it can read it.
+   */
+  suspend fun rejectPrescription(uid: String, prescription: Prescription)
+
+  /**
+   * Emits the prescriptions [addedBy] added that [uid] rejected, now and every time they change, so
+   * the caregiver can see it was rejected.
+   */
+  fun observeRejectedPrescriptions(uid: String, addedBy: String): Flow<List<Prescription>>
+
+  /**
+   * Deletes the rejected prescription [id] of [uid], once the caregiver who added it saw it. Does
+   * nothing if it doesn't exist.
+   */
+  suspend fun deleteRejectedPrescription(uid: String, id: String)
 }

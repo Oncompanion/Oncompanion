@@ -74,12 +74,29 @@ service cloud.firestore {
     function confirmationOf(data) {
       return data.get('confirmation', 'CONFIRMED');
     }
-    // Only the patient decides: a prescription waiting for them becomes confirmed or rejected, and
-    // can't be edited without being confirmed; a decided one keeps its state.
+    // Only the patient decides: a prescription waiting for them becomes confirmed, and can't be
+    // edited without being confirmed; a confirmed one stays confirmed. A rejected one moves to
+    // rejectedPrescriptions instead (wasWaitingFor).
     function decidesConfirmation(data, previous) {
       return confirmationOf(previous) == 'PENDING'
-          ? confirmationOf(data) != 'PENDING'
+          ? confirmationOf(data) == 'CONFIRMED'
           : confirmationOf(data) == confirmationOf(previous);
+    }
+
+    // The signed-in user is the caregiver who added this prescription
+    function addedIt(data) {
+      return signedIn() && data.get('addedBy', null) == request.auth.uid;
+    }
+
+    // [data] is the prescription [id] of [uid] that was waiting for the patient, rejected and moved
+    // out of their prescriptions in the same write, with who added it
+    function wasWaitingFor(uid, id, data) {
+      let path = /databases/$(database)/documents/users/$(uid)/prescriptions/$(id);
+      return exists(path)
+          && !existsAfter(path)
+          && confirmationOf(get(path).data) == 'PENDING'
+          && data.addedBy == get(path).data.addedBy
+          && data.addedByName == get(path).data.addedByName;
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY, MAX_NOTES_LENGTH,
@@ -247,6 +264,21 @@ service cloud.firestore {
                       && keepsAttribution(request.resource.data, resource.data)
                       && decidesConfirmation(request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
+      }
+
+      // ---------- Rejected prescriptions ----------
+      // /users/{uid}/rejectedPrescriptions/{prescriptionId}: a prescription a caregiver added that
+      // the patient rejected (US-43), moved out of their prescriptions so no other member sees it.
+      // The patient and the caregiver who added it read it; only that caregiver deletes it, once
+      // they saw it, even without the right to edit the patient's prescriptions.
+      match /rejectedPrescriptions/{prescriptionId} {
+        allow read: if isOwner(uid) || addedIt(resource.data);
+        allow delete: if addedIt(resource.data);
+        allow create: if isOwner(uid)
+                      && isValidPrescription(request.resource.data)
+                      && confirmationOf(request.resource.data) == 'REJECTED'
+                      && wasWaitingFor(uid, prescriptionId, request.resource.data)
+                      && request.resource.data.createdAt == request.time;
       }
 
       // ---------- Symptoms ----------

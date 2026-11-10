@@ -1905,7 +1905,9 @@ class PrescriptionFormViewModelTest {
     return editViewModel().also { advanceUntilIdle() }
   }
 
-  private fun savedConfirmation() = fakeMedications.prescriptionsOf(uid).single().confirmation
+  /** What is saved of [sams]: in the prescriptions, or kept apart once rejected. */
+  private fun savedConfirmation() =
+      (fakeMedications.prescriptionsOf(uid) + fakeMedications.rejectedOf(uid)).single().confirmation
 
   @Test
   fun caregiversPrescription_isToConfirm_andSavingConfirmsIt_keepingWhoAddedIt() = runTest {
@@ -2006,12 +2008,7 @@ class PrescriptionFormViewModelTest {
       assertFalse(name, viewModel.state.isConfirmingRejection)
       check(viewModel.state)
       assertTrue(name, before.isToConfirm)
-      assertTrue(
-          name,
-          fakeMedications.prescriptionsOf(uid).none {
-            it.confirmation == PrescriptionConfirmation.REJECTED
-          },
-      )
+      assertTrue(name, fakeMedications.rejectedOf(uid).isEmpty())
     }
   }
 

@@ -112,8 +112,51 @@ class MedicationRepositoryFirestore(
     prescriptions(uid).document(id).delete().reportServerRejection(id)
   }
 
+  override suspend fun rejectPrescription(uid: String, prescription: Prescription): Unit =
+      SessionAccess.operation {
+        val rejected = prescription.copy(confirmation = PrescriptionConfirmation.REJECTED)
+        require(rejected.isValid() && rejected.addedBy != null) { "Invalid rejected prescription" }
+        // One write: the rules check it leaves the prescriptions as it arrives apart
+        db.batch()
+            .delete(prescriptions(uid).document(prescription.id))
+            .set(
+                rejectedPrescriptions(uid).document(prescription.id),
+                prescriptionFields(rejected) +
+                    attributionFields(rejected) +
+                    (FIELD_CREATED_AT to FieldValue.serverTimestamp()),
+            )
+            .commit()
+            .reportServerRejection(prescription.id)
+      }
+
+  override fun observeRejectedPrescriptions(
+      uid: String,
+      addedBy: String,
+  ): Flow<List<Prescription>> = SessionAccess.snapshots {
+    // Only the caregiver's own: the rules let them read no other
+    val registration =
+        rejectedPrescriptions(uid).whereEqualTo(FIELD_ADDED_BY, addedBy).addSnapshotListener {
+            snapshot,
+            error ->
+          if (error != null) {
+            close(error)
+          } else if (snapshot != null) {
+            trySend(snapshot.documents.mapNotNull(::toPrescription))
+          }
+        }
+    awaitClose { registration.remove() }
+  }
+
+  override suspend fun deleteRejectedPrescription(uid: String, id: String): Unit =
+      SessionAccess.operation {
+        rejectedPrescriptions(uid).document(id).delete().reportServerRejection(id)
+      }
+
   private fun prescriptions(uid: String) =
       db.collection(USERS).document(uid).collection(PRESCRIPTIONS)
+
+  private fun rejectedPrescriptions(uid: String) =
+      db.collection(USERS).document(uid).collection(REJECTED_PRESCRIPTIONS)
 
   /**
    * Whether this device knows that prescription [id] doesn't exist (e.g. it was deleted). Only
@@ -248,6 +291,7 @@ class MedicationRepositoryFirestore(
   companion object {
     const val USERS = "users"
     const val PRESCRIPTIONS = "prescriptions"
+    const val REJECTED_PRESCRIPTIONS = "rejectedPrescriptions"
 
     // Prescription fields
     const val FIELD_PRESCRIBED_BY = "prescribedBy"

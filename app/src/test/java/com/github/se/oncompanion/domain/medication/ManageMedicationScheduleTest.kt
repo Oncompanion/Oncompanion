@@ -263,13 +263,38 @@ class ManageMedicationScheduleTest {
 
       val rejected = manageMedicationSchedule.reject(uid, saved.id)
 
-      val now = repository.prescriptionsOf(uid).single { it.id == saved.id }
-      assertEquals("$before", before == PrescriptionConfirmation.PENDING, rejected)
+      val isPending = before == PrescriptionConfirmation.PENDING
+      // A rejected one leaves the prescriptions and is kept apart
+      val now =
+          (repository.prescriptionsOf(uid) + repository.rejectedOf(uid)).single {
+            it.id == saved.id
+          }
+      assertEquals("$before", isPending, rejected)
+      assertEquals("$before", isPending, repository.rejectedOf(uid).any { it.id == saved.id })
       assertEquals(after, now.confirmation)
       // It keeps who added it, so the caregiver can see it was rejected
       assertEquals("Sam", now.addedByName)
     }
     assertFalse(manageMedicationSchedule.reject(uid, "missing"))
+  }
+
+  @Test
+  fun dismissRejected_deletesTheRejectedOne_once_theCaregiverSawIt() = runTest {
+    val saved =
+        draft
+            .toPrescription(repository.newId(), repository::newId)
+            .copy(
+                addedBy = "sam",
+                addedByName = "Sam",
+                confirmation = PrescriptionConfirmation.PENDING,
+            )
+    repository.addPrescription(uid, saved)
+    manageMedicationSchedule.reject(uid, saved.id)
+
+    manageMedicationSchedule.dismissRejected(uid, saved.id)
+
+    assertTrue(repository.rejectedOf(uid).isEmpty())
+    assertTrue(repository.prescriptionsOf(uid).isEmpty())
   }
 
   @Test

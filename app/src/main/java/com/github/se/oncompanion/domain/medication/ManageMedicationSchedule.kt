@@ -82,10 +82,10 @@ class ManageMedicationSchedule(
   }
 
   /**
-   * Rejects the prescription [prescriptionId] a caregiver added to [uid]'s (US-43): it is kept as
-   * [PrescriptionConfirmation.REJECTED], so the caregiver can later see it was rejected, but it no
-   * longer shows for the patient and none of its medications are ever reminded. Returns once it is
-   * saved on the device, also offline. The caller asks the patient to confirm first.
+   * Rejects the prescription [prescriptionId] a caregiver added to [uid]'s (US-43): it leaves their
+   * prescriptions and is kept apart as [PrescriptionConfirmation.REJECTED], where only the
+   * caregiver who added it sees it was rejected. None of its medications are ever reminded. Returns
+   * once it is saved on the device, also offline. The caller asks the patient to confirm first.
    *
    * @return `false` if there is no such prescription waiting for the patient (e.g. it was deleted,
    *   or decided on another device): nothing is written
@@ -93,11 +93,16 @@ class ManageMedicationSchedule(
   suspend fun reject(uid: String, prescriptionId: String): Boolean {
     val saved = medicationRepository.observePrescription(uid, prescriptionId).first()
     if (saved?.confirmation != PrescriptionConfirmation.PENDING) return false
-    medicationRepository.updatePrescription(
-        uid,
-        saved.copy(confirmation = PrescriptionConfirmation.REJECTED),
-    )
+    medicationRepository.rejectPrescription(uid, saved)
     return true
+  }
+
+  /**
+   * Deletes the rejected prescription [prescriptionId] of [patientUid], once the caregiver who
+   * added it saw it was rejected (US-43). Returns once it is deleted on the device, also offline.
+   */
+  suspend fun dismissRejected(patientUid: String, prescriptionId: String) {
+    medicationRepository.deleteRejectedPrescription(patientUid, prescriptionId)
   }
 
   /**
