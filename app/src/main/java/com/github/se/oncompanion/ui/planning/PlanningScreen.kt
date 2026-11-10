@@ -467,13 +467,7 @@ private fun PlanningRow(
         is PlanningSource.Medication ->
             R.drawable.ic_medication to R.string.planning_type_medication
       }
-  val supportingText =
-      if (item.source is PlanningSource.Medication) {
-        item.frequency
-            ?.takeIf { it.isNotBlank() }
-            ?.let { stringResource(R.string.planning_frequency, it) }
-            ?: stringResource(R.string.planning_frequency_unspecified)
-      } else item.subtitle
+  val supportingText = item.supportingText()
   val timed = item.timing as? PlanningTiming.Timed
   ListItem(
       leadingContent = {
@@ -508,4 +502,14 @@ private fun PlanningRow(
                   if (onItemClick == null) Modifier else Modifier.clickable { onItemClick(item) }
               ),
   )
+}
+
+/** Appointments may have no supporting text; medications always have a frequency fallback. */
+@Composable
+private fun PlanningItem.supportingText(): String? {
+  if (source !is PlanningSource.Medication) return subtitle
+  return frequency
+      ?.takeIf { it.isNotBlank() }
+      ?.let { stringResource(R.string.planning_frequency, it) }
+      ?: stringResource(R.string.planning_frequency_unspecified)
 }

@@ -448,4 +448,32 @@ class PlanningScreenTest {
         .assertTextContains("Room 3", substring = true)
         .assertTextContains("Added by Sam", substring = true)
   }
+
+  /** Optional location and attribution independently control the row's supporting content. */
+  @Test
+  fun appointmentSupportingContent_handlesEveryNullableCombination() {
+    val cases = listOf(null to null, "Room 3" to null, null to "Sam", "Room 3" to "Sam")
+    val rows = cases.mapIndexed { index, (location, author) ->
+      item.copy(
+          source = PlanningSource.Appointment("optional-$index"),
+          subtitle = location,
+          addedByName = author,
+      )
+    }
+    render(state(rows))
+    for ((index, values) in cases.withIndex()) {
+      val row = compose.onNodeWithTag(C.Tag.planningItem(rows[index].key))
+      compose
+          .onNodeWithTag(C.Tag.planning_list)
+          .performScrollToNode(hasTestTag(C.Tag.planningItem(rows[index].key)))
+      row.assert(
+          if (values.first == null) hasText("Room 3", substring = true).not()
+          else hasText("Room 3", substring = true)
+      )
+      row.assert(
+          if (values.second == null) hasText("Added by Sam", substring = true).not()
+          else hasText("Added by Sam", substring = true)
+      )
+    }
+  }
 }
