@@ -3,9 +3,12 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -31,6 +35,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
+import com.github.se.oncompanion.model.symptom.Severity
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
@@ -39,8 +44,10 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,6 +55,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class SymptomDetailScreenTest {
@@ -168,6 +176,46 @@ class SymptomDetailScreenTest {
         )
         .assertExists()
     assertTextInside("After the walk", C.Tag.symptom_detail_notes)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun intensity_showsItsSeverityInWords_onTheSameBadgeWhateverTheValue() {
+    var intensity by mutableStateOf(1)
+    var container = Color.Unspecified
+    composeTestRule.setContent {
+      OncompanionTheme {
+        container = MaterialTheme.colorScheme.primaryContainer
+        SymptomDetailContent(
+            uiState = loaded.copy(entry = fatigue.copy(intensity = intensity)),
+            onBack = {},
+            onRetry = {},
+            onDelete = {},
+            onConfirmDelete = {},
+            onCancelDelete = {},
+            zone = ZoneOffset.UTC,
+        )
+      }
+    }
+
+    val cases = listOf(2 to Severity.MILD, 5 to Severity.MODERATE, 9 to Severity.SEVERE)
+    for ((value, severity) in cases) {
+      intensity = value
+
+      assertTextInside(context.getString(severity.label), C.Tag.symptom_detail_intensity)
+      val badge =
+          composeTestRule
+              .onNode(hasContentDescription("Intensity $value out of 10"))
+              .captureToImage()
+              .toPixelMap()
+      // The badge's fill, on its left edge, away from the rounded corners and the text
+      val fill = badge[2, badge.height / 2]
+      val same =
+          abs(container.red - fill.red) < 0.02f &&
+              abs(container.green - fill.green) < 0.02f &&
+              abs(container.blue - fill.blue) < 0.02f
+      assertTrue("$value: expected $container, was $fill", same)
+    }
   }
 
   @Test
