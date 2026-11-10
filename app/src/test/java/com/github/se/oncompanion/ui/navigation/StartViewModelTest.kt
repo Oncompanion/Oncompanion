@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -199,7 +200,7 @@ class StartViewModelTest {
 
         advanceTimeBy(2L)
         runCurrent()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
       }
 
   @Test
@@ -215,7 +216,7 @@ class StartViewModelTest {
       }
 
   @Test
-  fun signedIn_profileReadFailsOffline_startsOnOverview() =
+  fun signedIn_profileReadFailsOffline_startsOnTheAccountCheck() =
       runTest(dispatcher) {
         val profiles = RecordingProfileRepository {
           throw FirebaseFirestoreException(
@@ -227,22 +228,22 @@ class StartViewModelTest {
         val viewModel = StartViewModel(signedIn(), profiles)
         advanceUntilIdle()
 
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
       }
 
   @Test
-  fun signedIn_profileReadThrowsUnexpectedException_startsOnOverview() =
+  fun signedIn_profileReadThrowsUnexpectedException_startsOnTheAccountCheck() =
       runTest(dispatcher) {
         val profiles = RecordingProfileRepository { throw RuntimeException("boom") }
 
         val viewModel = StartViewModel(signedIn(), profiles)
         advanceUntilIdle()
 
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
       }
 
   @Test
-  fun signedIn_profileReadNeverReturns_staysUndecidedUntilTimeout_thenStartsOnOverview() =
+  fun signedIn_profileReadNeverReturns_staysUndecidedUntilTimeout_thenStartsOnTheAccountCheck() =
       runTest(dispatcher) {
         val profiles = RecordingProfileRepository { awaitCancellation() }
 
@@ -257,7 +258,7 @@ class StartViewModelTest {
 
         advanceTimeBy(2L)
         runCurrent()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
       }
 
   @Test
@@ -272,7 +273,7 @@ class StartViewModelTest {
 
         advanceTimeBy(2L)
         runCurrent()
-        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
       }
 
   @Test
@@ -425,4 +426,24 @@ class StartViewModelTest {
   ) : CareCircleInviteRepository by delegate {
     override suspend fun hasJoinedCircle(caregiverUid: String): Boolean = awaitCancellation()
   }
+
+  @Test
+  fun accountCheck_decidesOnlyOnRetry_thenStartsWhereTheProfileSays() =
+      runTest(dispatcher) {
+        val profiles = RecordingProfileRepository { profile }
+        val viewModel = StartViewModel(signedIn(), profiles, decided = Route.ACCOUNT_CHECK)
+        advanceUntilIdle()
+        // Opening the account check doesn't decide again by itself
+        assertEquals(Route.ACCOUNT_CHECK, viewModel.startRoute.value)
+        assertTrue(profiles.requestedUids.isEmpty())
+
+        viewModel.retry()
+        assertNull(viewModel.startRoute.value)
+        advanceUntilIdle()
+
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+        // Once decided, retrying changes nothing
+        viewModel.retry()
+        assertEquals(Route.OVERVIEW, viewModel.startRoute.value)
+      }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -98,6 +99,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -151,6 +153,7 @@ class AppNavHostTest {
       medicationRepository: MedicationRepository = FakeMedicationRepository(),
       symptomRepository: SymptomRepository = FakeSymptomRepository(),
       credentialProvider: GoogleCredentialProvider = FakeGoogleCredentialProvider(),
+      restoration: StateRestorationTester? = null,
   ) {
     PlanningRepositoryProvider.repository = planningRepository
     // The Overview and Planning read the user's role: a test that sets no profiles gets a patient,
@@ -164,6 +167,14 @@ class AppNavHostTest {
     AuthRepositoryProvider.repository = authRepository
     MedicationRepositoryProvider.repository = medicationRepository
     SymptomRepositoryProvider.repository = symptomRepository
+    // Restoring the state needs the app's own NavController, which saves where the user was
+    if (restoration != null) {
+      restoration.setContent {
+        activity = checkNotNull(LocalActivity.current)
+        AppNavHost(startRoute = startRoute ?: Route.AUTH, credentialProvider = credentialProvider)
+      }
+      return
+    }
     composeTestRule.setContent {
       activity = checkNotNull(LocalActivity.current)
       navController =
@@ -394,6 +405,127 @@ class AppNavHostTest {
     composeTestRule
         .onNodeWithTag(C.Tag.overview_whose_care)
         .assertTextContains(context.getString(R.string.overview_care_of, "Paul"))
+  }
+
+  /** Waits until a node with [tag] is on screen. */
+  private fun waitForTag(tag: String) =
+      composeTestRule.waitUntil(timeoutMillis = 5_000) {
+        composeTestRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+      }
+
+  @Test
+  fun accountCheck_retry_startsWhereTheProfileSays() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "newcomer") })
+    runBlocking { auth.signInWithGoogle("token") }
+    setNavHost(Route.ACCOUNT_CHECK, authRepository = auth)
+    waitForTag(C.Tag.account_check_retry)
+
+    // Read this time: no profile yet, so the newcomer starts onboarding
+    composeTestRule.onNodeWithTag(C.Tag.account_check_retry).performClick()
+
+    waitForTag(C.Tag.onboarding_role_screen)
+    composeTestRule.onNodeWithTag(C.Tag.account_check_screen).assertDoesNotExist()
+    // Back can't return to the account check
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
+  }
+
+  @Test
+  fun caregiverMode_removedByTheOnlyPatient_goesBackToJoiningACircle() {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    waitForTag(C.Tag.overview_whose_care)
+
+    // Anne removes the caregiver while they look at her Overview
+    circles.setMembers("p-anne", emptyList())
+
+    waitForTag(C.Tag.join_circle_screen)
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertDoesNotExist()
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
+  }
+
+  private fun removedMessage(firstName: String) =
+      ApplicationProvider.getApplicationContext<Context>()
+          .getString(R.string.removed_from_circle, firstName)
+
+  @Test
+  fun caregiverMode_removedByOneOfTwoPatients_listsTheOtherOne_thenTheLastOneToo() {
+    // Two patients with the same first name: the second removal must be noticed all the same
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-anne-b" to "Anne")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+    )
+    waitForTag(C.Tag.whoseCarePatient("p-anne"))
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+
+    circles.setMembers("p-anne", emptyList())
+
+    // Back to "Whose care?", where only the other one is left, without choosing for the caregiver
+    waitForTag(C.Tag.whoseCarePatient("p-anne-b"))
+    composeTestRule.onNodeWithTag(C.Tag.whose_care_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).assertDoesNotExist()
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
+
+    // The last one removes them too: straight to joining a circle
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne-b")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+    circles.setMembers("p-anne-b", emptyList())
+
+    waitForTag(C.Tag.join_circle_screen)
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertNull(navController.previousBackStackEntry) }
+  }
+
+  /** Follows Anne and Paul, opens Anne's care, then Anne removes the caregiver. */
+  private fun removedByAnneWhileFollowingPaul(restoration: StateRestorationTester? = null) {
+    val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne", "p-paul" to "Paul")
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        restoration = restoration,
+    )
+    waitForTag(C.Tag.whoseCarePatient("p-anne"))
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-anne")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+    circles.setMembers("p-anne", emptyList())
+    waitForTag(C.Tag.whoseCarePatient("p-paul"))
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
+  }
+
+  @Test
+  fun caregiverMode_removalMessage_choosingAnotherPatient_doesNotBringItBackLater() {
+    removedByAnneWhileFollowingPaul()
+
+    // Paul is chosen while the message still shows, so it never finished
+    composeTestRule.onNodeWithTag(C.Tag.whoseCarePatient("p-paul")).performClick()
+    waitForTag(C.Tag.overview_whose_care)
+    composeTestRule.onNodeWithTag(C.Tag.overview_whose_care).performClick()
+
+    waitForTag(C.Tag.whoseCarePatient("p-paul"))
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverMode_removalMessage_survivesTheActivityBeingRecreated() {
+    val restoration = StateRestorationTester(composeTestRule)
+    removedByAnneWhileFollowingPaul(restoration)
+
+    restoration.emulateSavedInstanceStateRestore()
+
+    waitForTag(C.Tag.whoseCarePatient("p-paul"))
+    composeTestRule.onNodeWithText(removedMessage("Anne")).assertIsDisplayed()
   }
 
   @Test

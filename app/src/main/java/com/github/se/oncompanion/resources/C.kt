@@ -74,6 +74,10 @@ object C {
     const val sign_in_screen = "sign_in_screen"
     const val google_sign_in_button = "google_sign_in_button"
     const val sign_in_loading = "sign_in_loading"
+    const val account_check_screen = "account_check_screen"
+    const val account_check_retry = "account_check_retry"
+    const val account_check_loading = "account_check_loading"
+    const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
@@ -333,9 +337,13 @@ object C {
     const val whose_care_empty = "whose_care_empty"
     const val whose_care_action = "whose_care_action"
     const val whose_care_join_another = "whose_care_join_another"
+    const val whose_care_unconfirmed = "whose_care_unconfirmed"
+    const val whose_care_secondary_action = "whose_care_secondary_action"
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
+    const val removed_from_circle_snackbar = "removed_from_circle_snackbar"
 
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"

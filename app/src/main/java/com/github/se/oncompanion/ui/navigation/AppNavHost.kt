@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +35,8 @@ import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
+import com.github.se.oncompanion.ui.auth.AccountCheckScreen
+import com.github.se.oncompanion.ui.auth.AccountSwitchViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SessionBoundary
@@ -133,6 +138,18 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  // Removed from the chosen patient's circle: the patients still followed, or joining a circle.
+  // The list shows even with one left, so the caregiver sees who removed them is gone
+  val lostAccess by caregiverMode.lostAccess.collectAsStateWithLifecycle()
+  // Who removed them, until the message saying so went away on the screen they land on
+  var removedFrom by rememberSaveable { mutableStateOf<String?>(null) }
+  LaunchedEffect(lostAccess) {
+    lostAccess?.let { firstName ->
+      removedFrom = firstName
+      caregiverMode.accessLossHandled()
+      navigationActions.navigateAndClearBackStack(Screen.WHOSE_CARE_SWITCH)
+    }
+  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -156,6 +173,19 @@ private fun SessionNavHost(
                   }
               )
             },
+        )
+      }
+    }
+
+    // The account couldn't be checked at startup: no role is guessed until Retry knows it
+    navigation(startDestination = Screen.ACCOUNT_CHECK, route = Route.ACCOUNT_CHECK) {
+      composable(Screen.ACCOUNT_CHECK) {
+        AccountCheckScreen(
+            viewModel = viewModel { StartViewModel(decided = Route.ACCOUNT_CHECK) },
+            switchViewModel = viewModel { AccountSwitchViewModel() },
+            credentialProvider = credentialProvider,
+            onChecked = { route -> navigationActions.navigateAndClearBackStack(route) },
+            onSignedOut = signOut,
         )
       }
     }
@@ -192,6 +222,8 @@ private fun SessionNavHost(
             onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
             onSignedOut = signOut,
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }
@@ -214,12 +246,17 @@ private fun SessionNavHost(
                 navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
             // Their Overview, in caregiver mode
             onPatientChosen = { patient ->
+              // Chosen while the message showed: it must not come back next time
+              removedFrom = null
               caregiverMode.choose(patient)
               navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
             },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
             onSignedOut = signOut,
+            onNoPatient = { navigationActions.navigateAndClearBackStack(Route.JOIN_CIRCLE) },
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }
