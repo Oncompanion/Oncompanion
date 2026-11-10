@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * Writes return once saved on the phone and sync when the connection returns. If the server rejects
  * one (e.g. the event started before the phone synced), it is rolled back on the device, which
- * [observeIsRegistered] then emits, and reported through [RejectedWrites], which tells the user.
+ * [observeRegistration] then emits, and reported through [RejectedWrites], which tells the user.
  */
 class EventRegistrationRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
@@ -39,7 +39,7 @@ class EventRegistrationRepositoryFirestore(
   private val db: FirebaseFirestore
     get() = dbProvider()
 
-  override fun observeIsRegistered(uid: String, eventId: String): Flow<Boolean> {
+  override fun observeRegistration(uid: String, eventId: String): Flow<EventRegistration?> {
     requirePathSegment(uid)
     requirePathSegment(eventId)
     return SessionAccess.snapshots {
@@ -48,7 +48,16 @@ class EventRegistrationRepositoryFirestore(
         if (error != null) {
           close(error)
         } else {
-          trySend(snapshot?.exists() == true)
+          trySend(
+              snapshot
+                  ?.takeIf { it.exists() }
+                  ?.let {
+                    EventRegistration(
+                        it.getString(FIELD_ADDED_BY),
+                        it.getString(FIELD_ADDED_BY_NAME),
+                    )
+                  }
+          )
         }
       }
       awaitClose { registration.remove() }
@@ -69,12 +78,17 @@ class EventRegistrationRepositoryFirestore(
     }
   }
 
-  override fun confirm(uid: String, eventId: String): Unit = SessionAccess.immediate {
-    // The server sets the time, so the rules can check it against the event's start
-    document(uid, eventId)
-        .set(mapOf(FIELD_CONFIRMED_AT to FieldValue.serverTimestamp()))
-        .addOnFailureListener { reportRejected("Confirmation for event $eventId", it) }
-  }
+  override fun confirm(uid: String, eventId: String, by: EventRegistration): Unit =
+      SessionAccess.immediate {
+        // The server sets the time, so the rules can check it against the event's start. The
+        // patient's own confirmation says nothing about who added it, as the rules require
+        val signature =
+            if (by.addedBy == null) emptyMap()
+            else mapOf(FIELD_ADDED_BY to by.addedBy, FIELD_ADDED_BY_NAME to by.addedByName)
+        document(uid, eventId)
+            .set(mapOf(FIELD_CONFIRMED_AT to FieldValue.serverTimestamp()) + signature)
+            .addOnFailureListener { reportRejected("Confirmation for event $eventId", it) }
+      }
 
   override fun remove(uid: String, eventId: String): Unit = SessionAccess.immediate {
     document(uid, eventId).delete().addOnFailureListener {
@@ -107,6 +121,8 @@ class EventRegistrationRepositoryFirestore(
     const val USERS_COLLECTION = "users"
     const val COLLECTION = "eventRegistrations"
     const val FIELD_CONFIRMED_AT = "confirmedAt"
+    const val FIELD_ADDED_BY = "addedBy"
+    const val FIELD_ADDED_BY_NAME = "addedByName"
     private const val TAG = "EventRegistrationRepo"
   }
 }

@@ -4,6 +4,9 @@ package com.github.se.oncompanion.ui.events
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.assertIsDisplayed
@@ -288,6 +291,40 @@ class EventDetailScreenTest {
   }
 
   @Test
+  fun websiteThatCantOpen_forACaregiverAllowedToConfirm_pointsToTheirButton() {
+    setContent(
+        loaded(RegistrationStatus.CAN_CONFIRM).copy(caregiverCanConfirm = true),
+        uriHandler = RecordingUriHandler(canOpen = false),
+        caregiverOf = "Anne",
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_visit_website).performClick()
+
+    composeTestRule
+        .onNode(
+            hasText(
+                context.getString(R.string.event_detail_website_error_can_confirm_caregiver, "Anne")
+            )
+        )
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun websiteThatCantOpen_forAReadOnlyCaregiver_doesntOfferConfirming() {
+    setContent(
+        loaded(RegistrationStatus.CAN_CONFIRM),
+        uriHandler = RecordingUriHandler(canOpen = false),
+        caregiverOf = "Anne",
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_visit_website).performClick()
+
+    composeTestRule
+        .onNode(hasText(context.getString(R.string.event_detail_website_error)))
+        .assertIsDisplayed()
+  }
+
+  @Test
   fun websiteThatCantOpen_onceConfirmed_doesntOfferConfirming() {
     setContent(
         loaded(RegistrationStatus.CONFIRMED),
@@ -554,5 +591,62 @@ class EventDetailScreenTest {
         .onNodeWithTag(C.Tag.event_detail_visit_website)
         .performScrollTo()
         .assertIsFullyVisible()
+  }
+
+  // ---- a caregiver the patient lets confirm events (US-42) ----
+
+  @Test
+  fun caregiverAllowedToConfirm_confirmsForThePatient_andSaysItsOnlyTheirRecord() {
+    var confirms = 0
+    setContent(
+        loaded(RegistrationStatus.CAN_CONFIRM).copy(caregiverCanConfirm = true),
+        onConfirmRegistration = { confirms++ },
+        caregiverOf = "Anne",
+    )
+
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_visit_website).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.event_detail_confirm)
+        .assertTextEquals(context.getString(R.string.event_detail_registered_caregiver, "Anne"))
+    assertTagged(
+        context.getString(R.string.event_detail_registration_note_caregiver, "Anne"),
+        C.Tag.event_detail_registration_note,
+    )
+    composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).performScrollTo().performClick()
+    composeTestRule.runOnIdle { assertEquals(1, confirms) }
+  }
+
+  @Test
+  fun confirmedByACaregiver_saysWho_andOnlyThePatientCanRemoveIt() {
+    val confirmed =
+        loaded(RegistrationStatus.CONFIRMED).copy(caregiverCanConfirm = true, addedByName = "Sam")
+    var caregiverOf by mutableStateOf<String?>("Anne")
+    composeTestRule.setContent {
+      EventDetailContent(confirmed, {}, {}, {}, {}, {}, {}, caregiverOf = caregiverOf)
+    }
+
+    // The caregiver who confirmed it, then the patient
+    for (viewer in listOf("Anne", null)) {
+      caregiverOf = viewer
+      assertTextInside(
+          context.getString(R.string.symptom_added_by, "Sam"),
+          C.Tag.event_detail_registration_confirmed,
+      )
+      composeTestRule.onNodeWithTag(C.Tag.event_detail_confirm).assertDoesNotExist()
+      val remove = composeTestRule.onNodeWithTag(C.Tag.event_detail_remove)
+      if (viewer == null) remove.assertExists() else remove.assertDoesNotExist()
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiverAllowedToConfirm_isFullyVisibleInLandscape() {
+    setContent(
+        loaded(RegistrationStatus.CAN_CONFIRM).copy(caregiverCanConfirm = true),
+        caregiverOf = "Anne",
+    )
+    for (tag in listOf(C.Tag.event_detail_confirm, C.Tag.event_detail_registration_note)) {
+      composeTestRule.onNodeWithTag(tag).performScrollTo().assertIsFullyVisible()
+    }
   }
 }

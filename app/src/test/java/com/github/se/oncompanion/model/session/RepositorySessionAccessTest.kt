@@ -75,7 +75,7 @@ class RepositorySessionAccessTest {
             medications.observeMedications("one"),
             circle.observeMember("patient", "one"),
             invites.observeJoinedCircles("one"),
-            registrations.observeIsRegistered("one", "event"),
+            registrations.observeRegistration("one", "event"),
         )
     SessionAccess.stopListeners()
     SessionAccess.reopen()
