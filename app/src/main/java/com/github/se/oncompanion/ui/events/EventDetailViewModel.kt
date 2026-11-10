@@ -113,7 +113,8 @@ class EventDetailViewModel(
     editableOwner = null
     _uiState.value = EventDetailUiState()
     viewModelScope.launch {
-      val event =
+      // Null when the event no longer exists: the page then says it wasn't found
+      val event: Event? =
           try {
             repository.getEvent(eventId)
           } catch (e: CancellationException) {
