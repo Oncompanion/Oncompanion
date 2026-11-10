@@ -211,6 +211,59 @@ class MedicationRepositoryFirestoreTest {
   }
 
   @Test
+  fun aCaregiversPrescription_roundTripsWaiting_thenThePatientConfirmsIt(): Unit = runBlocking {
+    val carolUid = EmulatorTestData.createUser("presc-repo-carol")
+    // Alice lets carol see and add prescriptions (from another device, bypassing the rules)
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/circle",
+        carolUid,
+        """{"firstName": {"stringValue": "Carol"},
+            "relationship": {"stringValue": "SISTER"},
+            "permissions": {"arrayValue": {"values": [{"stringValue": "PRESCRIPTIONS"}]}},
+            "canAdd": {"arrayValue": {"values": [{"stringValue": "PRESCRIPTIONS"}]}},
+            "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
+    )
+    val carols =
+        prescription()
+            .copy(
+                addedBy = carolUid,
+                addedByName = "Carol",
+                confirmation = PrescriptionConfirmation.PENDING,
+            )
+    repository.addPrescription(aliceUid, carols)
+    awaitServerAck()
+    assertEquals("the server accepted it", 0, rejectedWrites.unseen.value)
+
+    EmulatorTestData.signIn("alice")
+    assertSameContent(carols, repository.observePrescription(aliceUid, "presc-1").awaitFirst())
+
+    // Alice checks it and confirms it: who added it stays
+    repository.updatePrescription(
+        aliceUid,
+        carols.copy(prescribedBy = "Dr. Rossi", confirmation = PrescriptionConfirmation.CONFIRMED),
+    )
+    awaitServerAck()
+    assertEquals(0, rejectedWrites.unseen.value)
+    val confirmed =
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst { it?.isConfirmed == true }
+    assertEquals("Carol", confirmed!!.addedByName)
+    assertEquals(carolUid, confirmed.addedBy)
+    assertEquals("Dr. Rossi", confirmed.prescribedBy)
+  }
+
+  @Test
+  fun aPrescriptionSavedBeforeUs43_readsAsThePatientsOwn_confirmed(): Unit = runBlocking {
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/prescriptions",
+        "presc-old",
+        rawPrescription("old-1" to "Paracetamol"),
+    )
+    val old = repository.observePrescription(aliceUid, "presc-old").awaitFirst { it != null }!!
+    assertTrue(old.isConfirmed)
+    assertEquals(null, old.addedBy)
+  }
+
+  @Test
   fun deleteOfAnotherUsersPrescriptionReturnsButIsRejectedAndReported(): Unit = runBlocking {
     val bobUid = EmulatorTestData.createUser("bob")
     repository.addPrescription(bobUid, prescription())
