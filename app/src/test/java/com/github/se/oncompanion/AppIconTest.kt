@@ -9,9 +9,9 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 import androidx.test.core.app.ApplicationProvider
+import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.theme.SurfaceLight
 import com.github.se.oncompanion.ui.theme.TertiaryLight
-import kotlin.math.abs
 import kotlin.math.hypot
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -36,23 +36,14 @@ class AppIconTest {
     return bitmap
   }
 
-  private fun assertSameColor(message: String, expected: Color, actual: Int) {
-    val color = Color(actual)
-    val close =
-        abs(expected.red - color.red) < 0.02f &&
-            abs(expected.green - color.green) < 0.02f &&
-            abs(expected.blue - color.blue) < 0.02f
-    assertTrue("$message: expected $expected, was $color", close)
-  }
-
   @Test
   fun bothIcons_areTheVioletRibbonOnACreamTile() {
     for (id in listOf(R.mipmap.ic_launcher, R.mipmap.ic_launcher_round)) {
       val icon = context.getDrawable(id) as AdaptiveIconDrawable
 
-      assertSameColor("tile", SurfaceLight, draw(icon.background).getPixel(54, 54))
+      assertSameColor("tile", SurfaceLight, Color(draw(icon.background).getPixel(54, 54)))
       // The top of the ribbon's loop, on the tile's vertical axis
-      assertSameColor("ribbon", TertiaryLight, draw(icon.foreground).getPixel(54, 33))
+      assertSameColor("ribbon", TertiaryLight, Color(draw(icon.foreground).getPixel(54, 33)))
     }
   }
 

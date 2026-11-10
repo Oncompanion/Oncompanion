@@ -6,30 +6,28 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.assertSameColor
+import com.github.se.oncompanion.ui.colorAt
 import com.github.se.oncompanion.ui.theme.TertiaryDark
 import com.github.se.oncompanion.ui.theme.TertiaryLight
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -204,22 +202,9 @@ class SignInContentTest {
     composeTestRule.onNodeWithText(string(R.string.sign_in_retry)).assertIsDisplayed()
   }
 
-  /** The color at the top of the ribbon's loop, in the 64 dp logo (20-unit drawing). */
-  private fun ribbonColor(): Color {
-    val scale = 64f / 20f * composeTestRule.density.density
-    return composeTestRule
-        .onNodeWithTag(C.Tag.sign_in_logo)
-        .captureToImage()
-        .toPixelMap()[(10f * scale).toInt(), (2.1f * scale).toInt()]
-  }
-
-  private fun assertSameColor(message: String, expected: Color, actual: Color) {
-    val close =
-        abs(expected.red - actual.red) < 0.02f &&
-            abs(expected.green - actual.green) < 0.02f &&
-            abs(expected.blue - actual.blue) < 0.02f
-    assertTrue("$message: expected $expected, was $actual", close)
-  }
+  /** The color at the top of the ribbon's loop: (10, 2.1) of its 20-unit drawing, at 64 dp. */
+  private fun ribbonColor() =
+      composeTestRule.onNodeWithTag(C.Tag.sign_in_logo).colorAt(x = 32.dp, y = 6.72.dp)
 
   @Test
   fun logo_isTheRibbonReadAsTheAppName() {
@@ -230,12 +215,12 @@ class SignInContentTest {
         .assertIsDisplayed()
         .assertContentDescriptionEquals(string(R.string.app_name))
     // The "O" placeholder is gone
-    assertFalse(composeTestRule.onAllNodes(hasText("O")).fetchSemanticsNodes().isNotEmpty())
+    composeTestRule.onNodeWithText("O").assertDoesNotExist()
   }
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun logo_isTheDuskRibbon_inLightTheme() {
+  fun logo_isTheVioletRibbon_inLightTheme() {
     setContent(SignInUiState())
 
     assertSameColor("light ribbon", TertiaryLight, ribbonColor())
