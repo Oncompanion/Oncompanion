@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -22,7 +24,9 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -250,6 +254,51 @@ class LakeTextFieldTest {
     val bounds = composeTestRule.onNodeWithTag(FORM.first().tag).getUnclippedBoundsInRoot()
 
     assertEveryBoxIs(bounds.bottom - bounds.top)
+  }
+
+  // "Family name" in the member form's name row (160 dp) wraps at 200%: the box grows for it
+  @Test
+  @Config(fontScale = 2f)
+  fun at200PercentFont_aLabelThatWraps_staysInTheBox_aboveTheValue() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        typography = MaterialTheme.typography
+        LakeTextField(
+            value = value,
+            onValueChange = { value = it },
+            label = { Text("Family name") },
+            singleLine = true,
+            modifier = Modifier.width(160.dp).testTag(FIELD),
+        )
+      }
+    }
+    val oneLine = with(composeTestRule.density) { typography.bodySmall.lineHeight.toDp() }
+
+    // Empty, the large label fills the box
+    val emptyLabel = text("Family name").getUnclippedBoundsInRoot()
+    val emptyBox = field().getUnclippedBoundsInRoot()
+    assertTrue("the label wraps", emptyLabel.bottom - emptyLabel.top > oneLine * 1.5f)
+    assertTrue("empty: $emptyLabel in $emptyBox", emptyLabel.top >= emptyBox.top)
+    assertTrue("empty: $emptyLabel in $emptyBox", emptyLabel.bottom <= emptyBox.bottom)
+
+    // Filled, the small label leaves room for the value below it
+    value = "Value"
+    composeTestRule.waitForIdle()
+    val label = text("Family name").getUnclippedBoundsInRoot()
+    val box = field().getUnclippedBoundsInRoot()
+    // The field's node spans the whole box, so the value's height comes from its text layout
+    val layouts = mutableListOf<TextLayoutResult>()
+    field().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+    val valueHeight = with(composeTestRule.density) { layouts.single().size.height.toDp() }
+    assertTrue("filled: $label in $box", label.top >= box.top)
+    assertTrue(
+        "the value fits below the label: $label in $box, value $valueHeight tall",
+        box.bottom - label.bottom >= valueHeight,
+    )
+    assertTrue(
+        "filling never makes it taller",
+        box.bottom - box.top <= emptyBox.bottom - emptyBox.top,
+    )
   }
 
   private companion object {

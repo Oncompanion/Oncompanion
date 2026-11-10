@@ -7,6 +7,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -19,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.ui.SMALL_PHONE
+import com.github.se.oncompanion.ui.assertNoWordIsCut
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.colorAt
@@ -43,14 +48,16 @@ class LakeBannerTest {
   private lateinit var typography: Typography
   private var primaryText = Color.Unspecified
   private var retries = 0
+  private var dark by mutableStateOf(false)
 
-  /** One banner per tone, tagged with its tone's name, with a Retry action when [withAction]. */
+  /** One banner per tone, tagged with its tone's name, with an [action] when [withAction]. */
   private fun setContent(
       message: String = "Couldn't refresh the events.",
       withAction: Boolean = true,
+      action: String = "Retry",
   ) {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         colors = MaterialTheme.colorScheme
         typography = MaterialTheme.typography
         primaryText = MaterialTheme.lakeColors.primaryText
@@ -60,7 +67,7 @@ class LakeBannerTest {
               LakeBanner(
                   message = "$message ${tone.name}",
                   tone = tone,
-                  actionLabel = if (withAction) "Retry ${tone.name}" else null,
+                  actionLabel = if (withAction) "$action ${tone.name}" else null,
                   onAction = { retries++ },
                   actionTestTag = "${tone.name} action",
                   modifier = Modifier.testTag(tone.name),
@@ -84,18 +91,23 @@ class LakeBannerTest {
       }
 
   @Test
-  fun eachTone_isA48dpBox_withMediumCorners_inItsFigmaColors() {
+  fun eachTone_isA48dpBox_withMediumCorners_inItsFigmaColors_inBothThemes() {
     setContent()
 
-    for (tone in LakeBannerTone.entries) {
-      val (container, content) = figmaColors(tone)
-      banner(tone).assertHeightIsEqualTo(48.dp)
-      composeTestRule
-          .onNodeWithText("Couldn't refresh the events. ${tone.name}", useUnmergedTree = true)
-          .assertTextStyle(typography.bodyMedium, content)
-      // Left of the icon, in the 12 dp padding; the very corner is rounded off
-      assertSameColor("$tone container", container, banner(tone).colorAt(6.dp, 24.dp))
-      assertSameColor("$tone corner", colors.surface, banner(tone).colorAt(1.dp, 1.dp))
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      for (tone in LakeBannerTone.entries) {
+        val (container, content) = figmaColors(tone)
+        banner(tone).assertHeightIsEqualTo(48.dp)
+        composeTestRule
+            .onNodeWithText("Couldn't refresh the events. ${tone.name}", useUnmergedTree = true)
+            .assertTextStyle(typography.bodyMedium, content)
+        // Left of the icon, in the 12 dp padding; the very corner is rounded off
+        val where = "$tone, dark $theme"
+        assertSameColor("$where container", container, banner(tone).colorAt(6.dp, 24.dp))
+        assertSameColor("$where corner", colors.surface, banner(tone).colorAt(1.dp, 1.dp))
+      }
     }
   }
 
@@ -153,6 +165,23 @@ class LakeBannerTest {
               .getUnclippedBoundsInRoot()
       assertTrue("$tone grows", box.bottom - box.top > 48.dp)
       assertTrue("$tone message inside", message.top >= box.top && message.bottom <= box.bottom)
+    }
+  }
+
+  // On a narrow phone at 200%, a long action beside the message would leave it a few letters a line
+  @Test
+  @Config(qualifiers = SMALL_PHONE, fontScale = 2f)
+  fun aLongAction_atLargeFont_leavesTheMessageAndTheActionReadable() {
+    setContent(action = "Try again later")
+
+    for (tone in LakeBannerTone.entries) {
+      for (text in
+          listOf("Couldn't refresh the events. ${tone.name}", "Try again later ${tone.name}")) {
+        composeTestRule.onNodeWithText(text, useUnmergedTree = true).assertNoWordIsCut()
+      }
+      val action = composeTestRule.onNodeWithTag("${tone.name} action").getUnclippedBoundsInRoot()
+      val box = bounds(tone)
+      assertTrue("$tone action inside", action.left >= box.left && action.right <= box.right)
     }
   }
 }

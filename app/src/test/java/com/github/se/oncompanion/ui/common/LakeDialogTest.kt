@@ -4,6 +4,9 @@ package com.github.se.oncompanion.ui.common
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -32,10 +35,11 @@ class LakeDialogTest {
 
   private lateinit var typography: Typography
   private var primaryText = Color.Unspecified
+  private var dark by mutableStateOf(false)
 
   private fun setContent(isWorking: Boolean = false, focusCancel: Boolean = false) {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         typography = MaterialTheme.typography
         primaryText = MaterialTheme.lakeColors.primaryText
         LakeDialog(
@@ -55,13 +59,17 @@ class LakeDialogTest {
 
   // Only a destructive action is red
   @Test
-  fun aDecisionThatIsntDestructive_hasBothLabelsInPrimaryText() {
+  fun aDecisionThatIsntDestructive_hasBothLabelsInPrimaryText_inBothThemes() {
     setContent()
 
-    for (label in listOf("Sign out", "Cancel")) {
-      composeTestRule
-          .onNodeWithText(label, useUnmergedTree = true)
-          .assertTextStyle(typography.buttonLabel, primaryText)
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      for (label in listOf("Sign out", "Cancel")) {
+        composeTestRule
+            .onNodeWithText(label, useUnmergedTree = true)
+            .assertTextStyle(typography.buttonLabel, primaryText)
+      }
     }
   }
 
