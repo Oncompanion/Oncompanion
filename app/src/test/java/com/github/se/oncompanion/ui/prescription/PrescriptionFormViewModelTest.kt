@@ -14,6 +14,7 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -1887,5 +1888,147 @@ class PrescriptionFormViewModelTest {
 
     assertNull(viewModel.state.alreadySaved)
     assertEquals(SavePhase.SAVED, viewModel.state.save)
+  }
+
+  // ---------- The patient confirms or rejects a caregiver's prescription (US-43) ----------
+
+  private val sams =
+      saved.copy(
+          addedBy = "sam",
+          addedByName = "Sam",
+          confirmation = PrescriptionConfirmation.PENDING,
+      )
+
+  /** The patient's form reviewing [sams], loaded. */
+  private fun TestScope.reviewing(): PrescriptionFormViewModel {
+    fakeMedications.seed(uid, sams)
+    return editViewModel().also { advanceUntilIdle() }
+  }
+
+  private fun savedConfirmation() = fakeMedications.prescriptionsOf(uid).single().confirmation
+
+  @Test
+  fun caregiversPrescription_isToConfirm_andSavingConfirmsIt_keepingWhoAddedIt() = runTest {
+    val viewModel = reviewing()
+    assertTrue(viewModel.state.isToConfirm)
+
+    viewModel.onPrescribedByChange("Dr. House")
+    viewModel.save()
+    advanceUntilIdle()
+
+    val confirmed = fakeMedications.prescriptionsOf(uid).single()
+    assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
+    assertEquals("Dr. House", confirmed.prescribedBy)
+    assertEquals("Sam", confirmed.addedByName)
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
+  }
+
+  @Test
+  fun rejecting_asksFirst_cancelKeepsIt_thenRejectsIt() = runTest {
+    val viewModel = reviewing()
+
+    viewModel.reject()
+    assertEquals(PrescriptionConfirmation.PENDING, savedConfirmation())
+    viewModel.requestRejection()
+    assertTrue(viewModel.state.isConfirmingRejection)
+    viewModel.cancelRejection()
+    viewModel.reject()
+    advanceUntilIdle()
+    assertFalse(viewModel.state.isConfirmingRejection)
+    assertEquals(PrescriptionConfirmation.PENDING, savedConfirmation())
+
+    viewModel.requestRejection()
+    viewModel.reject()
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionConfirmation.REJECTED, savedConfirmation())
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
+    assertFalse(viewModel.state.isConfirmingRejection)
+  }
+
+  @Test
+  fun onlyAPrescriptionWaitingForThePatient_canBeRejected() = runTest {
+    val viewModel = loadedEditViewModel()
+    assertFalse(viewModel.state.isToConfirm)
+
+    viewModel.requestRejection()
+
+    assertFalse(viewModel.state.isConfirmingRejection)
+  }
+
+  @Test
+  fun rejecting_whenItCantBeSaved_orWasDecidedElsewhere_orSignedOut() = runTest {
+    // What goes wrong just before rejecting, and what the form then says
+    val cases =
+        listOf<Triple<String, () -> Unit, (PrescriptionFormUiState) -> Unit>>(
+            Triple(
+                "write fails",
+                { fakeMedications.writeError = IOException("disk full") },
+                {
+                  assertEquals(PrescriptionFormError.SAVE_FAILED, it.error)
+                  assertEquals(SavePhase.EDITING, it.save)
+                },
+            ),
+            Triple(
+                "confirmed on another device",
+                {
+                  fakeMedications.seed(
+                      uid,
+                      sams.copy(confirmation = PrescriptionConfirmation.CONFIRMED),
+                  )
+                },
+                {
+                  // Nothing is rejected, and the form shows it is confirmed
+                  assertFalse(it.isToConfirm)
+                  assertEquals(SavePhase.EDITING, it.save)
+                },
+            ),
+            Triple(
+                "signed out",
+                { runBlocking { auth.signOut() } },
+                { assertEquals(PrescriptionFormError.NOT_SIGNED_IN, it.error) },
+            ),
+        )
+    for ((name, change, check) in cases) {
+      fakeMedications = FakeMedicationRepository()
+      medications = GatedMedicationRepository(fakeMedications)
+      auth = FakeAuthRepository(onSignIn = { AuthUser(uid = uid) })
+      runBlocking { auth.signInWithGoogle("token") }
+      val viewModel = reviewing()
+      viewModel.requestRejection()
+      val before = viewModel.state
+
+      // The change happens just before the tap on Reject, before the form hears of it
+      change()
+      viewModel.reject()
+      advanceUntilIdle()
+
+      assertFalse(name, viewModel.state.isConfirmingRejection)
+      check(viewModel.state)
+      assertTrue(name, before.isToConfirm)
+      assertTrue(
+          name,
+          fakeMedications.prescriptionsOf(uid).none {
+            it.confirmation == PrescriptionConfirmation.REJECTED
+          },
+      )
+    }
+  }
+
+  @Test
+  fun rejectedPrescription_isNotFound_andOneConfirmedElsewhere_isNoLongerToConfirm() = runTest {
+    fakeMedications.seed(uid, sams.copy(confirmation = PrescriptionConfirmation.REJECTED))
+    assertEquals(
+        PrescriptionFormLoad.NOT_FOUND,
+        editViewModel().also { advanceUntilIdle() }.state.load,
+    )
+
+    fakeMedications.seed(uid, sams)
+    val viewModel = editViewModel()
+    advanceUntilIdle()
+    fakeMedications.seed(uid, sams.copy(confirmation = PrescriptionConfirmation.CONFIRMED))
+    advanceUntilIdle()
+
+    assertFalse(viewModel.state.isToConfirm)
   }
 }

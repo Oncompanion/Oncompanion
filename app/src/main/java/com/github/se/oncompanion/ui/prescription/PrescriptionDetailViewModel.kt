@@ -19,6 +19,7 @@ import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeleteState
 import com.github.se.oncompanion.ui.common.HasDeleteState
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -127,7 +129,11 @@ class PrescriptionDetailViewModel(
     observation?.cancel()
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
-            val prescription = medicationRepository.observePrescription(ownerUid, prescriptionId)
+            // A rejected prescription is gone for everyone, as a deleted one (US-43)
+            val prescription =
+                medicationRepository.observePrescription(ownerUid, prescriptionId).map {
+                  it?.takeIf { saved -> saved.confirmation != PrescriptionConfirmation.REJECTED }
+                }
             // The patient sees the name they gave the member who added it; a caregiver the stored
             // one
             if (patientUid != null) prescription

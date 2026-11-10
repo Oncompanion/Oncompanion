@@ -608,6 +608,49 @@ class PrescriptionsScreenTest {
     }
   }
 
+  @Test
+  fun waitingForThePatient_tappingItOpensTheReview_forThePatientOnly() {
+    val state =
+        filled.copy(
+            prescriptions =
+                listOf(
+                    chemo.copy(
+                        addedBy = "caregiver",
+                        addedByName = "Sam",
+                        confirmation = PrescriptionConfirmation.PENDING,
+                    ),
+                    fever,
+                ),
+            caregiverUid = "caregiver",
+        )
+    val opened = mutableListOf<String>()
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = { opened += "open $it" },
+          caregiverOf = caregiverOf,
+          onReview = { opened += "review $it" },
+      )
+    }
+
+    for (patient in listOf(null, "Anne")) {
+      composeTestRule.runOnIdle { caregiverOf = patient }
+      composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("fever")).performClick()
+    }
+
+    // The caregiver who added it only opens its detail: only the patient confirms it
+    assertEquals(
+        listOf("review chemo", "open fever", "open chemo", "open fever"),
+        opened,
+    )
+  }
+
   // ----- Caregiver mode (US-20) -----
 
   private fun setCaregiverContent(state: PrescriptionsUiState) {

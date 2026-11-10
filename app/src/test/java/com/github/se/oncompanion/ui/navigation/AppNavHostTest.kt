@@ -68,6 +68,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.session.RejectedWritesProvider
@@ -1735,6 +1736,43 @@ class AppNavHostTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_back_button).performClick()
     assertOnTab(Tab.OVERVIEW, C.Tag.overview_screen)
+  }
+
+  @Test
+  fun prescriptionACaregiverAdded_thePatientReviewsAndConfirmsIt_fromTheList() {
+    val date = LocalDate.of(2026, 9, 29)
+    val sams =
+        Prescription(
+            id = "sams",
+            prescribedOn = date,
+            medications =
+                listOf(
+                    Medication(
+                        id = "m1",
+                        prescriptionId = "sams",
+                        name = "Ondansetron",
+                        startDate = date,
+                    )
+                ),
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.PENDING,
+        )
+    val medications = FakeMedicationRepository().apply { seed("owner", sams) }
+    openPrescriptionsFromOverview(medications)
+
+    // Tapping it opens the review, and Confirm saves it as confirmed
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("sams")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_confirm_notice).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_waiting_header).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      val confirmed = medications.prescriptionsOf("owner").single()
+      assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
+      assertEquals("Sam", confirmed.addedByName)
+    }
   }
 
   @Test

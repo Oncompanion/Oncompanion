@@ -517,6 +517,14 @@
     <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
     <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
     <string name="prescriptions_added_by_you">Added by you</string>
+    <!-- US-43: the patient reviews a prescription a caregiver added, then confirms or rejects it -->
+    <string name="prescription_confirm_title">Review the prescription</string>
+    <string name="prescription_confirm_notice">A caregiver added this prescription. Check each field and correct it if needed, then confirm.</string>
+    <string name="prescription_confirm_save">Confirm prescription</string>
+    <string name="prescription_reject">Reject</string>
+    <string name="prescription_reject_title">Reject this prescription?</string>
+    <string name="prescription_reject_message">It will be removed from your prescriptions and never remind you.</string>
+    <string name="prescription_reject_cancel">Cancel</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

@@ -459,6 +459,8 @@ private fun SessionNavHost(
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
             caregiverOf = chosenPatient?.firstName,
+            // The patient reviews a prescription a caregiver added in the form (US-43)
+            onReview = { id -> navigationActions.navigateTo(Screen.prescriptionEdit(id)) },
         )
       }
       composable(

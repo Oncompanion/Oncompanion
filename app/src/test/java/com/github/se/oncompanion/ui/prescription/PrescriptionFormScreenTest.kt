@@ -166,6 +166,15 @@ class PrescriptionFormScreenTest {
           onRetry = { events += "retry" },
           onKeepEditing = { events += "keepEditing" },
           onSaveAnyway = { events += "saveAnyway" },
+          onReject = {
+            events += "reject"
+            uiState = uiState.copy(isConfirmingRejection = true)
+          },
+          onConfirmRejection = { events += "confirmRejection" },
+          onCancelRejection = {
+            events += "cancelRejection"
+            uiState = uiState.copy(isConfirmingRejection = false)
+          },
       )
     }
   }
@@ -926,6 +935,67 @@ class PrescriptionFormScreenTest {
         .performScrollTo()
         .assertIsFullyVisible()
   }
+
+  // ---------- The patient reviews a caregiver's prescription (US-43) ----------
+
+  private val toConfirm = filled.copy(isEditing = true, isToConfirm = true)
+
+  @Test
+  fun toConfirm_asksToCheckIt_thenConfirmOrReject() {
+    setContent(toConfirm)
+
+    composeTestRule.onNodeWithText(string(R.string.prescription_confirm_title)).assertExists()
+    node(C.Tag.prescription_confirm_notice).assertIsDisplayed()
+    node(C.Tag.prescription_form_save_button)
+        .assertTextContains(string(R.string.prescription_confirm_save))
+        .performClick()
+    node(C.Tag.prescription_form_reject_button).performClick()
+
+    // Rejecting asks first: Cancel keeps it, Reject rejects it
+    node(C.Tag.prescription_reject_dialog).assertIsDisplayed()
+    node(C.Tag.prescription_reject_cancel).performClick()
+    node(C.Tag.prescription_reject_dialog).assertDoesNotExist()
+    node(C.Tag.prescription_form_reject_button).performClick()
+    node(C.Tag.prescription_reject_confirm).performClick()
+    assertEquals(
+        listOf("save", "reject", "cancelRejection", "reject", "confirmRejection"),
+        events,
+    )
+  }
+
+  @Test
+  fun aPrescriptionNotToConfirm_hasNoReject() {
+    setContent(filled.copy(isEditing = true))
+
+    node(C.Tag.prescription_form_reject_button).assertDoesNotExist()
+    node(C.Tag.prescription_confirm_notice).assertDoesNotExist()
+    node(C.Tag.prescription_form_save_button)
+        .assertTextContains(string(R.string.prescription_form_save))
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun toConfirm_landscape_rejectAndConfirmCanBeReached() {
+    setContent(toConfirm)
+
+    node(C.Tag.prescription_form_reject_button).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.prescription_form_save_button).performScrollTo().assertIsFullyVisible()
+  }
+
+  private fun rejectDialog_isFullyVisible() {
+    setContent(toConfirm.copy(isConfirmingRejection = true))
+
+    node(C.Tag.prescription_reject_confirm).assertIsFullyVisible()
+    node(C.Tag.prescription_reject_cancel).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun rejectDialog_landscape_isFullyVisible() = rejectDialog_isFullyVisible()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun rejectDialog_smallLandscape_isFullyVisible() = rejectDialog_isFullyVisible()
 
   // ---------- PrescriptionFormScreen ----------
 

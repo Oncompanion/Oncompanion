@@ -30,7 +30,7 @@ Health tracking that adapts to the patient's energy level: minimal input, minima
 ## Capabilities and Constraints
 
 - Native Android, Jetpack Compose, Material 3. English UI.
-- **Not a medical device**: no diagnosis, no medical advice, never changes a treatment. Anything drafted automatically (e.g. a scanned prescription) is shown for the patient to confirm field by field before saving.
+- **Not a medical device**: no diagnosis, no medical advice, never changes a treatment. Anything drafted automatically (e.g. a scanned prescription) is shown for the patient to confirm field by field before saving. A prescription a caregiver adds for the patient (US-43) is saved unconfirmed and triggers no reminder until the patient reviews and confirms it.
 - Prescription scanning uses the camera and on-device text recognition; voice journaling uses on-device speech recognition when available. What either drafts lands in the form for the patient to check.
 - Reminders are Android notifications for appointments, confirmed events and medications, with one switch per category in Profile. They repeat what the patient recorded; the app never decides whether a dose was taken.
 

@@ -12,6 +12,7 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeleteState
@@ -128,6 +129,23 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertNull(vm.uiState.value.prescription)
+    assertTrue(vm.uiState.value.isNotFound)
+  }
+
+  @Test
+  fun rejectedPrescription_isNotFound() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.REJECTED,
+        ),
+    )
+    val vm = viewModel()
+
+    advanceUntilIdle()
+
     assertTrue(vm.uiState.value.isNotFound)
   }
 

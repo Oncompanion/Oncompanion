@@ -437,6 +437,11 @@ object C {
     const val prescription_already_saved_keep_editing = "prescription_already_saved_keep_editing"
     const val prescription_already_saved_save_anyway = "prescription_already_saved_save_anyway"
     const val prescription_renewal_notice = "prescription_renewal_notice"
+    const val prescription_confirm_notice = "prescription_confirm_notice"
+    const val prescription_form_reject_button = "prescription_form_reject_button"
+    const val prescription_reject_dialog = "prescription_reject_dialog"
+    const val prescription_reject_confirm = "prescription_reject_confirm"
+    const val prescription_reject_cancel = "prescription_reject_cancel"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
