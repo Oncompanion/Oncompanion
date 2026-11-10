@@ -700,12 +700,12 @@ private fun appointmentOpener(navigationActions: NavigationActions): (String) ->
 private fun eventOpener(navigationActions: NavigationActions): (String) -> Unit =
     detailOpener(navigationActions, Screen::eventDetail)
 
-/** Opens the [route] of an id only while the current entry is resumed. */
+/** Opens the [route] of a detail argument only while the current entry is resumed. */
 @Composable
-private fun detailOpener(
+private fun <T> detailOpener(
     navigationActions: NavigationActions,
-    route: (String) -> String,
-): (String) -> Unit {
+    route: (T) -> String,
+): (T) -> Unit {
   val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
   return { id ->
     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
@@ -719,10 +719,9 @@ private fun detailOpener(
  */
 @Composable
 private fun medicationOpener(navigationActions: NavigationActions): (String, String) -> Unit {
-  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-  return { prescriptionId, medicationId ->
-    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-      navigationActions.navigateTo(Screen.medicationDetail(prescriptionId, medicationId))
-    }
-  }
+  val open =
+      detailOpener<Pair<String, String>>(navigationActions) { (prescriptionId, medicationId) ->
+        Screen.medicationDetail(prescriptionId, medicationId)
+      }
+  return { prescriptionId, medicationId -> open(prescriptionId to medicationId) }
 }

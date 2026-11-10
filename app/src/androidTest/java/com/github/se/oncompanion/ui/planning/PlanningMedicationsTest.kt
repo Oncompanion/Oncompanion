@@ -109,7 +109,8 @@ class PlanningMedicationsTest {
             .onNodeWithTag(C.Tag.planning_heading)
             .fetchSemanticsNode()
             .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
-    compose.onNodeWithText(b.name).performClick()
+    // Rapid taps must open only one medication detail; Back below returns directly to Planning.
+    compose.onNodeWithText(b.name).performTouchInput { doubleClick() }
     compose.waitUntil(10_000) {
       compose
           .onAllNodesWithTag(C.Tag.medication_detail_prescription)
