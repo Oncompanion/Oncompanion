@@ -375,6 +375,7 @@ object C {
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
+    const val prescription_form_band = "prescription_form_band"
     const val prescription_form_close_button = "prescription_form_close_button"
     const val prescription_form_prescribed_by_field = "prescription_form_prescribed_by_field"
     const val prescription_form_date_field = "prescription_form_date_field"
