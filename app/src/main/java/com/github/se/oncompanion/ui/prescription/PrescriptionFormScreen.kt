@@ -31,8 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -68,6 +66,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -206,15 +205,13 @@ fun PrescriptionFormContent(
 
         // What the medications share: the doctor (optional) and the date of the prescription
         val prescribedByCheck = uiState.checkOf(ScannedField.PrescribedBy, "prescribed_by")
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.draft.prescribedBy,
             onValueChange = onPrescribedByChange,
             label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
             supportingText = prescribedByCheck?.let { { CheckReason(it) } },
             trailingIcon = prescribedByCheck?.let { { CheckIcon() } },
-            colors =
-                if (prescribedByCheck != null) checkColors()
-                else OutlinedTextFieldDefaults.colors(),
+            isCheck = prescribedByCheck != null,
             singleLine = true,
             keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
@@ -411,7 +408,7 @@ private fun OpenMedication(
     val nameMissing = nameTouched && medication.name.isBlank()
     // A missing name blocks Save: its red warning comes before a detail to check
     val nameCheck = checks[MedicationDetail.NAME]?.takeUnless { nameMissing }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.name,
         onValueChange = onNameChange,
         label = { Text(stringResource(R.string.prescription_form_medication_name)) },
@@ -428,31 +425,31 @@ private fun OpenMedication(
         },
         trailingIcon = nameCheck?.let { { CheckIcon() } },
         isError = nameMissing,
-        colors = if (nameCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = nameCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_medication_name_field),
     )
     val dosageCheck = checks[MedicationDetail.DOSAGE]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.dosage,
         onValueChange = onDosageChange,
         label = { Text(stringResource(R.string.prescription_form_dosage)) },
         supportingText = dosageCheck?.let { { CheckReason(it) } },
         trailingIcon = dosageCheck?.let { { CheckIcon() } },
-        colors = if (dosageCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = dosageCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.None),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_dosage_field),
     )
     val frequencyCheck = checks[MedicationDetail.FREQUENCY]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.frequency,
         onValueChange = onFrequencyChange,
         label = { Text(stringResource(R.string.prescription_form_frequency)) },
         supportingText = frequencyCheck?.let { { CheckReason(it) } },
         trailingIcon = frequencyCheck?.let { { CheckIcon() } },
-        colors = if (frequencyCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = frequencyCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_frequency_field),
@@ -468,7 +465,7 @@ private fun OpenMedication(
     val durationInvalid = !Medication.isValidDuration(medication.durationDays)
     // A duration that can't be saved: its red warning comes before a detail to check
     val durationCheck = checks[MedicationDetail.DURATION]?.takeUnless { durationInvalid }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.durationDays?.toString().orEmpty(),
         onValueChange = onDurationChange,
         label = { Text(stringResource(R.string.prescription_form_duration)) },
@@ -489,7 +486,7 @@ private fun OpenMedication(
             } else durationCheck?.let { { CheckReason(it) } },
         trailingIcon = durationCheck?.let { { CheckIcon() } },
         isError = durationInvalid,
-        colors = if (durationCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = durationCheck != null,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_duration_field),
@@ -598,7 +595,7 @@ private fun DateField(
               )
             }
           },
-      colors = if (check != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+      isCheck = check != null,
   )
 
   if (pickerOpen) {

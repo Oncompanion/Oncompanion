@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.user
 
 import android.util.Log
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
@@ -21,15 +23,20 @@ import kotlinx.coroutines.tasks.await
  *
  * Writes return as soon as they are applied to the local cache, without waiting for the server, so
  * they never block the UI (offline, Firestore syncs them when the connection comes back). If the
- * server later rejects a write (security rules), Firestore rolls the local change back and the
- * rejection is logged; [UserProfile.isValid] mirrors the rules so this shouldn't happen.
+ * server later rejects a write (security rules, revoked access), it is rolled back on the device
+ * and reported through [RejectedWrites], which tells the user; [UserProfile.isValid] mirrors the
+ * rules so this shouldn't happen.
  */
 class UserProfileRepositoryFirestore(
     private val dbProvider: () -> FirebaseFirestore = SessionAccess::firestore,
+    private val rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
 ) : UserProfileRepository {
 
   /** Uses the given [FirebaseFirestore] instance, e.g. one connected to the emulator. */
-  constructor(db: FirebaseFirestore) : this({ db })
+  constructor(
+      db: FirebaseFirestore,
+      rejectedWrites: RejectedWrites = RejectedWritesProvider.rejectedWrites,
+  ) : this({ db }, rejectedWrites)
 
   // Firestore is only accessed when first used, so screens can create this repository (e.g. as a
   // ViewModel default) where Firebase isn't initialized, like unit tests
@@ -72,20 +79,22 @@ class UserProfileRepositoryFirestore(
                     FIELD_CREATED_AT to FieldValue.serverTimestamp(),
                 )
         )
-        .logServerRejection(profile.uid)
+        .reportServerRejection(profile.uid)
   }
 
   override suspend fun updateProfile(profile: UserProfile): Unit = SessionAccess.operation {
     require(profile.isValid()) { "Invalid profile" }
     // update() (not a merge set) so a missing profile is never created half-filled
-    document(profile.uid).update(editableFields(profile)).logServerRejection(profile.uid)
+    document(profile.uid).update(editableFields(profile)).reportServerRejection(profile.uid)
   }
 
   private fun document(uid: String) = db.collection(COLLECTION).document(uid)
 
-  private fun Task<Void>.logServerRejection(uid: String) {
+  /** Logs and reports to [rejectedWrites] the server rejecting this write of [uid]'s profile. */
+  private fun Task<Void>.reportServerRejection(uid: String) {
     addOnFailureListener { e ->
       Log.e(TAG, "The server rejected the profile $uid; the local change was rolled back", e)
+      rejectedWrites.report()
     }
   }
 

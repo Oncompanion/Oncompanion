@@ -50,6 +50,7 @@ com.github.se.oncompanion/
   - A temporary message (snackbar) never covers an action, and goes away on its own.
   - The add, edit and detail views of the same item share their components and show the fields in the same order.
   - **Reuse shared components** from `ui/common` rather than building one per screen, so the same element looks and behaves the same everywhere: `DayPickerDialog`, `SaveButton`, `DetailActions`, `DeleteConfirmationDialog`, `ClickableReadOnlyField`, `isCompactHeight()`.
+  - **Theme tokens, never raw values**: colors from `MaterialTheme.colorScheme` / `lakeColors`, text from `MaterialTheme.typography`, corners from `MaterialTheme.shapes`, spacing from `Spacing`, the shadow from `Modifier.elevation1()`. The values and where each one is used are in [DESIGN.md](DESIGN.md).
   - **Keyboard**: `MainActivity` is `adjustResize`, so a screen with text fields puts `imePadding()` on its Scaffold, or the keyboard covers its bottom. If it also pins a top bar or a button, it lets them scroll on short windows (`isCompactHeight()` in `ui/common`), so the field being typed stays visible in landscape.
     - A screen with text fields that leaves out `imePadding()` on purpose says why in a comment on its Scaffold. `adjustResize` is set once for the whole app; a screen can't opt out of it.
 - **Navigation**: each feature is a nested graph. Add its route to `Route`, its screens to `Screen` (`ui/navigation/NavigationActions.kt`), and a `navigation(...)` block in `ui/navigation/AppNavHost.kt`.
@@ -165,10 +166,10 @@ Run these before every push and make sure they pass:
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.
 - Before opening a PR: merge the latest `main`, run the checks above, tick the definition of done.
 - If your PR adds or changes a screen, use case or repository, or builds something drawn as planned, update its feature diagram in `docs/` in the same PR (see "To edit a diagram" in [docs/architecture.md](docs/architecture.md)). Update the overview only when a core flow changes.
-  - The overview diagram shows the core flows with arrows, so someone new understands the app from it alone (#264); details stay in the feature diagrams, and a box appears once per diagram.
+  - The overview shows how the layers call each other and two numbered core flows (offline writes, what a caregiver may see), so someone new understands the app from it alone (#264). Details stay in the feature diagrams, and a box appears once per diagram.
   - **Stay ahead of the code**: draw a new feature as planned in its diagram, and in Figma, before implementing it.
   - Agents update the diagrams themselves by editing the `.excalidraw` JSON:
-    - Copy an existing box, label or arrow that already has the style you need (see the legend in architecture.md), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
+    - Copy an existing box, label or arrow that already has the style you need (see the colours in architecture.md: one per layer, grey dashed for planned), give the copy a new unique `id`, then change its position and text. Keep the layout: screens on top, then use cases, repositories and the backend, and no crossing arrows.
     - A box's label is a separate `text` element whose `containerId` is the box: `x` = box `x` + 10, `width` = box width − 20, `height` = number of lines × 25, centered vertically in the box. Set both `text` and `originalText`.
     - Arrows point to boxes with `startBinding` / `endBinding`, and their `points` are relative to the arrow's `x`, `y`. Every box lists its label and arrows in `boundElements`; keep both sides in sync when you add or remove one.
     - Regenerate the SVGs with `npm ci && npm run export` in `scripts/diagrams`, render the changed ones to an image and look at them (text inside its box, nothing overlapping) before committing.

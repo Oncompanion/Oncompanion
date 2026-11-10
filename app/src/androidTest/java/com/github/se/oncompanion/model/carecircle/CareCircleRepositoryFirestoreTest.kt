@@ -12,8 +12,10 @@ import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_INVITE_CODE
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_PERMISSIONS
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_RELATIONSHIP
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertEachRejectionIsReported
 import com.google.firebase.firestore.Source
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +46,7 @@ import org.junit.runner.RunWith
 class CareCircleRepositoryFirestoreTest {
 
   private lateinit var repository: CareCircleRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
   private lateinit var bobUid: String
 
@@ -56,7 +59,8 @@ class CareCircleRepositoryFirestoreTest {
     db.enableNetwork().await()
     bobUid = EmulatorTestData.createUser("bob")
     aliceUid = EmulatorTestData.createUser("alice") // alice, the patient, stays signed in
-    repository = CareCircleRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = CareCircleRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -523,6 +527,7 @@ class CareCircleRepositoryFirestoreTest {
     val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
     assertEquals("Marcus", saved.getString(FIELD_FIRST_NAME))
     assertEquals(listOf("EVENTS", "SYMPTOMS"), saved.get(FIELD_PERMISSIONS))
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
   @Test
@@ -557,6 +562,8 @@ class CareCircleRepositoryFirestoreTest {
     assertNull(firstMember("marc"))
     synced()
     assertFalse(withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }.exists())
+    // The update the server refused is reported, like a rejected one: the user's change is undone
+    withTimeout(10_000) { rejectedWrites.unseen.first { it == 1 } }
   }
 
   // ---- removeMember ----
@@ -572,6 +579,7 @@ class CareCircleRepositoryFirestoreTest {
     assertEquals(listOf("marc"), firstMembers().map { it.uid })
     synced()
     assertFalse(withTimeout(10_000) { memberDoc(bobUid).get(Source.SERVER).await() }.exists())
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
     EmulatorTestData.signIn("bob")
     assertFalse(withTimeout(10_000) { bobsLinkToAlice().get(Source.SERVER).await() }.exists())
   }
@@ -601,6 +609,35 @@ class CareCircleRepositoryFirestoreTest {
     assertEquals("Marcus", members.documents.single().getString(FIELD_FIRST_NAME))
     EmulatorTestData.signIn("bob")
     assertFalse(withTimeout(10_000) { bobsLinkToAlice().get(Source.SERVER).await() }.exists())
+  }
+
+  // ---- server rejections ----
+
+  @Test
+  fun everyWriteTheServerRejects_isReported(): Unit = runBlocking {
+    // Marc is in bob's circle: only bob may change or remove him
+    withTimeout(10_000) {
+      EmulatorTestData.createRawDocument(
+          "users/$bobUid/$COLLECTION",
+          "marc",
+          """{"firstName": {"stringValue": "Marc"}}""",
+      )
+    }
+
+    assertEachRejectionIsReported(
+        db,
+        rejectedWrites,
+        listOf(
+            "the update of a member of someone else's circle" to
+                {
+                  repository.updateMember(bobUid, "marc", UPDATED)
+                },
+            "the removal of a member of someone else's circle" to
+                {
+                  repository.removeMember(bobUid, "marc")
+                },
+        ),
+    )
   }
 
   private companion object {

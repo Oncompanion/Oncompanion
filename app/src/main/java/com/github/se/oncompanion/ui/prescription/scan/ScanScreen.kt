@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,7 +57,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -79,7 +82,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -307,7 +312,7 @@ fun ScanContent(
                 R.string.prescription_scan_camera_unavailable_explanation,
             )
         uiState.photo != null ->
-            PhotoPreview(uiState.photo, photoDispatcher, content) {
+            PhotoPreview(uiState.photo, photoDispatcher, content, dimmed = uiState.isReading) {
               when {
                 uiState.isReading -> Reading()
                 uiState.nothingRead != null ->
@@ -322,7 +327,8 @@ fun ScanContent(
 }
 
 /**
- * The camera: its preview (with a spinner over it while it starts), the framing hint and the
+ * The camera (Figma "US-10 / Prescription scan"): its preview on a darker panel, with the framing
+ * guide over it and a spinner in the guide while the camera starts, then the framing hint and the
  * shutter.
  */
 @Composable
@@ -334,27 +340,31 @@ private fun CameraView(
 ) {
   Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
-        modifier = Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.prescription_scan_viewfinder),
+        modifier =
+            Modifier.weight(1f)
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .testTag(C.Tag.prescription_scan_viewfinder),
         contentAlignment = Alignment.Center,
     ) {
       // Shown while the camera starts too: CameraX only reports it open once the preview has
       // somewhere to draw
       viewfinder(Modifier.fillMaxSize())
-      if (uiState.camera == CameraStatus.READY) {
-        FramingGuide(
-            Modifier.fillMaxSize().padding(24.dp).testTag(C.Tag.prescription_scan_framing_guide)
-        )
-      } else {
+      // The guide shows where the page goes even before the camera is ready, as in the Figma
+      FramingGuide(
+          Modifier.fillMaxSize().padding(Spacing.xl).testTag(C.Tag.prescription_scan_framing_guide)
+      )
+      if (uiState.camera != CameraStatus.READY) {
         CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_scan_camera_starting))
       }
     }
     Text(
         text = stringResource(R.string.prescription_scan_frame_hint),
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(16.dp),
+        modifier = Modifier.padding(Spacing.lg),
     )
     Shutter(enabled = uiState.canCapture, isCapturing = uiState.isCapturing, onClick = onCapture)
-    Spacer(Modifier.navigationBarsPadding().height(24.dp))
+    Spacer(Modifier.navigationBarsPadding().height(Spacing.xl))
   }
 }
 
@@ -385,23 +395,29 @@ private fun FramingGuide(modifier: Modifier) {
 /** Height / width of an A4 page. */
 private const val A4_RATIO = 1.414f
 
-/** The round shutter button; a spinner replaces it while the photo is being taken. */
+/**
+ * The shutter (Figma "Shutter"): a disc inside a ring, faded as a whole while a photo can't be
+ * taken yet (camera starting), but not while one is being taken, when a spinner shows on the disc.
+ */
 @Composable
 private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit) {
   val description = stringResource(R.string.prescription_scan_take_photo)
+  val color = MaterialTheme.colorScheme.onSurface
   Surface(
       onClick = onClick,
       enabled = enabled,
       shape = CircleShape,
-      color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
-      border = BorderStroke(4.dp, MaterialTheme.colorScheme.surface),
+      color = Color.Transparent,
+      border = BorderStroke(SHUTTER_RING_WIDTH, color),
       // Screen readers announce the button, which has no visible text
       modifier =
-          Modifier.size(76.dp).testTag(C.Tag.prescription_scan_capture_button).semantics {
-            contentDescription = description
-          },
+          Modifier.size(SHUTTER_SIZE)
+              .alpha(if (enabled || isCapturing) 1f else LakeButtonDefaults.DISABLED_ALPHA)
+              .testTag(C.Tag.prescription_scan_capture_button)
+              .semantics { contentDescription = description },
   ) {
     Box(contentAlignment = Alignment.Center) {
+      Box(Modifier.size(SHUTTER_DISC_SIZE).background(color, CircleShape))
       if (isCapturing) {
         CircularProgressIndicator(
             color = MaterialTheme.colorScheme.surface,
@@ -412,6 +428,11 @@ private fun Shutter(enabled: Boolean, isCapturing: Boolean, onClick: () -> Unit)
   }
 }
 
+// The Figma's shutter: a 56 dp disc in a ring 4 dp wide, 72 dp across
+private val SHUTTER_SIZE = 72.dp
+private val SHUTTER_DISC_SIZE = 56.dp
+private val SHUTTER_RING_WIDTH = 4.dp
+
 /**
  * The photo just taken, with [below] it what can be done with it: check it, see it being read, or
  * see that nothing could be read on it.
@@ -421,13 +442,17 @@ private fun PhotoPreview(
     photo: File,
     photoDispatcher: CoroutineDispatcher,
     modifier: Modifier,
+    dimmed: Boolean,
     below: @Composable ColumnScope.() -> Unit,
 ) {
   Column(
       modifier = modifier.testTag(C.Tag.prescription_scan_photo_preview),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Box(Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.weight(1f).fillMaxWidth().padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
       when (val image = rememberPhoto(photo, photoDispatcher)) {
         PhotoImage.Loading -> CircularProgressIndicator()
         PhotoImage.Unreadable ->
@@ -441,7 +466,11 @@ private fun PhotoPreview(
                 bitmap = image.bitmap,
                 contentDescription = stringResource(R.string.prescription_scan_photo_description),
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().testTag(C.Tag.prescription_scan_photo),
+                // Dimmed while it is being read, as in the Figma, so the spinner below stands out
+                modifier =
+                    Modifier.fillMaxSize()
+                        .alpha(if (dimmed) READING_ALPHA else 1f)
+                        .testTag(C.Tag.prescription_scan_photo),
             )
       }
     }
@@ -476,7 +505,9 @@ private fun CheckPhoto(onUsePhoto: () -> Unit, onRetake: () -> Unit) {
 private fun Reading() {
   Column(
       modifier =
-          Modifier.navigationBarsPadding().padding(24.dp).testTag(C.Tag.prescription_scan_reading),
+          Modifier.navigationBarsPadding()
+              .padding(Spacing.xl)
+              .testTag(C.Tag.prescription_scan_reading),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     CircularProgressIndicator()
@@ -484,7 +515,7 @@ private fun Reading() {
         text = stringResource(R.string.prescription_scan_reading),
         style = MaterialTheme.typography.bodyMedium,
         textAlign = TextAlign.Center,
-        modifier = Modifier.padding(top = 16.dp),
+        modifier = Modifier.padding(top = Spacing.lg),
     )
   }
 }
@@ -588,6 +619,9 @@ private fun rememberPhoto(photo: File, dispatcher: CoroutineDispatcher): PhotoIm
               }
         }
         .value
+
+// How much of the photo shows while it is being read (Figma: 50%)
+private const val READING_ALPHA = 0.5f
 
 /** Longest side of the photo on screen, in pixels: enough to check it, light enough to load. */
 private const val MAX_PREVIEW_SIZE = 2048f

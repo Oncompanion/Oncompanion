@@ -21,17 +21,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -79,6 +75,8 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeFilterChip
+import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -370,14 +368,10 @@ private fun TypeChips(picked: List<SymptomType>, onToggleType: (SymptomType) -> 
   FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     SymptomType.entries.forEach { type ->
       val selected = type in picked
-      FilterChip(
+      LakeFilterChip(
           selected = selected,
           onClick = { onToggleType(type) },
-          label = { Text(stringResource(type.label)) },
-          leadingIcon =
-              if (selected) {
-                { Icon(Icons.Default.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }
-              } else null,
+          label = stringResource(type.label),
           modifier = Modifier.testTag(C.Tag.symptomAddType(type.name)),
       )
     }
@@ -658,7 +652,7 @@ private fun TimePickerDialogFor(
 /** Free text; with "Other" it asks which symptom it was, and is required. */
 @Composable
 private fun NotesField(uiState: AddSymptomUiState, onNotesChange: (String) -> Unit) {
-  OutlinedTextField(
+  LakeTextField(
       value = uiState.notes,
       onValueChange = onNotesChange,
       label = { Text(stringResource(R.string.symptom_add_notes)) },

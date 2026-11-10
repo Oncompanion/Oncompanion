@@ -469,5 +469,14 @@ object C {
 
     // A change the server rejected and was undone
     const val rejected_write_snackbar = "rejected_write_snackbar"
+
+    // Shared dialog: the spinner while its action is on its way
+    const val dialog_progress = "dialog_progress"
+
+    // Shared message state: its round info tile
+    const val message_state_icon = "message_state_icon"
+
+    // Shared filter chip: the check of a selected chip
+    const val filter_chip_check = "filter_chip_check"
   }
 }

@@ -871,7 +871,9 @@ class PrescriptionFormScreenTest {
     setContent(filled)
     val keyboardHeight = 600
 
-    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).performClick()
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).performScrollTo()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).requestFocus()
     composeTestRule.showKeyboard(keyboardHeight)
 
     val save = composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button)
