@@ -35,8 +35,9 @@ enum class LakeBannerTone {
 
 /**
  * A lasting note at the top of content that stays on screen (Figma: "Inline banner" in Shared
- * patterns): the info icon, [message], then an optional [actionLabel] such as "Retry". The icon is
- * a neutral notice on purpose, not a red warning sign.
+ * patterns): the info icon, [message], then an optional [actionLabel] such as "Retry", below the
+ * message when it doesn't fit beside it. The icon is a neutral notice on purpose, not a red warning
+ * sign.
  *
  * @param actionTestTag the test tag of the action, shown when [actionLabel] isn't null
  */
@@ -70,19 +71,28 @@ fun LakeBanner(
       Icon(painterResource(R.drawable.ic_info), contentDescription = null, Modifier.size(ICON_SIZE))
       // The Figma's 4 dp above and below go around the message only, so the action keeps the
       // banner's whole 48 dp as its touch target
-      Text(
-          message,
-          style = MaterialTheme.typography.bodyMedium,
-          modifier = Modifier.weight(1f).padding(vertical = Spacing.xs),
+      MessageAndAction(
+          message = {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = Spacing.xs),
+            )
+          },
+          action =
+              actionLabel?.let {
+                {
+                  LinkAction(
+                      it,
+                      MaterialTheme.lakeColors.primaryText,
+                      onAction,
+                      Modifier.testTag(actionTestTag),
+                  )
+                }
+              },
+          gap = Spacing.md,
+          modifier = Modifier.weight(1f),
       )
-      if (actionLabel != null) {
-        LinkAction(
-            actionLabel,
-            MaterialTheme.lakeColors.primaryText,
-            onAction,
-            Modifier.testTag(actionTestTag),
-        )
-      }
     }
   }
 }

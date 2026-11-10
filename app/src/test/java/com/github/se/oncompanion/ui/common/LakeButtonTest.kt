@@ -3,11 +3,16 @@
 package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -29,10 +34,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.SMALL_PHONE
+import com.github.se.oncompanion.ui.assertNoWordIsCut
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.textLayout
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.Spacing
 import com.github.se.oncompanion.ui.theme.buttonLabel
 import com.github.se.oncompanion.ui.theme.lakeColors
 import org.junit.Assert.assertEquals
@@ -54,6 +63,7 @@ class LakeButtonTest {
   private lateinit var typography: Typography
   private var primaryText = Color.Unspecified
   private val clicks = mutableListOf<LakeButtonStyle>()
+  private var dark by mutableStateOf(false)
 
   /** One button per style, labeled and tagged with its style's name, on the theme's surface. */
   private fun setContent(
@@ -63,7 +73,7 @@ class LakeButtonTest {
       icon: @Composable () -> Painter? = { null },
   ) {
     composeTestRule.setContent {
-      OncompanionTheme {
+      OncompanionTheme(darkTheme = dark) {
         colors = MaterialTheme.colorScheme
         typography = MaterialTheme.typography
         primaryText = MaterialTheme.lakeColors.primaryText
@@ -112,17 +122,23 @@ class LakeButtonTest {
       }
 
   @Test
-  fun eachStyle_isA56dpPill_inItsFigmaColors_andReportsClicks() {
+  fun eachStyle_isA56dpPill_inItsFigmaColors_inBothThemes_andReportsClicks() {
     setContent()
 
-    for (style in LakeButtonStyle.entries) {
-      val (container, content) = figmaColors(style)
-      button(style).assertHeightIsEqualTo(56.dp).assertIsEnabled().performClick()
-      label(style).assertTextStyle(typography.buttonLabel, content)
-      // Left of the label, inside the rounded end
-      assertSameColor("$style container", container, button(style).colorAt(10.dp, 28.dp))
-      assertSameColor("$style edge", figmaEdge(style), topEdge(style))
+    for (theme in listOf(false, true)) {
+      dark = theme
+      composeTestRule.waitForIdle()
+      for (style in LakeButtonStyle.entries) {
+        val (container, content) = figmaColors(style)
+        button(style).assertHeightIsEqualTo(56.dp).assertIsEnabled()
+        label(style).assertTextStyle(typography.buttonLabel, content)
+        // Left of the label, inside the rounded end
+        val where = "$style, dark $theme"
+        assertSameColor("$where container", container, button(style).colorAt(10.dp, 28.dp))
+        assertSameColor("$where edge", figmaEdge(style), topEdge(style))
+      }
     }
+    for (style in LakeButtonStyle.entries) button(style).performClick()
     assertEquals(LakeButtonStyle.entries, clicks)
   }
 
@@ -194,5 +210,32 @@ class LakeButtonTest {
       button(style).assertHeightIsAtLeast(56.dp)
       assertTrue("$style label inside", text.top >= box.top && text.bottom <= box.bottom)
     }
+  }
+
+  // As a detail's Delete, full width between the screen's margins: the longest label wraps whole
+  @Test
+  @Config(qualifiers = SMALL_PHONE, fontScale = 2f)
+  fun at200PercentFont_aLongLabelOnANarrowPhone_staysWhole() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        LakeButton(
+            text = LONG_LABEL,
+            onClick = {},
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).testTag(LONG_LABEL),
+        )
+      }
+    }
+
+    val label = composeTestRule.onNodeWithText(LONG_LABEL, useUnmergedTree = true)
+    assertEquals("label lines", 2, label.textLayout().lineCount)
+    label.assertNoWordIsCut()
+    val text = label.getUnclippedBoundsInRoot()
+    val box = composeTestRule.onNodeWithTag(LONG_LABEL).getUnclippedBoundsInRoot()
+    assertTrue("label $text in $box", text.left >= box.left && text.right <= box.right)
+    assertTrue("label $text in $box", text.top >= box.top && text.bottom <= box.bottom)
+  }
+
+  private companion object {
+    const val LONG_LABEL = "Delete prescription"
   }
 }

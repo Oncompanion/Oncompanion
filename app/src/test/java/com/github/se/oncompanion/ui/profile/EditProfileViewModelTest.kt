@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.profile
 
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
@@ -37,6 +38,7 @@ class EditProfileViewModelTest {
       UserProfile("uid-1", Role.PATIENT, "Alex", "Doe", "Lymphoma", Instant.EPOCH)
   private lateinit var auth: FakeAuthRepository
   private lateinit var profiles: FakeUserProfileRepository
+  private val rejectedWrites = RejectedWrites()
   private val writes = mutableListOf<UserProfile>()
   private var gate: CompletableDeferred<Unit>? = null
   private var ignoreCancellation = false
@@ -46,7 +48,7 @@ class EditProfileViewModelTest {
   fun setUp() {
     Dispatchers.setMain(dispatcher)
     auth = FakeAuthRepository { AuthUser(it) }
-    profiles = FakeUserProfileRepository().apply { seed(original) }
+    profiles = FakeUserProfileRepository(rejectedWrites = rejectedWrites).apply { seed(original) }
     repository =
         object : UserProfileRepository by profiles {
           override suspend fun updateProfile(profile: UserProfile) {
@@ -263,18 +265,27 @@ class EditProfileViewModelTest {
   }
 
   @Test
-  fun localCompletionDoesNotReportLaterRollbackAsSaveFailure() = runTest {
+  fun saveRejectedLaterByTheServer_bringsTheProfileBackAndTellsTheUser() = runTest {
     signIn()
     val vm = vm()
     advanceUntilIdle()
+    profiles.serverRejectsWrites = true
     vm.onFamilyNameChange("Edited")
     vm.saveProfile()
     advanceUntilIdle()
+    // Done without waiting for the server
     assertEquals(SavePhase.SAVED, vm.uiState.value.save)
-    profiles.seed(original)
+    assertEquals("Edited", profiles.profiles[original.uid]?.familyName)
+    assertEquals(0, rejectedWrites.unseen.value)
+
+    profiles.rejectPendingWrites()
     advanceUntilIdle()
+
+    assertEquals(original, profiles.profiles[original.uid])
+    // The snackbar tells the user, not this screen: the save isn't shown as failed
     assertFalse(vm.uiState.value.saveFailed)
     assertEquals(SavePhase.SAVED, vm.uiState.value.save)
+    assertEquals(1, rejectedWrites.unseen.value)
   }
 
   @Test
