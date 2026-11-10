@@ -70,26 +70,38 @@ class ObserveCarePlanning(
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   operator fun invoke(patientUid: String?, range: PlanningRange): Flow<CarePlanning> =
-      resolveSection(CarePermission.PLANNING, patientUid).flatMapLatest { access ->
-        planningFor(access, range)
-      }
+      resolveSection
+          .withSharedSections(CarePermission.PLANNING, patientUid)
+          // Only the sections Planning reads: sharing another one (Symptoms) must not reload it
+          .map { it.copy(shared = it.shared intersect READ_SECTIONS) }
+          .distinctUntilChanged()
+          .flatMapLatest { planningFor(it.access, range, it.shared) }
 
-  /** What the user sees of the planning with [access]. */
-  private fun planningFor(access: SectionAccess, range: PlanningRange): Flow<CarePlanning> =
+  /** What the user sees of the planning with [access], from its [shared] sections. */
+  private fun planningFor(
+      access: SectionAccess,
+      range: PlanningRange,
+      shared: Set<CarePermission>,
+  ): Flow<CarePlanning> =
       when (access) {
         SectionAccess.Loading -> flowOf(CarePlanning.Loading)
         SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
         SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
-        is SectionAccess.Readable -> shown(access, range)
+        is SectionAccess.Readable -> shown(access, range, shared)
       }
 
   /**
-   * The entries [access] lets the user read, from [CarePlanning.Loading]; a read failure is
-   * [CarePlanning.Failed].
+   * The entries [access] lets the user read, of the [shared] sections (a caregiver gets medications
+   * and events only when the patient also shares Prescriptions or Events), from
+   * [CarePlanning.Loading]; a read failure is [CarePlanning.Failed].
    */
-  private fun shown(access: SectionAccess.Readable, range: PlanningRange): Flow<CarePlanning> =
+  private fun shown(
+      access: SectionAccess.Readable,
+      range: PlanningRange,
+      shared: Set<CarePermission>,
+  ): Flow<CarePlanning> =
       planning
-          .observeItems(access.ownerUid, range)
+          .observeItems(access.ownerUid, range, shared)
           .withAddedByNames(access)
           .map<List<PlanningItem>, CarePlanning> { CarePlanning.Shown(it, access.canAdd) }
           .onStart { emit(CarePlanning.Loading) }
@@ -134,5 +146,9 @@ class ObserveCarePlanning(
 
   private companion object {
     const val TAG = "ObserveCarePlanning"
+
+    /** The sections Planning shows entries of: appointments, medications and events. */
+    val READ_SECTIONS =
+        setOf(CarePermission.PLANNING, CarePermission.PRESCRIPTIONS, CarePermission.EVENTS)
   }
 }

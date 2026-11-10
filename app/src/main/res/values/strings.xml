@@ -229,6 +229,8 @@
     <string name="event_detail_registration_error">Couldn\'t load or save your registration.</string>
     <string name="event_detail_website_error">Couldn\'t open the event website.</string>
     <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
+    <!-- Caregiver mode: the followed patient's first name -->
+    <string name="event_detail_registration_confirmed_by_patient">%1$s confirmed they signed up for this event.</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>

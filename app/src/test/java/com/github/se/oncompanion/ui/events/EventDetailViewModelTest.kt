@@ -3,8 +3,10 @@
 package com.github.se.oncompanion.ui.events
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
@@ -111,7 +113,6 @@ class EventDetailViewModelTest {
 
     assertEquals(yoga, state.event)
     assertFalse(state.isLoading)
-    assertFalse(state.notFound)
     assertFalse(state.hasError)
   }
 
@@ -121,7 +122,6 @@ class EventDetailViewModelTest {
         viewModel(events = FakeEventRepository(listOf(yoga.copy(id = "other")))).uiState.value
 
     assertNull(state.event)
-    assertTrue(state.notFound)
     assertFalse(state.isLoading)
   }
 
@@ -327,7 +327,7 @@ class EventDetailViewModelTest {
     val state =
         viewModel(events = FakeEventRepository(listOf(yoga.copy(id = "other")))).uiState.value
 
-    assertTrue(state.notFound)
+    assertNull(state.event)
     assertEquals(RegistrationStatus.LOADING, state.registration)
   }
 
@@ -463,5 +463,95 @@ class EventDetailViewModelTest {
     viewModel.refreshStatus()
 
     assertEquals(RegistrationStatus.LOADING, viewModel.uiState.value.registration)
+  }
+
+  /** The event page of the caregiver of [patient], who follows "patient". */
+  private fun caregiverViewModel(patient: FollowedPatient, now: LocalDateTime = beforeYoga) =
+      EventDetailViewModel(
+          yoga.id,
+          FakeEventRepository(listOf(yoga)),
+          registrations,
+          patient.auth,
+          clockAt(now),
+          patientUid = "patient",
+          resolveSection = patient.sectionAccess,
+      )
+
+  @Test
+  fun caregiver_eventsShared_seesThePatientsConfirmation_notTheirOwn() {
+    registrations.confirm("patient", "yoga")
+    val confirmed = caregiverViewModel(FollowedPatient(CarePermission.EVENTS))
+    assertEquals(RegistrationStatus.CONFIRMED, confirmed.uiState.value.registration)
+
+    registrations.remove("patient", "yoga")
+    registrations.confirm("caregiver", "yoga")
+    ShadowLooper.idleMainLooper()
+    assertEquals(RegistrationStatus.CAN_CONFIRM, confirmed.uiState.value.registration)
+  }
+
+  @Test
+  fun caregiver_eventsNotShared_seesNothing_andReadsNoRegistration() {
+    // A read would fail and show an error instead of nothing
+    registrations.observeError = IllegalStateException("must not be read")
+
+    val state = caregiverViewModel(FollowedPatient(CarePermission.PLANNING)).uiState.value
+
+    assertEquals(yoga, state.event)
+    assertEquals(RegistrationStatus.HIDDEN, state.registration)
+  }
+
+  @Test
+  fun caregiver_accessChanges_hideTheConfirmationLive() {
+    registrations.confirm("patient", "yoga")
+    val patient = FollowedPatient(CarePermission.EVENTS)
+    val viewModel = caregiverViewModel(patient)
+    assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
+
+    // The patient stops sharing Events, then shares it again, then removes the caregiver
+    val steps =
+        listOf(
+            { patient.shares(CarePermission.PLANNING) } to RegistrationStatus.HIDDEN,
+            { patient.shares(CarePermission.EVENTS) } to RegistrationStatus.CONFIRMED,
+            { patient.removesTheCaregiver() } to RegistrationStatus.HIDDEN,
+        )
+    for ((change, expected) in steps) {
+      change()
+      ShadowLooper.idleMainLooper()
+      assertEquals(expected, viewModel.uiState.value.registration)
+    }
+  }
+
+  @Test
+  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsHidden() {
+    // The patient stops sharing Events: the server refuses the open read before the access change
+    // arrives
+    registrations.observeError = IllegalStateException("permission denied")
+    val patient = FollowedPatient(CarePermission.EVENTS)
+    val viewModel = caregiverViewModel(patient)
+    assertEquals(RegistrationStatus.ERROR, viewModel.uiState.value.registration)
+
+    patient.shares(CarePermission.PLANNING)
+    ShadowLooper.idleMainLooper()
+
+    assertEquals(RegistrationStatus.HIDDEN, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun caregiver_cantConfirmNorRemoveThePatientsRegistration() {
+    val patient = FollowedPatient(CarePermission.EVENTS)
+    val viewModel = caregiverViewModel(patient)
+    assertEquals(RegistrationStatus.CAN_CONFIRM, viewModel.uiState.value.registration)
+
+    viewModel.confirmRegistration()
+    assertTrue(registrations.registeredEventIds("patient").isEmpty())
+    assertTrue(registrations.registeredEventIds("caregiver").isEmpty())
+
+    registrations.confirm("patient", "yoga")
+    ShadowLooper.idleMainLooper()
+    viewModel.requestRemoval()
+    viewModel.removeRegistration()
+    assertFalse(viewModel.uiState.value.isConfirmingRemoval)
+    assertEquals(setOf("yoga"), registrations.registeredEventIds("patient"))
+    assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
   }
 }

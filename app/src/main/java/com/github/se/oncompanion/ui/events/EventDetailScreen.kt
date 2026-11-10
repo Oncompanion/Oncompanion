@@ -67,7 +67,8 @@ private val endTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLI
  * list or from Planning. The patient can open the organizer's website and confirm here that they
  * registered there (Figma: "US-25 / Event detail").
  *
- * @param readOnly a caregiver only reads the event: registering is the patient's (US-20)
+ * @param caregiverOf the first name of the patient a caregiver follows, who only reads the event
+ *   and the patient's confirmation: registering is the patient's (US-20); null for the patient
  */
 @Composable
 fun EventDetailScreen(
@@ -75,7 +76,7 @@ fun EventDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EventDetailViewModel = viewModel(key = eventId) { EventDetailViewModel(eventId) },
-    readOnly: Boolean = false,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsState()
   // The event may have started while the patient was away: recompute what can be confirmed
@@ -92,14 +93,15 @@ fun EventDetailScreen(
       onCancelRemoval = viewModel::cancelRemoval,
       onRemoveRegistration = viewModel::removeRegistration,
       modifier = modifier,
-      readOnly = readOnly,
+      caregiverOf = caregiverOf,
   )
 }
 
 /**
  * Stateless content of the event detail screen, so each state can be tested without a ViewModel.
  *
- * @param readOnly hides confirming and removing the registration, for a caregiver
+ * @param caregiverOf the followed patient's first name for a caregiver, which hides confirming and
+ *   removing the registration; null for the patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,7 +114,7 @@ fun EventDetailContent(
     onCancelRemoval: () -> Unit,
     onRemoveRegistration: () -> Unit,
     modifier: Modifier = Modifier,
-    readOnly: Boolean = false,
+    caregiverOf: String? = null,
 ) {
   val snackbarHostState = remember { SnackbarHostState() }
   Scaffold(
@@ -152,9 +154,9 @@ fun EventDetailContent(
           }
       event == null -> MissingEvent(onBack, contentModifier)
       else -> {
-        EventDetails(event, uiState.registration, contentModifier) {
+        EventDetails(event, uiState.registration, caregiverOf, contentModifier) {
           RegistrationActions(
-              readOnly = readOnly,
+              readOnly = caregiverOf != null,
               link = webLinkOrNull(event.websiteUrl),
               registration = uiState.registration,
               snackbarHostState = snackbarHostState,
@@ -175,11 +177,12 @@ fun EventDetailContent(
 private fun EventDetails(
     event: Event,
     registration: RegistrationStatus,
+    caregiverOf: String?,
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
   Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-    if (registration == RegistrationStatus.CONFIRMED) ConfirmedBanner()
+    if (registration == RegistrationStatus.CONFIRMED) ConfirmedBanner(caregiverOf)
     // Events have no picture yet: the mockup's placeholder image
     Image(
         painter = painterResource(R.drawable.event_image_placeholder),
@@ -232,9 +235,12 @@ private fun EventDetails(
   }
 }
 
-/** "Registration confirmed", above the event once the patient confirmed it (Figma). */
+/**
+ * "Registration confirmed", above the event once the patient confirmed it (Figma). A caregiver
+ * reads that [caregiverOf] (the patient) confirmed it, not themselves.
+ */
 @Composable
-private fun ConfirmedBanner() {
+private fun ConfirmedBanner(caregiverOf: String?) {
   Surface(
       color = MaterialTheme.colorScheme.secondaryContainer,
       shape = RoundedCornerShape(12.dp),
@@ -256,7 +262,14 @@ private fun ConfirmedBanner() {
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
-            text = stringResource(R.string.event_detail_registration_confirmed_supporting),
+            text =
+                if (caregiverOf == null)
+                    stringResource(R.string.event_detail_registration_confirmed_supporting)
+                else
+                    stringResource(
+                        R.string.event_detail_registration_confirmed_by_patient,
+                        caregiverOf,
+                    ),
             style = MaterialTheme.typography.bodySmall,
         )
       }
@@ -316,8 +329,9 @@ private fun RegistrationActions(
     // The website stays open to a caregiver; confirming the registration is the patient's
     if (readOnly) return@Column
     when (registration) {
-      RegistrationStatus.LOADING -> {
-        // Nothing to offer until the registration status is known
+      RegistrationStatus.LOADING,
+      RegistrationStatus.HIDDEN -> {
+        // Nothing to offer until the registration status is known, or for a caregiver
       }
       RegistrationStatus.CAN_CONFIRM,
       RegistrationStatus.CLOSED -> {

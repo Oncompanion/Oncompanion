@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.domain.planning
 
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -25,13 +26,20 @@ class ObservePlanning(private val sources: List<PlanningRepository>) : PlanningR
   /** Merges [sources], e.g. `ObservePlanning(appointments, events)`. */
   constructor(vararg sources: PlanningRepository) : this(sources.toList())
 
-  /** [ownerUid]'s entries of every source within [range], sorted by day, then by time. */
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> {
+  /**
+   * [ownerUid]'s entries of every source within [range] and [sections], sorted by day, then by
+   * time.
+   */
+  override fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> {
     // combine() never emits without any flow to combine
     if (sources.isEmpty()) return flowOf(emptyList())
     // Built once per observation, not on every update of a source
     val order = order(range)
-    return combine(sources.map { it.observeItems(ownerUid, range) }) { lists ->
+    return combine(sources.map { it.observeItems(ownerUid, range, sections) }) { lists ->
       lists.flatMap { it }.filter { it.timing in range }.sortedWith(order)
     }
   }
