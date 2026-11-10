@@ -577,6 +577,9 @@
         <item quantity="one">Please check 1 detail</item>
         <item quantity="other">Please check %1$d details</item>
     </plurals>
+    <!-- A caregiver adds a prescription for the patient (US-43), e.g. "Add a prescription for Anne" -->
+    <string name="prescription_form_add_title_for">Add a prescription for %1$s</string>
+    <string name="prescription_review_title_for">Review %1$s\'s prescription</string>
 
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>

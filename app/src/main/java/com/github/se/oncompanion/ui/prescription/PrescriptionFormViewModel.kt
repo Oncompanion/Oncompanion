@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.prescription
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CaregiverName
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
@@ -21,6 +22,9 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.time.Clock
 import java.time.LocalDate
@@ -143,6 +147,12 @@ data class PrescriptionFormUiState(
  * @param prescriptionId the saved prescription to correct; `null` to add a new one
  * @param scan the prescription read from a scan, which the form starts from instead of
  *   [initialDraft]: the patient reviews it, with the details to check marked
+ * @param patientUid in caregiver mode (US-43), the patient whose prescriptions get the new one;
+ *   null for the user's own. It is saved waiting for the patient to confirm it, signed with the
+ *   caregiver's first name, and the rules only accept it if the patient lets them add
+ *   prescriptions. Only the patient corrects a saved prescription.
+ * @param profileRepository the caregiver's profile, for the first name their prescription is signed
+ *   with
  */
 class PrescriptionFormViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -154,7 +164,12 @@ class PrescriptionFormViewModel(
     initialDraft: PrescriptionDraft? = null,
     private val prescriptionId: String? = null,
     scan: ScannedPrescription? = null,
+    private val patientUid: String? = null,
+    profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
+
+  /** The first name a caregiver's prescription is signed with. */
+  private val caregiverName = CaregiverName(profileRepository, authRepository)
 
   // A new form follows the date of the prescription; in a given draft every start date is chosen
   private val _uiState =
@@ -188,6 +203,9 @@ class PrescriptionFormViewModel(
   private var saved: List<Prescription> = emptyList()
 
   init {
+    require(patientUid == null || prescriptionId == null) {
+      "Only the patient corrects a saved prescription"
+    }
     // A saved prescription has to be read before the form can show it
     if (prescriptionId != null) {
       _uiState.update { it.copy(isEditing = true, load = PrescriptionFormLoad.LOADING) }
@@ -197,15 +215,16 @@ class PrescriptionFormViewModel(
 
   /**
    * Follows the prescriptions already saved, from the device's cache when offline, so a new one can
-   * be compared with them. Comparing is only a warning: if they can't be read, the form works as
-   * before.
+   * be compared with them: the patient's, confirmed or not, also when a caregiver adds one. A
+   * rejected prescription is left out, as it is for the patient. Comparing is only a warning: if
+   * they can't be read, the form works as before.
    */
   private fun observeSaved() {
     val uid = authRepository.signedInUid(TAG) ?: return
     viewModelScope.launch {
       try {
-        medicationRepository.observePrescriptions(uid).collect { prescriptions ->
-          saved = prescriptions
+        medicationRepository.observePrescriptions(patientUid ?: uid).collect { prescriptions ->
+          saved = prescriptions.filter { it.confirmation != PrescriptionConfirmation.REJECTED }
           _uiState.update { it.withRenewal() }
         }
       } catch (e: CancellationException) {
@@ -468,11 +487,7 @@ class PrescriptionFormViewModel(
     _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
-        val stillExists =
-            if (prescriptionId == null) {
-              manageMedicationSchedule.add(uid, state.draft)
-              true
-            } else manageMedicationSchedule.update(uid, prescriptionId, state.draft)
+        val stillExists = write(uid, state.draft)
         _uiState.update {
           // Deleted since the form was opened, or while saving (the repository then writes
           // nothing): there is nothing left to correct
@@ -482,6 +497,10 @@ class PrescriptionFormViewModel(
         }
       } catch (e: CancellationException) {
         throw e
+      } catch (_: NotSignedIn) {
+        _uiState.update {
+          it.copy(save = SavePhase.EDITING, error = PrescriptionFormError.NOT_SIGNED_IN)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Failed to save the prescription", e)
         _uiState.update {
@@ -490,6 +509,43 @@ class PrescriptionFormViewModel(
       }
     }
   }
+
+  /**
+   * Writes [draft] for the signed-in [uid]: corrects the saved prescription, adds the user's own,
+   * or adds it for the patient a caregiver follows.
+   *
+   * @return `false` if the prescription to correct no longer exists
+   */
+  private suspend fun write(uid: String, draft: PrescriptionDraft): Boolean =
+      when {
+        prescriptionId != null -> manageMedicationSchedule.update(uid, prescriptionId, draft)
+        patientUid != null -> addForThePatient(patientUid, uid, draft)
+        else -> {
+          manageMedicationSchedule.add(uid, draft)
+          true
+        }
+      }
+
+  /**
+   * Adds [draft] to [patientUid]'s prescriptions, signed by the caregiver [uid] and waiting for the
+   * patient. Reading the name can take a while: if the caregiver signed out meanwhile, nothing is
+   * saved and the form says they have to sign in again.
+   *
+   * @return `true` once saved
+   */
+  private suspend fun addForThePatient(
+      patientUid: String,
+      uid: String,
+      draft: PrescriptionDraft,
+  ): Boolean {
+    val name = caregiverName(uid)
+    if (authRepository.signedInUid(TAG) != uid) throw NotSignedIn()
+    manageMedicationSchedule.add(patientUid, draft, addedBy = uid, addedByName = name)
+    return true
+  }
+
+  /** The caregiver signed out while their prescription was being signed. */
+  private class NotSignedIn : Exception()
 
   /**
    * Whether a new [draft] is the same as a saved prescription:

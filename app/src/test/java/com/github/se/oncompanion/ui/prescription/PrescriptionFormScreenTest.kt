@@ -119,8 +119,11 @@ class PrescriptionFormScreenTest {
     uiState = uiState.copy(draft = uiState.draft.copy(medications = medications))
   }
 
-  /** Shows PrescriptionFormContent like the real screen does: typing updates the state. */
-  private fun setContent(state: PrescriptionFormUiState) {
+  /**
+   * Shows PrescriptionFormContent like the real screen does: typing updates the state. A caregiver
+   * adds for [caregiverOf].
+   */
+  private fun setContent(state: PrescriptionFormUiState, caregiverOf: String? = null) {
     uiState = state
     composeTestRule.setContent {
       PrescriptionFormContent(
@@ -166,6 +169,7 @@ class PrescriptionFormScreenTest {
           onRetry = { events += "retry" },
           onKeepEditing = { events += "keepEditing" },
           onSaveAnyway = { events += "saveAnyway" },
+          caregiverOf = caregiverOf,
       )
     }
   }
@@ -925,6 +929,42 @@ class PrescriptionFormScreenTest {
         .onNodeWithTag(C.Tag.prescription_form_close_button)
         .performScrollTo()
         .assertIsFullyVisible()
+  }
+
+  // ---------- A caregiver adds for the patient (US-43) ----------
+
+  @Test
+  fun caregiver_titleSaysWhosePrescriptionsItGoesTo() {
+    setContent(filled, caregiverOf = "Anne")
+    val cases =
+        listOf(
+            filled to R.string.prescription_form_add_title_for,
+            filled.copy(isScanned = true) to R.string.prescription_review_title_for,
+        )
+    for ((state, title) in cases) {
+      uiState = state
+      composeTestRule.onNodeWithText(context.getString(title, "Anne")).assertExists()
+    }
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_add_title))
+        .assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_landscapeKeyboardOpen_titleCloseAndSaveCanBeScrolledTo() {
+    setContent(filled.copy(isScanned = true), caregiverOf = "Anne")
+    val keyboardHeight = 500
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_review_title_for, "Anne"))
+        .performScrollTo()
+        .assertIsFullyVisible()
+    node(C.Tag.prescription_form_close_button).performScrollTo().assertIsFullyVisible()
+    val save = node(C.Tag.prescription_form_save_button)
+    save.performScrollTo().assertIsFullyVisible()
+    save.assertIsAboveKeyboard(keyboardHeight)
   }
 
   // ---------- PrescriptionFormScreen ----------

@@ -87,6 +87,8 @@ private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENG
  *
  * @param onClose called when the user leaves the form without saving
  * @param onSaved called once the prescription is saved
+ * @param caregiverOf the first name of the patient a caregiver adds the prescription for (US-43),
+ *   `null` for a patient
  */
 @Composable
 fun PrescriptionFormScreen(
@@ -94,6 +96,7 @@ fun PrescriptionFormScreen(
     onClose: () -> Unit,
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -120,6 +123,7 @@ fun PrescriptionFormScreen(
       modifier = modifier,
       onKeepEditing = viewModel::keepEditing,
       onSaveAnyway = viewModel::saveAnyway,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -131,6 +135,8 @@ fun PrescriptionFormScreen(
  * @param onRetry reads the saved prescription again after it couldn't be loaded
  * @param onKeepEditing closes the "already saved" question without saving
  * @param onSaveAnyway saves although the prescription is already saved
+ * @param caregiverOf the patient's first name when a caregiver adds for them: the title says whose
+ *   prescriptions it goes to
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,6 +159,7 @@ fun PrescriptionFormContent(
     modifier: Modifier = Modifier,
     onKeepEditing: () -> Unit = {},
     onSaveAnyway: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   // Asks before saving a prescription already saved (US-39)
   uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway) }
@@ -178,7 +185,7 @@ fun PrescriptionFormContent(
       // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
       modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
       // Without fields there is no keyboard, so the top bar can stay fixed
-      topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose) },
+      topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose, caregiverOf) },
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
@@ -192,7 +199,7 @@ fun PrescriptionFormContent(
             Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
     ) {
       // The Scaffold already keeps the content clear of the status bar
-      if (scrollsEverything) FormTopBar(uiState, onClose, WindowInsets(0))
+      if (scrollsEverything) FormTopBar(uiState, onClose, caregiverOf, WindowInsets(0))
       Column(
           modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
           verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -275,18 +282,22 @@ fun PrescriptionFormContent(
 private fun FormTopBar(
     uiState: PrescriptionFormUiState,
     onClose: () -> Unit,
+    caregiverOf: String?,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
   TopAppBar(
       title = {
         Text(
-            stringResource(
-                when {
-                  uiState.isEditing -> R.string.prescription_form_edit_title
-                  uiState.isScanned -> R.string.prescription_review_title
-                  else -> R.string.prescription_form_add_title
-                }
-            )
+            when {
+              uiState.isEditing -> stringResource(R.string.prescription_form_edit_title)
+              // A caregiver's title says whose prescriptions it goes to (US-43)
+              caregiverOf != null && uiState.isScanned ->
+                  stringResource(R.string.prescription_review_title_for, caregiverOf)
+              caregiverOf != null ->
+                  stringResource(R.string.prescription_form_add_title_for, caregiverOf)
+              uiState.isScanned -> stringResource(R.string.prescription_review_title)
+              else -> stringResource(R.string.prescription_form_add_title)
+            }
         )
       },
       navigationIcon = {
