@@ -1069,6 +1069,39 @@ class AppNavHostTest {
   }
 
   @Test
+  fun careCircleForm_emailAlreadyInvited_opensThatInvitation_andBackReturnsToTheForm() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository()
+    invites.setInvites(
+        listOf(
+            CareCircleInvite(
+                inviteCode = "JJJJJ23456",
+                ownerUid = "owner",
+                ownerFirstName = "Anne",
+                details = CareCircleMemberDetails(firstName = "Julie"),
+                email = "julie@example.com",
+            )
+        )
+    )
+    setNavHost(Route.CARE_CIRCLE, careCircleInviteRepository = invites, authRepository = auth)
+
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_add_member_fab).performClick()
+    composeTestRule
+        .onNodeWithTag(C.Tag.care_circle_form_email)
+        .performTextInput("julie@example.com")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_open_invite).performClick()
+
+    // Julie's invitation, with the access she was given and her code
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_code).assertTextEquals("JJJJJ-23456")
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_invite_back_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.CARE_CIRCLE_ADD, NavigationActions(navController).currentRoute())
+    }
+  }
+
+  @Test
   fun careCircleForm_saveFinishingAfterLeaving_keepsTheList() {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
     runBlocking { auth.signInWithGoogle("token") }

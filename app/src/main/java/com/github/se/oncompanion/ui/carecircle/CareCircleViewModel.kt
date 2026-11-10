@@ -13,11 +13,9 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -113,15 +111,9 @@ class CareCircleViewModel(
             // A failing listener cancels it too and ends up in the catch below, so the timer can't
             // show the old lists over the error
             .collectLatest { (members, invites) ->
-              while (true) {
-                val now = clock.instant()
+              // Shown again when an invitation expires, so it never stays "pending" after that
+              repeatAtEachExpiry(clock, invites.map { it.expiresAt }) { now ->
                 _uiState.value = toUiState(members, invites, now)
-                // Show the list again when the next invitation expires, so it never stays
-                // "pending" after its validity ends while the screen is open
-                val nextExpiry =
-                    invites.mapNotNull { it.expiresAt }.filter { it > now }.minOrNull() ?: break
-                // Rounded up, so it wakes up at or after the expiry, never just before
-                delay(Duration.between(now, nextExpiry).toMillis() + 1)
               }
             }
       } catch (e: CancellationException) {

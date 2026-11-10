@@ -523,6 +523,12 @@ private fun SessionNavHost(
                 else navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
               }
             },
+            // The invitation the typed email already has: Back returns to the form
+            onOpenInvite = { inviteCode ->
+              if (navController.currentBackStackEntry == entry) {
+                navigationActions.navigateTo(Screen.careCircleInvite(inviteCode))
+              }
+            },
             viewModel = viewModel { CareCircleMemberFormViewModel() },
         )
       }
@@ -533,7 +539,8 @@ private fun SessionNavHost(
       ) {
         CareCircleInviteScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
-            // The new invite code replaces the expired one: Back still returns to the list
+            // The new invite code replaces the expired one: Back still returns to where it was
+            // opened from, the list or the add form
             onRenewed = { inviteCode ->
               navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
             },
@@ -559,6 +566,8 @@ private fun SessionNavHost(
                 navigationActions.goBack()
               }
             },
+            // Editing never compares the email, so it never links to an invitation
+            onOpenInvite = {},
             viewModel = viewModel { CareCircleMemberFormViewModel(memberUid = memberUid) },
         )
       }

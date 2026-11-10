@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
 
 /**
  * "Whose care?" (US-20, Figma: "US-20 / Whose care?"): the patients a caregiver follows, with what
@@ -213,8 +213,10 @@ private fun Message(
           textAlign = TextAlign.Center,
       )
     }
-    Button(onClick = onAction, modifier = Modifier.testTag(C.Tag.whose_care_action)) {
-      Text(action)
-    }
+    LakeButton(
+        text = action,
+        onClick = onAction,
+        modifier = Modifier.testTag(C.Tag.whose_care_action),
+    )
   }
 }

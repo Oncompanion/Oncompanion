@@ -32,6 +32,8 @@ import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -168,9 +170,12 @@ fun AppointmentDetailContent(
 private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
   Column(Modifier.padding(16.dp).testTag(C.Tag.appointment_detail_feedback)) {
     Text(stringResource(message))
-    TextButton(onRetry, Modifier.testTag(C.Tag.appointment_detail_retry)) {
-      Text(stringResource(R.string.appointment_detail_retry))
-    }
+    LakeButton(
+        text = stringResource(R.string.appointment_detail_retry),
+        onClick = onRetry,
+        style = LakeButtonStyle.Text,
+        modifier = Modifier.testTag(C.Tag.appointment_detail_retry),
+    )
   }
 }
 

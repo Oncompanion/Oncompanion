@@ -5,11 +5,9 @@ package com.github.se.oncompanion.ui.prescription
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -19,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DialogTags
+import com.github.se.oncompanion.ui.common.LakeDialog
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -41,27 +41,19 @@ internal fun AlreadySavedDialog(
       saved.prescribedBy?.let {
         pluralStringResource(R.plurals.prescription_already_saved_by, count, it, date, count)
       } ?: pluralStringResource(R.plurals.prescription_already_saved, count, date, count)
-  AlertDialog(
-      onDismissRequest = onKeepEditing,
-      modifier = Modifier.testTag(C.Tag.prescription_already_saved_dialog),
-      title = { Text(stringResource(R.string.prescription_already_saved_title)) },
-      text = { Text(message) },
-      confirmButton = {
-        TextButton(
-            onClick = onSaveAnyway,
-            modifier = Modifier.testTag(C.Tag.prescription_already_saved_save_anyway),
-        ) {
-          Text(stringResource(R.string.prescription_already_saved_save_anyway))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onKeepEditing,
-            modifier = Modifier.testTag(C.Tag.prescription_already_saved_keep_editing),
-        ) {
-          Text(stringResource(R.string.prescription_already_saved_keep_editing))
-        }
-      },
+  LakeDialog(
+      title = stringResource(R.string.prescription_already_saved_title),
+      message = message,
+      confirmLabel = stringResource(R.string.prescription_already_saved_save_anyway),
+      cancelLabel = stringResource(R.string.prescription_already_saved_keep_editing),
+      onConfirm = onSaveAnyway,
+      onCancel = onKeepEditing,
+      tags =
+          DialogTags(
+              dialog = C.Tag.prescription_already_saved_dialog,
+              confirm = C.Tag.prescription_already_saved_save_anyway,
+              cancel = C.Tag.prescription_already_saved_keep_editing,
+          ),
   )
 }
 

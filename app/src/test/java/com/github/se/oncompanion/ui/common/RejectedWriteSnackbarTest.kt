@@ -134,11 +134,13 @@ class RejectedWriteSnackbarTest {
     val cases =
         listOf(
             // Left margin, then the snackbar's straight left edge
-            Triple("margin", 14.dp to 24.dp, colors.surface),
-            Triple("left edge", 18.dp to 24.dp, colors.inverseSurface),
-            // Its top left corner is rounded by 12dp: the corner is cut, its top edge isn't
-            Triple("cut corner", 18.5.dp to 2.5.dp, colors.surface),
-            Triple("top edge", 28.dp to 2.dp, colors.inverseSurface),
+            Triple("margin", 14.dp to 36.dp, colors.surface),
+            Triple("left edge", 18.dp to 36.dp, colors.inverseSurface),
+            // 12 dp above it, then its top left corner, rounded by 12dp: the corner is cut, its top
+            // edge isn't
+            Triple("top margin", 28.dp to 10.dp, colors.surface),
+            Triple("cut corner", 18.5.dp to 14.5.dp, colors.surface),
+            Triple("top edge", 28.dp to 14.dp, colors.inverseSurface),
         )
     for ((name, point, expected) in cases) {
       assertSameColor(name, expected, host.colorAt(point.first, point.second))

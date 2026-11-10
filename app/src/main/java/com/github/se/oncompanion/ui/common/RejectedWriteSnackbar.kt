@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,7 +20,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
-import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
  * App-wide snackbar that tells the user a change couldn't be saved and was undone, because the
@@ -58,17 +56,14 @@ fun RejectedWriteSnackbarContent(
     }
   }
   // Raised by the height of the bottom navigation bar, so the message never covers the tabs
-  SnackbarHost(
+  LakeSnackbarHost(
       hostState,
       modifier
           .navigationBarsPadding()
           .imePadding()
           .padding(bottom = BOTTOM_BAR_HEIGHT)
           .testTag(C.Tag.rejected_write_snackbar),
-  ) { data ->
-    // The Figma snackbar spans the screen, less the 16 dp side margins
-    LakeSnackbar(data, Modifier.padding(horizontal = Spacing.lg))
-  }
+  )
 }
 
 private val BOTTOM_BAR_HEIGHT = 80.dp

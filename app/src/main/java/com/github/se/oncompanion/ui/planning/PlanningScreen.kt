@@ -36,6 +36,8 @@ import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
@@ -359,9 +361,12 @@ internal fun PlanningAgenda(
     if (state.hasError) {
       Column(Modifier.padding(16.dp).testTag(C.Tag.planning_error)) {
         Text(stringResource(R.string.planning_error))
-        TextButton(onRetry, Modifier.testTag(C.Tag.planning_retry)) {
-          Text(stringResource(R.string.planning_retry))
-        }
+        LakeButton(
+            text = stringResource(R.string.planning_retry),
+            onClick = onRetry,
+            style = LakeButtonStyle.Text,
+            modifier = Modifier.testTag(C.Tag.planning_retry),
+        )
       }
     }
     if (state.isNotShared && caregiverOf != null) {

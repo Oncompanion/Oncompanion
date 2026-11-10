@@ -152,7 +152,7 @@ fun AppointmentFormContent(
   // Short windows let the header scroll too, leaving room for the focused field.
   Scaffold(
       modifier = modifier.imePadding().testTag(C.Tag.appointment_screen),
-      snackbarHost = { SnackbarHost(snackbar) },
+      snackbarHost = { LakeSnackbarHost(snackbar) },
       topBar = { if (!compact) topBar() },
   ) { padding ->
     if (state.load != AppointmentFormLoad.READY) {
@@ -177,9 +177,12 @@ fun AppointmentFormContent(
           )
           if (state.load == AppointmentFormLoad.FAILED)
               onRetry?.let { retry ->
-                TextButton(retry, Modifier.testTag(C.Tag.appointment_form_retry)) {
-                  Text(stringResource(R.string.appointment_detail_retry))
-                }
+                LakeButton(
+                    text = stringResource(R.string.appointment_detail_retry),
+                    onClick = retry,
+                    style = LakeButtonStyle.Text,
+                    modifier = Modifier.testTag(C.Tag.appointment_form_retry),
+                )
               }
         }
       }
@@ -358,20 +361,23 @@ fun AppointmentFormContent(
         title = { Text(stringResource(R.string.appointment_pick_time)) },
         text = { TimeInput(picker) },
         confirmButton = {
-          TextButton(
-              {
+          LakeButton(
+              text = stringResource(R.string.appointment_confirm),
+              onClick = {
                 onTimeChange(LocalTime.of(picker.hour, picker.minute))
                 timeOpen = false
               },
-              Modifier.testTag(C.Tag.appointment_confirm),
-          ) {
-            Text(stringResource(R.string.appointment_confirm))
-          }
+              style = LakeButtonStyle.Text,
+              modifier = Modifier.testTag(C.Tag.appointment_confirm),
+          )
         },
         dismissButton = {
-          TextButton({ timeOpen = false }, Modifier.testTag(C.Tag.appointment_cancel)) {
-            Text(stringResource(R.string.appointment_cancel))
-          }
+          LakeButton(
+              text = stringResource(R.string.appointment_cancel),
+              onClick = { timeOpen = false },
+              style = LakeButtonStyle.Text,
+              modifier = Modifier.testTag(C.Tag.appointment_cancel),
+          )
         },
     )
   }

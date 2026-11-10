@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -35,6 +34,7 @@ import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
+import com.github.se.oncompanion.ui.common.LakeButton
 
 /**
  * First onboarding step (Figma "US-01 / Onboarding – Role"): patient or caregiver. The role decides
@@ -113,16 +113,12 @@ fun RoleContent(
         )
       }
       Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
-      Button(
+      LakeButton(
+          text = stringResource(R.string.onboarding_continue),
           onClick = onContinue,
           enabled = selectedRole != null,
-          modifier =
-              Modifier.fillMaxWidth()
-                  .heightIn(min = 56.dp)
-                  .testTag(C.Tag.onboarding_continue_button),
-      ) {
-        Text(stringResource(R.string.onboarding_continue))
-      }
+          modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_continue_button),
+      )
       Spacer(Modifier.height(8.dp))
       SignedInAs(email, canSwitchAccount, onUseAnotherAccount)
     }
