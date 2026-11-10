@@ -124,7 +124,7 @@ class EventDetailViewModel(
             return@launch
           }
       _uiState.value = EventDetailUiState(event = event, isLoading = false)
-      event?.let(::observeRegistration)
+      if (event != null) observeRegistration(event)
     }
   }
 
