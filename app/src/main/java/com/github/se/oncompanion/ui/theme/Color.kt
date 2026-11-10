@@ -89,3 +89,7 @@ val HorizonDayBottomDark = Color(0xFF2D5866)
 val HorizonDuskTopDark = Color(0xFF2E2745)
 val HorizonDuskBottomDark = Color(0xFF1D1A2E)
 val OnHorizonDark = Color(0xFFE3E6E7)
+
+// The hull of the boats on the lake: dark ink by day, a grey that still reads on dark water
+val LakeHullLight = Color(0xFF1F2A30)
+val LakeHullDark = Color(0xFF3B4448)
