@@ -16,7 +16,7 @@ on:
       - reopened
 
 # A new push to a PR cancels the run of the previous commit, which nobody needs anymore. Runs on
-# main are never cancelled, so every merged commit is checked and publishes its APK.
+# main are never cancelled, so every merged commit is checked.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -52,9 +52,9 @@ jobs:
           'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 
 
-  # Formatting, lint, unit tests and the release APK. They run beside the connected tests in the CI
-  # job, so a formatting, lint or unit test error shows up in a few minutes and they no longer add
-  # to the time of the whole run.
+  # Formatting, lint, unit tests and the unsigned release build. They run beside the connected tests
+  # in the CI job, so a formatting, lint or unit test error shows up in a few minutes and they no
+  # longer add to the time of the whole run.
   checks:
     # The CI job waits for this job by its name ("Wait for the Checks job"): rename both together
     name: Checks
@@ -129,36 +129,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      # The release APK is built on every run, so a PR that breaks R8 (a missing keep rule) fails
-      # here; it's signed and uploaded on main only, since PRs never use it.
-      # Write the release key from the secrets, so the release APK is signed with the key registered
-      # in Firebase (Google Sign-In fails otherwise). Secrets are missing on PRs from forks: skipped.
-      - name: Decode release keystore
-        if: github.event_name == 'push'
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-            echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          fi
-
+      # Build the release variant (unsigned) on every run, so a PR that breaks R8 (a missing keep
+      # rule) fails here. The signed APK is built and published by release.yml.
       - name: Assemble release
-        env:
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           ./gradlew assembleRelease --build-cache
-
-      - name: Upload APK
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: oncompanion-apk
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: warn
-          retention-days: 14
 
   # Connected tests, the coverage of all tests and the SonarCloud analysis
   ci:

@@ -129,7 +129,8 @@ Run these before every push and make sure they pass:
   - **Hospital proxy**: the `functions/` checks above.
   - **Checks**: ktfmt, lint, unit + Robolectric tests, and the release build. A formatting, lint or unit test error shows up here in a few minutes.
   - **CI**: the connected tests on an emulator with the Firebase emulators, the coverage report and SonarCloud, which gets the lint report and the unit test coverage from Checks. When Checks fails, CI stops (before the connected tests if Checks already failed), so SonarCloud never computes a coverage without Checks' reports.
-  - The signed release APK is uploaded on `main` only, and every run keeps its test results (with each test's time) for 7 days.
+  - Every run keeps its test results (with each test's time) for 7 days.
+- **Releases**: `release.yml` publishes the signed APK as a GitHub Release every Thursday, from the latest commit on `main` whose CI passed (or by hand: Actions → Weekly release → Run workflow). Its version is `<baseVersion>.<release number>` (`app/build.gradle.kts`): bump `baseVersion` once each milestone is released. Never rename or recreate `release.yml`: its run number is the APK's `versionCode`, and a restart at 1 would block updates on phones.
 - **When a job fails on a flake, use "Re-run failed jobs"**, not "Re-run job" on Checks alone: CI must run again for SonarCloud to get Checks' reports. If only CI failed, it reruns alone and reuses Checks' reports, which are kept 7 days: after that, use "Re-run all jobs".
 - `gradle/gradle-daemon-jvm.properties` pins the Gradle daemon to Java 25, so everyone's builds run on the same Java. The first build downloads it into `~/.gradle/jdks`; on CI it's already installed.
 - Dependency versions are locked (`app/gradle.lockfile`, `settings-gradle.lockfile`). After adding or updating a dependency in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated lock files with your change.
