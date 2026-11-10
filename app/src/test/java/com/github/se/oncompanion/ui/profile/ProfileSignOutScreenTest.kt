@@ -95,7 +95,7 @@ class ProfileSignOutScreenTest {
       state.value = ProfileUiState.ConfirmingSignOut(ProfileUiState.SignedOut, true)
     }
     node(C.Tag.profile_sign_out_error).assertDoesNotExist()
-    node(C.Tag.profile_signing_out).assertIsDisplayed()
+    node(C.Tag.dialog_progress).assertIsDisplayed()
     node(C.Tag.profile_sign_out_confirm).assertIsNotEnabled()
     node(C.Tag.profile_sign_out_cancel).assertIsNotEnabled()
     node(C.Tag.profile_name).assertDoesNotExist()

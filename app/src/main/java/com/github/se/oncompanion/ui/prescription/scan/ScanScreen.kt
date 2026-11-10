@@ -35,16 +35,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -82,7 +79,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.Spacing
 import java.io.File
@@ -252,7 +252,7 @@ fun ScanContent(
   OncompanionTheme(darkTheme = true) {
     Scaffold(
         modifier = modifier.testTag(C.Tag.prescription_scan_screen),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LakeSnackbarHost(snackbarHostState) },
         topBar = {
           TopAppBar(
               title = {
@@ -559,22 +559,21 @@ private fun PhotoActions(
     onSecondary: () -> Unit,
     secondaryTag: String,
 ) {
-  Button(
+  LakeButton(
+      text = stringResource(primary),
       onClick = onPrimary,
       modifier =
           Modifier.fillMaxWidth()
               .padding(start = 16.dp, end = 16.dp, top = 16.dp)
               .testTag(primaryTag),
-  ) {
-    Text(stringResource(primary))
-  }
-  OutlinedButton(
+  )
+  LakeButton(
+      text = stringResource(secondary),
       onClick = onSecondary,
+      style = LakeButtonStyle.Outlined,
       modifier =
           Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).testTag(secondaryTag),
-  ) {
-    Text(stringResource(secondary))
-  }
+  )
 }
 
 /** The photo as shown on screen: being read, impossible to read, or ready. */
@@ -664,27 +663,21 @@ private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: (() ->
       modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
       horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    FilledTonalButton(
+    LakeButton(
+        text = stringResource(R.string.prescription_scan_enter_manually),
         onClick = onEnterManually,
+        style = LakeButtonStyle.Tonal,
+        icon = rememberVectorPainter(Icons.Filled.Edit),
         modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_enter_manually_button),
-    ) {
-      Icon(Icons.Filled.Edit, contentDescription = null)
-      Text(
-          stringResource(R.string.prescription_scan_enter_manually),
-          Modifier.padding(start = 8.dp),
-      )
-    }
+    )
     if (onOpenSettings != null) {
-      FilledTonalButton(
+      LakeButton(
+          text = stringResource(R.string.prescription_scan_open_settings),
           onClick = onOpenSettings,
+          style = LakeButtonStyle.Tonal,
+          icon = rememberVectorPainter(Icons.Filled.Settings),
           modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_open_settings_button),
-      ) {
-        Icon(Icons.Filled.Settings, contentDescription = null)
-        Text(
-            stringResource(R.string.prescription_scan_open_settings),
-            Modifier.padding(start = 8.dp),
-        )
-      }
+      )
     }
   }
 }

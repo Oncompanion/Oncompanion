@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -301,36 +301,18 @@ private fun LoadingDay() {
  */
 @Composable
 private fun DayError(onRetry: () -> Unit, withShortcuts: Boolean) {
-  Surface(
-      modifier = Modifier.fillMaxWidth().testTag(C.Tag.overview_error),
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.surfaceContainerLow,
-  ) {
-    Column(
-        modifier = Modifier.padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      Text(
-          text = stringResource(R.string.overview_error_title),
-          style = MaterialTheme.typography.titleMedium,
-          textAlign = TextAlign.Center,
-      )
-      Text(
-          text =
-              stringResource(
-                  if (withShortcuts) R.string.overview_error_hint
-                  else R.string.overview_error_hint_caregiver
-              ),
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center,
-      )
-      Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.overview_retry)) {
-        Text(stringResource(R.string.overview_retry))
-      }
-    }
-  }
+  LakeMessageState(
+      title = stringResource(R.string.overview_error_title),
+      message =
+          stringResource(
+              if (withShortcuts) R.string.overview_error_hint
+              else R.string.overview_error_hint_caregiver
+          ),
+      actionLabel = stringResource(R.string.overview_retry),
+      onAction = onRetry,
+      actionTestTag = C.Tag.overview_retry,
+      modifier = Modifier.testTag(C.Tag.overview_error),
+  )
 }
 
 /** Space between two tiles. */

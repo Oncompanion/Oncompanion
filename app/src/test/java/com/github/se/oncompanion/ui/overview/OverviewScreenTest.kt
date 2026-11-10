@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -44,10 +45,13 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -211,6 +215,34 @@ class OverviewScreenTest {
     composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertExists()
 
     composeTestRule.runOnIdle { assertEquals(1, retries) }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun errorState_retryIsFullyVisibleInLandscape_aboveTheBottomBar() {
+    composeTestRule.setContent {
+      OncompanionTheme {
+        OverviewContent(
+            uiState = loaded.copy(hasError = true),
+            onShortcutClick = {},
+            onOpenPlanning = {},
+            onOpenAppointment = {},
+            onRetry = {},
+            bottomBar = { BottomNavigationBar(Tab.OVERVIEW, {}) },
+        )
+      }
+    }
+
+    val retry = composeTestRule.onNodeWithTag(C.Tag.overview_retry).performScrollTo()
+    // Not squeezed by a space too short for it either
+    retry.assertHeightIsAtLeast(LakeButtonDefaults.MinHeight).assertIsFullyVisible()
+    // Nothing clips content under the bottom bar, so check it's above the bar too
+    val bar = composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).fetchSemanticsNode()
+    val bottom = retry.fetchSemanticsNode().boundsInRoot.bottom
+    assertTrue(
+        "Retry ends at $bottom, the bar starts at ${bar.boundsInRoot.top}",
+        bottom <= bar.boundsInRoot.top,
+    )
   }
 
   @Test

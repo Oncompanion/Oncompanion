@@ -15,8 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,7 +26,6 @@ import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,10 +43,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeBanner
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -187,28 +190,15 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
 /** Shown above the list when refreshing the events failed, so the list stays visible. */
 @Composable
 private fun RefreshErrorBanner(onRetry: () -> Unit) {
-  Surface(
+  LakeBanner(
+      message = stringResource(R.string.events_refresh_error),
+      actionLabel = stringResource(R.string.events_retry),
+      onAction = onRetry,
+      actionTestTag = C.Tag.events_refresh_retry,
       modifier =
-          Modifier.fillMaxWidth()
-              .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+          Modifier.padding(start = Spacing.lg, top = Spacing.sm, end = Spacing.lg)
               .testTag(C.Tag.events_refresh_error),
-      shape = RoundedCornerShape(12.dp),
-      color = MaterialTheme.colorScheme.surfaceContainerHigh,
-  ) {
-    Row(
-        modifier = Modifier.padding(start = 16.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-          text = stringResource(R.string.events_refresh_error),
-          style = MaterialTheme.typography.bodyMedium,
-          modifier = Modifier.weight(1f),
-      )
-      TextButton(onClick = onRetry, modifier = Modifier.testTag(C.Tag.events_refresh_retry)) {
-        Text(stringResource(R.string.events_retry))
-      }
-    }
-  }
+  )
 }
 
 @Composable
@@ -228,17 +218,23 @@ private fun EmptyEvents(modifier: Modifier = Modifier) {
   )
 }
 
-/** Shown when the events couldn't be loaded, with a button to try again. */
+/**
+ * Shown when the events couldn't be loaded, with a button to try again. It scrolls when the space
+ * between the bars is too short for it (landscape), so Retry is never squeezed.
+ */
 @Composable
 private fun EventsError(onRetry: () -> Unit, modifier: Modifier = Modifier) {
-  CenteredMessage(
-      title = stringResource(R.string.events_error_title),
-      supportingText = stringResource(R.string.events_error_supporting),
-      modifier = modifier.testTag(C.Tag.events_error),
+  Box(
+      modifier.fillMaxSize().testTag(C.Tag.events_error).verticalScroll(rememberScrollState()),
+      contentAlignment = Alignment.Center,
   ) {
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.events_retry)) {
-      Text(stringResource(R.string.events_retry))
-    }
+    LakeMessageState(
+        title = stringResource(R.string.events_error_title),
+        message = stringResource(R.string.events_error_supporting),
+        actionLabel = stringResource(R.string.events_retry),
+        onAction = onRetry,
+        actionTestTag = C.Tag.events_retry,
+    )
   }
 }
 
@@ -247,7 +243,6 @@ private fun CenteredMessage(
     title: String,
     supportingText: String,
     modifier: Modifier = Modifier,
-    action: @Composable () -> Unit = {},
 ) {
   Column(
       modifier = modifier.fillMaxSize().padding(32.dp),
@@ -268,6 +263,5 @@ private fun CenteredMessage(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
-    action()
   }
 }

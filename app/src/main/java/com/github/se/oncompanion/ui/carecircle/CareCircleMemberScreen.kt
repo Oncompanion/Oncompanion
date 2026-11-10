@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -18,20 +17,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -57,6 +52,10 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMemberDetails
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.DialogTags
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeDialog
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -147,12 +146,11 @@ fun CareCircleMemberContent(
               message = stringResource(R.string.care_circle_member_error),
               modifier = contentModifier.testTag(C.Tag.care_circle_member_error),
           ) {
-            Button(
+            LakeButton(
+                text = stringResource(R.string.care_circle_retry),
                 onClick = onRetry,
                 modifier = Modifier.testTag(C.Tag.care_circle_member_retry_button),
-            ) {
-              Text(stringResource(R.string.care_circle_retry))
-            }
+            )
           }
       is CareCircleMemberUiState.Member -> {
         MemberDetails(
@@ -172,29 +170,20 @@ fun CareCircleMemberContent(
 /** "Remove Marc from your circle?", as in the mockup: Cancel changes nothing. */
 @Composable
 private fun RemoveDialog(firstName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-  AlertDialog(
-      onDismissRequest = onDismiss,
-      title = { Text(stringResource(R.string.care_circle_member_remove_title, firstName)) },
-      text = { Text(stringResource(R.string.care_circle_member_remove_body)) },
-      confirmButton = {
-        TextButton(
-            onClick = onConfirm,
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.testTag(C.Tag.care_circle_member_remove_confirm),
-        ) {
-          Text(stringResource(R.string.care_circle_member_remove_confirm))
-        }
-      },
-      dismissButton = {
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.testTag(C.Tag.care_circle_member_remove_dismiss),
-        ) {
-          Text(stringResource(R.string.care_circle_member_remove_dismiss))
-        }
-      },
-      modifier = Modifier.testTag(C.Tag.care_circle_member_remove_dialog),
+  LakeDialog(
+      title = stringResource(R.string.care_circle_member_remove_title, firstName),
+      message = stringResource(R.string.care_circle_member_remove_body),
+      confirmLabel = stringResource(R.string.care_circle_member_remove_confirm),
+      cancelLabel = stringResource(R.string.care_circle_member_remove_dismiss),
+      onConfirm = onConfirm,
+      onCancel = onDismiss,
+      tags =
+          DialogTags(
+              dialog = C.Tag.care_circle_member_remove_dialog,
+              confirm = C.Tag.care_circle_member_remove_confirm,
+              cancel = C.Tag.care_circle_member_remove_dismiss,
+          ),
+      isDestructive = true,
   )
 }
 
@@ -394,29 +383,21 @@ private fun MemberActions(enabled: Boolean, onEdit: () -> Unit, onRemove: () -> 
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    OutlinedButton(
+    LakeButton(
+        text = stringResource(R.string.care_circle_member_edit),
         onClick = onEdit,
+        style = LakeButtonStyle.Outlined,
         enabled = enabled,
-        modifier =
-            Modifier.fillMaxWidth().height(56.dp).testTag(C.Tag.care_circle_member_edit_button),
-    ) {
-      Icon(
-          Icons.Outlined.Edit,
-          contentDescription = null,
-          modifier = Modifier.size(ButtonDefaults.IconSize),
-      )
-      Text(
-          text = stringResource(R.string.care_circle_member_edit),
-          modifier = Modifier.padding(start = ButtonDefaults.IconSpacing),
-      )
-    }
-    TextButton(
+        icon = rememberVectorPainter(Icons.Outlined.Edit),
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.care_circle_member_edit_button),
+    )
+    LakeButton(
+        text = stringResource(R.string.care_circle_member_remove),
         onClick = onRemove,
+        style = LakeButtonStyle.Text,
         enabled = enabled,
-        modifier = Modifier.height(56.dp).testTag(C.Tag.care_circle_member_remove_button),
-    ) {
-      Text(stringResource(R.string.care_circle_member_remove))
-    }
+        modifier = Modifier.testTag(C.Tag.care_circle_member_remove_button),
+    )
   }
 }
 
