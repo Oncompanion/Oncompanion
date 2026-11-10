@@ -15,6 +15,7 @@ import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.model.session.FakeCleanupJournal
 import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
+import com.github.se.oncompanion.ui.prescription.scan.FakeScanTipSettings
 import com.github.se.oncompanion.ui.prescription.scan.ScanViewModel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -138,7 +139,7 @@ class SessionBoundaryTest {
       compose.runOnUiThread {
         compose.activity.setContent {
           SessionBoundary(FakeGoogleCredentialProvider()) { _, _, _ ->
-            scan = viewModel { ScanViewModel(photos) }
+            scan = viewModel { ScanViewModel(photos, FakeScanTipSettings()) }
           }
         }
       }

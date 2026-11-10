@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.medication.scan.PreferencesScanTipSettings
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeButton
@@ -197,12 +198,24 @@ fun ScanScreen(
   )
 }
 
-/** The scan view model, with its photos kept in the app's cache. */
+/**
+ * The scan view model, with its photos kept in the app's cache and its tip setting on the phone.
+ */
 @Composable
 private fun scanViewModel(): ScanViewModel {
-  val cacheDir = LocalContext.current.cacheDir
-  return viewModel { ScanViewModel(ScanPhotoStore(cacheDir)) }
+  val context = LocalContext.current
+  return viewModel {
+    ScanViewModel(
+        ScanPhotoStore(context.cacheDir),
+        PreferencesScanTipSettings(
+            context.getSharedPreferences(SCAN_SETTINGS, Context.MODE_PRIVATE)
+        ),
+    )
+  }
 }
+
+// The phone's settings of the scan, apart from the account's data
+private const val SCAN_SETTINGS = "scan_settings"
 
 /**
  * Stateless content of the scan screen, so each state can be tested without a camera.

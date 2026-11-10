@@ -52,6 +52,7 @@ class ScanScreenTest {
 
   private val camera = FakeScanCamera()
   private lateinit var cacheDir: File
+  private val tips = FakeScanTipSettings()
   private lateinit var viewModel: ScanViewModel
   private var backs = 0
   private var manualEntries = 0
@@ -68,7 +69,7 @@ class ScanScreenTest {
 
   private fun showScreen() {
     cacheDir = temporaryFolder.newFolder("cache")
-    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer))
+    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), tips, DraftPrescriptionFromScan(recognizer))
     compose.setContent {
       ScanScreen(
           onEnterManually = { manualEntries++ },
@@ -433,7 +434,7 @@ class ScanScreenTest {
     compose.runOnUiThread { controller().isAppearanceLightStatusBars = true }
     var showScan by mutableStateOf(true)
     cacheDir = temporaryFolder.newFolder("cache")
-    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer))
+    viewModel = ScanViewModel(ScanPhotoStore(cacheDir), tips, DraftPrescriptionFromScan(recognizer))
     compose.setContent {
       if (showScan)
           ScanScreen(
