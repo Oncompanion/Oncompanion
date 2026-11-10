@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.webLinkOrNull
 import com.github.se.oncompanion.resources.C
@@ -52,6 +53,7 @@ import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeDialog
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -231,6 +233,10 @@ private fun EventDetails(
             Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
                 .testTag(C.Tag.event_detail_description),
     )
+    // Where the patient's registration would be: why it isn't, rather than an empty spot
+    if (registration == RegistrationStatus.NOT_SHARED && caregiverOf != null) {
+      NotSharedMessage(caregiverOf, CarePermission.EVENTS)
+    }
     actions()
   }
 }
@@ -330,6 +336,7 @@ private fun RegistrationActions(
     if (readOnly) return@Column
     when (registration) {
       RegistrationStatus.LOADING,
+      RegistrationStatus.NOT_SHARED,
       RegistrationStatus.HIDDEN -> {
         // Nothing to offer until the registration status is known, or for a caregiver
       }
