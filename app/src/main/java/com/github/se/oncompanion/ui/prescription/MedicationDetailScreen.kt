@@ -80,7 +80,12 @@ fun MedicationDetailContent(
                     onClick = { onViewPrescription(state.prescription.id) },
                     modifier =
                         Modifier.fillMaxWidth()
-                            .padding(Spacing.lg)
+                            .padding(
+                                start = Spacing.lg,
+                                end = Spacing.lg,
+                                top = Spacing.lg,
+                                bottom = Spacing.xl,
+                            )
                             .testTag(C.Tag.medication_detail_prescription),
                 )
               },
