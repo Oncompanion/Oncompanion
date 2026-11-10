@@ -93,6 +93,7 @@ class MedicationRepositoryFirestore(
             .document(prescription.id)
             .set(
                 prescriptionFields(prescription) +
+                    attributionFields(prescription) +
                     (FIELD_CREATED_AT to FieldValue.serverTimestamp())
             )
             .reportServerRejection(prescription.id)
@@ -158,13 +159,26 @@ class MedicationRepositoryFirestore(
 
   private fun Timestamp.toLocalDate(): LocalDate = toInstant().atZone(ZONE).toLocalDate()
 
-  /** The fields of the prescription document, except `createdAt`. */
+  /**
+   * The fields of the prescription document, except `createdAt` and who added it, which never
+   * change once it is created.
+   */
   private fun prescriptionFields(prescription: Prescription): Map<String, Any?> =
       mapOf(
           FIELD_PRESCRIBED_BY to prescription.prescribedBy,
           FIELD_PRESCRIBED_ON to prescription.prescribedOn.toTimestamp(),
           FIELD_MEDICATIONS to prescription.medications.map(::medicationFields),
+          FIELD_CONFIRMATION to prescription.confirmation.name,
       )
+
+  /** Who added [prescription]: nothing for the patient's own, as the rules require. */
+  private fun attributionFields(prescription: Prescription): Map<String, Any?> =
+      if (prescription.addedBy == null) emptyMap()
+      else
+          mapOf(
+              FIELD_ADDED_BY to prescription.addedBy,
+              FIELD_ADDED_BY_NAME to prescription.addedByName,
+          )
 
   /** One entry of the list of medications; its prescription is the document it is stored in. */
   private fun medicationFields(medication: Medication): Map<String, Any?> =
@@ -196,6 +210,12 @@ class MedicationRepositoryFirestore(
                       .distinctBy { it.id },
               // Pending server timestamps read as null until the write reaches the server
               createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
+              addedBy = doc.getString(FIELD_ADDED_BY),
+              addedByName = doc.getString(FIELD_ADDED_BY_NAME),
+              // Saved before US-43: the patient's own, so confirmed
+              confirmation =
+                  doc.getString(FIELD_CONFIRMATION)?.let(PrescriptionConfirmation::valueOf)
+                      ?: PrescriptionConfirmation.CONFIRMED,
           )
           .takeIf { it.medications.isNotEmpty() }
     } catch (e: Exception) {
@@ -236,6 +256,9 @@ class MedicationRepositoryFirestore(
     const val FIELD_PRESCRIBED_BY = "prescribedBy"
     const val FIELD_PRESCRIBED_ON = "prescribedOn"
     const val FIELD_CREATED_AT = "createdAt"
+    const val FIELD_ADDED_BY = "addedBy"
+    const val FIELD_ADDED_BY_NAME = "addedByName"
+    const val FIELD_CONFIRMATION = "confirmation"
     /** The medications of the prescription, in the order they were saved. */
     const val FIELD_MEDICATIONS = "medications"
 

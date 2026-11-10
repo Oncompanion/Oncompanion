@@ -305,6 +305,8 @@
     <string name="permission_symptoms_add_description">They can log a symptom for you</string>
     <string name="permission_planning_add">Allow adding appointments</string>
     <string name="permission_planning_add_description">They can add an appointment to your planning. It shows right away, with their name.</string>
+    <string name="permission_prescriptions_add">Allow adding prescriptions</string>
+    <string name="permission_prescriptions_add_description">They can add a prescription. It waits for you to confirm it.</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>

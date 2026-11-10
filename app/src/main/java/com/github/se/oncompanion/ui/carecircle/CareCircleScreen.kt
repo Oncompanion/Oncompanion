@@ -392,8 +392,8 @@ internal val CarePermission.addLabel: Int?
       when (this) {
         CarePermission.SYMPTOMS -> R.string.permission_symptoms_add
         CarePermission.PLANNING -> R.string.permission_planning_add
-        CarePermission.EVENTS,
-        CarePermission.PRESCRIPTIONS -> null
+        CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions_add
+        CarePermission.EVENTS -> null
       }
 
 /** What [addLabel] lets the member do, e.g. "They can log a symptom for you". */
@@ -403,8 +403,8 @@ internal val CarePermission.addDescription: Int?
       when (this) {
         CarePermission.SYMPTOMS -> R.string.permission_symptoms_add_description
         CarePermission.PLANNING -> R.string.permission_planning_add_description
-        CarePermission.EVENTS,
-        CarePermission.PRESCRIPTIONS -> null
+        CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions_add_description
+        CarePermission.EVENTS -> null
       }
 
 /** The relationship as shown to the user, e.g. "Home nurse". */
