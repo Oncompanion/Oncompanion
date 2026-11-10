@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onChildren
@@ -643,30 +644,43 @@ class ScanContentTest {
   }
 
   /**
-   * At 200% font scale, what the patient acts on in each state stays whole on screen: the shutter,
-   * even when the viewfinder takes the space, the buttons, and the reading message.
+   * At 200% font scale, what the patient reads and acts on in each state stays whole on screen: the
+   * shutter, even when the viewfinder takes the space, the buttons, and the message that explains
+   * each state.
    */
   private fun eachState_staysWholeAtTwiceTheFontSize() {
     val photo = photoFile(300, 424)
+    fun tag(tag: String) = hasTestTag(tag)
+    fun text(id: Int) = hasText(string(id))
     val cases =
         listOf(
-            granted() to listOf(C.Tag.prescription_scan_capture_button),
+            granted() to listOf(tag(C.Tag.prescription_scan_capture_button)),
             granted().copy(photo = photo) to
                 listOf(
-                    C.Tag.prescription_scan_use_photo_button,
-                    C.Tag.prescription_scan_retake_button,
+                    text(R.string.prescription_scan_check_hint),
+                    tag(C.Tag.prescription_scan_use_photo_button),
+                    tag(C.Tag.prescription_scan_retake_button),
                 ),
             granted().copy(photo = photo, isReading = true) to
-                listOf(C.Tag.prescription_scan_reading),
+                listOf(tag(C.Tag.prescription_scan_reading)),
+            granted().copy(photo = photo, nothingRead = NothingRead.NO_TEXT) to
+                listOf(
+                    text(R.string.prescription_scan_nothing_read),
+                    tag(C.Tag.prescription_scan_nothing_read_enter_manually_button),
+                    tag(C.Tag.prescription_scan_nothing_read_retake_button),
+                ),
             granted().copy(photo = photo, nothingRead = NothingRead.NOT_A_PRESCRIPTION) to
                 listOf(
-                    C.Tag.prescription_scan_nothing_read_enter_manually_button,
-                    C.Tag.prescription_scan_nothing_read_retake_button,
+                    text(R.string.prescription_scan_not_a_prescription),
+                    tag(C.Tag.prescription_scan_nothing_read_enter_manually_button),
+                    tag(C.Tag.prescription_scan_nothing_read_retake_button),
                 ),
             ScanUiState(permission = CameraPermission.REFUSED) to
                 listOf(
-                    C.Tag.prescription_scan_open_settings_button,
-                    C.Tag.prescription_scan_enter_manually_button,
+                    text(R.string.prescription_scan_camera_off_title),
+                    text(R.string.prescription_scan_camera_off_explanation),
+                    tag(C.Tag.prescription_scan_open_settings_button),
+                    tag(C.Tag.prescription_scan_enter_manually_button),
                 ),
         )
     var state by mutableStateOf(cases.first().first)
@@ -683,16 +697,18 @@ class ScanContentTest {
       }
     }
     val screen = compose.onNodeWithTag(C.Tag.prescription_scan_screen).fetchSemanticsNode()
-    cases.forEach { (case, tags) ->
+    cases.forEach { (case, matchers) ->
       state = case
       compose.waitForIdle()
-      tags.forEach { tag ->
-        val node = compose.onNodeWithTag(tag).fetchSemanticsNode()
+      matchers.forEach { matcher ->
+        val node = compose.onNode(matcher).fetchSemanticsNode()
+        val name = matcher.description
         val bounds = node.boundsInRoot
         // Not squeezed away, not cut by the screen's edges, and its whole height drawn
-        assertTrue("$tag has no height", node.size.height > 0)
-        assertTrue("$tag at $bounds is off the screen", bounds.bottom <= screen.size.height)
-        assertEquals("$tag is cut", node.size.height.toFloat(), bounds.height, 1f)
+        assertTrue("$name has no height", node.size.height > 0)
+        assertTrue("$name at $bounds is off the screen", bounds.top >= 0f)
+        assertTrue("$name at $bounds is off the screen", bounds.bottom <= screen.size.height)
+        assertEquals("$name is cut", node.size.height.toFloat(), bounds.height, 1f)
       }
     }
   }
