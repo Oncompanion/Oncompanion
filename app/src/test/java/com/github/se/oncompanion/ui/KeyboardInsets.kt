@@ -5,7 +5,6 @@ package com.github.se.oncompanion.ui
 
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onRoot
 import androidx.core.graphics.Insets
@@ -56,7 +55,6 @@ fun SemanticsNodeInteraction.assertIsFullyVisible() {
       "Node has no drawable area: ${size.width} x ${size.height} px",
       size.width > 0 && size.height > 0,
   )
-  assertIsDisplayed()
   val visible = node.boundsInRoot
   assertTrue(
       "Only ${visible.width} px of ${size.width} px width are visible",

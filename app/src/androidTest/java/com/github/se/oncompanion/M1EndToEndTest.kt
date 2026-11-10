@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
-// Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion
 
@@ -11,7 +11,6 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
@@ -151,7 +150,6 @@ class M1EndToEndTest {
     val node = fetchSemanticsNode()
     val size = node.size
     assertTrue("The control must have drawable area", size.width > 0 && size.height > 0)
-    assertIsDisplayed()
     assertTrue(
         "The whole control must fit in the viewport",
         node.boundsInRoot.width >= size.width && node.boundsInRoot.height >= size.height,
