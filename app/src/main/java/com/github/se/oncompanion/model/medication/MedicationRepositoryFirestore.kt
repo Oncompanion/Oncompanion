@@ -80,10 +80,7 @@ class MedicationRepositoryFirestore(
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
       snapshots(uid).map { documents ->
-        documents
-            .mapNotNull(::toPrescription)
-            .flatMap { it.medications }
-            .sortedWith(compareBy({ it.startDate }, { it.name }))
+        documents.mapNotNull(::toPrescription).confirmedMedications()
       }
 
   override suspend fun addPrescription(uid: String, prescription: Prescription): Unit =

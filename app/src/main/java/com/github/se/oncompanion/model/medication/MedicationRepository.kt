@@ -32,8 +32,9 @@ interface MedicationRepository {
   fun observePrescription(uid: String, id: String): Flow<Prescription?>
 
   /**
-   * Emits all the medications of [uid] now and every time they change, earliest start date first
-   * then by name, for features that don't need the prescriptions (e.g. Planning).
+   * Emits the medications of [uid]'s confirmed prescriptions ([confirmedMedications]) now and every
+   * time they change, for features that don't need the prescriptions, such as reminders: one a
+   * caregiver added never schedules anything before the patient confirms it (US-43).
    */
   fun observeMedications(uid: String): Flow<List<Medication>>
 

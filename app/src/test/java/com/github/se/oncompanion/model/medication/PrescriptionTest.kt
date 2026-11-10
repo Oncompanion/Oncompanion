@@ -135,4 +135,47 @@ class PrescriptionTest {
         valid.copy(medications = listOf(medication("med-1"), medication("med-1"))).isValid()
     )
   }
+
+  /** What reminders may schedule (US-32, US-34): only the medications the patient confirmed. */
+  @Test
+  fun confirmedMedications_leaveOutWhatThePatientHasntConfirmed_sortedByStartThenName() {
+    fun medication(id: String, prescriptionId: String, name: String, start: LocalDate) =
+        Medication(id, prescriptionId, name, startDate = start)
+    fun prescription(id: String, confirmation: PrescriptionConfirmation, vararg m: Medication) =
+        Prescription(
+            id,
+            prescribedOn = LocalDate.of(2026, 10, 1),
+            medications = m.toList(),
+            addedBy = "sam".takeIf { confirmation != PrescriptionConfirmation.CONFIRMED },
+            addedByName = "Sam",
+            confirmation = confirmation,
+        )
+    val day = LocalDate.of(2026, 10, 2)
+    val prescriptions =
+        listOf(
+            prescription(
+                "own",
+                PrescriptionConfirmation.CONFIRMED,
+                medication("b", "own", "Ondansetron", day),
+                medication("a", "own", "Dexamethasone", day.plusDays(1)),
+            ),
+            prescription(
+                "pending",
+                PrescriptionConfirmation.PENDING,
+                medication("p", "pending", "Aspirin", day),
+            ),
+            prescription(
+                "rejected",
+                PrescriptionConfirmation.REJECTED,
+                medication("r", "rejected", "Aspirin", day),
+            ),
+            prescription(
+                "confirmed",
+                PrescriptionConfirmation.CONFIRMED,
+                medication("c", "confirmed", "Cisplatin", day),
+            ),
+        )
+
+    assertEquals(listOf("c", "b", "a"), prescriptions.confirmedMedications().map { it.id })
+  }
 }

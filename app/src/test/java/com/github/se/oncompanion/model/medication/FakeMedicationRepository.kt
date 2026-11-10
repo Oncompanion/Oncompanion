@@ -100,15 +100,7 @@ class FakeMedicationRepository(
           .onCompletion { prescriptionObservers-- }
 
   override fun observeMedications(uid: String): Flow<List<Medication>> =
-      read(
-          store.map { all ->
-            all[uid]
-                .orEmpty()
-                .values
-                .flatMap { it.medications }
-                .sortedWith(compareBy({ it.startDate }, { it.name }))
-          }
-      )
+      read(store.map { all -> all[uid].orEmpty().values.toList().confirmedMedications() })
 
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     writeError?.let { throw it }

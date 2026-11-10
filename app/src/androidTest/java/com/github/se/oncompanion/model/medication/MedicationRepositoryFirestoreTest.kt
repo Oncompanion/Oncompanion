@@ -236,6 +236,8 @@ class MedicationRepositoryFirestoreTest {
 
     EmulatorTestData.signIn("alice")
     assertSameContent(carols, repository.observePrescription(aliceUid, "presc-1").awaitFirst())
+    // Not confirmed yet: none of its medications may be reminded (US-43)
+    assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
 
     // Alice checks it and confirms it: who added it stays
     repository.updatePrescription(
@@ -249,6 +251,14 @@ class MedicationRepositoryFirestoreTest {
     assertEquals("Carol", confirmed!!.addedByName)
     assertEquals(carolUid, confirmed.addedBy)
     assertEquals("Dr. Rossi", confirmed.prescribedBy)
+    assertEquals(
+        carols.medications.map { it.id }.toSet(),
+        repository
+            .observeMedications(aliceUid)
+            .awaitFirst { it.isNotEmpty() }
+            .map { it.id }
+            .toSet(),
+    )
   }
 
   @Test
