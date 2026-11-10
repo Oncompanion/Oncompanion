@@ -40,6 +40,51 @@ class HospitalRepositoryProviderTest {
     assertSame(fake, HospitalRepositoryProvider.repository)
   }
 
+  /** Missing deployment configuration leaves manual mode and test overrides intact. */
+  @Test
+  fun blankStartupConfigurationLeavesTheRepositoryUnchanged() {
+    HospitalRepositoryProvider.disable()
+    val unconfigured = HospitalRepositoryProvider.repository
+    for (endpoint in listOf("", "  ")) {
+      HospitalRepositoryProvider.configureAtStartup(endpoint)
+      assertSame(unconfigured, HospitalRepositoryProvider.repository)
+      assertFalse(HospitalRepositoryProvider.isConfigured)
+    }
+    val fake = FakeHospitalRepository()
+    HospitalRepositoryProvider.repository = fake
+    HospitalRepositoryProvider.configureAtStartup("")
+    assertSame(fake, HospitalRepositoryProvider.repository)
+  }
+
+  /** Activity recreation preserves the adapter's public-result cache and retry gate. */
+  @Test
+  fun repeatedStartupConfigurationKeepsTheSharedAdapter() {
+    HospitalRepositoryProvider.disable()
+    HospitalRepositoryProvider.configureAtStartup("https://example.invalid/search")
+    val configured = HospitalRepositoryProvider.repository
+    assertTrue(HospitalRepositoryProvider.isConfigured)
+    HospitalRepositoryProvider.configureAtStartup("https://example.invalid/search")
+    HospitalRepositoryProvider.configureAtStartup("")
+    assertSame(configured, HospitalRepositoryProvider.repository)
+  }
+
+  /**
+   * Startup uses the existing endpoint validation rather than permitting direct upstream access.
+   */
+  @Test
+  fun invalidStartupEndpointDoesNotEnableSearch() {
+    for (endpoint in
+        listOf("http://example.invalid/search", "https://nominatim.openstreetmap.org/search")) {
+      HospitalRepositoryProvider.disable()
+      val unconfigured = HospitalRepositoryProvider.repository
+      assertThrows(IllegalArgumentException::class.java) {
+        HospitalRepositoryProvider.configureAtStartup(endpoint)
+      }
+      assertSame(unconfigured, HospitalRepositoryProvider.repository)
+      assertFalse(HospitalRepositoryProvider.isConfigured)
+    }
+  }
+
   /** Configuration constructs the HTTP implementation once, without issuing a request. */
   @Test
   fun configuredRepositoryIsSharedAcrossConsumers() = runTest {

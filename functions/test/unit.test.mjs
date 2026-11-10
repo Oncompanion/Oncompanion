@@ -395,6 +395,10 @@ test("deployed entry point preserves conservative scaling and rejects unauthenti
   assert.equal(hospitalSearch.__endpoint.platform, "gcfv2");
   assert.equal(hospitalSearch.__endpoint.maxInstances, 1);
   assert.equal(hospitalSearch.__endpoint.concurrency, 1);
+  assert.equal(
+    hospitalSearch.__endpoint.serviceAccountEmail.name,
+    "HOSPITAL_RUNTIME_SERVICE_ACCOUNT",
+  );
   const req = {
     ...request(),
     get() {

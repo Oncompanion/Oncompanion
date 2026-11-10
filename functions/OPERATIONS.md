@@ -2,10 +2,34 @@
 
 # Hospital proxy deployment and operations
 
-Status: repository configuration only. No deployment, TTL activation, IAM changes, metrics,
-alert policies or notification channels have been applied or verified by this PR.
+Status (10 November 2026): billing is enabled and the authorized Cloud Functions, Cloud Run,
+Cloud Build, Artifact Registry and Secret Manager API activations are verified for
+`oncompanion-c4144` (project number `782199763007`). `hospitalSearch` is ACTIVE in `europe-west1`.
+The separately approved public invoker binding is verified on its `hospitalsearch` service;
+existing service bindings and project IAM were preserved. Firebase Auth and approved App Check
+remain mandatory in the verified deployed source. No live search has been performed. See DEPLOYMENT.md.
+The quota secret was created with approval; version 1 is ENABLED with automatic replication.
+Its value was generated in memory and not printed or saved locally. Both cache/quota TTL policies
+are ACTIVE, with single-field indexing disabled on their `expiresAt` fields. The field-specific
+operations completed successfully; unrelated field settings, composite indexes, security-rule
+releases and coordinator field settings were unchanged. One approved email notification channel
+is created and enabled; delivery is not yet tested. The separately approved CHF 5/month project
+budget is created and verified, with actual-spend thresholds at 50%, 90%, 100% and a 100% forecast
+threshold. Budget API enablement is verified; existing budgets were preserved. No proxy alert
+policies are configured. Play Integrity configuration exists, but real token verification
+is outstanding. The dedicated `hospital-search` runtime account was created with separate approval,
+with project-level `roles/datastore.user` and `roles/secretmanager.secretAccessor` on the quota
+secret only. Existing bindings were preserved; this runtime has no Editor grant or user-managed
+keys. Unexpected Google-managed bindings are a separate [security follow-up](../docs/hospital-proxy-iam-follow-up.md).
+The approved `hospital_proxy_request_urls` exclusion is enabled for platform request logs of the
+verified `hospitalsearch` service only. Existing exclusions, unrelated sink settings and monitoring
+configuration were preserved. Application stdout/stderr are not excluded. Proxy alert policies remain
+inactive. Authenticated live search, server-cache and release App Check verification are deferred.
 Obtain separate authorization before executing any cloud mutation below.
 See [README](README.md) for the contract, privacy constraints and coordinator proof.
+See the [current rollout plan](DEPLOYMENT.md) for audited state and separately approved steps.
+The [minimal course-project monitoring proposal](MONITORING.md) is prepared but not active;
+the project owner is the primary operator and the backup remains TBD by agreement.
 
 ## Before deployment
 
@@ -19,20 +43,22 @@ See [README](README.md) for the contract, privacy constraints and coordinator pr
 - Review deployment identity separately from runtime identity. The deployer needs function
   deployment/build permissions and `iam.serviceAccounts.actAs` on the runtime identity;
   IAM changes require an authorized administrator. Preserve Google-managed service agents.
-- No runtime service account is pinned in `src/index.ts`; Gen 2 defaults to the Compute
-  Engine default service account. Inspect its effective permissions before rollout. It needs
+- Set `HOSPITAL_RUNTIME_SERVICE_ACCOUNT` to a reviewed runtime identity; `src/index.ts` requires
+  this deployment parameter instead of inheriting the Compute Engine default service account.
+  The audit found that default account has Editor; do not use it for this proxy. The runtime needs
   Firestore data access (for example `roles/datastore.user` on the project) and
   `roles/secretmanager.secretAccessor` on **only** `HOSPITAL_QUOTA_SECRET`. Avoid broad Editor
-  grants. A dedicated account is preferred but must be selected/reviewed before adding its
-  project-specific identity to function configuration. No service-account keys are needed.
+  grants. A dedicated account must be created and granted permissions only after approval.
+  No service-account keys are needed.
 - The endpoint uses `invoker: "public"`: network access is public so Firebase mobile tokens
   can reach the handler. Confirm organization policy permits this. Cloud Run IAM tokens are
   not Firebase ID tokens. Do not remove handler Auth/App Check verification to resolve IAM errors.
-- Register production Android App Check with Play Integrity and approved Firebase app IDs.
-  Android Auth/App Check transport and activation remain a separate PR. A valid Auth ID token
+- Verify production Android App Check with Play Integrity and approved Firebase app IDs.
+  Android Auth/App Check transport is implemented; endpoint activation remains gated. A valid Auth ID token
   **and** a valid App Check token from an allowed app are required, including in staging.
 - Copy `.env.example` to ignored `functions/.env.oncompanion-c4144`; set a real monitored
-  `NOMINATIM_CONTACT_EMAIL` and comma-separated `HOSPITAL_APP_IDS`. These are existing
+  `NOMINATIM_CONTACT_EMAIL`, comma-separated `HOSPITAL_APP_IDS`, and the reviewed
+  `HOSPITAL_RUNTIME_SERVICE_ACCOUNT`. These are
   `defineString` parameters; changes require deployment of a new revision.
 - Provision `HOSPITAL_QUOTA_SECRET` using the interactive command below with at least 32
   random characters. Never pass its value in a command argument, commit it, print it or log it.
@@ -55,7 +81,7 @@ npm --prefix functions run lint
 npm --prefix functions run build
 firebase emulators:exec --config firebase.proxy-test.json --only firestore \
   --project demo-oncompanion-proxy \
-  'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
+  'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 ```
 
 Only after authorization, configure the secret and deploy the existing TTL declarations:

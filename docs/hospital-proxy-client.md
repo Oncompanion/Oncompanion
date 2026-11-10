@@ -58,16 +58,22 @@ Before approved staging/release use:
 - Unit tests inject `HospitalProxyTokens` and transport/connection fakes and never need real credentials.
   Firebase emulators have no App Check emulator; real end-to-end verification requires authorized
   staging registration. Do not disable backend verification to make tests pass.
-- Choose HTTP versus callable before later repository/UI integration. This PR implements the current
-  HTTP contract requested for PR 2; it does not resolve the prior callable recommendation or the
-  [GET URL logging rollout blocker](../functions/OPERATIONS.md). It does not deploy resources,
-  configure production enforcement, set an endpoint or make live proxy/Nominatim requests.
+- The implemented repository/UI integration uses the HTTP contract. Any callable migration remains
+  a separate reviewed change; this does not resolve the prior callable recommendation or the
+  [GET URL privacy constraints](../functions/OPERATIONS.md). The backend is deployed with a scoped
+  request-log exclusion; Android activation and authenticated live verification remain deferred.
 
 ## Opt-in repository and Profile integration
 
 After authorized deployment, App Check registration and rollout review, application setup may call
 `HospitalRepositoryProvider.configure(trustedProxyUrl)` **before** creating hospital field ViewModels.
-There is no default URL and no call in startup code in this PR, so shipped builds remain manual-only.
+`MainActivity` calls `configureAtStartup` before creating field consumers, using the non-translatable
+`hospital_proxy_endpoint` string resource. It is empty by default, so shipped builds remain manual-only.
+After deployment and rollout approval, set that resource to the actual verified HTTPS endpoint;
+the URL is public configuration, not a credential. Do not guess it from the project name.
+Startup configuration reuses an installed adapter across activity recreation, preserving its cache
+and retry gate. Blank configuration leaves the current repository untouched. Changing a configured
+endpoint requires a new app build/process, rather than replacing live consumers or bypassing a wait.
 `disable()` restores the unconfigured provider for new consumers. Configuration is a startup boundary,
 not a reactive remote flag: recreate existing field consumers after endpoint/configuration changes.
 The provider installs the shared proxy adapter, never the legacy Nominatim HTTP repository, and
@@ -91,3 +97,15 @@ OpenStreetMap attribution and navigation. Editing/saving/disposal cancels old se
 ViewModel generation check prevents late responses replacing newer results. Onboarding and Add
 Appointment remain unchanged. New unit tests use the real adapter/client with fake tokens/HTTP and fake user
 repositories; they do not require or mutate shared Firebase emulator state.
+
+## Deployment verification and debug-emulator handoff
+
+The backend endpoint is verified as
+`https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch`; the resource remains empty
+until the authenticated live plan is approved and ready. No release-signing change is needed for the
+owner-requested debug-emulator path. A temporary debug enrollment in the existing project requires
+explicit approval and private handling/revocation; it does not prove release Play Integrity works.
+See [LIVE_VERIFICATION.md](../functions/LIVE_VERIFICATION.md) for the five completed rejection checks,
+current custom-auth/bootstrap limitations, Android Studio steps and the one-upstream-request plan.
+IAM concerns are a [separate security follow-up](hospital-proxy-iam-follow-up.md), not changes to make
+in this deployment PR.

@@ -25,6 +25,15 @@ object HospitalRepositoryProvider {
   }
 
   /**
+   * Applies trusted startup configuration without replacing a live adapter on activity recreation.
+   * A blank endpoint keeps manual entry available without initializing Firebase or networking.
+   */
+  fun configureAtStartup(searchEndpoint: String) {
+    if (searchEndpoint.isBlank() || isConfigured) return
+    configure(searchEndpoint)
+  }
+
+  /**
    * Installs one shared authenticated proxy repository for a configured HTTPS endpoint, retaining
    * its cache across fields. Invalid endpoints leave the current repository unchanged. This does
    * not make a request; the deployment remains responsible for the aggregate-rate-limited proxy.
