@@ -312,6 +312,9 @@ object C {
     /** The switch letting the member add to [permissionName], e.g. "SYMPTOMS". */
     fun careCircleFormCanAdd(permissionName: String) = "care_circle_form_can_add_$permissionName"
 
+    /** Under the email warning: opens the invitation that already has this email (#257). */
+    const val care_circle_form_open_invite = "care_circle_form_open_invite"
+
     // Join a care circle
     const val join_circle_screen = "join_circle_screen"
     const val join_circle_code_field = "join_circle_code_field"
