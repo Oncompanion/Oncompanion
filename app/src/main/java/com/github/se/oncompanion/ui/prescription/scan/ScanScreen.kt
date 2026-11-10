@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,12 +58,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -84,6 +80,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.Spacing
@@ -683,60 +680,42 @@ private const val READING_ALPHA = 0.5f
 /** Longest side of the photo on screen, in pixels: enough to check it, light enough to load. */
 private const val MAX_PREVIEW_SIZE = 2048f
 
-/** The camera can't be used (refused, or no camera): why, and that the photo stays on the phone. */
+/**
+ * The camera can't be used (refused, or no camera): why, and that the photo stays on the phone, as
+ * the shared message state (Figma "US-10 / Scan – Camera access refused").
+ */
 @Composable
 private fun CameraOff(modifier: Modifier, title: Int, explanation: Int) {
-  Box(modifier = modifier.padding(horizontal = 32.dp), contentAlignment = Alignment.Center) {
-    Column(
+  Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    LakeMessageState(
+        title = stringResource(title),
+        message = stringResource(explanation),
         modifier = Modifier.testTag(C.Tag.prescription_scan_camera_off),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      Icon(
-          painter = painterResource(R.drawable.ic_videocam_off),
-          contentDescription = null,
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Spacer(Modifier.height(16.dp))
-      Text(
-          text = stringResource(title),
-          style = MaterialTheme.typography.titleLarge,
-          textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(12.dp))
-      Text(
-          text = stringResource(explanation),
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center,
-      )
-    }
+    )
   }
 }
 
-/** "Enter manually" and, after a refusal, "Open settings", side by side as in the mockup. */
+/**
+ * The ways forward, stacked at the bottom: after a refusal "Open settings" first, since it brings
+ * the camera back, then "Enter manually" (Figma); without a camera, "Enter manually" alone, as the
+ * main button.
+ */
 @Composable
 private fun CameraOffActions(onEnterManually: () -> Unit, onOpenSettings: (() -> Unit)?) {
-  Row(
-      modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    LakeButton(
-        text = stringResource(R.string.prescription_scan_enter_manually),
-        onClick = onEnterManually,
-        style = LakeButtonStyle.Tonal,
-        icon = rememberVectorPainter(Icons.Filled.Edit),
-        modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_enter_manually_button),
-    )
+  BottomActions {
     if (onOpenSettings != null) {
       LakeButton(
           text = stringResource(R.string.prescription_scan_open_settings),
           onClick = onOpenSettings,
-          style = LakeButtonStyle.Tonal,
-          icon = rememberVectorPainter(Icons.Filled.Settings),
-          modifier = Modifier.weight(1f).testTag(C.Tag.prescription_scan_open_settings_button),
+          modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_scan_open_settings_button),
       )
     }
+    LakeButton(
+        text = stringResource(R.string.prescription_scan_enter_manually),
+        onClick = onEnterManually,
+        style = if (onOpenSettings != null) LakeButtonStyle.Tonal else LakeButtonStyle.Filled,
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_scan_enter_manually_button),
+    )
   }
 }
 

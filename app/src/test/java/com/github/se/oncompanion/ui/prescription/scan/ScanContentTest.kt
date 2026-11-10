@@ -14,8 +14,11 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -25,6 +28,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
+import com.github.se.oncompanion.ui.theme.PrimaryDark
 import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
 import com.github.se.oncompanion.ui.theme.SurfaceDark
 import java.io.File
@@ -596,6 +601,41 @@ class ScanContentTest {
         assertEquals(screen.bottom - 16f, second.bottom, 1f)
       }
     }
+  }
+
+  @Test
+  @Config(qualifiers = "w390dp-h844dp-xhdpi")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun cameraOff_isTheSharedMessageState_withItsButtonsStackedAtTheBottom() {
+    var state by mutableStateOf(ScanUiState(permission = CameraPermission.REFUSED))
+    compose.setContent {
+      ScanContent(uiState = state, onBack = {}, onEnterManually = {}, onOpenSettings = {})
+    }
+    val screen = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_screen))
+    fun button(tag: String) = compose.onNodeWithTag(tag)
+    fun colorOf(tag: String) =
+        button(tag).captureToImage().toPixelMap().let { it[it.width / 8, it.height / 2] }
+
+    // Refused: "Open settings" first and filled, then "Enter manually" on the tonal container
+    compose
+        .onNodeWithTag(C.Tag.prescription_scan_camera_off)
+        .onChildren()
+        .filterToOne(hasTestTag(C.Tag.message_state_icon))
+        .assertIsDisplayed()
+    val settings = boundsDp(button(C.Tag.prescription_scan_open_settings_button))
+    val manual = boundsDp(button(C.Tag.prescription_scan_enter_manually_button))
+    assertEquals(16f, settings.left, 1f)
+    assertEquals(screen.right - 16f, manual.right, 1f)
+    assertEquals(settings.bottom + 8f, manual.top, 1f)
+    assertEquals(screen.bottom - 16f, manual.bottom, 1f)
+    assertEquals(PrimaryDark, colorOf(C.Tag.prescription_scan_open_settings_button))
+    assertEquals(PrimaryContainerDark, colorOf(C.Tag.prescription_scan_enter_manually_button))
+
+    // No camera: "Enter manually" alone, as the main button
+    state = granted(CameraStatus.UNAVAILABLE)
+    compose.waitForIdle()
+    button(C.Tag.prescription_scan_open_settings_button).assertDoesNotExist()
+    assertEquals(PrimaryDark, colorOf(C.Tag.prescription_scan_enter_manually_button))
   }
 
   private fun luminance(color: androidx.compose.ui.graphics.Color) =
