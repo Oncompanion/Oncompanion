@@ -368,19 +368,24 @@ class PlanningScreenTest {
     assertEquals(item, opened)
   }
 
-  /** Each source only reaches its own page, and a medication can't be routed to either. */
+  /** Each source opens its own detail with the original identifiers. */
   @Test
   fun openingAnItemRoutesItToItsOwner() {
     val opened = mutableListOf<String>()
     val open = { planned: PlanningItem ->
-      openPlanningItem(planned, { opened += "appointment:$it" }, { opened += "event:$it" })
+      openPlanningItem(
+          planned,
+          { opened += "appointment:$it" },
+          { opened += "event:$it" },
+          { p, m -> opened += "medication:$p:$m" },
+      )
     }
 
     open(item.copy(source = PlanningSource.Appointment("a")))
     open(item.copy(source = PlanningSource.Event("e")))
     open(medication())
 
-    assertEquals(listOf("appointment:a", "event:e"), opened)
+    assertEquals(listOf("appointment:a", "event:e", "medication:prescription:med"), opened)
   }
 
   // ----- Caregiver mode (US-20) -----

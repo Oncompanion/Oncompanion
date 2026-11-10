@@ -111,6 +111,14 @@ object Screen {
   /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
   fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
 
+  /** Identifies one medication inside the prescription document. */
+  const val MEDICATION_ID = "medicationId"
+  const val MEDICATION_DETAIL = "medication_detail/{$PRESCRIPTION_ID}/{$MEDICATION_ID}"
+
+  /** Opens the recorded medication, without replacing the originating Planning destination. */
+  fun medicationDetail(prescriptionId: String, medicationId: String) =
+      "medication_detail/${Uri.encode(prescriptionId)}/${Uri.encode(medicationId)}"
+
   const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_ID}"
 
   /** The [PRESCRIPTION_EDIT] screen of the prescription [prescriptionId]. */

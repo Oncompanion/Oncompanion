@@ -348,4 +348,11 @@ class NavigationActionsTest {
     assertEquals("appointment_edit/{appointmentId}", Screen.APPOINTMENT_EDIT)
     assertEquals("appointment_edit/visit%20%3F%23", Screen.appointmentEdit("visit ?#"))
   }
+
+  /** Both identifiers are route data, even when they contain reserved characters. */
+  @Test
+  fun medicationDetailEncodesBothIdentifiers() {
+    assertEquals("medication_detail/{prescriptionId}/{medicationId}", Screen.MEDICATION_DETAIL)
+    assertEquals("medication_detail/p%20%3F%23/m%2F1", Screen.medicationDetail("p ?#", "m/1"))
+  }
 }

@@ -103,6 +103,42 @@ class PlanningMedicationsTest {
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
     compose.onNodeWithText(a.name).assertIsDisplayed()
     screenshot("planning-medications-next-week.png")
+    // Open the second medication offline, then its prescription, without replacing this week.
+    val selectedDay =
+        compose
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+    compose.onNodeWithText(b.name).performClick()
+    compose.waitUntil(10_000) {
+      compose
+          .onAllNodesWithTag(C.Tag.medication_detail_prescription)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    compose.onNodeWithText(b.name).assertIsDisplayed()
+    compose.onNodeWithText(a.name).assertDoesNotExist()
+    screenshot("medication-detail-offline.png")
+    compose.onNodeWithTag(C.Tag.medication_detail_prescription).performTouchInput { doubleClick() }
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.prescription_detail_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose.onNodeWithText(b.name).performScrollTo().assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.medication_detail_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose.onNodeWithTag(C.Tag.medication_detail_back).performClick()
+    compose.waitUntil(10_000) {
+      compose.onAllNodesWithTag(C.Tag.planning_screen).fetchSemanticsNodes().isNotEmpty()
+    }
+    assertEquals(
+        selectedDay,
+        compose
+            .onNodeWithTag(C.Tag.planning_heading)
+            .fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text],
+    )
     compose.onNodeWithTag(C.Tag.planning_previous).performClick()
     val edited =
         prescription.copy(

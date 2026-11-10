@@ -67,6 +67,8 @@ import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.overview.OverviewViewModel
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.prescription.MedicationDetailScreen
+import com.github.se.oncompanion.ui.prescription.MedicationDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionDetailScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
@@ -301,6 +303,7 @@ private fun SessionNavHost(
             onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
             onOpenAppointment = appointmentOpener(navigationActions),
             onOpenEvent = eventOpener(navigationActions),
+            onOpenMedication = medicationOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
         )
       }
@@ -458,6 +461,30 @@ private fun SessionNavHost(
             onAdd = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_ADD) },
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
+            caregiverOf = chosenPatient?.firstName,
+        )
+      }
+      composable(
+          Screen.MEDICATION_DETAIL,
+          arguments =
+              listOf(
+                  navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType },
+                  navArgument(Screen.MEDICATION_ID) { type = NavType.StringType },
+              ),
+      ) { entry ->
+        MedicationDetailScreen(
+            viewModel =
+                viewModel {
+                  MedicationDetailViewModel(
+                      prescriptionId =
+                          requireNotNull(entry.arguments?.getString(Screen.PRESCRIPTION_ID)),
+                      medicationId =
+                          requireNotNull(entry.arguments?.getString(Screen.MEDICATION_ID)),
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onViewPrescription = detailOpener(navigationActions, Screen::prescriptionDetail),
             caregiverOf = chosenPatient?.firstName,
         )
       }
@@ -683,6 +710,19 @@ private fun detailOpener(
   return { id ->
     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
       navigationActions.navigateTo(route(id))
+    }
+  }
+}
+
+/**
+ * Opens the medication's exact source while Planning is resumed, like other detail entry points.
+ */
+@Composable
+private fun medicationOpener(navigationActions: NavigationActions): (String, String) -> Unit {
+  val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+  return { prescriptionId, medicationId ->
+    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+      navigationActions.navigateTo(Screen.medicationDetail(prescriptionId, medicationId))
     }
   }
 }
