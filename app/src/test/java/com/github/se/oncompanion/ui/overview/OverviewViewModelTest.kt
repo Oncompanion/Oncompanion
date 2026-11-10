@@ -382,6 +382,23 @@ class OverviewViewModelTest {
   }
 
   @Test
+  fun medication_ofAnUnconfirmedPrescription_saysWhoAddedIt_andOnlyThen() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    medication("pending").copy(addedByName = "Sam", isConfirmed = false),
+                    medication("confirmed").copy(addedByName = "Sam"),
+                )
+        )
+
+    assertEquals(
+        mapOf("Medication pending" to "Sam", "Medication confirmed" to null),
+        vm.uiState.value.todayEntries.associate { it.title to it.notConfirmedAddedBy },
+    )
+  }
+
+  @Test
   fun timedEntries_areDoneNowNextOrLater_withTheClock() {
     val vm =
         viewModel(

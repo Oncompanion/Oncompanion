@@ -483,8 +483,10 @@ private fun PlanningRow(
             {
               Column {
                 supportingText?.let { Text(it) }
-                // An appointment a caregiver added for the patient says who did (US-41)
-                item.addedByName?.let { AddedBy(it) }
+                // An entry a caregiver added says who did (US-41), and whether the patient
+                // confirmed
+                // it, for a prescription (US-43)
+                item.addedByName?.let { AddedBy(it, isConfirmed = item.isConfirmed) }
               }
             }
           },

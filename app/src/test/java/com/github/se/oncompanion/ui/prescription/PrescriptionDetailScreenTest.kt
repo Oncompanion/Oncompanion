@@ -3,10 +3,14 @@
 package com.github.se.oncompanion.ui.prescription
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -23,6 +27,7 @@ import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -514,5 +519,41 @@ class PrescriptionDetailScreenTest {
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
+  }
+
+  // ---- a prescription a caregiver added (US-43) ----
+
+  @Test
+  fun prescriptionAddedByACaregiver_saysWho_andWhetherItIsConfirmed() {
+    var confirmation by mutableStateOf(PrescriptionConfirmation.PENDING)
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState =
+              shown.copy(
+                  prescription =
+                      chemo.copy(addedBy = "sam", addedByName = "Sam", confirmation = confirmation)
+              ),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+      )
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.added_by)
+        .assertTextEquals(context.getString(R.string.added_by_not_confirmed, "Sam"))
+    confirmation = PrescriptionConfirmation.CONFIRMED
+    composeTestRule
+        .onNodeWithTag(C.Tag.added_by)
+        .assertTextEquals(context.getString(R.string.symptom_added_by, "Sam"))
+  }
+
+  @Test
+  fun patientsOwnPrescription_saysNothingAboutWhoAddedIt() {
+    setContent(shown)
+    composeTestRule.onNodeWithTag(C.Tag.added_by).assertDoesNotExist()
   }
 }

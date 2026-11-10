@@ -443,4 +443,31 @@ class PlanningScreenTest {
         .assertTextContains("Room 3", substring = true)
         .assertTextContains("Added by Sam", substring = true)
   }
+
+  // ----- A prescription a caregiver added, not confirmed yet (US-43) -----
+
+  @Test
+  fun medicationOfAnUnconfirmedPrescription_saysItIsNotConfirmed() {
+    val pending =
+        medication("pending").copy(addedBy = "sam", addedByName = "Sam", isConfirmed = false)
+    val confirmed = medication("confirmed").copy(addedBy = "sam", addedByName = "Sam")
+    render(state(listOf(pending, confirmed)))
+
+    compose
+        .onNodeWithTag(C.Tag.planningItem(pending.key))
+        .assertTextContains("Added by Sam · Not confirmed", substring = true)
+    compose
+        .onNodeWithTag(C.Tag.planningItem(confirmed.key))
+        .assertTextContains("Added by Sam", substring = true)
+        .assert(!hasText("Not confirmed", substring = true))
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun medicationOfAnUnconfirmedPrescription_isFullyVisibleInLandscape() {
+    val pending =
+        medication("pending").copy(addedBy = "sam", addedByName = "Sam", isConfirmed = false)
+    render(state(listOf(pending)))
+    compose.onNodeWithTag(C.Tag.planningItem(pending.key)).performScrollTo().assertIsFullyVisible()
+  }
 }

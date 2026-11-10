@@ -7,10 +7,13 @@ import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
@@ -473,6 +476,86 @@ class PrescriptionsViewModelTest {
 
           // After a failed read, the access may have been taken away: no adding
           assertEquals("fails=$fails", !fails, viewModel.uiState.value.canAdd)
+        }
+      }
+
+  // ----- A prescription a caregiver added (US-43) -----
+
+  @Test
+  fun addedByACaregiver_thePatientSeesTheNameTheyGave_theCaregiverTheStoredOne() =
+      runTest(dispatcher) {
+        val added =
+            prescription("p1", "2026-10-01", "Ondansetron 8 mg")
+                .copy(addedBy = "caregiver", addedByName = "Sam")
+        val circle =
+            FakeCareCircleRepository().apply {
+              setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Samuel")))
+            }
+        repository.seed(uid, added)
+        repository.seed("patient", added)
+        val patient =
+            PrescriptionsViewModel(signedIn(), repository, clock, careCircleRepository = circle)
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+                careCircleRepository = circle,
+            )
+        advanceUntilIdle()
+
+        assertEquals("Samuel", patient.uiState.value.prescriptions.single().addedByName)
+        assertEquals("Sam", caregiver.uiState.value.prescriptions.single().addedByName)
+      }
+
+  @Test
+  fun waitingForThePatient_isGroupedFirst_allForThePatient_onlyTheirOwnForACaregiver() =
+      runTest(dispatcher) {
+        // Sam's and Lea's prescriptions wait for the patient; Sam's older one was confirmed
+        val sams =
+            prescription("sams", "2026-10-02", "Ondansetron 8 mg")
+                .copy(
+                    addedBy = "caregiver",
+                    addedByName = "Sam",
+                    confirmation = PrescriptionConfirmation.PENDING,
+                )
+        val leas =
+            prescription("leas", "2026-09-02", "Metoclopramide")
+                .copy(
+                    addedBy = "lea",
+                    addedByName = "Lea",
+                    confirmation = PrescriptionConfirmation.PENDING,
+                )
+        val confirmed =
+            prescription("confirmed", "2026-10-01", "Paracetamol")
+                .copy(addedBy = "caregiver", addedByName = "Sam")
+        for (owner in listOf(uid, "patient")) {
+          listOf(sams, leas, confirmed).forEach { repository.seed(owner, it) }
+        }
+        val patient = viewModel()
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+            )
+        advanceUntilIdle()
+
+        // Waiting first, then this month and earlier, without the waiting ones
+        val cases =
+            listOf(
+                patient to Triple(listOf("sams", "leas"), listOf("confirmed"), emptyList()),
+                caregiver to Triple(listOf("sams"), listOf("confirmed"), listOf("leas")),
+            )
+        for ((viewModel, expected) in cases) {
+          val state = viewModel.uiState.value
+          assertEquals(expected.first, state.waiting.map { it.id })
+          assertEquals(expected.second, viewModel.thisMonthIds)
+          assertEquals(expected.third, viewModel.earlierIds)
         }
       }
 }

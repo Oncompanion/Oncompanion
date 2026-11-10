@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import java.time.LocalDate
@@ -231,6 +232,7 @@ private fun TodayRow(entry: TodayEntry) {
       entry.subtitle?.let {
         Text(text = it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
       }
+      entry.notConfirmedAddedBy?.let { AddedBy(it, isConfirmed = false) }
     }
     when (entry.status) {
       TodayItemStatus.DONE ->

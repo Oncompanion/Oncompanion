@@ -48,6 +48,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import java.time.format.DateTimeFormatter
@@ -162,7 +163,13 @@ fun PrescriptionsContent(
                 Modifier.align(Alignment.Center),
             )
         uiState.prescriptions.isEmpty() -> EmptyState(caregiverOf, buttonRoom)
-        else -> PrescriptionList(uiState.thisMonth, uiState.earlier, buttonRoom, onOpen)
+        else ->
+            PrescriptionList(
+                uiState,
+                isCaregiver = caregiverOf != null,
+                buttonRoom = buttonRoom,
+                onOpen = onOpen,
+            )
       }
     }
   }
@@ -218,19 +225,38 @@ private fun AddButton(
   )
 }
 
-/** The two groups, each under its subheader; a group with nothing in it shows no subheader. */
+/**
+ * The groups, each under its subheader; a group with nothing in it shows no subheader. Those
+ * waiting for the patient come first (US-43): "Added by a caregiver" for the patient, "Added by
+ * you" for the caregiver who added them ([isCaregiver]).
+ */
 @Composable
 private fun PrescriptionList(
-    thisMonth: List<Prescription>,
-    earlier: List<Prescription>,
+    uiState: PrescriptionsUiState,
+    isCaregiver: Boolean,
     buttonRoom: Dp,
     onOpen: (String) -> Unit,
 ) {
+  val waiting = uiState.waiting
+  val thisMonth = uiState.thisMonth
+  val earlier = uiState.earlier
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.prescriptions_list),
       // Room for the buttons, so they never hide the last prescription
       contentPadding = PaddingValues(bottom = buttonRoom),
   ) {
+    if (waiting.isNotEmpty()) {
+      item(key = C.Tag.prescriptions_waiting_header) {
+        Subheader(
+            stringResource(
+                if (isCaregiver) R.string.prescriptions_added_by_you
+                else R.string.prescriptions_added_by_a_caregiver
+            ),
+            C.Tag.prescriptions_waiting_header,
+        )
+      }
+      items(waiting, key = { it.id }) { PrescriptionItem(it, onOpen) }
+    }
     if (thisMonth.isNotEmpty()) {
       item(key = C.Tag.prescriptions_this_month_header) {
         Subheader(
@@ -283,10 +309,14 @@ private fun PrescriptionItem(prescription: Prescription, onOpen: (String) -> Uni
         )
       },
       supportingContent = {
-        Text(
-            if (prescribedBy.isEmpty()) date
-            else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
-        )
+        Column {
+          Text(
+              if (prescribedBy.isEmpty()) date
+              else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
+          )
+          // A prescription a caregiver added says who did, and whether the patient confirmed it
+          prescription.addedByName?.let { AddedBy(it, isConfirmed = prescription.isConfirmed) }
+        }
       },
       modifier =
           Modifier.clickable { onOpen(prescription.id) }
