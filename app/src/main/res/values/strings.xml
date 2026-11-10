@@ -233,6 +233,9 @@
     <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
     <!-- Caregiver mode: the followed patient's first name -->
     <string name="event_detail_registration_confirmed_by_patient">%1$s confirmed they signed up for this event.</string>
+    <string name="event_detail_registered_caregiver">%1$s is registered</string>
+    <string name="event_detail_website_error_can_confirm_caregiver">Couldn\'t open the event website. You can still tap \"%1$s is registered\".</string>
+    <string name="event_detail_registration_note_caregiver">This saves it in %1$s\'s record. It doesn\'t register %1$s with the organizer or reserve a spot.</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
@@ -305,6 +308,8 @@
     <string name="permission_symptoms_add_description">They can log a symptom for you</string>
     <string name="permission_planning_add">Allow adding appointments</string>
     <string name="permission_planning_add_description">They can add an appointment to your planning. It shows right away, with their name.</string>
+    <string name="permission_events_add">Allow confirming events</string>
+    <string name="permission_events_add_description">They can confirm that you registered for an event. It shows right away, with their name.</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>

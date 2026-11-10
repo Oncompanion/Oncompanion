@@ -264,20 +264,28 @@ service cloud.firestore {
       // /users/{uid}/eventRegistrations/{eventId}: the user's own statement that they registered
       // with the organizer of /events/{eventId}. It is keyed by the event, so confirming twice
       // writes the same document instead of a duplicate. Members the owner shares Events with
-      // can read it; only the owner saves and removes it. Saving needs an existing event that
-      // hasn't started yet, by the server's clock: a confirmation made offline that only syncs
-      // once the event has started is rejected.
+      // can read it; only the owner removes it. A member the owner lets confirm events (US-42)
+      // can save one that doesn't exist yet, signed with their identity, never replace one.
+      // Saving needs an existing event that hasn't started yet, by the server's clock: a
+      // confirmation made offline that only syncs once the event has started is rejected.
       match /eventRegistrations/{eventId} {
         function isUpcomingEvent() {
           let event = /databases/$(database)/documents/events/$(eventId);
           return exists(event) && get(event).data.startAt > request.time;
         }
+        function isValidRegistration(data) {
+          return data.keys().hasOnly(['confirmedAt', 'addedBy', 'addedByName'])
+              && data.confirmedAt == request.time
+              && isUpcomingEvent();
+        }
         allow read: if canRead(uid, 'EVENTS');
         allow delete: if isOwner(uid);
-        allow create, update: if isOwner(uid)
-                      && request.resource.data.keys().hasOnly(['confirmedAt'])
-                      && request.resource.data.confirmedAt == request.time
-                      && isUpcomingEvent();
+        allow create: if canAddTo(uid, 'EVENTS')
+                      && isValidRegistration(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data);
+        allow update: if isOwner(uid)
+                      && isValidRegistration(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data);
       }
 
       // ---------- Care circle ----------

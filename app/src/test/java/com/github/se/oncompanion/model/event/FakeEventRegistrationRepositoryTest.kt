@@ -6,7 +6,8 @@ import java.io.IOException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,7 +18,7 @@ class FakeEventRegistrationRepositoryTest {
 
   @Test
   fun nothingIsConfirmed_atFirst() = runBlocking {
-    assertFalse(repository.observeIsRegistered("sam", "yoga").first())
+    assertNull(repository.observeRegistration("sam", "yoga").first())
   }
 
   @Test
@@ -25,7 +26,7 @@ class FakeEventRegistrationRepositoryTest {
     repository.confirm("sam", "yoga")
     repository.confirm("sam", "yoga")
 
-    assertTrue(repository.observeIsRegistered("sam", "yoga").first())
+    assertNotNull(repository.observeRegistration("sam", "yoga").first())
     assertEquals(setOf("yoga"), repository.registeredEventIds("sam"))
   }
 
@@ -36,7 +37,7 @@ class FakeEventRegistrationRepositoryTest {
 
     repository.remove("sam", "yoga")
 
-    assertFalse(repository.observeIsRegistered("sam", "yoga").first())
+    assertNull(repository.observeRegistration("sam", "yoga").first())
     assertEquals(setOf("walk"), repository.registeredEventIds("sam"))
   }
 
@@ -44,7 +45,7 @@ class FakeEventRegistrationRepositoryTest {
   fun confirmations_areSeparatedByUser() = runBlocking {
     repository.confirm("sam", "yoga")
 
-    assertFalse(repository.observeIsRegistered("alex", "yoga").first())
+    assertNull(repository.observeRegistration("alex", "yoga").first())
   }
 
   @Test
@@ -60,14 +61,14 @@ class FakeEventRegistrationRepositoryTest {
     repository.observeError = IOException("offline")
 
     assertThrows(IOException::class.java) {
-      runBlocking { repository.observeIsRegistered("sam", "yoga").first() }
+      runBlocking { repository.observeRegistration("sam", "yoga").first() }
     }
   }
 
   @Test
   fun invalidIds_areRejected() {
     assertThrows(IllegalArgumentException::class.java) {
-      repository.observeIsRegistered("sam", "a/b")
+      repository.observeRegistration("sam", "a/b")
     }
     assertThrows(IllegalArgumentException::class.java) { repository.confirm(" ", "yoga") }
   }

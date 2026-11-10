@@ -392,7 +392,7 @@ internal val CarePermission.addLabel: Int?
       when (this) {
         CarePermission.SYMPTOMS -> R.string.permission_symptoms_add
         CarePermission.PLANNING -> R.string.permission_planning_add
-        CarePermission.EVENTS,
+        CarePermission.EVENTS -> R.string.permission_events_add
         CarePermission.PRESCRIPTIONS -> null
       }
 
@@ -403,7 +403,7 @@ internal val CarePermission.addDescription: Int?
       when (this) {
         CarePermission.SYMPTOMS -> R.string.permission_symptoms_add_description
         CarePermission.PLANNING -> R.string.permission_planning_add_description
-        CarePermission.EVENTS,
+        CarePermission.EVENTS -> R.string.permission_events_add_description
         CarePermission.PRESCRIPTIONS -> null
       }
 

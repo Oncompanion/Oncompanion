@@ -26,7 +26,8 @@ class FollowedPatient(
   }
       .also { runBlocking { it.signInWithGoogle("caregiver") } }
   val circle = FakeCareCircleRepository()
-  private val profiles =
+  /** The caregiver's profile, so what they add is signed "Sam". */
+  val profiles =
       FakeUserProfileRepository().apply {
         seed(UserProfile("caregiver", Role.CAREGIVER, firstName = "Sam"))
       }
