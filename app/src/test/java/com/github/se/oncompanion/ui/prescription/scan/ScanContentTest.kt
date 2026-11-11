@@ -726,7 +726,7 @@ class ScanContentTest {
   fun atTwiceTheFontSize_eachStateStaysWhole_inLandscape() =
       eachState_staysWholeAtTwiceTheFontSize()
 
-  /** The tip's checkbox and button stay whole on screen, and Back closes it like "Got it". */
+  /** The tip's checkbox and button stay whole on screen, and Back closes it. */
   private fun tip_staysWhole(fontScale: Float = 1f) {
     var dismissed: Boolean? = null
     compose.setContent {

@@ -5,6 +5,8 @@ package com.github.se.oncompanion.ui.prescription.scan
 import android.Manifest
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.view.MotionEvent
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -20,6 +22,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
@@ -106,6 +114,25 @@ class ScanScreenTest {
     compose.waitForIdle()
   }
 
+  /** Touches the screen beyond the root view, as a tap outside a dialog does. */
+  private fun touchOutside() =
+      object : ViewAction {
+        override fun getConstraints() = isRoot()
+
+        override fun getDescription() = "touch outside the dialog"
+
+        override fun perform(uiController: UiController, view: View) {
+          val x = view.width + 50f
+          val y = view.height + 50f
+          listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP).forEach { action ->
+            val event = MotionEvent.obtain(0L, 0L, action, x, y, 0)
+            view.dispatchTouchEvent(event)
+            event.recycle()
+          }
+          uiController.loopMainThreadUntilIdle()
+        }
+      }
+
   // ---- the tip to hold the phone upright (#356) ----
 
   /** The tip shows before anything else; "Got it" then asks for the camera, or turns it on. */
@@ -142,6 +169,30 @@ class ScanScreenTest {
     compose.waitForIdle()
 
     assertFalse(tips.showUprightTip)
+  }
+
+  /** The tip closed with its box ticked, but not by "Got it": it shows again on the next scan. */
+  private fun tip_closedWithoutGotIt_keepsShowing(close: () -> Unit) {
+    tips.showUprightTip = true
+    showScreen()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_dont_show_again).performClick()
+    close()
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip).assertDoesNotExist()
+    assertTrue(tips.showUprightTip)
+  }
+
+  @Test
+  fun tip_closedByBack_withTheBoxTicked_showsAgain() = tip_closedWithoutGotIt_keepsShowing {
+    Espresso.pressBack()
+  }
+
+  @Test
+  fun tip_closedByATapOutside_withTheBoxTicked_showsAgain() = tip_closedWithoutGotIt_keepsShowing {
+    // A touch beyond the dialog, as the dialog's window gets it (it only wraps the dialog here)
+    onView(isRoot()).inRoot(isDialog()).perform(touchOutside())
   }
 
   @Test

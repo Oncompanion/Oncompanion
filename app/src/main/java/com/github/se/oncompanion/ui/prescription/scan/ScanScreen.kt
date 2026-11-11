@@ -379,7 +379,8 @@ fun ScanContent(
 /**
  * Before the camera opens (Figma "US-10 / Scan – Hold the phone upright"): a prescription
  * photographed sideways is read less well, so the user is asked to hold the phone upright, with a
- * way to not be told again. Back and a tap outside close it like "Got it".
+ * way to not be told again. Only "Got it" keeps that choice: Back and a tap outside close the tip
+ * without it, so a box ticked by mistake can still be left behind.
  */
 @Composable
 private fun UprightTip(onDismiss: (dontShowAgain: Boolean) -> Unit) {
@@ -391,7 +392,7 @@ private fun UprightTip(onDismiss: (dontShowAgain: Boolean) -> Unit) {
       confirmLabel = stringResource(R.string.prescription_scan_tip_got_it),
       cancelLabel = null,
       onConfirm = { onDismiss(dontShowAgain) },
-      onCancel = { onDismiss(dontShowAgain) },
+      onCancel = { onDismiss(false) },
       tags =
           DialogTags(
               dialog = C.Tag.prescription_scan_tip,
