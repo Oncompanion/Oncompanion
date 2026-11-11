@@ -185,8 +185,7 @@ class PrescriptionsViewModel(
                 medicationRepository.observePrescriptions(ownerUid).map { it.visible() }
             // The patient sees the names they gave the members who added some; a caregiver the
             // stored ones, and those they added that the patient rejected
-            if (patientUid != null)
-                prescriptions.combine(rejectedBy(ownerUid)) { list, rejected -> list + rejected }
+            if (patientUid != null) prescriptions.combine(rejectedBy(ownerUid), ::withRejected)
             else
                 prescriptions.combine(careCircleRepository.observeMemberNames(ownerUid)) {
                     list,
@@ -196,6 +195,19 @@ class PrescriptionsViewModel(
           }
           .collect { section -> _uiState.update { it.showing(section) } }
     }
+  }
+
+  /**
+   * [list] with the [rejected] ones, each prescription once. The two listeners answer apart: right
+   * after a rejection, the rejected one can arrive before the one waiting is gone, and it then
+   * replaces it, as it is the newer state.
+   */
+  private fun withRejected(
+      list: List<Prescription>,
+      rejected: List<Prescription>,
+  ): List<Prescription> {
+    val rejectedIds = rejected.map { it.id }.toSet()
+    return list.filterNot { it.id in rejectedIds } + rejected
   }
 
   /**

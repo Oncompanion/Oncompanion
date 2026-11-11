@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -769,5 +770,27 @@ class PrescriptionsViewModelTest {
         val confirmed = repository.prescriptionsOf(uid).single()
         assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
         assertEquals("Sam", confirmed.addedByName)
+      }
+
+  @Test
+  fun caregiver_rejectedOneArrivingBeforeTheWaitingOneLeaves_showsOnce() =
+      runTest(dispatcher) {
+        // The waiting copy is still there when its rejected copy arrives: two listeners, apart
+        val waiting = added("sams", PrescriptionConfirmation.PENDING)
+        repository.seed("patient", waiting)
+        val bothAtOnce =
+            object : MedicationRepository by repository {
+              override fun observeRejectedPrescriptions(uid: String, addedBy: String) =
+                  flowOf(listOf(waiting.copy(confirmation = PrescriptionConfirmation.REJECTED)))
+            }
+        val viewModel = caregiverList(medications = bothAtOnce)
+        advanceUntilIdle()
+
+        // Once, as rejected: the list's keys stay unique
+        assertEquals(listOf("sams"), viewModel.ids)
+        assertEquals(
+            PrescriptionConfirmation.REJECTED,
+            viewModel.uiState.value.waiting.single().confirmation,
+        )
       }
 }
