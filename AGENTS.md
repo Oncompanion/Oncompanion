@@ -10,7 +10,7 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 - Android app in Kotlin with Jetpack Compose (Material 3). `minSdk 28`, `targetSdk 34`, JVM target 17.
 - Backend: Firebase Authentication (Google Sign-In), Cloud Firestore, and Cloud Functions in TypeScript (`functions/`, the hospital search proxy, checked with App Check). Firebase project: `oncompanion-c4144`.
 - Package root: `com.github.se.oncompanion`. User-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion"); #297 renames the strings that still say "Oncompanion".
-- Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved.
+- Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved. A prescription a caregiver adds for the patient (US-43) is saved unconfirmed and triggers no reminder until the patient reviews and confirms it.
 
 ## Before you start a task
 

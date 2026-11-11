@@ -7,11 +7,14 @@ import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
@@ -128,6 +131,23 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertNull(vm.uiState.value.prescription)
+    assertTrue(vm.uiState.value.isNotFound)
+  }
+
+  @Test
+  fun rejectedPrescription_isNotFound() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.REJECTED,
+        ),
+    )
+    val vm = viewModel()
+
+    advanceUntilIdle()
+
     assertTrue(vm.uiState.value.isNotFound)
   }
 
@@ -536,5 +556,41 @@ class PrescriptionDetailViewModelTest {
 
     assertTrue(viewModel.uiState.value.hasError)
     assertFalse(viewModel.uiState.value.isNotShared)
+  }
+
+  @Test
+  fun addedByACaregiver_followsARename_andKeepsTheStoredNameOnceTheyLeave() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "caregiver",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.PENDING,
+        ),
+    )
+    val circle = FakeCareCircleRepository()
+    fun named(firstName: String) =
+        circle.setMembers(
+            "alice",
+            listOf(CareCircleMember(uid = "caregiver", firstName = firstName)),
+        )
+    named("Samuel")
+    val viewModel =
+        PrescriptionDetailViewModel("chemo", signedIn(), repository, careCircleRepository = circle)
+    advanceUntilIdle()
+
+    // Renamed while the detail is open, then removed from the circle
+    val steps =
+        listOf({ named("Sammy") } to "Sammy", { circle.setMembers("alice", emptyList()) } to "Sam")
+    assertEquals("Samuel", viewModel.uiState.value.prescription?.addedByName)
+    for ((change, name) in steps) {
+      change()
+      advanceUntilIdle()
+      assertEquals(name, viewModel.uiState.value.prescription?.addedByName)
+    }
+    assertEquals(
+        PrescriptionConfirmation.PENDING,
+        viewModel.uiState.value.prescription?.confirmation,
+    )
   }
 }

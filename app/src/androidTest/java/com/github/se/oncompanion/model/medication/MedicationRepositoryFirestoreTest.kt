@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.model.medication
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
@@ -210,8 +211,11 @@ class MedicationRepositoryFirestoreTest {
     assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
   }
 
-  @Test
-  fun aCaregiversPrescription_roundTripsWaiting_thenThePatientConfirmsIt(): Unit = runBlocking {
+  /**
+   * Carol, whom Alice lets see and add prescriptions, adds one for her: it is accepted, waiting for
+   * Alice, who is then signed in.
+   */
+  private suspend fun carolAddsAPrescriptionForAlice(): Prescription {
     val carolUid = EmulatorTestData.createUser("presc-repo-carol")
     // Alice lets carol see and add prescriptions (from another device, bypassing the rules)
     EmulatorTestData.replaceRawDocument(
@@ -235,7 +239,16 @@ class MedicationRepositoryFirestoreTest {
     assertEquals("the server accepted it", 0, rejectedWrites.unseen.value)
 
     EmulatorTestData.signIn("alice")
+    return carols
+  }
+
+  @Test
+  fun aCaregiversPrescription_roundTripsWaiting_thenThePatientConfirmsIt(): Unit = runBlocking {
+    val carols = carolAddsAPrescriptionForAlice()
+    val carolUid = carols.addedBy
     assertSameContent(carols, repository.observePrescription(aliceUid, "presc-1").awaitFirst())
+    // Not confirmed yet: none of its medications may be reminded (US-43)
+    assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
 
     // Alice checks it and confirms it: who added it stays
     repository.updatePrescription(
@@ -249,6 +262,37 @@ class MedicationRepositoryFirestoreTest {
     assertEquals("Carol", confirmed!!.addedByName)
     assertEquals(carolUid, confirmed.addedBy)
     assertEquals("Dr. Rossi", confirmed.prescribedBy)
+    assertEquals(
+        carols.medications.map { it.id }.toSet(),
+        repository
+            .observeMedications(aliceUid)
+            .awaitFirst { it.isNotEmpty() }
+            .map { it.id }
+            .toSet(),
+    )
+  }
+
+  @Test
+  fun aCaregiversPrescription_thePatientRejectsIt_andItIsNeverReminded(): Unit = runBlocking {
+    carolAddsAPrescriptionForAlice()
+
+    assertTrue(ManageMedicationSchedule(repository).reject(aliceUid, "presc-1"))
+    awaitServerAck()
+
+    assertEquals("the server accepted the rejection", 0, rejectedWrites.unseen.value)
+    val rejected =
+        repository.observePrescription(aliceUid, "presc-1").awaitFirst {
+          it?.confirmation == PrescriptionConfirmation.REJECTED
+        }
+    assertEquals("Carol", rejected!!.addedByName)
+    assertEquals(emptyList<Medication>(), repository.observeMedications(aliceUid).awaitFirst())
+    // A rejected prescription stays rejected: it can't be confirmed afterwards
+    repository.updatePrescription(
+        aliceUid,
+        rejected.copy(confirmation = PrescriptionConfirmation.CONFIRMED),
+    )
+    awaitServerAck()
+    awaitRejectionReported()
   }
 
   @Test

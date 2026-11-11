@@ -5,17 +5,20 @@ package com.github.se.oncompanion.ui.symptom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,14 +26,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.symptom.SymptomEntry
+import com.github.se.oncompanion.model.symptom.severity
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
@@ -39,9 +45,13 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeFilterChip
+import com.github.se.oncompanion.ui.common.LakeMessageState
+import com.github.se.oncompanion.ui.common.LakeTopAppBar
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -102,7 +112,6 @@ fun SymptomDetailScreen(
  * @param zone the time zone the date is shown in
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SymptomDetailContent(
     uiState: SymptomDetailUiState,
@@ -119,10 +128,8 @@ fun SymptomDetailContent(
   Scaffold(
       modifier = modifier.testTag(C.Tag.symptom_detail_screen),
       topBar = {
-        TopAppBar(
-            title = {
-              Text(uiState.entry?.title() ?: stringResource(R.string.symptom_detail_title))
-            },
+        LakeTopAppBar(
+            title = uiState.entry?.title() ?: stringResource(R.string.symptom_detail_title),
             navigationIcon = { BackButton(onBack) },
         )
       },
@@ -135,21 +142,22 @@ fun SymptomDetailContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.symptom_detail_loading)
             )
         uiState.hasError ->
-            SymptomMessage(
+            LakeMessageState(
                 title = stringResource(R.string.symptom_detail_error_title),
-                hint = stringResource(R.string.symptom_error_hint),
-                testTag = C.Tag.symptom_detail_error,
-                onRetry = onRetry,
-                retryTestTag = C.Tag.symptom_detail_retry,
+                message = stringResource(R.string.symptom_error_hint),
+                actionLabel = stringResource(R.string.symptom_retry),
+                onAction = onRetry,
+                actionTestTag = C.Tag.symptom_detail_retry,
+                modifier = Modifier.align(Alignment.Center).testTag(C.Tag.symptom_detail_error),
             )
         // The patient a caregiver follows doesn't share their symptoms (anymore)
         uiState.isNotShared && caregiverOf != null ->
             NotSharedMessage(caregiverOf, CarePermission.SYMPTOMS, Modifier.align(Alignment.Center))
         entry == null ->
-            SymptomMessage(
+            LakeMessageState(
                 title = stringResource(R.string.symptom_detail_not_found_title),
-                hint = stringResource(R.string.symptom_detail_not_found_hint),
-                testTag = C.Tag.symptom_detail_not_found,
+                message = stringResource(R.string.symptom_detail_not_found_hint),
+                modifier = Modifier.align(Alignment.Center).testTag(C.Tag.symptom_detail_not_found),
             )
         // Edit and Delete at the bottom, away from the back button, as in the Figma mockup
         else ->
@@ -188,29 +196,36 @@ fun SymptomDetailContent(
   }
 }
 
+/**
+ * The symptom in the order of the log form: what was felt, how strong and when, then the notes and
+ * who logged it. The symptoms are listed in full, since the title shows only the first line.
+ */
 @Composable
 private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
   Column(
-      modifier = Modifier.fillMaxWidth().padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(20.dp),
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(start = Spacing.lg, top = Spacing.md, end = Spacing.lg, bottom = Spacing.lg),
+      verticalArrangement = Arrangement.spacedBy(Spacing.lg),
   ) {
-    Field(stringResource(R.string.symptom_detail_when), C.Tag.symptom_detail_when) {
-      Text(
-          text = entry.occurredAt.atZone(zone).format(detailDateFormatter),
-          style = MaterialTheme.typography.bodyLarge,
-      )
-    }
-    // The intensity is optional: no field when the user didn't give one
-    val intensity = entry.intensity
-    if (intensity != null) {
-      Field(stringResource(R.string.symptom_detail_intensity), C.Tag.symptom_detail_intensity) {
-        IntensityBadge(intensity)
-      }
-    }
+    SymptomsSection(entry)
+    InfoCard(entry, zone)
     val notes = entry.notes?.takeIf { it.isNotBlank() }
     if (notes != null) {
-      Field(stringResource(R.string.symptom_detail_notes), C.Tag.symptom_detail_notes) {
-        Text(text = notes, style = MaterialTheme.typography.bodyLarge)
+      Column(
+          modifier = Modifier.testTag(C.Tag.symptom_detail_notes),
+          verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+      ) {
+        Text(
+            text = stringResource(R.string.symptom_detail_notes),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = notes,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
     }
     // A symptom a caregiver logged for the patient says who did
@@ -218,35 +233,122 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?)
   }
 }
 
-/** A field of the detail: a small [label] above its [content]. */
+/**
+ * Every symptom of the entry, as dawn chips like the ones picked on the log form, right under their
+ * heading.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Field(label: String, testTag: String, content: @Composable () -> Unit) {
+private fun SymptomsSection(entry: SymptomEntry) {
   Column(
-      modifier = Modifier.testTag(testTag),
-      verticalArrangement = Arrangement.spacedBy(4.dp),
+      modifier = Modifier.testTag(C.Tag.symptom_detail_symptoms),
+      verticalArrangement = Arrangement.spacedBy(Spacing.sm),
   ) {
     Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = stringResource(R.string.symptom_detail_symptoms),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.semantics { heading() },
     )
-    content()
+    // Read-only chips: they show what was logged, nothing to toggle here
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+      entry.types.forEach { type ->
+        LakeFilterChip(selected = true, onClick = null, label = stringResource(type.label))
+      }
+    }
   }
 }
 
-/** "7/10", read out as "Intensity 7 out of 10". Shown as entered, without any judgement. */
+/** If given, how strong it felt, then when: rows of one white card, split by a divider. */
+@Composable
+private fun InfoCard(entry: SymptomEntry, zone: ZoneId) {
+  Surface(
+      modifier = Modifier.fillMaxWidth(),
+      shape = MaterialTheme.shapes.large,
+      color = MaterialTheme.colorScheme.surfaceContainerLowest,
+  ) {
+    Column(Modifier.padding(vertical = Spacing.xs)) {
+      // The intensity is optional: no row when the user didn't give one
+      val intensity = entry.intensity
+      val severity = entry.severity
+      if (intensity != null && severity != null) {
+        InfoRow(
+            value = stringResource(severity.label),
+            label = stringResource(R.string.symptom_detail_intensity),
+            testTag = C.Tag.symptom_detail_intensity,
+        ) {
+          IntensityBadge(intensity)
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+      }
+      InfoRow(
+          value = entry.occurredAt.atZone(zone).format(detailDateFormatter),
+          label = stringResource(R.string.symptom_detail_when),
+          testTag = C.Tag.symptom_detail_when,
+      ) {
+        // Decorative: the label says what the row is
+        Icon(painterResource(R.drawable.ic_schedule), contentDescription = null)
+      }
+    }
+  }
+}
+
+/** A row of the card: [leading], then its [value] above its [label]. */
+@Composable
+private fun InfoRow(
+    value: String,
+    label: String,
+    testTag: String,
+    leading: @Composable () -> Unit,
+) {
+  Row(
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+              .testTag(testTag),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    leading()
+    Column {
+      Text(text = value, style = MaterialTheme.typography.titleMedium)
+      Text(
+          text = label,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+}
+
+/**
+ * "7/10", read out as "Intensity 7 out of 10". Shown as entered, on the same container whatever the
+ * value, so its colour never judges it.
+ */
 @Composable
 private fun IntensityBadge(intensity: Int, modifier: Modifier = Modifier) {
   val description = stringResource(R.string.symptom_intensity_description, intensity)
   Surface(
-      modifier = modifier.semantics { contentDescription = description },
-      shape = RoundedCornerShape(8.dp),
-      color = MaterialTheme.colorScheme.secondaryContainer,
+      modifier =
+          modifier.heightIn(min = BADGE_HEIGHT).semantics { contentDescription = description },
+      shape = MaterialTheme.shapes.small,
+      color = MaterialTheme.colorScheme.primaryContainer,
+      contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
   ) {
-    Text(
-        text = stringResource(R.string.symptom_intensity_value, intensity),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-    )
+    Box(contentAlignment = Alignment.Center) {
+      Text(
+          text = stringResource(R.string.symptom_intensity_value, intensity),
+          style = MaterialTheme.typography.titleMedium,
+          modifier = Modifier.padding(horizontal = Spacing.sm),
+      )
+    }
   }
 }
+
+// The intensity badge of the Figma's symptom detail
+private val BADGE_HEIGHT = 36.dp

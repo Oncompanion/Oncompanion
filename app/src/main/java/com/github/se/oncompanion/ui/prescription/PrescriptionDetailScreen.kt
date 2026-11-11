@@ -40,6 +40,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DeletePhase
@@ -48,6 +49,7 @@ import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -226,6 +228,14 @@ private fun PrescriptionDetail(prescription: Prescription) {
         style = MaterialTheme.typography.headlineSmall,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+    // A prescription a caregiver added says who did, and whether the patient confirmed it (US-43)
+    prescription.addedByName?.let {
+      AddedBy(
+          it,
+          modifier = Modifier.padding(horizontal = Spacing.lg),
+          isConfirmed = prescription.isConfirmed,
+      )
+    }
     // The prescriber is optional: no row when the user didn't give one
     val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
     if (prescribedBy.isNotEmpty()) {

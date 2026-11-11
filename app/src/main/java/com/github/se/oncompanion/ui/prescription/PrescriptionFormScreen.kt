@@ -30,6 +30,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -62,6 +63,8 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
@@ -71,6 +74,7 @@ import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
 import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalDate
 import java.time.LocalTime
@@ -92,6 +96,8 @@ private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENG
  * @param onSaved called once the prescription is saved
  * @param caregiverOf the first name of the patient a caregiver adds the prescription for (US-43),
  *   `null` for a patient
+ * @param onRejected called once the patient rejected the prescription a caregiver added: it no
+ *   longer exists, so the form doesn't return to its detail
  */
 @Composable
 fun PrescriptionFormScreen(
@@ -100,12 +106,18 @@ fun PrescriptionFormScreen(
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
     caregiverOf: String? = null,
+    onRejected: () -> Unit = onSaved,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-  // Leaves the form once the prescription is saved
+  // Leaves the form once the prescription is saved, or rejected
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
+  val currentOnRejected by rememberUpdatedState(onRejected)
+  LaunchedEffect(uiState.save) {
+    if (uiState.save == SavePhase.SAVED) {
+      if (uiState.wasRejected) currentOnRejected() else currentOnSaved()
+    }
+  }
 
   PrescriptionFormContent(
       uiState = uiState,
@@ -126,6 +138,9 @@ fun PrescriptionFormScreen(
       modifier = modifier,
       onKeepEditing = viewModel::keepEditing,
       onSaveAnyway = viewModel::saveAnyway,
+      onReject = viewModel::requestRejection,
+      onConfirmRejection = viewModel::reject,
+      onCancelRejection = viewModel::cancelRejection,
       caregiverOf = caregiverOf,
   )
 }
@@ -138,6 +153,9 @@ fun PrescriptionFormScreen(
  * @param onRetry reads the saved prescription again after it couldn't be loaded
  * @param onKeepEditing closes the "already saved" question without saving
  * @param onSaveAnyway saves although the prescription is already saved
+ * @param onReject asks to reject the prescription a caregiver added (US-43)
+ * @param onConfirmRejection rejects it, once asked
+ * @param onCancelRejection keeps reviewing it
  * @param caregiverOf the patient's first name when a caregiver adds for them: the title says whose
  *   prescriptions it goes to
  */
@@ -162,10 +180,28 @@ fun PrescriptionFormContent(
     modifier: Modifier = Modifier,
     onKeepEditing: () -> Unit = {},
     onSaveAnyway: () -> Unit = {},
+    onReject: () -> Unit = {},
+    onConfirmRejection: () -> Unit = {},
+    onCancelRejection: () -> Unit = {},
     caregiverOf: String? = null,
 ) {
   // Asks before saving a prescription already saved (US-39)
   uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway, caregiverOf) }
+  // Asks before rejecting a prescription a caregiver added (US-43)
+  if (uiState.isConfirmingRejection) {
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.prescription_reject_title),
+        message = stringResource(R.string.prescription_reject_message),
+        error = "",
+        confirmLabel = stringResource(R.string.prescription_reject),
+        cancelLabel = stringResource(R.string.prescription_reject_cancel),
+        isDeleting = uiState.save == SavePhase.SAVING,
+        hasError = false,
+        onConfirm = onConfirmRejection,
+        onCancel = onCancelRejection,
+        tags = rejectDialogTags,
+    )
+  }
 
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
@@ -191,7 +227,7 @@ fun PrescriptionFormContent(
       topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose, caregiverOf) },
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
-      bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
+      bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave, onReject) },
   ) { innerPadding ->
     if (!isReady) {
       LoadState(uiState.load, onRetry, Modifier.padding(innerPadding))
@@ -211,6 +247,8 @@ fun PrescriptionFormContent(
         uiState.renewalOf?.let { RenewalNotice(it, caregiverOf) }
         // A scanned prescription says what was read and what the patient should check
         if (uiState.isScanned) ReviewNotice(uiState)
+        // A prescription a caregiver added asks the patient to check it before confirming (US-43)
+        if (uiState.isToConfirm) ConfirmNotice()
 
         // What the medications share: the doctor (optional) and the date of the prescription
         val prescribedByCheck = uiState.checkOf(ScannedField.PrescribedBy, "prescribed_by")
@@ -274,7 +312,7 @@ fun PrescriptionFormContent(
             modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
         )
       }
-      if (scrollsEverything) FormSaveButton(uiState, onSave)
+      if (scrollsEverything) FormSaveButton(uiState, onSave, onReject)
     }
   }
 }
@@ -318,6 +356,7 @@ private fun FormTopAppBar(
       title = {
         Text(
             when {
+              uiState.isToConfirm -> stringResource(R.string.prescription_confirm_title)
               uiState.isEditing -> stringResource(R.string.prescription_form_edit_title)
               // A caregiver's title says whose prescriptions it goes to (US-43)
               caregiverOf != null && uiState.isScanned ->
@@ -659,16 +698,67 @@ private fun DateField(
  * Save, enabled when the form is valid; in the bottom bar, or after the fields on a short screen.
  */
 @Composable
-private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit) {
-  SaveButton(
-      text = stringResource(R.string.prescription_form_save),
-      enabled = uiState.canSave,
-      isSaving = uiState.save == SavePhase.SAVING,
-      onClick = onSave,
-      testTag = C.Tag.prescription_form_save_button,
-      savingTestTag = C.Tag.prescription_form_saving,
-  )
+private fun FormSaveButton(
+    uiState: PrescriptionFormUiState,
+    onSave: () -> Unit,
+    onReject: () -> Unit,
+) {
+  if (!uiState.isToConfirm) {
+    SaveButton(
+        text = stringResource(R.string.prescription_form_save),
+        enabled = uiState.canSave,
+        isSaving = uiState.save == SavePhase.SAVING,
+        onClick = onSave,
+        testTag = C.Tag.prescription_form_save_button,
+        savingTestTag = C.Tag.prescription_form_saving,
+    )
+    return
+  }
+  // A prescription a caregiver added: Reject next to Confirm, which saves and confirms it (US-43)
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    LakeButton(
+        text = stringResource(R.string.prescription_reject),
+        onClick = onReject,
+        style = LakeButtonStyle.Text,
+        enabled = uiState.save == SavePhase.EDITING,
+        modifier =
+            Modifier.padding(start = Spacing.lg).testTag(C.Tag.prescription_form_reject_button),
+    )
+    SaveButton(
+        text = stringResource(R.string.prescription_confirm_save),
+        enabled = uiState.canSave,
+        isSaving = uiState.save == SavePhase.SAVING && !uiState.isConfirmingRejection,
+        onClick = onSave,
+        testTag = C.Tag.prescription_form_save_button,
+        savingTestTag = C.Tag.prescription_form_saving,
+        modifier = Modifier.weight(1f),
+    )
+  }
 }
+
+/** Asks the patient to check a prescription a caregiver added before confirming it (US-43). */
+@Composable
+private fun ConfirmNotice() {
+  Surface(
+      color = MaterialTheme.colorScheme.secondaryContainer,
+      contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+      shape = MaterialTheme.shapes.medium,
+      modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(
+        text = stringResource(R.string.prescription_confirm_notice),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(Spacing.lg).testTag(C.Tag.prescription_confirm_notice),
+    )
+  }
+}
+
+private val rejectDialogTags =
+    DeleteDialogTags(
+        dialog = C.Tag.prescription_reject_dialog,
+        confirm = C.Tag.prescription_reject_confirm,
+        cancel = C.Tag.prescription_reject_cancel,
+    )
 
 private fun textKeyboard(capitalization: KeyboardCapitalization) =
     KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Next)
@@ -678,4 +768,6 @@ private fun PrescriptionFormError.messageRes(): Int =
     when (this) {
       PrescriptionFormError.NOT_SIGNED_IN -> R.string.prescription_form_error_not_signed_in
       PrescriptionFormError.SAVE_FAILED -> R.string.prescription_form_error_save_failed
+      PrescriptionFormError.REJECT_FAILED -> R.string.prescription_form_error_reject_failed
+      PrescriptionFormError.ALREADY_CONFIRMED -> R.string.prescription_form_already_confirmed
     }

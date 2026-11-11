@@ -462,6 +462,8 @@ private fun SessionNavHost(
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
             caregiverOf = chosenPatient?.firstName,
+            // The patient reviews a prescription a caregiver added in the form (US-43)
+            onReview = { id -> navigationActions.navigateTo(Screen.prescriptionEdit(id)) },
         )
       }
       composable(
@@ -517,6 +519,8 @@ private fun SessionNavHost(
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the detail, which shows the correction
             onSaved = navigationActions::goBack,
+            // A rejected prescription has no detail any more: back to the list (US-43)
+            onRejected = { navController.popBackStack(Screen.PRESCRIPTIONS, inclusive = false) },
         )
       }
       composable(Screen.PRESCRIPTION_SCAN) { entry ->

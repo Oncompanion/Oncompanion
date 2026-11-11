@@ -107,6 +107,7 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
@@ -190,6 +191,7 @@ object C {
     const val symptom_edit_retry = "symptom_edit_retry"
     const val symptom_edit_not_found = "symptom_edit_not_found"
     const val symptom_detail_edit = "symptom_detail_edit"
+    const val symptom_detail_symptoms = "symptom_detail_symptoms"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
@@ -413,6 +415,7 @@ object C {
     const val prescriptions_earlier_header = "prescriptions_earlier_header"
     const val prescriptions_enter_manually_button = "prescriptions_enter_manually_button"
     const val prescriptions_scan_button = "prescriptions_scan_button"
+    const val prescriptions_waiting_header = "prescriptions_waiting_header"
 
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
@@ -438,6 +441,11 @@ object C {
     const val prescription_already_saved_keep_editing = "prescription_already_saved_keep_editing"
     const val prescription_already_saved_save_anyway = "prescription_already_saved_save_anyway"
     const val prescription_renewal_notice = "prescription_renewal_notice"
+    const val prescription_confirm_notice = "prescription_confirm_notice"
+    const val prescription_form_reject_button = "prescription_form_reject_button"
+    const val prescription_reject_dialog = "prescription_reject_dialog"
+    const val prescription_reject_confirm = "prescription_reject_confirm"
+    const val prescription_reject_cancel = "prescription_reject_cancel"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =

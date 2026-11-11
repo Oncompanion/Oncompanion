@@ -23,6 +23,7 @@ import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -47,6 +48,12 @@ enum class PrescriptionFormError {
    * [PrescriptionFormViewModel.save].
    */
   SAVE_FAILED,
+  /** Rejecting a prescription a caregiver added failed on the device (US-43). */
+  REJECT_FAILED,
+  /**
+   * The prescription to reject was confirmed meanwhile (e.g. on another device): nothing changed.
+   */
+  ALREADY_CONFIRMED,
 }
 
 /**
@@ -91,6 +98,12 @@ enum class PrescriptionFormLoad {
  *   looks like its renewal (US-39), said above the form
  * @property alreadySaved a saved prescription this one is the same as: Save asked first whether to
  *   save it anyway (US-39)
+ * @property isToConfirm the saved prescription was added by a caregiver and waits for the patient
+ *   (US-43): saving it confirms it, and it can be rejected instead
+ * @property isConfirmingRejection the patient asked to reject it and hasn't confirmed or cancelled
+ *   yet
+ * @property wasRejected the form is done because the patient rejected it: it no longer exists
+ *   anywhere, not even its detail
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -107,6 +120,9 @@ data class PrescriptionFormUiState(
     val dateFound: Boolean = true,
     val renewalOf: Prescription? = null,
     val alreadySaved: Prescription? = null,
+    val isToConfirm: Boolean = false,
+    val isConfirmingRejection: Boolean = false,
+    val wasRejected: Boolean = false,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -227,7 +243,7 @@ class PrescriptionFormViewModel(
     viewModelScope.launch {
       try {
         medicationRepository.observePrescriptions(patientUid ?: uid).collect { prescriptions ->
-          saved = prescriptions.filter { it.confirmation != PrescriptionConfirmation.REJECTED }
+          saved = prescriptions.visible()
           _uiState.update { it.withRenewal() }
         }
       } catch (e: CancellationException) {
@@ -288,20 +304,38 @@ class PrescriptionFormViewModel(
     val state = _uiState.value
     // Once saved, the form is done: what arrives next is its own save
     if (state.save == SavePhase.SAVED) return
+    // A deletion ends the form at once, also while saving
     if (saved == null) {
       _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
       return
     }
-    // While saving, the form keeps showing what is being saved
+    // While saving, the form keeps showing what is being saved: also its own rejection, which
+    // arrives before reject() returns
     if (state.save == SavePhase.SAVING) return
+    // A prescription rejected elsewhere is gone for the patient, as a deleted one
+    if (saved.isRejected) {
+      _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
+      return
+    }
     val draft = saved.toDraft().cutToLimits()
+    val isToConfirm = saved.confirmation == PrescriptionConfirmation.PENDING
     // A form in use is left alone if the user changed it, and also if the same content arrives
     // again (e.g. the server confirmed it), which would close the medication they opened
     val ready = state.load == PrescriptionFormLoad.READY
-    if (ready && (state.draft != shownDraft || draft == state.draft)) return
+    if (ready && (state.draft != shownDraft || draft == state.draft)) {
+      // Confirmed on another device meanwhile: nothing left to reject
+      _uiState.value = state.copy(isToConfirm = isToConfirm)
+      return
+    }
     // Anything typed before a deletion or a failure is dropped: the form starts from what is saved
     shownDraft = draft
-    _uiState.value = PrescriptionFormUiState(draft, isEditing = true, error = state.error)
+    _uiState.value =
+        PrescriptionFormUiState(
+            draft,
+            isEditing = true,
+            error = state.error,
+            isToConfirm = isToConfirm,
+        )
   }
 
   /** Text longer than the prescription can store is cut. */
@@ -561,6 +595,74 @@ class PrescriptionFormViewModel(
     val same = similarPrescription(draft, saved) as? SimilarPrescription.Same ?: return false
     _uiState.update { it.copy(alreadySaved = same.prescription) }
     return true
+  }
+
+  /**
+   * Asks the patient to confirm the rejection of the prescription a caregiver added. Nothing is
+   * rejected before [reject].
+   */
+  fun requestRejection() {
+    _uiState.update {
+      if (it.isToConfirm && it.load == PrescriptionFormLoad.READY && it.save == SavePhase.EDITING)
+          it.copy(isConfirmingRejection = true)
+      else it
+    }
+  }
+
+  /** Closes the rejection question: the patient keeps reviewing the prescription. */
+  fun cancelRejection() {
+    _uiState.update { it.copy(isConfirmingRejection = false) }
+  }
+
+  /**
+   * Rejects the prescription, once the patient confirmed it (US-43): it disappears from their
+   * prescriptions, Planning and the Overview, and is never reminded. The form is then done, as
+   * after saving. If it was deleted or decided elsewhere meanwhile, nothing is rejected: the form
+   * then shows what is saved, as it follows the prescription.
+   */
+  fun reject() {
+    val state = _uiState.value
+    val id = prescriptionId
+    if (!state.isConfirmingRejection || state.save != SavePhase.EDITING || id == null) return
+    val uid = authRepository.signedInUid(TAG)
+    if (uid == null) {
+      _uiState.update {
+        it.copy(isConfirmingRejection = false, error = PrescriptionFormError.NOT_SIGNED_IN)
+      }
+      return
+    }
+    _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
+    viewModelScope.launch {
+      try {
+        val rejected = manageMedicationSchedule.reject(uid, id)
+        _uiState.update {
+          // Not rejected: it was confirmed elsewhere, which the patient is told (a deletion shows
+          // as
+          // not found by itself)
+          it.copy(
+              save = if (rejected) SavePhase.SAVED else SavePhase.EDITING,
+              isConfirmingRejection = false,
+              isToConfirm = rejected,
+              wasRejected = rejected,
+              error =
+                  if (!rejected && it.load == PrescriptionFormLoad.READY)
+                      PrescriptionFormError.ALREADY_CONFIRMED
+                  else null,
+          )
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to reject the prescription", e)
+        _uiState.update {
+          it.copy(
+              save = SavePhase.EDITING,
+              isConfirmingRejection = false,
+              error = PrescriptionFormError.REJECT_FAILED,
+          )
+        }
+      }
+    }
   }
 
   /** The error has been shown. */

@@ -3,26 +3,33 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -31,6 +38,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
+import com.github.se.oncompanion.model.symptom.Severity
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
@@ -39,15 +47,19 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class SymptomDetailScreenTest {
@@ -105,9 +117,14 @@ class SymptomDetailScreenTest {
   }
 
   private fun assertTextInside(text: String, parentTag: String) {
-    composeTestRule
-        .onNode(hasText(text) and hasAnyAncestor(hasTestTag(parentTag)), useUnmergedTree = true)
-        .assertExists()
+    val found =
+        composeTestRule
+            .onAllNodes(
+                hasText(text) and hasAnyAncestor(hasTestTag(parentTag)),
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNodes()
+    assertTrue("\"$text\" inside $parentTag", found.isNotEmpty())
   }
 
   private fun signedInAsAlice() =
@@ -168,6 +185,85 @@ class SymptomDetailScreenTest {
         )
         .assertExists()
     assertTextInside("After the walk", C.Tag.symptom_detail_notes)
+    for (heading in listOf(R.string.symptom_detail_symptoms, R.string.symptom_detail_notes)) {
+      composeTestRule.onNode(hasText(context.getString(heading)) and isHeading()).assertExists()
+    }
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun intensity_showsItsSeverityInWords_onTheSameBadgeWhateverTheValue() {
+    var intensity by mutableStateOf(1)
+    var container = Color.Unspecified
+    composeTestRule.setContent {
+      OncompanionTheme {
+        container = MaterialTheme.colorScheme.primaryContainer
+        SymptomDetailContent(
+            uiState = loaded.copy(entry = fatigue.copy(intensity = intensity)),
+            onBack = {},
+            onRetry = {},
+            onDelete = {},
+            onConfirmDelete = {},
+            onCancelDelete = {},
+            zone = ZoneOffset.UTC,
+        )
+      }
+    }
+
+    val cases = listOf(2 to Severity.MILD, 5 to Severity.MODERATE, 9 to Severity.SEVERE)
+    for ((value, severity) in cases) {
+      intensity = value
+
+      assertTextInside(context.getString(severity.label), C.Tag.symptom_detail_intensity)
+      val badge =
+          composeTestRule
+              .onNode(hasContentDescription("Intensity $value out of 10"))
+              .captureToImage()
+              .toPixelMap()
+      // The badge's fill, on its left edge, away from the rounded corners and the text
+      val fill = badge[2, badge.height / 2]
+      val same =
+          abs(container.red - fill.red) < 0.02f &&
+              abs(container.green - fill.green) < 0.02f &&
+              abs(container.blue - fill.blue) < 0.02f
+      assertTrue("$value: expected $container, was $fill", same)
+    }
+  }
+
+  // The title shows one line: the card is where every symptom can be read, whatever the font
+  @Test
+  @Config(qualifiers = "w411dp-h891dp", fontScale = 2f)
+  fun everySymptom_isShownInFull_atALargeFont() {
+    setContent(loaded.copy(entry = fatigue.copy(types = SymptomType.entries)))
+
+    for (type in SymptomType.entries) {
+      val label = context.getString(type.label)
+      val chip = hasText(label) and hasAnyAncestor(hasTestTag(C.Tag.symptom_detail_symptoms))
+      composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).performScrollToNode(chip)
+      val node = composeTestRule.onNode(chip, useUnmergedTree = true).assertIsDisplayed()
+      val layouts = mutableListOf<TextLayoutResult>()
+      node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(layouts)
+      // Every character is laid out on a visible line, none cut off below or behind an ellipsis
+      val layout = layouts.single()
+      assertFalse("$label is cut at the bottom", layout.didOverflowHeight)
+      assertEquals(label, label.length, layout.getLineEnd(layout.lineCount - 1, visibleEnd = true))
+    }
+  }
+
+  // The same order as the log form: what, how strong, when, then the notes
+  @Test
+  fun fields_followTheOrderOfTheLogForm() {
+    setContent(loaded.copy(entry = fatigue))
+
+    val tops =
+        listOf(
+                C.Tag.symptom_detail_symptoms,
+                C.Tag.symptom_detail_intensity,
+                C.Tag.symptom_detail_when,
+                C.Tag.symptom_detail_notes,
+            )
+            .map { composeTestRule.onNodeWithTag(it).getUnclippedBoundsInRoot().top }
+    assertEquals(tops.sorted(), tops)
   }
 
   @Test

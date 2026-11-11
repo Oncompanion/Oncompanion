@@ -90,6 +90,11 @@
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
+    <!-- US-43: on the Prescriptions shortcut, read by screen readers, e.g. "1 prescription to confirm" -->
+    <plurals name="overview_prescriptions_to_confirm">
+        <item quantity="one">%1$d prescription to confirm</item>
+        <item quantity="other">%1$d prescriptions to confirm</item>
+    </plurals>
 
     <!-- Symptoms -->
     <string name="symptom_type_fatigue">Fatigue</string>
@@ -165,6 +170,8 @@
     <string name="symptom_add_title_for">Log symptoms for %1$s</string>
     <!-- Under a symptom a caregiver logged, e.g. "Added by Sam" -->
     <string name="symptom_added_by">Added by %1$s</string>
+    <!-- Heading of the logged symptoms on the detail -->
+    <string name="symptom_detail_symptoms">Symptoms</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -529,6 +536,19 @@
     <string name="prescriptions_list_title_for">%1$s\'s prescriptions</string>
     <string name="prescriptions_empty_hint_for">When %1$s saves a prescription, it will appear here.</string>
     <string name="prescriptions_error_title_for">Couldn\'t load %1$s\'s prescriptions</string>
+    <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
+    <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
+    <string name="prescriptions_added_by_you">Added by you</string>
+    <!-- US-43: the patient reviews a prescription a caregiver added, then confirms or rejects it -->
+    <string name="prescription_confirm_title">Review the prescription</string>
+    <string name="prescription_confirm_notice">A caregiver added this prescription. Check each field and correct it if needed, then confirm.</string>
+    <string name="prescription_confirm_save">Confirm prescription</string>
+    <string name="prescription_reject">Reject</string>
+    <string name="prescription_reject_title">Reject this prescription?</string>
+    <string name="prescription_reject_message">It will be removed from your prescriptions and never remind you.</string>
+    <string name="prescription_reject_cancel">Cancel</string>
+    <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
+    <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -665,4 +685,7 @@
 
     <!-- Shared text field: what screen readers say about a field in error -->
     <string name="field_error">Invalid input</string>
+
+    <!-- Shared "Added by": a prescription a caregiver added, not confirmed by the patient yet (US-43) -->
+    <string name="added_by_not_confirmed">Added by %1$s · Not confirmed</string>
 </resources>

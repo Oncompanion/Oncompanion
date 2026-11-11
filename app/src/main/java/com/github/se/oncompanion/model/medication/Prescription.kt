@@ -33,6 +33,10 @@ data class Prescription(
   val isConfirmed: Boolean
     get() = confirmation == PrescriptionConfirmation.CONFIRMED
 
+  /** Whether the patient rejected it (US-43): it then shows nowhere, see [visible]. */
+  val isRejected: Boolean
+    get() = confirmation == PrescriptionConfirmation.REJECTED
+
   /** Whether the prescription satisfies the same constraints as the Firestore security rules. */
   fun isValid(): Boolean =
       id.isNotBlank() &&
@@ -65,4 +69,20 @@ enum class PrescriptionConfirmation {
   PENDING,
   /** The patient rejected it. */
   REJECTED,
+}
+
+/**
+ * The prescriptions that show anywhere: all but those the patient rejected (US-43). Every screen,
+ * Planning and the duplicate check read them through it, so they always agree.
+ */
+fun List<Prescription>.visible(): List<Prescription> = filterNot { it.isRejected }
+
+/**
+ * The medications of the prescriptions the patient confirmed, earliest start date first, then by
+ * name: what may be scheduled or reminded (US-32, US-34). A prescription a caregiver added counts
+ * only once the patient confirmed it (US-43).
+ */
+fun List<Prescription>.confirmedMedications(): List<Medication> {
+  val confirmed = filter { it.isConfirmed }
+  return confirmed.flatMap { it.medications }.sortedWith(compareBy({ it.startDate }, { it.name }))
 }
