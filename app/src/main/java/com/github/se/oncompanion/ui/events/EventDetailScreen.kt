@@ -48,6 +48,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.webLinkOrNull
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DialogTags
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
@@ -69,8 +70,9 @@ private val endTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLI
  * list or from Planning. The patient can open the organizer's website and confirm here that they
  * registered there (Figma: "US-25 / Event detail").
  *
- * @param caregiverOf the first name of the patient a caregiver follows, who only reads the event
- *   and the patient's confirmation: registering is the patient's (US-20); null for the patient
+ * @param caregiverOf the first name of the patient a caregiver follows, who reads the event and the
+ *   patient's confirmation, and confirms it only when the patient lets them (US-42); null for the
+ *   patient
  */
 @Composable
 fun EventDetailScreen(
@@ -102,8 +104,9 @@ fun EventDetailScreen(
 /**
  * Stateless content of the event detail screen, so each state can be tested without a ViewModel.
  *
- * @param caregiverOf the followed patient's first name for a caregiver, which hides confirming and
- *   removing the registration; null for the patient
+ * @param caregiverOf the followed patient's first name for a caregiver, which hides removing the
+ *   registration, and confirming it unless [EventDetailUiState.caregiverCanConfirm]; null for the
+ *   patient
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,9 +159,10 @@ fun EventDetailContent(
           }
       event == null -> MissingEvent(onBack, contentModifier)
       else -> {
-        EventDetails(event, uiState.registration, caregiverOf, contentModifier) {
+        EventDetails(event, uiState, caregiverOf, contentModifier) {
           RegistrationActions(
-              readOnly = caregiverOf != null,
+              readOnly = caregiverOf != null && !uiState.caregiverCanConfirm,
+              caregiverOf = caregiverOf,
               link = webLinkOrNull(event.websiteUrl),
               registration = uiState.registration,
               snackbarHostState = snackbarHostState,
@@ -178,13 +182,16 @@ fun EventDetailContent(
 @Composable
 private fun EventDetails(
     event: Event,
-    registration: RegistrationStatus,
+    uiState: EventDetailUiState,
     caregiverOf: String?,
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
+  val registration = uiState.registration
   Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-    if (registration == RegistrationStatus.CONFIRMED) ConfirmedBanner(caregiverOf)
+    if (registration == RegistrationStatus.CONFIRMED) {
+      ConfirmedBanner(caregiverOf, uiState.addedByName)
+    }
     // Events have no picture yet: the mockup's placeholder image
     Image(
         painter = painterResource(R.drawable.event_image_placeholder),
@@ -242,11 +249,12 @@ private fun EventDetails(
 }
 
 /**
- * "Registration confirmed", above the event once the patient confirmed it (Figma). A caregiver
- * reads that [caregiverOf] (the patient) confirmed it, not themselves.
+ * "Registration confirmed", above the event once the patient confirmed it (Figma). When a caregiver
+ * confirmed it for them, it says who ([addedByName]); otherwise a caregiver reads that
+ * [caregiverOf] (the patient) confirmed it, not themselves.
  */
 @Composable
-private fun ConfirmedBanner(caregiverOf: String?) {
+private fun ConfirmedBanner(caregiverOf: String?, addedByName: String?) {
   Surface(
       color = MaterialTheme.colorScheme.secondaryContainer,
       shape = RoundedCornerShape(12.dp),
@@ -267,17 +275,21 @@ private fun ConfirmedBanner(caregiverOf: String?) {
             text = stringResource(R.string.event_detail_registration_confirmed),
             style = MaterialTheme.typography.titleSmall,
         )
-        Text(
-            text =
-                if (caregiverOf == null)
-                    stringResource(R.string.event_detail_registration_confirmed_supporting)
-                else
-                    stringResource(
-                        R.string.event_detail_registration_confirmed_by_patient,
-                        caregiverOf,
-                    ),
-            style = MaterialTheme.typography.bodySmall,
-        )
+        if (addedByName != null) {
+          AddedBy(addedByName)
+        } else {
+          Text(
+              text =
+                  if (caregiverOf == null)
+                      stringResource(R.string.event_detail_registration_confirmed_supporting)
+                  else
+                      stringResource(
+                          R.string.event_detail_registration_confirmed_by_patient,
+                          caregiverOf,
+                      ),
+              style = MaterialTheme.typography.bodySmall,
+          )
+        }
       }
     }
   }
@@ -285,11 +297,13 @@ private fun ConfirmedBanner(caregiverOf: String?) {
 
 /**
  * The buttons below the event: the organizer's website, if any, and confirming or removing the
- * registration, depending on [registration].
+ * registration, depending on [registration]. A caregiver ([caregiverOf]) confirms for the patient
+ * and never removes it.
  */
 @Composable
 private fun RegistrationActions(
     readOnly: Boolean,
+    caregiverOf: String?,
     link: String?,
     registration: RegistrationStatus,
     snackbarHostState: SnackbarHostState,
@@ -299,14 +313,15 @@ private fun RegistrationActions(
 ) {
   val uriHandler = LocalUriHandler.current
   val scope = rememberCoroutineScope()
+  // Points to the confirm button only when this user has one
   val websiteError =
-      stringResource(
-          if (registration == RegistrationStatus.CAN_CONFIRM) {
-            R.string.event_detail_website_error_can_confirm
-          } else {
-            R.string.event_detail_website_error
-          }
-      )
+      when {
+        readOnly || registration != RegistrationStatus.CAN_CONFIRM ->
+            stringResource(R.string.event_detail_website_error)
+        caregiverOf != null ->
+            stringResource(R.string.event_detail_website_error_can_confirm_caregiver, caregiverOf)
+        else -> stringResource(R.string.event_detail_website_error_can_confirm)
+      }
   Column(
       modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -332,7 +347,7 @@ private fun RegistrationActions(
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.event_detail_visit_website),
       )
     }
-    // The website stays open to a caregiver; confirming the registration is the patient's
+    // The website stays open to a caregiver; confirming is theirs only when the patient allows it
     if (readOnly) return@Column
     when (registration) {
       RegistrationStatus.LOADING,
@@ -344,8 +359,11 @@ private fun RegistrationActions(
       RegistrationStatus.CLOSED -> {
         val canConfirm = registration == RegistrationStatus.CAN_CONFIRM
         // The main action when there is no website to visit first (Figma: "No website link")
+        // A caregiver says the patient registered, not themselves
         LakeButton(
-            text = stringResource(R.string.event_detail_registered),
+            text =
+                if (caregiverOf == null) stringResource(R.string.event_detail_registered)
+                else stringResource(R.string.event_detail_registered_caregiver, caregiverOf),
             onClick = onConfirm,
             style = if (link == null) LakeButtonStyle.Filled else LakeButtonStyle.Outlined,
             enabled = canConfirm,
@@ -353,22 +371,26 @@ private fun RegistrationActions(
         )
         Note(
             text =
-                stringResource(
-                    if (canConfirm) R.string.event_detail_registration_note
-                    else R.string.event_detail_registration_closed
-                ),
+                when {
+                  !canConfirm -> stringResource(R.string.event_detail_registration_closed)
+                  caregiverOf != null ->
+                      stringResource(R.string.event_detail_registration_note_caregiver, caregiverOf)
+                  else -> stringResource(R.string.event_detail_registration_note)
+                },
             testTag =
                 if (canConfirm) C.Tag.event_detail_registration_note
                 else C.Tag.event_detail_registration_closed,
         )
       }
       RegistrationStatus.CONFIRMED ->
-          LakeButton(
-              text = stringResource(R.string.event_detail_remove),
-              onClick = onRequestRemoval,
-              style = LakeButtonStyle.Text,
-              modifier = Modifier.testTag(C.Tag.event_detail_remove),
-          )
+          if (caregiverOf == null) {
+            LakeButton(
+                text = stringResource(R.string.event_detail_remove),
+                onClick = onRequestRemoval,
+                style = LakeButtonStyle.Text,
+                modifier = Modifier.testTag(C.Tag.event_detail_remove),
+            )
+          }
       RegistrationStatus.ERROR -> {
         Text(
             text = stringResource(R.string.event_detail_registration_error),

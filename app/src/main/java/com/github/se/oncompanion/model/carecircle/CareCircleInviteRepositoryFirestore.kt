@@ -207,7 +207,9 @@ class CareCircleInviteRepositoryFirestore(
           if (e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
           patients(caregiverUid).get(Source.CACHE).await()
         }
-    return@operation !snapshot.isEmpty
+    // Offline, an empty copy may only miss a circle joined on another phone: not known yet, so not
+    // a "no". "Whose care?" then waits for the server, with Join offered meanwhile
+    return@operation !snapshot.isEmpty || snapshot.metadata.isFromCache
   }
 
   /**
@@ -222,15 +224,26 @@ class CareCircleInviteRepositoryFirestore(
     }
   }
 
-  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> =
+  override fun observeJoinedCircles(caregiverUid: String): Flow<JoinedCircles> =
       SessionAccess.snapshots {
+            // INCLUDE: the server confirming the list without changing it changes only the
+            // metadata, and would otherwise never be delivered
             val registration =
-                patients(caregiverUid).addSnapshotListener { snapshot, error ->
+                patients(caregiverUid).addSnapshotListener(MetadataChanges.INCLUDE) {
+                    snapshot,
+                    error ->
                   if (error != null) close(error)
-                  else if (snapshot != null) trySend(snapshot.documents.map(::joinedFromDocument))
+                  else if (snapshot != null)
+                      trySend(
+                          JoinedCircles(
+                              snapshot.documents.map(::joinedFromDocument),
+                              snapshot.metadata.isFromCache,
+                          )
+                      )
                 }
             awaitClose { registration.remove() }
           }
+          // INCLUDE also fires on metadata-only changes that don't change the answer
           .distinctUntilChanged()
 
   /**
