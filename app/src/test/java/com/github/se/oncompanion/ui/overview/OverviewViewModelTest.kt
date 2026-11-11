@@ -652,6 +652,24 @@ class OverviewViewModelTest {
       medications.seed("patient", prescription("waiting", PrescriptionConfirmation.CONFIRMED))
       advanceUntilIdle()
       assertEquals(1, vm.uiState.value.prescriptionsToConfirm)
+
+      // They can't be read when the Overview opens: no badge, until Retry reads them again
+      medications.readError = IllegalStateException("unavailable")
+      val failing =
+          OverviewViewModel(
+              auth,
+              FakeUserProfileRepository(),
+              ownPlanning(FakePlanningRepository()),
+              TestClock(now),
+              zone,
+              medicationRepository = medications,
+          )
+      advanceUntilIdle()
+      assertEquals(0, failing.uiState.value.prescriptionsToConfirm)
+      medications.readError = null
+      failing.loadDay()
+      advanceUntilIdle()
+      assertEquals(1, failing.uiState.value.prescriptionsToConfirm)
     } finally {
       Dispatchers.resetMain()
     }

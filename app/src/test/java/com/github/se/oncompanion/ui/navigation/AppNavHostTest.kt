@@ -728,6 +728,56 @@ class AppNavHostTest {
   }
 
   @Test
+  fun caregiverMode_allowedToAdd_addsThePrescriptionWaitingForThePatient() {
+    val prescriptionsOnly = setOf(CarePermission.PRESCRIPTIONS)
+    val (auth, invites, circles) =
+        followingCaregiver(
+            "p-anne" to "Anne",
+            shared = prescriptionsOnly,
+            canAdd = prescriptionsOnly,
+        )
+    val medications = FakeMedicationRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        medicationRepository = medications,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+        .performScrollTo()
+        .performClick()
+    waitForTag(C.Tag.prescriptions_enter_manually_button)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+    // The form says whose prescriptions it goes to
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_form_add_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_medication_name_field)
+        .performScrollTo()
+        .performTextInput("Ondansetron 8 mg")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // Back on Anne's list: the prescription is hers, signed by the caregiver, and waits for her
+    waitForTag(C.Tag.prescriptions_screen)
+    composeTestRule.runOnIdle {
+      val added = medications.prescriptionsOf("p-anne").single()
+      assertEquals("caregiver", added.addedBy)
+      assertEquals(PrescriptionConfirmation.PENDING, added.confirmation)
+      assertTrue(medications.prescriptionsOf("caregiver").isEmpty())
+    }
+  }
+
+  @Test
   fun caregiverMode_planningNotShared_saysSoOnTheOverviewAndPlanning() {
     val (auth, invites, circles) = followingCaregiver("p-anne" to "Anne")
     val planning = FakePlanningRepository()
@@ -1740,24 +1790,7 @@ class AppNavHostTest {
 
   @Test
   fun prescriptionACaregiverAdded_thePatientReviewsAndConfirmsIt_fromTheList() {
-    val date = LocalDate.of(2026, 9, 29)
-    val sams =
-        Prescription(
-            id = "sams",
-            prescribedOn = date,
-            medications =
-                listOf(
-                    Medication(
-                        id = "m1",
-                        prescriptionId = "sams",
-                        name = "Ondansetron",
-                        startDate = date,
-                    )
-                ),
-            addedBy = "sam",
-            addedByName = "Sam",
-            confirmation = PrescriptionConfirmation.PENDING,
-        )
+    val sams = samsPrescription()
     val medications = FakeMedicationRepository().apply { seed("owner", sams) }
     openPrescriptionsFromOverview(medications)
 
@@ -1773,6 +1806,46 @@ class AppNavHostTest {
       assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
       assertEquals("Sam", confirmed.addedByName)
     }
+  }
+
+  @Test
+  fun prescriptionACaregiverAdded_rejectedFromItsDetail_returnsToTheList() {
+    val medications = FakeMedicationRepository().apply { seed("owner", samsPrescription()) }
+    openPrescriptionsFromOverview(medications)
+    // Its detail, e.g. opened from Planning, offers Edit, which opens the same review
+    composeTestRule.runOnIdle { navController.navigate(Screen.prescriptionDetail("sams")) }
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_reject_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_reject_confirm).performClick()
+
+    // Its detail no longer exists: the list, not "This prescription no longer exists"
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertTrue(medications.prescriptionsOf("owner").isEmpty())
+      assertEquals(listOf("sams"), medications.rejectedOf("owner").map { it.id })
+    }
+  }
+
+  /** A prescription Sam added for the patient "owner", waiting for them. */
+  private fun samsPrescription(): Prescription {
+    val date = LocalDate.of(2026, 9, 29)
+    return Prescription(
+        id = "sams",
+        prescribedOn = date,
+        medications =
+            listOf(
+                Medication(
+                    id = "m1",
+                    prescriptionId = "sams",
+                    name = "Ondansetron",
+                    startDate = date,
+                )
+            ),
+        addedBy = "sam",
+        addedByName = "Sam",
+        confirmation = PrescriptionConfirmation.PENDING,
+    )
   }
 
   @Test

@@ -18,7 +18,6 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,10 +94,7 @@ class MedicationDetailViewModel(
                   CareSection.NotShared -> MedicationDetailUiState.NotShared
                   is CareSection.Failed -> MedicationDetailUiState.Error
                   is CareSection.Shown -> {
-                    val prescription =
-                        section.data?.takeUnless {
-                          it.confirmation == PrescriptionConfirmation.REJECTED
-                        }
+                    val prescription = section.data?.takeUnless(Prescription::isRejected)
                     val medication = prescription?.medications?.find { it.id == medicationId }
                     if (prescription == null || medication == null)
                         MedicationDetailUiState.Unavailable
