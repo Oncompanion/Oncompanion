@@ -20,8 +20,8 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.addedByName
 import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
-import com.github.se.oncompanion.ui.common.DeleteState
-import com.github.se.oncompanion.ui.common.HasDeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
+import com.github.se.oncompanion.ui.common.HasDeletePhase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -37,12 +37,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** Exclusive states prevent old appointment content from remaining visible after a read failure. */
-sealed interface AppointmentDetailUiState : HasDeleteState {
-  override val delete: DeleteState
-    get() = DeleteState()
+sealed interface AppointmentDetailUiState : HasDeletePhase {
+  override val delete: DeletePhase
+    get() = DeletePhase.IDLE
 
   override val canDelete: Boolean
-    get() = this is Loaded && isOwn && !delete.isDeleting && !delete.isDeleted
+    get() = this is Loaded && isOwn && !delete.isUnderWay
 
   /** Waiting for this patient's locally available appointment. */
   data object Loading : AppointmentDetailUiState
@@ -56,7 +56,7 @@ sealed interface AppointmentDetailUiState : HasDeleteState {
    */
   data class Loaded(
       val appointment: Appointment,
-      override val delete: DeleteState = DeleteState(),
+      override val delete: DeletePhase = DeletePhase.IDLE,
       val isOwn: Boolean = true,
       val addedByName: String? = appointment.addedByName,
   ) : AppointmentDetailUiState
@@ -140,7 +140,8 @@ class AppointmentDetailViewModel(
 
   /** Whether completion still belongs to the patient whose detail is on screen. */
   fun canLeaveAfterDeletion(): Boolean =
-      state.value.delete.isDeleted && owner?.let { isCurrentSession(it, session) } == true
+      state.value.delete == DeletePhase.DELETED &&
+          owner?.let { isCurrentSession(it, session) } == true
 
   private fun isCurrentSession(uid: String, generation: Long): Boolean =
       generation == session &&
@@ -203,7 +204,7 @@ class AppointmentDetailViewModel(
 
   /** Restarts a failed or unavailable observation without keeping duplicate listeners. */
   fun retry() {
-    if (state.value.delete.isDeleting || state.value.delete.isDeleted) return
+    if (state.value.delete.isUnderWay) return
     if (patientUid != null) return followPatient(patientUid)
     observe(runCatching { authRepository.currentUser?.uid }.getOrNull())
     observeAuthentication()

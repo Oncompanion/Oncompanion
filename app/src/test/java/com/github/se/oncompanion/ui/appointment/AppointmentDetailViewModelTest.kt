@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.Instant
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
@@ -166,11 +167,11 @@ class AppointmentDetailViewModelTest {
         vm.confirmDelete()
         vm.confirmDelete()
         runCurrent()
-        assertTrue(vm.uiState.value.delete.isDeleting)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertTrue(vm.uiState.value.isDeleteDialogShown)
         vm.cancelDelete()
         vm.retry()
-        assertTrue(vm.uiState.value.delete.isDeleting)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertEquals(listOf("uid-patient" to "visit"), repository.deleteRequests)
         repository.writeGate!!.complete(Unit)
         advanceUntilIdle()
@@ -193,7 +194,7 @@ class AppointmentDetailViewModelTest {
         vm.confirmDelete()
         advanceUntilIdle()
         assertEquals(appointment, (vm.uiState.value as AppointmentDetailUiState.Loaded).appointment)
-        assertTrue(vm.uiState.value.delete.hasError)
+        assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
         assertTrue(vm.uiState.value.isDeleteDialogShown)
         assertFalse(vm.canLeaveAfterDeletion())
         repository.writeError = null
@@ -308,7 +309,7 @@ class AppointmentDetailViewModelTest {
         repository.writeGate!!.complete(Unit)
         advanceUntilIdle()
         assertEquals(listOf(appointment), repository.appointments("uid-patient"))
-        assertFalse(vm.uiState.value.delete.hasError)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertFalse(vm.canLeaveAfterDeletion())
       }
 

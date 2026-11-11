@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The splash screen's icon, exported from the Figma (page M2, "US-2 / Splash – Signing you in"):
+     the ribbon standing in the dawn Paper lake, cut to a 160 dp circle as in the Figma, in the
+     middle of the 288 dp Android gives a splash icon without a background. Android scales the icon
+     to those 288 dp, so it declares 200 dp, lint's limit for vectors. The same in light and dark
+     theme: the circle brings its own sky and water. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <group
+        android:translateX="64"
+        android:translateY="64">
+        <clip-path android:pathData="M80,0A80,80 0,1 1,80 160A80,80 0,1 1,80 0Z" />
+        <!-- Sky (HorizonDawnTopLight) and sun (SurfaceLight) -->
+        <path
+            android:fillColor="#F6D2B8"
+            android:pathData="M160 0H0V160H160V0Z" />
+        <path
+            android:fillColor="#FBF8F4"
+            android:pathData="M121.667 115C131.792 115 140 106.792 140 96.6667C140 86.5415 131.792 78.3334 121.667 78.3334C111.541 78.3334 103.333 86.5415 103.333 96.6667C103.333 106.792 111.541 115 121.667 115Z" />
+        <!-- The Salève (HorizonDuskBottomLight) -->
+        <path
+            android:fillColor="#C3B5E0"
+            android:pathData="M0 106.667L28.3333 90L50 98.3333L81.6667 80L113.333 98.3333L138.333 88.3333L160 96.6667V113.333H0V106.667Z" />
+        <!-- Three bands of water: HorizonDayBottomLight, the Paper lake's middle water, PrimaryLight -->
+        <path
+            android:fillColor="#A9CFD8"
+            android:pathData="M160 111.667H0V160H160V111.667Z" />
+        <path
+            android:fillColor="#7FB3C0"
+            android:pathData="M160 130H0V160H160V130Z" />
+        <path
+            android:fillColor="#2F6F7E"
+            android:pathData="M160 146.667H0V160H160V146.667Z" />
+        <!-- The ribbon (TertiaryLight) -->
+        <path
+            android:pathData="M48.95 125.634L89.9 82.6586C95.7499 76.3586 99.7999 69.1586 98.8999 60.6086C97.9999 49.8086 90.35 41.0336 80 41.0336C69.65 41.0336 62 49.8086 61.1 60.6086C60.2 69.1586 64.25 76.3586 70.1 82.6586L111.05 125.634"
+            android:strokeColor="#6A5A8C"
+            android:strokeLineJoin="round"
+            android:strokeWidth="11.25" />
+    </group>
+</vector>

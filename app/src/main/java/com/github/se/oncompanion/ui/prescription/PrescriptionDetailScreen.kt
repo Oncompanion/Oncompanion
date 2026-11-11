@@ -42,6 +42,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
@@ -89,7 +90,7 @@ fun PrescriptionDetailScreen(
 
   // Back to the list, which no longer shows the prescription, once it is deleted
   val leave by rememberUpdatedState(onDeleted)
-  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) leave() }
+  LaunchedEffect(uiState.delete) { if (uiState.delete == DeletePhase.DELETED) leave() }
 
   PrescriptionDetailContent(
       uiState = uiState,
@@ -207,8 +208,8 @@ fun PrescriptionDetailContent(
         error = stringResource(R.string.prescription_delete_error),
         confirmLabel = stringResource(R.string.prescription_delete_confirm),
         cancelLabel = stringResource(R.string.prescription_delete_cancel),
-        isDeleting = uiState.delete.isDeleting,
-        hasError = uiState.delete.hasError,
+        isDeleting = uiState.delete == DeletePhase.DELETING,
+        hasError = uiState.delete == DeletePhase.FAILED,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags = deleteDialogTags,

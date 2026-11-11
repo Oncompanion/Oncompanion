@@ -74,10 +74,13 @@ fun PlanningScreen(
     onAddAppointment: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (String) -> Unit,
     onOpenEvent: (String) -> Unit,
+    onOpenMedication: (String, String) -> Unit,
     caregiverOf: String? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val openItem: (PlanningItem) -> Unit = { openPlanningItem(it, onOpenAppointment, onOpenEvent) }
+  val openItem: (PlanningItem) -> Unit = {
+    openPlanningItem(it, onOpenAppointment, onOpenEvent, onOpenMedication)
+  }
   // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
   // at each midnight
   LifecycleResumeEffect(viewModel) {
@@ -97,7 +100,6 @@ fun PlanningScreen(
               viewModel::retry,
               onAddAppointment = onAddAppointment,
               onItemClick = openItem,
-              canOpenItem = { it.source !is PlanningSource.Medication },
           ),
       modifier = modifier,
       bottomBar = {
@@ -107,16 +109,17 @@ fun PlanningScreen(
   )
 }
 
-/** Opens the page of the feature that owns [item]; medications have none here. */
+/** Opens the page of the feature that owns [item], preserving its source identifiers. */
 internal fun openPlanningItem(
     item: PlanningItem,
     onOpenAppointment: (String) -> Unit,
     onOpenEvent: (String) -> Unit,
+    onOpenMedication: (String, String) -> Unit,
 ) {
   when (val source = item.source) {
     is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
     is PlanningSource.Event -> onOpenEvent(source.eventId)
-    is PlanningSource.Medication -> Unit
+    is PlanningSource.Medication -> onOpenMedication(source.prescriptionId, source.medicationId)
   }
 }
 
@@ -464,13 +467,7 @@ private fun PlanningRow(
         is PlanningSource.Medication ->
             R.drawable.ic_medication to R.string.planning_type_medication
       }
-  val supportingText =
-      if (item.source is PlanningSource.Medication) {
-        item.frequency
-            ?.takeIf { it.isNotBlank() }
-            ?.let { stringResource(R.string.planning_frequency, it) }
-            ?: stringResource(R.string.planning_frequency_unspecified)
-      } else item.subtitle
+  val supportingText = item.supportingText()
   val timed = item.timing as? PlanningTiming.Timed
   ListItem(
       leadingContent = {
@@ -505,4 +502,14 @@ private fun PlanningRow(
                   if (onItemClick == null) Modifier else Modifier.clickable { onItemClick(item) }
               ),
   )
+}
+
+/** Appointments may have no supporting text; medications always have a frequency fallback. */
+@Composable
+private fun PlanningItem.supportingText(): String? {
+  if (source !is PlanningSource.Medication) return subtitle
+  return frequency
+      ?.takeIf { it.isNotBlank() }
+      ?.let { stringResource(R.string.planning_frequency, it) }
+      ?: stringResource(R.string.planning_frequency_unspecified)
 }

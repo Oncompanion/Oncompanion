@@ -12,6 +12,12 @@ plugins {
   id("jacoco")
 }
 
+// MAJOR.MINOR, bumped by hand once each milestone is released
+val baseVersion = "0.1" // 0.1 for M1, 0.2 for M2, 0.3 for M3, 1.0 for the final version
+// Release number, set by release.yml only: it goes up with each run, so each APK installs over
+// the previous one. Null in CI and on a personal computer.
+val releaseNumber = System.getenv("RELEASE_NUMBER")?.toInt()
+
 android {
   namespace = "com.github.se.oncompanion"
   compileSdk = 37
@@ -20,8 +26,8 @@ android {
     applicationId = "com.github.se.oncompanion"
     minSdk = 28
     targetSdk = 34
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = releaseNumber ?: 1
+    versionName = if (releaseNumber != null) "$baseVersion.$releaseNumber" else "$baseVersion-dev"
 
     // Connects instrumented tests to the Firebase emulators (never the production project)
     testInstrumentationRunner = "com.github.se.oncompanion.utils.OncompanionTestRunner"
@@ -135,6 +141,27 @@ sonar {
 // `protobuf-javalite` Firestore needs (NoSuchMethodError when Firestore runs in tests).
 configurations.configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
 
+// Robolectric's Android jars (#324): Gradle downloads them with its retries, caches them and locks
+// them in gradle.lockfile, instead of Robolectric fetching them itself from Maven with no retry
+// (#300). One configuration per jar: they are versions of the same module, which one
+// configuration would resolve to the newest only. Not testRuntimeOnly: on the test classpath they
+// would clash with android.jar.
+val robolectricAndroidJars =
+    libs.bundles.robolectric.android.get().map { jar ->
+      // e.g. robolectricAndroid12_1 for 12.1-robolectric-8229987-i7
+      val android = jar.version!!.substringBefore("-").replace(".", "_")
+      configurations.create("robolectricAndroid$android") {
+        isCanBeConsumed = false
+        isTransitive = false
+        dependencies.add(project.dependencies.create(jar))
+      }
+    }
+val copyRobolectricAndroidJars by
+    tasks.registering(Sync::class) {
+      from(robolectricAndroidJars)
+      into(layout.buildDirectory.dir("robolectric-jars"))
+    }
+
 // When a library is used both by robolectric and connected tests, use this function
 fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
   androidTestImplementation(dep)
@@ -208,6 +235,20 @@ dependencies {
 }
 
 tasks.withType<Test> {
+  // Robolectric reads its Android jars from the folder Gradle filled and never downloads anything:
+  // a missing one fails at once with its name
+  val jars = copyRobolectricAndroidJars.map { it.destinationDir }
+  inputs
+      .files(copyRobolectricAndroidJars)
+      .withPropertyName("robolectricAndroidJars")
+      .withPathSensitivity(PathSensitivity.NAME_ONLY)
+  systemProperty("robolectric.offline", "true")
+  jvmArgumentProviders.add(
+      CommandLineArgumentProvider {
+        listOf("-Drobolectric.dependency.dir=${jars.get().absolutePath}")
+      }
+  )
+
   // Configure Jacoco for each tests
   configure<JacocoTaskExtension> {
     isIncludeNoLocationClasses = true
