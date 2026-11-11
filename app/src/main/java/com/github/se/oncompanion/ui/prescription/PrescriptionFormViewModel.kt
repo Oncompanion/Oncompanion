@@ -48,6 +48,12 @@ enum class PrescriptionFormError {
    * [PrescriptionFormViewModel.save].
    */
   SAVE_FAILED,
+  /** Rejecting a prescription a caregiver added failed on the device (US-43). */
+  REJECT_FAILED,
+  /**
+   * The prescription to reject was confirmed meanwhile (e.g. on another device): nothing changed.
+   */
+  ALREADY_CONFIRMED,
 }
 
 /**
@@ -630,12 +636,18 @@ class PrescriptionFormViewModel(
       try {
         val rejected = manageMedicationSchedule.reject(uid, id)
         _uiState.update {
-          // Not rejected: it was confirmed elsewhere (a deletion shows as not found by itself)
+          // Not rejected: it was confirmed elsewhere, which the patient is told (a deletion shows
+          // as
+          // not found by itself)
           it.copy(
               save = if (rejected) SavePhase.SAVED else SavePhase.EDITING,
               isConfirmingRejection = false,
               isToConfirm = rejected,
               wasRejected = rejected,
+              error =
+                  if (!rejected && it.load == PrescriptionFormLoad.READY)
+                      PrescriptionFormError.ALREADY_CONFIRMED
+                  else null,
           )
         }
       } catch (e: CancellationException) {
@@ -646,7 +658,7 @@ class PrescriptionFormViewModel(
           it.copy(
               save = SavePhase.EDITING,
               isConfirmingRejection = false,
-              error = PrescriptionFormError.SAVE_FAILED,
+              error = PrescriptionFormError.REJECT_FAILED,
           )
         }
       }

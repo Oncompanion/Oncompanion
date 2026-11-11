@@ -2026,7 +2026,7 @@ class PrescriptionFormViewModelTest {
                 "write fails",
                 { fakeMedications.writeError = IOException("disk full") },
                 {
-                  assertEquals(PrescriptionFormError.SAVE_FAILED, it.error)
+                  assertEquals(PrescriptionFormError.REJECT_FAILED, it.error)
                   assertEquals(SavePhase.EDITING, it.save)
                 },
             ),
@@ -2039,9 +2039,10 @@ class PrescriptionFormViewModelTest {
                   )
                 },
                 {
-                  // Nothing is rejected, and the form shows it is confirmed
+                  // Nothing is rejected, and the form says it was already confirmed
                   assertFalse(it.isToConfirm)
                   assertEquals(SavePhase.EDITING, it.save)
+                  assertEquals(PrescriptionFormError.ALREADY_CONFIRMED, it.error)
                 },
             ),
             Triple(

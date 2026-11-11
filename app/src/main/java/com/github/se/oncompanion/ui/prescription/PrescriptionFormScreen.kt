@@ -766,4 +766,6 @@ private fun PrescriptionFormError.messageRes(): Int =
     when (this) {
       PrescriptionFormError.NOT_SIGNED_IN -> R.string.prescription_form_error_not_signed_in
       PrescriptionFormError.SAVE_FAILED -> R.string.prescription_form_error_save_failed
+      PrescriptionFormError.REJECT_FAILED -> R.string.prescription_form_error_reject_failed
+      PrescriptionFormError.ALREADY_CONFIRMED -> R.string.prescription_form_already_confirmed
     }

@@ -995,6 +995,19 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun rejectionThatDidntHappen_saysWhy() {
+    setContent(toConfirm)
+    for ((error, message) in
+        listOf(
+            PrescriptionFormError.REJECT_FAILED to R.string.prescription_form_error_reject_failed,
+            PrescriptionFormError.ALREADY_CONFIRMED to R.string.prescription_form_already_confirmed,
+        )) {
+      composeTestRule.runOnIdle { uiState = toConfirm.copy(error = error) }
+      waitForText(string(message))
+    }
+  }
+
+  @Test
   fun aPrescriptionNotToConfirm_hasNoReject() {
     setContent(filled.copy(isEditing = true))
 

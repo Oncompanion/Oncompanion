@@ -545,6 +545,8 @@
     <string name="prescription_reject_title">Reject this prescription?</string>
     <string name="prescription_reject_message">It will be removed from your prescriptions and never remind you.</string>
     <string name="prescription_reject_cancel">Cancel</string>
+    <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
+    <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
