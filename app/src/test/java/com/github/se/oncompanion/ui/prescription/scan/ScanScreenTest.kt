@@ -196,6 +196,20 @@ class ScanScreenTest {
   }
 
   @Test
+  fun leavingTheApp_withTheTipOpen_keepsItOnReturn_andStillAsksNothing() {
+    tips.showUprightTip = true
+    showScreen()
+
+    // Home, then back to the app: the activity is stopped, not destroyed
+    compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+    comeBackToTheApp()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip).assertIsDisplayed()
+    assertNull(shadowOf(compose.activity).lastRequestedPermission)
+    assertEquals(0, camera.starts)
+  }
+
+  @Test
   fun phoneRotated_withTheTipOpen_keepsIt_andStillAsksNothing() {
     tips.showUprightTip = true
     showScreen()
