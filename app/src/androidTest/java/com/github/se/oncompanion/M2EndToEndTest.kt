@@ -44,6 +44,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -63,6 +64,8 @@ class M2EndToEndTest {
   private val run = UUID.randomUUID().toString()
   private val patient = Account("patient", "Sam")
   private val caregiver = Account("caregiver", "Julie")
+  // The patient's private contact name differs from the caregiver's own account name.
+  private val circleName = "Juju"
   private val credentials = AccountPicker()
   private val patientNotes = "Patient entry $run"
   private val caregiverNotes = "Caregiver entry $run"
@@ -154,8 +157,10 @@ class M2EndToEndTest {
     joinCareCircle()
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
+    assertReadOnly(patientNotes)
     tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
     logSymptom("NAUSEA", caregiverNotes)
+    assertCaregiverAttribution()
     assertSymptom("FATIGUE", patientNotes)
     open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
@@ -166,6 +171,8 @@ class M2EndToEndTest {
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     assertSymptom("NAUSEA", caregiverNotes)
+    assertReadOnly(patientNotes)
+    assertCaregiverAttribution()
     open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
@@ -174,7 +181,7 @@ class M2EndToEndTest {
     assertEquals(patient.uid, FirebaseEmulator.auth.currentUser?.uid)
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
-    val addedBy = compose.activity.getString(R.string.symptom_added_by, caregiver.firstName)
+    val addedBy = compose.activity.getString(R.string.symptom_added_by, circleName)
     val caregiverRow = symptomRow(caregiverNotes)
     tag(C.Tag.symptom_journal_list).performScrollToNode(caregiverRow)
     waitFor(caregiverRow and text(addedBy)).assertIsDisplayed()
@@ -228,10 +235,44 @@ class M2EndToEndTest {
     waitFor(row and text(title)).assertIsDisplayed()
   }
 
+  /** A caregiver can read a patient's recorded entry without being offered changes. */
+  private fun assertReadOnly(notes: String) {
+    open(symptomRow(notes), hasTestTag(C.Tag.symptom_detail_content))
+    waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(notes)).reveal().assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.symptom_detail_edit).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.symptom_detail_delete).assertDoesNotExist()
+    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+  }
+
+  /** The caregiver sees their own name, never the patient's private contact name. */
+  private fun assertCaregiverAttribution() {
+    val ownName = compose.activity.getString(R.string.symptom_added_by, caregiver.firstName)
+    val row = symptomRow(caregiverNotes)
+    tag(C.Tag.symptom_journal_list).performScrollToNode(row)
+    waitFor(row and text(ownName)).assertIsDisplayed()
+    assertPrivateNameAbsent()
+    open(row, hasTestTag(C.Tag.symptom_detail_content))
+    waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes))
+        .reveal()
+        .assertIsDisplayed()
+    waitFor(hasTestTag(C.Tag.added_by) and hasText(ownName), unmerged = true)
+        .reveal()
+        .assertIsDisplayed()
+    assertPrivateNameAbsent()
+    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+  }
+
+  private fun assertPrivateNameAbsent() {
+    assertFalse(
+        "The caregiver must never see what the patient calls them",
+        exists(hasText(circleName, substring = true), unmerged = true),
+    )
+  }
+
   private fun inviteCaregiver() {
     open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_empty_add_button))
     open(C.Tag.care_circle_empty_add_button, hasTestTag(C.Tag.care_circle_form_first_name))
-        .replaceText(caregiver.firstName)
+        .replaceText(circleName)
     tag(C.Tag.care_circle_form_relationship).reveal().performClick()
     tag(C.Tag.careCircleFormRelationshipOption("DAUGHTER")).reveal().performClick()
     waitFor(
@@ -273,7 +314,7 @@ class M2EndToEndTest {
     val member = C.Tag.careCircleMember(checkNotNull(caregiver.uid))
     open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_member_list))
     tag(C.Tag.care_circle_member_list).performScrollToNode(hasTestTag(member))
-    waitFor(hasTestTag(member) and text(caregiver.firstName)).assertIsDisplayed()
+    waitFor(hasTestTag(member) and text(circleName)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.careCircleInvite(inviteCode)).assertDoesNotExist()
     compose
         .onNodeWithTag(C.Tag.care_circle_pending_label, useUnmergedTree = true)
