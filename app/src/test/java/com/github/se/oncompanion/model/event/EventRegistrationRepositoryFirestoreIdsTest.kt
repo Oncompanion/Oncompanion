@@ -19,7 +19,7 @@ class EventRegistrationRepositoryFirestoreIdsTest {
   fun invalidIds_areRejected_withoutReachingFirestore() {
     for ((uid, eventId) in listOf("" to "yoga", "sam" to " ", "a/b" to "yoga", "sam" to "a/b")) {
       assertThrows(IllegalArgumentException::class.java) {
-        repository.observeIsRegistered(uid, eventId)
+        repository.observeRegistration(uid, eventId)
       }
       assertThrows(IllegalArgumentException::class.java) { repository.confirm(uid, eventId) }
       assertThrows(IllegalArgumentException::class.java) { repository.remove(uid, eventId) }

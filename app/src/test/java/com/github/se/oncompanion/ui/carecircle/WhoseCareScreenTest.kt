@@ -291,6 +291,27 @@ class WhoseCareScreenTest {
   }
 
   @Test
+  fun screen_anEmptyListFromTheCache_staysUsable_insteadOfGoingToJoin() {
+    // Offline or before the server answered: maybe a circle this phone doesn't know about yet
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository().apply { joinedCirclesFromCache = true }
+    setScreen(
+        WhoseCareViewModel(auth, invites, FakeCareCircleRepository()),
+        autoSelectSingle = true,
+    )
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodes(hasTestTag(C.Tag.whose_care_unconfirmed))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    node(C.Tag.whose_care_secondary_action).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(emptyList<String>(), events) }
+  }
+
+  @Test
   fun screen_singlePatient_isChosenByItself_once() {
     setScreen(viewModelFollowing("p-anne" to "Anne"), autoSelectSingle = true)
     composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
