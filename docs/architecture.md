@@ -104,8 +104,9 @@ enforces ten initial shared-cache misses per rolling hour and fifty per rolling 
 `hospitalSearchQuota/{HMAC-SHA256}` retains bounded miss timestamps with one-day TTL using a
 server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
 deployable TTL policy; logical expiry remains enforced.
-The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
-The repository-to-proxy client path is implemented and opt-in; the service remains undeployed.
+The Account, Appointments and overview diagrams identify the deployed backend. The
+repository-to-proxy client path remains opt-in: the endpoint resource is empty pending
+authenticated live verification and Android activation.
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -135,15 +136,21 @@ the block for that adapter's lifetime instead of shortening the provider wait. C
 once before creating field ViewModels; endpoint changes/disable require recreating existing consumers.
 The prior local HTTP repository remains legacy code for its tests, not an integrated search path.
 
-`FirebaseHospitalProxyTokens` still obtains Auth/App Check tokens lazily; production has no endpoint
-configured by this change. Profile Search is enabled only for an installed proxy adapter. The existing
+`MainActivity` passes the empty-by-default `hospital_proxy_endpoint` resource to
+`HospitalRepositoryProvider.configureAtStartup` before creating fields. An installed adapter is
+reused across activity recreation, keeping its cache and retry gate. Endpoint activation follows
+verified deployment and rollout approval. `FirebaseHospitalProxyTokens` obtains Auth/App Check
+tokens lazily.
+Profile Search is enabled only for an installed proxy adapter. The existing
 HospitalFieldViewModel owns explicit Search actions and stale-result cancellation, while edits,
 selection, saving and leaving Profile clear obsolete feedback. Calls join `SessionAccess.operation`.
 See [Android proxy setup](hospital-proxy-client.md) for registration and the opt-in configuration API.
-The backend CI job runs type, format, unit and demo Firestore tests. `onCall` remains a team
-decision before Android integration: it improves token handling and URL privacy but requires a
-new Android SDK and transport contract. See the backend runbook for the comparison.
-No production deployment or automatic Functions deployment workflow is included.
+The backend CI job runs type, format, unit and demo Firestore tests. The Android integration
+uses the existing HTTP contract; any future `onCall` migration remains a team decision requiring
+a new Android SDK and transport contract. The deployed service has a scoped platform request-log
+exclusion; application logs remain sanitized.
+See the backend runbook and verification record for the remaining live/token/monitoring checks.
+Deployment is manual; no automatic Functions deployment workflow is included.
 
 ## Reusable hospital field (issue #143)
 

@@ -2,10 +2,28 @@
 
 # Hospital proxy deployment and operations
 
-Status: repository configuration only. No deployment, TTL activation, IAM changes, metrics,
-alert policies or notification channels have been applied or verified by this PR.
-Obtain separate authorization before executing any cloud mutation below.
-See [README](README.md) for the contract, privacy constraints and coordinator proof.
+## Deployment status
+
+Related: [deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435),
+[deployment task #217](https://github.com/Oncompanion/Oncompanion/issues/217).
+Re-read live metadata before any action; historical evidence belongs in #435.
+
+| Area | Configuration / limitation |
+| --- | --- |
+| Function | `hospitalSearch`, `europe-west1`, ACTIVE; Run service `hospitalsearch` |
+| Invocation | Public Run invocation; Firebase Auth and approved App Check required by handler |
+| Runtime | Dedicated `hospital-search` account; Datastore User, secret-scoped Secret Accessor; no Editor/keys |
+| Secret | `HOSPITAL_QUOTA_SECRET`, version 1 ENABLED; never log/export its value |
+| TTL/indexes | Cache/quota `expiresAt` TTL ACTIVE, single-field indexing disabled; no coordinator TTL |
+| Request logs | `hospital_proxy_request_urls` excludes only this service's platform request logs; app logs retained |
+| Monitoring | Email channel and CHF 5 project budget exist; proxy policies inactive, delivery unverified |
+| Verification | Authenticated search, server cache and release App Check deferred; Android search inactive |
+| Operators | Primary: project owner; backup: TBD |
+| Governance | Discussion recorded in #435; obtain team agreement and authorization for further live changes |
+
+See [README](README.md) for the contract, [DEPLOYMENT.md](DEPLOYMENT.md) for deployment/rollback,
+[MONITORING.md](MONITORING.md) for the proposed policies and the separate
+[IAM investigation](../docs/hospital-proxy-iam-follow-up.md). No live mutation is authorized by this runbook.
 
 ## Before deployment
 
@@ -19,20 +37,22 @@ See [README](README.md) for the contract, privacy constraints and coordinator pr
 - Review deployment identity separately from runtime identity. The deployer needs function
   deployment/build permissions and `iam.serviceAccounts.actAs` on the runtime identity;
   IAM changes require an authorized administrator. Preserve Google-managed service agents.
-- No runtime service account is pinned in `src/index.ts`; Gen 2 defaults to the Compute
-  Engine default service account. Inspect its effective permissions before rollout. It needs
+- Set `HOSPITAL_RUNTIME_SERVICE_ACCOUNT` to a reviewed runtime identity; `src/index.ts` requires
+  this deployment parameter instead of inheriting the Compute Engine default service account.
+  The audit found that default account has Editor; do not use it for this proxy. The runtime needs
   Firestore data access (for example `roles/datastore.user` on the project) and
   `roles/secretmanager.secretAccessor` on **only** `HOSPITAL_QUOTA_SECRET`. Avoid broad Editor
-  grants. A dedicated account is preferred but must be selected/reviewed before adding its
-  project-specific identity to function configuration. No service-account keys are needed.
+  grants. A dedicated account must be created and granted permissions only after approval.
+  No service-account keys are needed.
 - The endpoint uses `invoker: "public"`: network access is public so Firebase mobile tokens
   can reach the handler. Confirm organization policy permits this. Cloud Run IAM tokens are
   not Firebase ID tokens. Do not remove handler Auth/App Check verification to resolve IAM errors.
-- Register production Android App Check with Play Integrity and approved Firebase app IDs.
-  Android Auth/App Check transport and activation remain a separate PR. A valid Auth ID token
+- Verify production Android App Check with Play Integrity and approved Firebase app IDs.
+  Android Auth/App Check transport is implemented; endpoint activation remains gated. A valid Auth ID token
   **and** a valid App Check token from an allowed app are required, including in staging.
 - Copy `.env.example` to ignored `functions/.env.oncompanion-c4144`; set a real monitored
-  `NOMINATIM_CONTACT_EMAIL` and comma-separated `HOSPITAL_APP_IDS`. These are existing
+  `NOMINATIM_CONTACT_EMAIL`, comma-separated `HOSPITAL_APP_IDS`, and the reviewed
+  `HOSPITAL_RUNTIME_SERVICE_ACCOUNT`. These are
   `defineString` parameters; changes require deployment of a new revision.
 - Provision `HOSPITAL_QUOTA_SECRET` using the interactive command below with at least 32
   random characters. Never pass its value in a command argument, commit it, print it or log it.
@@ -55,7 +75,7 @@ npm --prefix functions run lint
 npm --prefix functions run build
 firebase emulators:exec --config firebase.proxy-test.json --only firestore \
   --project demo-oncompanion-proxy \
-  'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
+  'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 ```
 
 Only after authorization, configure the secret and deploy the existing TTL declarations:
