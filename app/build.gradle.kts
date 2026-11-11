@@ -12,6 +12,12 @@ plugins {
   id("jacoco")
 }
 
+// MAJOR.MINOR, bumped by hand once each milestone is released
+val baseVersion = "0.1" // 0.1 for M1, 0.2 for M2, 0.3 for M3, 1.0 for the final version
+// Release number, set by release.yml only: it goes up with each run, so each APK installs over
+// the previous one. Null in CI and on a personal computer.
+val releaseNumber = System.getenv("RELEASE_NUMBER")?.toInt()
+
 android {
   namespace = "com.github.se.oncompanion"
   compileSdk = 37
@@ -20,8 +26,8 @@ android {
     applicationId = "com.github.se.oncompanion"
     minSdk = 28
     targetSdk = 34
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = releaseNumber ?: 1
+    versionName = if (releaseNumber != null) "$baseVersion.$releaseNumber" else "$baseVersion-dev"
 
     // Connects instrumented tests to the Firebase emulators (never the production project)
     testInstrumentationRunner = "com.github.se.oncompanion.utils.OncompanionTestRunner"
