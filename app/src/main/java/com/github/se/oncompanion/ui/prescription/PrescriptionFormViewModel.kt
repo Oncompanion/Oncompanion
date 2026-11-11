@@ -298,13 +298,19 @@ class PrescriptionFormViewModel(
     val state = _uiState.value
     // Once saved, the form is done: what arrives next is its own save
     if (state.save == SavePhase.SAVED) return
-    // A rejected prescription is gone for the patient, as a deleted one
-    if (saved == null || saved.isRejected) {
+    // A deletion ends the form at once, also while saving
+    if (saved == null) {
       _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
       return
     }
-    // While saving, the form keeps showing what is being saved
+    // While saving, the form keeps showing what is being saved: also its own rejection, which
+    // arrives before reject() returns
     if (state.save == SavePhase.SAVING) return
+    // A prescription rejected elsewhere is gone for the patient, as a deleted one
+    if (saved.isRejected) {
+      _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
+      return
+    }
     val draft = saved.toDraft().cutToLimits()
     val isToConfirm = saved.confirmation == PrescriptionConfirmation.PENDING
     // A form in use is left alone if the user changed it, and also if the same content arrives

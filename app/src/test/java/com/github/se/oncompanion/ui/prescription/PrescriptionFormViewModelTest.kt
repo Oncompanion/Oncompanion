@@ -1979,6 +1979,35 @@ class PrescriptionFormViewModelTest {
   }
 
   @Test
+  fun ownRejection_arrivingBeforeItReturns_isNotTakenForADeletion() = runTest {
+    // The rejection is saved on the device, and heard back, before reject() returns
+    val returned = CompletableDeferred<Unit>()
+    val writesThenWaits =
+        object : MedicationRepository by fakeMedications {
+          override suspend fun updatePrescription(uid: String, prescription: Prescription) {
+            fakeMedications.updatePrescription(uid, prescription)
+            returned.await()
+          }
+        }
+    fakeMedications.seed(uid, sams)
+    val viewModel =
+        PrescriptionFormViewModel(auth, writesThenWaits, clock = clock, prescriptionId = saved.id)
+    advanceUntilIdle()
+
+    viewModel.requestRejection()
+    viewModel.reject()
+    advanceUntilIdle()
+    // Still the form and its rejection on the way, not "This prescription no longer exists"
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+    assertEquals(SavePhase.SAVING, viewModel.state.save)
+
+    returned.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
+    assertEquals(PrescriptionFormLoad.READY, viewModel.state.load)
+  }
+
+  @Test
   fun onlyAPrescriptionWaitingForThePatient_canBeRejected() = runTest {
     val viewModel = loadedEditViewModel()
     assertFalse(viewModel.state.isToConfirm)
