@@ -28,5 +28,5 @@ data class JoinedCareCircle(
  */
 data class JoinedCircles(
     val circles: List<JoinedCareCircle>,
-    val isFromCache: Boolean = false,
+    val isFromCache: Boolean,
 )
