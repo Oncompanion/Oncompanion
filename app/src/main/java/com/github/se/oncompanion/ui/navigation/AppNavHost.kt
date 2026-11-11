@@ -540,8 +540,15 @@ private fun SessionNavHost(
       composable(Screen.PRESCRIPTION_ADD) { entry ->
         val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            // Reviews the scanned prescription if it was just read, empty otherwise
-            viewModel = viewModel { PrescriptionFormViewModel(scan = handoff.scanned) },
+            // Reviews the scanned prescription if it was just read, empty otherwise. In caregiver
+            // mode, it goes in the chosen patient's prescriptions, waiting for them (US-43)
+            viewModel =
+                viewModel {
+                  PrescriptionFormViewModel(
+                      scan = handoff.scanned,
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
             // A second tap while the form is already leaving is dropped, so Back happens once. The
             // scan's photo is no longer needed once the form is done
             onClose =
@@ -554,6 +561,7 @@ private fun SessionNavHost(
               handoff.finish()
               navigationActions.goBack()
             },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }
