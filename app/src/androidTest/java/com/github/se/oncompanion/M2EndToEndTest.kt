@@ -160,6 +160,15 @@ class M2EndToEndTest {
     open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
+    // Sign-out clears local data: an existing circle must be found again through Whose care.
+    open(C.Tag.google_sign_in_button, caregiverTitle())
+    assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
+    openSymptoms()
+    assertSymptom("FATIGUE", patientNotes)
+    assertSymptom("NAUSEA", caregiverNotes)
+    open(C.Tag.symptom_back_button, caregiverTitle())
+    signOutThroughProfile()
+
     credentials.select(patient)
     open(C.Tag.google_sign_in_button, patientGreeting())
     assertEquals(patient.uid, FirebaseEmulator.auth.currentUser?.uid)
@@ -171,8 +180,12 @@ class M2EndToEndTest {
     waitFor(caregiverRow and text(addedBy)).assertIsDisplayed()
     // Detail proves the full notes and attribution belong to this exact saved entry.
     open(caregiverRow, hasTestTag(C.Tag.symptom_detail_content))
+    // The restyled detail puts notes and attribution after the recorded symptom fields.
+    waitFor(hasText(caregiverNotes)).reveal().assertIsDisplayed()
     waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes)).assertIsDisplayed()
-    waitFor(hasTestTag(C.Tag.added_by) and hasText(addedBy), unmerged = true).assertIsDisplayed()
+    waitFor(hasTestTag(C.Tag.added_by) and hasText(addedBy), unmerged = true)
+        .reveal()
+        .assertIsDisplayed()
     open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
     open(C.Tag.symptom_back_button, patientGreeting())
     assertAcceptedMember()
