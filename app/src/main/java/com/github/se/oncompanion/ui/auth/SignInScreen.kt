@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.ui.auth
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.RibbonLogo
 
 /**
  * Sign-in screen (Figma "US-01 / Login"): the only way in is "Continue with Google". The first
@@ -108,7 +107,7 @@ fun SignInContent(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      AppLogo()
+      RibbonLogo(Modifier.testTag(C.Tag.sign_in_logo), size = 64.dp)
       Spacer(Modifier.height(24.dp))
       Text(
           text = stringResource(R.string.sign_in_welcome),
@@ -135,23 +134,6 @@ fun SignInContent(
         }
       }
     }
-  }
-}
-
-/** The "O" app mark from the mockup, until there is a real logo. */
-@Composable
-private fun AppLogo() {
-  Box(
-      modifier =
-          Modifier.size(64.dp)
-              .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)),
-      contentAlignment = Alignment.Center,
-  ) {
-    Text(
-        text = "O",
-        style = MaterialTheme.typography.headlineLarge,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-    )
   }
 }
 

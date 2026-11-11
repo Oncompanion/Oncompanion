@@ -18,3 +18,15 @@ data class JoinedCareCircle(
     val patientFirstName: String,
     val joinedAt: Instant? = null,
 )
+
+/**
+ * The circles a caregiver joined, as [CareCircleInviteRepository.observeJoinedCircles] knows them.
+ *
+ * @property circles the circles joined
+ * @property isFromCache true while the server hasn't answered: an empty list may then only mean
+ *   that this phone doesn't know about a circle yet (e.g. joined on another phone)
+ */
+data class JoinedCircles(
+    val circles: List<JoinedCareCircle>,
+    val isFromCache: Boolean,
+)

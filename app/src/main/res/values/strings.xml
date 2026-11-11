@@ -454,8 +454,8 @@
     <string name="prescription_form_remove_medication">Remove</string>
     <string name="prescription_form_add_medication">Add medication</string>
     <string name="prescription_form_save">Save prescription</string>
-    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
-    <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save this prescription.</string>
+    <string name="prescription_form_error_save_failed">Couldn\'t save this prescription. Please try again.</string>
     <string name="prescription_form_edit_title">Edit prescription</string>
     <string name="prescription_form_not_found_title">This prescription no longer exists</string>
     <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
@@ -478,6 +478,16 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <!-- Medication detail (US-35) -->
+    <string name="medication_detail_title">Medication</string>
+    <string name="medication_detail_view_prescription">View prescription</string>
+    <string name="medication_detail_prescription_date">Prescription date</string>
+    <string name="medication_detail_pending">Not confirmed</string>
+    <string name="medication_detail_error">Couldn\'t load this medication</string>
+    <string name="medication_detail_error_hint">Please try again.</string>
+    <string name="medication_detail_unavailable">This medication is unavailable</string>
+    <string name="medication_detail_unavailable_hint">It may have been removed, or its prescription may not be saved on this device.</string>
+
     <string name="prescription_detail_title">Prescription</string>
     <string name="prescription_detail_back">Back</string>
     <string name="prescription_detail_prescribed_by">Prescribed by</string>
@@ -525,7 +535,7 @@
     <string name="prescription_scan_close">Close</string>
     <string name="prescription_scan_frame_hint">Place the prescription inside the frame</string>
     <string name="prescription_scan_camera_off_title">Camera access is off</string>
-    <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
+    <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read the prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
     <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
@@ -536,7 +546,7 @@
     <string name="prescription_scan_retake">Retake</string>
     <string name="prescription_scan_use_photo">Use this photo</string>
     <string name="prescription_scan_reading_title">Reading the prescription</string>
-    <string name="prescription_scan_reading">Reading your prescription… This takes a few seconds.</string>
+    <string name="prescription_scan_reading">Reading the prescription… This takes a few seconds.</string>
     <string name="prescription_scan_nothing_read_title">Couldn\'t read the prescription</string>
     <string name="prescription_scan_nothing_read">We couldn\'t find any text on this photo. It may be handwritten, blurry or too dark.</string>
     <string name="prescription_scan_not_a_prescription_title">Not a prescription</string>
@@ -555,7 +565,7 @@
     <!-- US-10: reviewing the prescription read from a scan, in the prescription form -->
     <string name="prescription_review_title">Review prescription</string>
     <string name="prescription_review_read">We read these details from your scan.</string>
-    <string name="prescription_review_partly_read">We could only read part of your prescription.</string>
+    <string name="prescription_review_partly_read">We could only read part of the prescription.</string>
     <plurals name="prescription_review_to_check">
         <item quantity="one">1 detail needs checking: it is marked in orange.</item>
         <item quantity="other">%1$d details need checking: they are marked in orange.</item>
@@ -582,6 +592,11 @@
         <item quantity="one">Please check 1 detail</item>
         <item quantity="other">Please check %1$d details</item>
     </plurals>
+    <!-- A caregiver adds a prescription for the patient (US-43), e.g. "Add a prescription for Anne" -->
+    <string name="prescription_form_add_title_for">Add a prescription for %1$s</string>
+    <string name="prescription_review_title_for">Review %1$s\'s prescription</string>
+    <!-- US-39 for a caregiver: their patient's prescriptions, e.g. "Already in Anne\'s prescriptions" -->
+    <string name="prescription_already_saved_title_for">Already in %1$s\'s prescriptions</string>
 
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>

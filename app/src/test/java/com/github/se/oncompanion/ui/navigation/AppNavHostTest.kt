@@ -68,6 +68,7 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.session.RejectedWritesProvider
@@ -723,6 +724,56 @@ class AppNavHostTest {
       assertEquals("Oncology check-up", added.title)
       assertEquals("caregiver", added.addedBy)
       assertTrue(appointments.appointments("caregiver").isEmpty())
+    }
+  }
+
+  @Test
+  fun caregiverMode_allowedToAdd_addsThePrescriptionWaitingForThePatient() {
+    val prescriptionsOnly = setOf(CarePermission.PRESCRIPTIONS)
+    val (auth, invites, circles) =
+        followingCaregiver(
+            "p-anne" to "Anne",
+            shared = prescriptionsOnly,
+            canAdd = prescriptionsOnly,
+        )
+    val medications = FakeMedicationRepository()
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        medicationRepository = medications,
+    )
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodesWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+        .performScrollTo()
+        .performClick()
+    waitForTag(C.Tag.prescriptions_enter_manually_button)
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_enter_manually_button).performClick()
+    // The form says whose prescriptions it goes to
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_form_add_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_medication_name_field)
+        .performScrollTo()
+        .performTextInput("Ondansetron 8 mg")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    // Back on Anne's list: the prescription is hers, signed by the caregiver, and waits for her
+    waitForTag(C.Tag.prescriptions_screen)
+    composeTestRule.runOnIdle {
+      val added = medications.prescriptionsOf("p-anne").single()
+      assertEquals("caregiver", added.addedBy)
+      assertEquals(PrescriptionConfirmation.PENDING, added.confirmation)
+      assertTrue(medications.prescriptionsOf("caregiver").isEmpty())
     }
   }
 

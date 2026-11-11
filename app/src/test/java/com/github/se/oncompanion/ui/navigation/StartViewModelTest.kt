@@ -355,6 +355,16 @@ class StartViewModelTest {
       }
 
   @Test
+  fun caregiverOfflineWithNoCircleOnThePhone_startsOnWhoseCare_notJoin() =
+      runTest(dispatcher) {
+        // A circle joined on another phone may be missing from this one's copy
+        val invites = FakeCareCircleInviteRepository().apply { joinedCirclesFromCache = true }
+        val viewModel = caregiverStart(invites)
+        advanceUntilIdle()
+        assertEquals(Route.WHOSE_CARE, viewModel.startRoute.value)
+      }
+
+  @Test
   fun caregiverCirclesCantBeRead_startsOnWhoseCare_whichCanRetry() =
       runTest(dispatcher) {
         // Assumed in a circle: "Whose care?" then shows the error with Retry
