@@ -101,7 +101,11 @@ class HospitalFieldViewModelTest {
       fake.result = HospitalSearchResult.Error(error)
       vm.search("Geneva")
       advanceUntilIdle()
-      assertEquals(HospitalFieldUiState.Error, vm.uiState.value)
+      assertEquals(
+          if (error == HospitalSearchError.RATE_LIMITED) HospitalFieldUiState.RateLimited
+          else HospitalFieldUiState.Error,
+          vm.uiState.value,
+      )
     }
     fake.result = HospitalSearchResult.Success(emptyList())
     vm.search("Geneva")

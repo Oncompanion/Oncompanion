@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.model.hospital.Hospital
 import com.github.se.oncompanion.model.hospital.HospitalRepository
 import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
+import com.github.se.oncompanion.model.hospital.HospitalSearchError
 import com.github.se.oncompanion.model.hospital.HospitalSearchResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -27,6 +28,9 @@ sealed interface HospitalFieldUiState {
 
   /** A recoverable search failure; free text remains valid. */
   data object Error : HospitalFieldUiState
+
+  /** The service limits new searches; retry only after waiting or enter the hospital manually. */
+  data object RateLimited : HospitalFieldUiState
 }
 
 /** Owns explicit searches through one injected repository, preserving its existing cache. */
@@ -59,7 +63,10 @@ class HospitalFieldViewModel(
         // Always ask the repository, including offline: it may already have cached this query.
         when (val result = repository.searchHospitals(text)) {
           is HospitalSearchResult.Success -> HospitalFieldUiState.Results(result.hospitals)
-          is HospitalSearchResult.Error -> HospitalFieldUiState.Error
+          is HospitalSearchResult.Error ->
+              if (result.reason == HospitalSearchError.RATE_LIMITED)
+                  HospitalFieldUiState.RateLimited
+              else HospitalFieldUiState.Error
         }
       } catch (cancelled: CancellationException) {
         // Lifecycle cancellation must not appear as a recoverable search failure.

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
+<resources>
+    <!-- Debug opt-in only: Auth and an explicitly registered App Check debug token remain required. -->
+    <string name="hospital_proxy_endpoint" translatable="false">https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch</string>
+</resources>

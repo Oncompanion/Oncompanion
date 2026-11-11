@@ -619,6 +619,7 @@
     <string name="hospital_search">Search</string>
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
     <string name="hospital_search_error">Search is unavailable. Try again later or enter the hospital manually.</string>
+    <string name="hospital_search_rate_limited">Too many searches. Wait before trying again, or enter the hospital manually.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
     <!-- Set only to the verified proxy HTTPS URL after authorized deployment and rollout review. -->
     <string name="hospital_proxy_endpoint" translatable="false"></string>
