@@ -89,7 +89,15 @@ class PlanningScreenIntegrationTest {
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
     compose.setContent {
-      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+      OncompanionTheme {
+        PlanningScreen(
+            navigation,
+            vm,
+            onOpenAppointment = {},
+            onOpenEvent = {},
+            onOpenMedication = { _, _ -> },
+        )
+      }
     }
     compose.onNodeWithText("Recorded medication").assertIsDisplayed()
     compose.onNodeWithText("Frequency: Mondays and Thursdays").assertIsDisplayed()
@@ -143,7 +151,15 @@ class PlanningScreenIntegrationTest {
           }
         }
     compose.setContent {
-      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+      OncompanionTheme {
+        PlanningScreen(
+            navigation,
+            vm,
+            onOpenAppointment = {},
+            onOpenEvent = {},
+            onOpenMedication = { _, _ -> },
+        )
+      }
     }
     compose.onNodeWithTag(C.Tag.planning_empty).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
@@ -163,7 +179,7 @@ class PlanningScreenIntegrationTest {
   }
 
   @Test
-  fun tappingAnEntryOpensItsOwnPage_andMedicationsOpenNothing() {
+  fun tappingAnEntryOpensItsOwnPage_includingTheExactMedication() {
     val timing = PlanningTiming.Timed(date.atTime(14, 0).atZone(zone).toInstant())
     val appointment = PlanningItem(PlanningSource.Appointment("a"), timing, "Consultation")
     val event = PlanningItem(PlanningSource.Event("e"), timing, "Workshop")
@@ -184,6 +200,7 @@ class PlanningScreenIntegrationTest {
         )
     val openedAppointments = mutableListOf<String>()
     val openedEvents = mutableListOf<String>()
+    val openedMedications = mutableListOf<Pair<String, String>>()
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
     compose.setContent {
@@ -193,6 +210,7 @@ class PlanningScreenIntegrationTest {
             vm,
             onOpenAppointment = { openedAppointments += it },
             onOpenEvent = { openedEvents += it },
+            onOpenMedication = { p, m -> openedMedications += p to m },
         )
       }
     }
@@ -204,7 +222,8 @@ class PlanningScreenIntegrationTest {
     }
     compose.onNodeWithTag(C.Tag.planningItem(appointment.key)).performClick()
     compose.runOnIdle { assertEquals(listOf("a"), openedAppointments) }
-    compose.onNodeWithTag(C.Tag.planningItem(medication.key)).assertHasNoClickAction()
+    compose.onNodeWithTag(C.Tag.planningItem(medication.key)).performClick()
+    compose.runOnIdle { assertEquals(listOf("p" to "m"), openedMedications) }
   }
 
   @Test
@@ -220,7 +239,15 @@ class PlanningScreenIntegrationTest {
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
     compose.setContent {
-      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+      OncompanionTheme {
+        PlanningScreen(
+            navigation,
+            vm,
+            onOpenAppointment = {},
+            onOpenEvent = {},
+            onOpenMedication = { _, _ -> },
+        )
+      }
     }
     compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
     compose.runOnIdle { repository.fail = false }
@@ -256,12 +283,21 @@ class PlanningScreenIntegrationTest {
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
     compose.setContent {
-      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+      OncompanionTheme {
+        PlanningScreen(
+            navigation,
+            vm,
+            onOpenAppointment = {},
+            onOpenEvent = {},
+            onOpenMedication = { _, _ -> },
+        )
+      }
     }
     compose.onNodeWithText("Frequency: Twice a day").assertIsDisplayed()
     compose.onNodeWithText("Workshop").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.planningItem(medication.key)).assertHasNoClickAction()
+    compose.onNodeWithTag(C.Tag.planningItem(medication.key)).performClick()
+
     compose.runOnIdle { repository.items.value = listOf(medication.copy(frequency = "As needed")) }
     compose.onNodeWithText("Frequency: As needed").assertIsDisplayed()
     compose.onNodeWithText("Workshop").assertDoesNotExist()
@@ -286,7 +322,15 @@ class PlanningScreenIntegrationTest {
     val navigation =
         NavigationActions(TestNavHostController(ApplicationProvider.getApplicationContext()))
     compose.setContent {
-      OncompanionTheme { PlanningScreen(navigation, vm, onOpenAppointment = {}, onOpenEvent = {}) }
+      OncompanionTheme {
+        PlanningScreen(
+            navigation,
+            vm,
+            onOpenAppointment = {},
+            onOpenEvent = {},
+            onOpenMedication = { _, _ -> },
+        )
+      }
     }
     compose.onNodeWithTag(C.Tag.planning_error).assertIsDisplayed()
     compose.runOnIdle { appointments.observeError = null }

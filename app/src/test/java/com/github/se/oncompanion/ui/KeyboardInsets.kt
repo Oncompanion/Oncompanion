@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui
 
@@ -44,11 +45,23 @@ fun SemanticsNodeInteraction.assertIsAboveKeyboard(keyboardHeightPx: Int) {
 }
 
 /**
- * Checks that none of the node is cut off, e.g. by a scrolling area too small to show it: a node
- * can be "displayed" with only a sliver of it on screen.
+ * Checks that the node has drawable area and none of it is cut off, e.g. by a scrolling area too
+ * small to show it: a node can be "displayed" with only a sliver of it on screen.
  */
 fun SemanticsNodeInteraction.assertIsFullyVisible() {
   val node = fetchSemanticsNode()
-  val visible = node.boundsInRoot.height
-  assertTrue("Only $visible px of ${node.size.height} px are visible", visible >= node.size.height)
+  val size = node.size
+  assertTrue(
+      "Node has no drawable area: ${size.width} x ${size.height} px",
+      size.width > 0 && size.height > 0,
+  )
+  val visible = node.boundsInRoot
+  assertTrue(
+      "Only ${visible.width} px of ${size.width} px width are visible",
+      visible.width >= size.width,
+  )
+  assertTrue(
+      "Only ${visible.height} px of ${size.height} px height are visible",
+      visible.height >= size.height,
+  )
 }

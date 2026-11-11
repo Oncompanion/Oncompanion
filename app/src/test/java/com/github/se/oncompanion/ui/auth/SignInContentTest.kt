@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,15 +18,22 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.assertSameColor
+import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.theme.TertiaryDark
+import com.github.se.oncompanion.ui.theme.TertiaryLight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class SignInContentTest {
@@ -192,5 +200,38 @@ class SignInContentTest {
 
     waitForText(string(R.string.sign_in_error_no_connection))
     composeTestRule.onNodeWithText(string(R.string.sign_in_retry)).assertIsDisplayed()
+  }
+
+  /** The color at the top of the ribbon's loop: (10, 2.1) of its 20-unit drawing, at 64 dp. */
+  private fun ribbonColor() =
+      composeTestRule.onNodeWithTag(C.Tag.sign_in_logo).colorAt(x = 32.dp, y = 6.72.dp)
+
+  @Test
+  fun logo_isTheRibbonReadAsTheAppName() {
+    setContent(SignInUiState())
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.sign_in_logo)
+        .assertIsDisplayed()
+        .assertContentDescriptionEquals(string(R.string.app_name))
+    // The "O" placeholder is gone
+    composeTestRule.onNodeWithText("O").assertDoesNotExist()
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun logo_isTheVioletRibbon_inLightTheme() {
+    setContent(SignInUiState())
+
+    assertSameColor("light ribbon", TertiaryLight, ribbonColor())
+  }
+
+  @Test
+  @Config(qualifiers = "night")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun logo_isTheLavenderRibbon_inDarkTheme() {
+    setContent(SignInUiState())
+
+    assertSameColor("dark ribbon", TertiaryDark, ribbonColor())
   }
 }

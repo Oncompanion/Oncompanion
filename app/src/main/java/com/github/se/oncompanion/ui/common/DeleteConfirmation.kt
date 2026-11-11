@@ -10,31 +10,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Where the deletion of a detail screen's item is at. Its four flags always change together, so
- * every such screen holds them in this one field.
- *
- * @property isConfirming the user asked to delete the item and hasn't confirmed or cancelled
- * @property isDeleting the item is being deleted
- * @property hasError the last deletion failed; the item is kept
- * @property isDeleted the item is deleted: the screen is done
- */
-data class DeleteState(
-    val isConfirming: Boolean = false,
-    val isDeleting: Boolean = false,
-    val hasError: Boolean = false,
-    val isDeleted: Boolean = false,
-) {
-  /**
-   * This deletion once the item has been read again, [exists] or not: an item deleted elsewhere
-   * can't be deleted here, so its confirmation and its error are dropped.
-   */
-  fun afterRead(exists: Boolean): DeleteState {
-    val stillConfirming = isConfirming && exists
-    return copy(isConfirming = stillConfirming, hasError = hasError && stillConfirming)
-  }
-}
-
-/**
  * The UI state of a detail screen whose item can be deleted after a confirmation (e.g. a symptom or
  * a prescription): what [DeleteConfirmation] reads before each step.
  *
@@ -42,8 +17,8 @@ data class DeleteState(
  * @property canDelete the item is shown and can be deleted; the screen also shows its Delete button
  *   from it, so both always agree
  */
-interface HasDeleteState {
-  val delete: DeleteState
+interface HasDeletePhase {
+  val delete: DeletePhase
   val canDelete: Boolean
 
   /**
@@ -51,7 +26,14 @@ interface HasDeleteState {
    * something, so it never stays over an item that is gone or reloading.
    */
   val isDeleteDialogShown: Boolean
-    get() = delete.isConfirming && (canDelete || delete.isDeleting)
+    get() =
+        when (delete) {
+          DeletePhase.CONFIRMING,
+          DeletePhase.FAILED -> canDelete
+          DeletePhase.DELETING -> true
+          DeletePhase.IDLE,
+          DeletePhase.DELETED -> false
+        }
 }
 
 /**
@@ -64,27 +46,24 @@ interface HasDeleteState {
  * @param withDelete a copy of the screen's state with the given deletion, e.g. `{ state, delete ->
  *   state.copy(delete = delete) }`: each state class has its own `copy`, so it is passed in
  */
-class DeleteConfirmation<S : HasDeleteState>(
+class DeleteConfirmation<S : HasDeletePhase>(
     private val uiState: MutableStateFlow<S>,
     private val scope: CoroutineScope,
     private val tag: String,
     private val item: String,
-    private val withDelete: (S, DeleteState) -> S,
+    private val withDelete: (S, DeletePhase) -> S,
 ) {
 
   /** Asks the user to confirm the deletion. Nothing is deleted before [confirm]. */
   fun request() {
-    uiState.update {
-      if (it.canDelete) withDelete(it, it.delete.copy(isConfirming = true, hasError = false))
-      else it
-    }
+    uiState.update { if (it.canDelete) withDelete(it, DeletePhase.CONFIRMING) else it }
   }
 
   /** Closes the confirmation and keeps the item. Ignored while it is being deleted. */
   fun cancel() {
     uiState.update {
-      if (it.delete.isDeleting) it
-      else withDelete(it, it.delete.copy(isConfirming = false, hasError = false))
+      // Once deleting, the deletion goes on; once deleted, the screen is leaving
+      if (it.delete.isUnderWay) it else withDelete(it, DeletePhase.IDLE)
     }
   }
 
@@ -105,26 +84,24 @@ class DeleteConfirmation<S : HasDeleteState>(
       onFailure: (uid: String) -> Unit,
   ) {
     val state = uiState.value
-    if (!state.delete.isConfirming || !state.canDelete) return
+    if (!state.delete.isAsking || !state.canDelete) return
     val uid = signedInUid()
     if (uid == null) {
-      uiState.update { withDelete(it, it.delete.copy(hasError = true)) }
+      uiState.update { withDelete(it, DeletePhase.FAILED) }
       return
     }
     stopObserving()
-    uiState.update { withDelete(it, it.delete.copy(isDeleting = true, hasError = false)) }
+    uiState.update { withDelete(it, DeletePhase.DELETING) }
     scope.launch {
       try {
         delete(uid)
-        uiState.update {
-          withDelete(it, it.delete.copy(isDeleting = false, isConfirming = false, isDeleted = true))
-        }
+        uiState.update { withDelete(it, DeletePhase.DELETED) }
       } catch (e: CancellationException) {
         // Not a failure: the screen was left, the deletion stops with it
         throw e
       } catch (e: Exception) {
         Log.e(tag, "Failed to delete $item", e)
-        uiState.update { withDelete(it, it.delete.copy(isDeleting = false, hasError = true)) }
+        uiState.update { withDelete(it, DeletePhase.FAILED) }
         onFailure(uid)
       }
     }

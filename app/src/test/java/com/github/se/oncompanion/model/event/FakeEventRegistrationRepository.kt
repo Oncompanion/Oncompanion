@@ -22,7 +22,8 @@ import kotlinx.coroutines.flow.update
  */
 class FakeEventRegistrationRepository(rejectedWrites: RejectedWrites = RejectedWrites()) :
     EventRegistrationRepository {
-  private val store = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+  /** Each uid's confirmations, by event id. */
+  private val store = MutableStateFlow<Map<String, Map<String, EventRegistration>>>(emptyMap())
 
   /** When set, observing fails with this exception when collection starts. */
   var observeError: Exception? = null
@@ -30,7 +31,7 @@ class FakeEventRegistrationRepository(rejectedWrites: RejectedWrites = RejectedW
   /** When set, confirming and removing fail with this exception without changing anything. */
   var writeError: Exception? = null
 
-  private val server = RejectingServer<Map<String, Set<String>>>(rejectedWrites)
+  private val server = RejectingServer<Map<String, Map<String, EventRegistration>>>(rejectedWrites)
 
   /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
   var serverRejectsWrites by server::rejectsWrites
@@ -41,14 +42,18 @@ class FakeEventRegistrationRepository(rejectedWrites: RejectedWrites = RejectedW
   fun rejectPendingWrites() = server.reject { store.value = it }
 
   /** The events [uid] confirmed, for assertions. */
-  fun registeredEventIds(uid: String): Set<String> = store.value[uid].orEmpty()
+  fun registeredEventIds(uid: String): Set<String> = store.value[uid].orEmpty().keys
 
-  override fun observeIsRegistered(uid: String, eventId: String): Flow<Boolean> {
+  /** [uid]'s confirmation for [eventId], with who added it, for assertions. */
+  fun registration(uid: String, eventId: String): EventRegistration? =
+      store.value[uid]?.get(eventId)
+
+  override fun observeRegistration(uid: String, eventId: String): Flow<EventRegistration?> {
     requirePathSegment(uid)
     requirePathSegment(eventId)
     return flow {
       observeError?.let { throw it }
-      emitAll(store.map { eventId in it[uid].orEmpty() }.distinctUntilChanged())
+      emitAll(store.map { it[uid]?.get(eventId) }.distinctUntilChanged())
     }
   }
 
@@ -56,16 +61,16 @@ class FakeEventRegistrationRepository(rejectedWrites: RejectedWrites = RejectedW
     requirePathSegment(uid)
     return flow {
       observeError?.let { throw it }
-      emitAll(store.map { it[uid].orEmpty() }.distinctUntilChanged())
+      emitAll(store.map { it[uid].orEmpty().keys }.distinctUntilChanged())
     }
   }
 
-  override fun confirm(uid: String, eventId: String) {
+  override fun confirm(uid: String, eventId: String, by: EventRegistration) {
     requirePathSegment(uid)
     requirePathSegment(eventId)
     writeError?.let { throw it }
     server.saving(store.value)
-    store.update { it + (uid to (it[uid].orEmpty() + eventId)) }
+    store.update { it + (uid to (it[uid].orEmpty() + (eventId to by))) }
   }
 
   override fun remove(uid: String, eventId: String) {
