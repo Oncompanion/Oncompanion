@@ -54,13 +54,7 @@ data class PrescriptionDetailUiState(
    * may be out of date.
    */
   val canEdit: Boolean
-    get() =
-        isOwn &&
-            prescription != null &&
-            !isLoading &&
-            !hasError &&
-            delete != DeletePhase.DELETING &&
-            delete != DeletePhase.DELETED
+    get() = isOwn && prescription != null && !isLoading && !hasError && !delete.isUnderWay
 
   /** The prescription is shown and can be deleted. */
   override val canDelete: Boolean

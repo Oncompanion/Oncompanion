@@ -55,13 +55,7 @@ data class SymptomDetailUiState(
 ) : HasDeletePhase {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
-    get() =
-        canEdit &&
-            entry != null &&
-            !isLoading &&
-            !hasError &&
-            delete != DeletePhase.DELETING &&
-            delete != DeletePhase.DELETED
+    get() = canEdit && entry != null && !isLoading && !hasError && !delete.isUnderWay
 
   /** The symptom doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean

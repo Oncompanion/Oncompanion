@@ -42,8 +42,7 @@ sealed interface AppointmentDetailUiState : HasDeletePhase {
     get() = DeletePhase.IDLE
 
   override val canDelete: Boolean
-    get() =
-        this is Loaded && isOwn && delete != DeletePhase.DELETING && delete != DeletePhase.DELETED
+    get() = this is Loaded && isOwn && !delete.isUnderWay
 
   /** Waiting for this patient's locally available appointment. */
   data object Loading : AppointmentDetailUiState
@@ -205,8 +204,7 @@ class AppointmentDetailViewModel(
 
   /** Restarts a failed or unavailable observation without keeping duplicate listeners. */
   fun retry() {
-    if (state.value.delete == DeletePhase.DELETING || state.value.delete == DeletePhase.DELETED)
-        return
+    if (state.value.delete.isUnderWay) return
     if (patientUid != null) return followPatient(patientUid)
     observe(runCatching { authRepository.currentUser?.uid }.getOrNull())
     observeAuthentication()

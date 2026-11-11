@@ -229,6 +229,23 @@ class DeleteConfirmationTest {
   }
 
   @Test
+  fun eachPhase_isAskingOrUnderWay_neverBoth() {
+    // IDLE is neither: nothing asked and nothing deleted
+    val cases =
+        listOf(
+            Triple(DeletePhase.IDLE, false, false),
+            Triple(DeletePhase.CONFIRMING, true, false),
+            Triple(DeletePhase.FAILED, true, false),
+            Triple(DeletePhase.DELETING, false, true),
+            Triple(DeletePhase.DELETED, false, true),
+        )
+    for ((phase, asking, underWay) in cases) {
+      assertEquals("$phase isAsking", asking, phase.isAsking)
+      assertEquals("$phase isUnderWay", underWay, phase.isUnderWay)
+    }
+  }
+
+  @Test
   fun aDeletionStep_leavesTheRestOfTheScreenAsItWas() = runTest {
     uiState.value = ItemState(isShown = true)
 

@@ -19,11 +19,21 @@ enum class DeletePhase {
   /** The item is deleted: the screen leaves. */
   DELETED;
 
+  /** The dialog is open and waits for the user: confirming, or after a failed deletion. */
+  val isAsking: Boolean
+    get() = this == CONFIRMING || this == FAILED
+
+  /**
+   * The user confirmed and the deletion can't be taken back: it is running or done. The item can't
+   * be deleted again, and the dialog can't be closed.
+   */
+  val isUnderWay: Boolean
+    get() = this == DELETING || this == DELETED
+
   /**
    * This phase once the item has been read again, [exists] or not: an item deleted elsewhere can't
    * be deleted here, so its confirmation and its error are dropped. A deletion under way or done
    * goes on.
    */
-  fun afterRead(exists: Boolean): DeletePhase =
-      if (!exists && (this == CONFIRMING || this == FAILED)) IDLE else this
+  fun afterRead(exists: Boolean): DeletePhase = if (!exists && isAsking) IDLE else this
 }

@@ -63,8 +63,7 @@ class DeleteConfirmation<S : HasDeletePhase>(
   fun cancel() {
     uiState.update {
       // Once deleting, the deletion goes on; once deleted, the screen is leaving
-      if (it.delete == DeletePhase.DELETING || it.delete == DeletePhase.DELETED) it
-      else withDelete(it, DeletePhase.IDLE)
+      if (it.delete.isUnderWay) it else withDelete(it, DeletePhase.IDLE)
     }
   }
 
@@ -85,8 +84,7 @@ class DeleteConfirmation<S : HasDeletePhase>(
       onFailure: (uid: String) -> Unit,
   ) {
     val state = uiState.value
-    val asked = state.delete == DeletePhase.CONFIRMING || state.delete == DeletePhase.FAILED
-    if (!asked || !state.canDelete) return
+    if (!state.delete.isAsking || !state.canDelete) return
     val uid = signedInUid()
     if (uid == null) {
       uiState.update { withDelete(it, DeletePhase.FAILED) }
