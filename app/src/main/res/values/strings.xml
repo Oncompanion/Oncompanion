@@ -165,6 +165,8 @@
     <string name="symptom_add_title_for">Log symptoms for %1$s</string>
     <!-- Under a symptom a caregiver logged, e.g. "Added by Sam" -->
     <string name="symptom_added_by">Added by %1$s</string>
+    <!-- Heading of the logged symptoms on the detail -->
+    <string name="symptom_detail_symptoms">Symptoms</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
