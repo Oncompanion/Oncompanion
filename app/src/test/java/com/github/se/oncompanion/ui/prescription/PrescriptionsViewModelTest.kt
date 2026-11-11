@@ -5,12 +5,17 @@ package com.github.se.oncompanion.ui.prescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
+import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
+import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.ui.VirtualClock
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
@@ -21,6 +26,7 @@ import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -474,5 +480,155 @@ class PrescriptionsViewModelTest {
           // After a failed read, the access may have been taken away: no adding
           assertEquals("fails=$fails", !fails, viewModel.uiState.value.canAdd)
         }
+      }
+
+  // ----- A prescription a caregiver added (US-43) -----
+
+  @Test
+  fun addedByACaregiver_thePatientSeesTheNameTheyGave_theCaregiverTheStoredOne() =
+      runTest(dispatcher) {
+        val added =
+            prescription("p1", "2026-10-01", "Ondansetron 8 mg")
+                .copy(addedBy = "caregiver", addedByName = "Sam")
+        val circle =
+            FakeCareCircleRepository().apply {
+              setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Samuel")))
+            }
+        repository.seed(uid, added)
+        repository.seed("patient", added)
+        val patient =
+            PrescriptionsViewModel(signedIn(), repository, clock, careCircleRepository = circle)
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+                careCircleRepository = circle,
+            )
+        advanceUntilIdle()
+
+        assertEquals("Samuel", patient.uiState.value.prescriptions.single().addedByName)
+        assertEquals("Sam", caregiver.uiState.value.prescriptions.single().addedByName)
+      }
+
+  @Test
+  fun waitingForThePatient_isGroupedFirst_allForThePatient_onlyTheirOwnForACaregiver() =
+      runTest(dispatcher) {
+        // Sam's and Lea's prescriptions wait for the patient; Sam's older one was confirmed
+        val sams =
+            prescription("sams", "2026-10-02", "Ondansetron 8 mg")
+                .copy(
+                    addedBy = "caregiver",
+                    addedByName = "Sam",
+                    confirmation = PrescriptionConfirmation.PENDING,
+                )
+        val leas =
+            prescription("leas", "2026-09-02", "Metoclopramide")
+                .copy(
+                    addedBy = "lea",
+                    addedByName = "Lea",
+                    confirmation = PrescriptionConfirmation.PENDING,
+                )
+        val confirmed =
+            prescription("confirmed", "2026-10-01", "Paracetamol")
+                .copy(addedBy = "caregiver", addedByName = "Sam")
+        for (owner in listOf(uid, "patient")) {
+          listOf(sams, leas, confirmed).forEach { repository.seed(owner, it) }
+        }
+        val patient = viewModel()
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+            )
+        advanceUntilIdle()
+
+        // Waiting first, then this month and earlier, without the waiting ones
+        val cases =
+            listOf(
+                patient to Triple(listOf("sams", "leas"), listOf("confirmed"), emptyList()),
+                caregiver to Triple(listOf("sams"), listOf("confirmed"), listOf("leas")),
+            )
+        for ((viewModel, expected) in cases) {
+          val state = viewModel.uiState.value
+          assertEquals(expected.first, state.waiting.map { it.id })
+          assertEquals(expected.second, viewModel.thisMonthIds)
+          assertEquals(expected.third, viewModel.earlierIds)
+        }
+      }
+
+  @Test
+  fun rejectedPrescription_isGone_forThePatientAndTheirCaregivers() =
+      runTest(dispatcher) {
+        val rejected =
+            prescription("rejected", "2026-10-02", "Ondansetron 8 mg")
+                .copy(
+                    addedBy = "caregiver",
+                    addedByName = "Sam",
+                    confirmation = PrescriptionConfirmation.REJECTED,
+                )
+        val kept = prescription("kept", "2026-10-01", "Paracetamol")
+        for (owner in listOf(uid, "patient")) {
+          listOf(rejected, kept).forEach { repository.seed(owner, it) }
+        }
+        val patient = viewModel()
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+            )
+        advanceUntilIdle()
+
+        for (viewModel in listOf(patient, caregiver)) assertEquals(listOf("kept"), viewModel.ids)
+      }
+
+  @Test
+  fun addedByACaregiver_followsARename_andOnceTheyLeave_staysPendingWithTheStoredName() =
+      runTest(dispatcher) {
+        val sams =
+            prescription("sams", "2026-10-01", "Ondansetron 8 mg")
+                .copy(
+                    addedBy = "caregiver",
+                    addedByName = "Sam",
+                    confirmation = PrescriptionConfirmation.PENDING,
+                )
+        repository.seed(uid, sams)
+        val circle = FakeCareCircleRepository()
+        fun named(firstName: String) =
+            circle.setMembers(
+                uid,
+                listOf(CareCircleMember(uid = "caregiver", firstName = firstName)),
+            )
+        named("Samuel")
+        val viewModel =
+            PrescriptionsViewModel(signedIn(), repository, clock, careCircleRepository = circle)
+        advanceUntilIdle()
+        fun shown() = viewModel.uiState.value.waiting.single()
+
+        // The patient renames them while the list is open, then removes them from the circle
+        val steps =
+            listOf({ named("Sammy") } to "Sammy", { circle.setMembers(uid, emptyList()) } to "Sam")
+        assertEquals("Samuel", shown().addedByName)
+        for ((change, name) in steps) {
+          change()
+          advanceUntilIdle()
+          assertEquals(name, shown().addedByName)
+        }
+
+        // Still waiting for the patient, never reminded, and the patient can still confirm it
+        assertEquals(PrescriptionConfirmation.PENDING, shown().confirmation)
+        assertTrue(repository.observeMedications(uid).first().isEmpty())
+        assertTrue(ManageMedicationSchedule(repository).update(uid, "sams", sams.toDraft()))
+        val confirmed = repository.prescriptionsOf(uid).single()
+        assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
+        assertEquals("Sam", confirmed.addedByName)
       }
 }

@@ -18,7 +18,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -146,12 +148,12 @@ internal fun TodaySection(entries: List<TodayEntry>, onOpenPlanning: () -> Unit)
           style = MaterialTheme.typography.titleMedium,
           modifier = Modifier.weight(1f),
       )
-      TextButton(
+      LakeButton(
+          text = stringResource(R.string.overview_see_planning),
           onClick = onOpenPlanning,
+          style = LakeButtonStyle.Text,
           modifier = Modifier.testTag(C.Tag.overview_see_planning),
-      ) {
-        Text(stringResource(R.string.overview_see_planning))
-      }
+      )
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -230,6 +232,7 @@ private fun TodayRow(entry: TodayEntry) {
       entry.subtitle?.let {
         Text(text = it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
       }
+      entry.notConfirmedAddedBy?.let { AddedBy(it, isConfirmed = false) }
     }
     when (entry.status) {
       TodayItemStatus.DONE ->

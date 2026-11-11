@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Code <noreply@anthropic.com>
+
 package com.github.se.oncompanion.model.appointment
 
 import java.time.Instant
@@ -22,6 +24,9 @@ enum class AppointmentType {
  * @property location optional free text, also usable without hospital search
  * @property notes optional information the patient wants to keep
  * @property createdAt the server creation timestamp; null before acknowledgement
+ * @property addedBy the uid of the caregiver who added it for the patient (US-41), or `null` when
+ *   the patient did
+ * @property addedByName that caregiver's first name, shown as "Added by Sam"
  */
 data class Appointment(
     val id: String = "",
@@ -31,6 +36,8 @@ data class Appointment(
     val location: String? = null,
     val notes: String? = null,
     val createdAt: Instant? = null,
+    val addedBy: String? = null,
+    val addedByName: String? = null,
 ) {
   /**
    * Whether the patient-entered fields fit the storage schema. The repository assigns [id] and
@@ -42,7 +49,10 @@ data class Appointment(
           scheduledAt >= MIN_SCHEDULED_AT &&
           scheduledAt <= MAX_SCHEDULED_AT &&
           (location == null || location.length <= MAX_LOCATION_LENGTH) &&
-          (notes == null || notes.length <= MAX_NOTES_LENGTH)
+          (notes == null || notes.length <= MAX_NOTES_LENGTH) &&
+          // A caregiver's appointment says who added it
+          (addedBy == null ||
+              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
 
   companion object {
     /** Maximum title length; keep in sync with the appointment security rules. */
@@ -53,6 +63,9 @@ data class Appointment(
 
     /** Maximum notes length; keep in sync with the appointment security rules. */
     const val MAX_NOTES_LENGTH = 1000
+
+    /** Longest name of the caregiver who added it; keep in sync with `isValidAttribution`. */
+    const val MAX_ADDED_BY_NAME_LENGTH = 50
 
     /** Earliest instant supported by a Firestore timestamp. */
     val MIN_SCHEDULED_AT: Instant = Instant.parse("0001-01-01T00:00:00Z")

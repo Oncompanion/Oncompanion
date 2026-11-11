@@ -4,26 +4,39 @@ package com.github.se.oncompanion.ui.prescription.scan
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
+import com.github.se.oncompanion.ui.theme.PrimaryDark
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
+import com.github.se.oncompanion.ui.theme.SurfaceDark
 import java.io.File
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
@@ -32,6 +45,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
@@ -139,7 +153,8 @@ class ScanContentTest {
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsNotEnabled()
     // The preview is already there, as the camera only opens once it can draw it
     compose.onNodeWithTag(FakeScanCamera.VIEWFINDER).assertExists()
-    compose.onNodeWithTag(C.Tag.prescription_scan_framing_guide).assertDoesNotExist()
+    // The guide already shows where the page goes, with the spinner inside it (Figma)
+    compose.onNodeWithTag(C.Tag.prescription_scan_framing_guide).assertIsDisplayed()
   }
 
   @Test
@@ -414,6 +429,300 @@ class ScanContentTest {
       assertEquals("close in state $s", index + 1, backs)
     }
   }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun camera_matchesTheFigma_viewfinderPanelAndRingedShutter() {
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        ScanContent(uiState = granted(), onBack = {}, onEnterManually = {}, onOpenSettings = {})
+      }
+    }
+    val screen = compose.onNodeWithTag(C.Tag.prescription_scan_screen).captureToImage().toPixelMap()
+    val viewfinder =
+        compose.onNodeWithTag(C.Tag.prescription_scan_viewfinder).fetchSemanticsNode().boundsInRoot
+    val shutter =
+        compose
+            .onNodeWithTag(C.Tag.prescription_scan_capture_button)
+            .fetchSemanticsNode()
+            .boundsInRoot
+    val density = compose.density.density
+
+    // The viewfinder's panel is darker than the screen around it (both dark, whatever the phone)
+    val panel = screen[viewfinder.left.toInt() + 4, viewfinder.top.toInt() + 4]
+    val around = screen[4, viewfinder.bottom.toInt() + 4]
+    assertEquals(SurfaceContainerLowestDark, panel)
+    assertTrue("panel $panel should be darker than $around", luminance(panel) < luminance(around))
+
+    // The shutter: a light disc in the middle, the dark screen in the gap, the light ring outside
+    val cx = shutter.center.x.toInt()
+    val cy = shutter.center.y.toInt()
+    fun at(dp: Float) = screen[cx + (dp * density).toInt(), cy]
+    assertTrue("disc", luminance(at(0f)) > 0.6)
+    assertTrue("gap", luminance(at(30f)) < 0.3)
+    assertTrue("ring", luminance(at(34f)) > 0.6)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun reading_dimsThePhotoByHalf_untilItIsRead() {
+    // A white page, so dimming shows
+    val photo =
+        temporaryFolder.newFile().apply {
+          outputStream().use {
+            Bitmap.createBitmap(40, 60, Bitmap.Config.ARGB_8888)
+                .apply { eraseColor(android.graphics.Color.WHITE) }
+                .compress(Bitmap.CompressFormat.JPEG, 90, it)
+          }
+        }
+    val state = mutableStateOf(granted().copy(photo = photo))
+    val dispatcher = StandardTestDispatcher()
+    compose.setContent {
+      ScanContent(
+          uiState = state.value,
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          photoDispatcher = dispatcher,
+      )
+    }
+    compose.waitForIdle()
+    dispatcher.scheduler.advanceUntilIdle()
+    compose.waitForIdle()
+    fun photoLuminance() =
+        compose.onNodeWithTag(C.Tag.prescription_scan_photo).captureToImage().toPixelMap().let {
+          luminance(it[it.width / 2, it.height / 2])
+        }
+    val before = photoLuminance()
+
+    state.value = state.value.copy(isReading = true)
+    compose.waitForIdle()
+    // Half of the white page, half of the dark screen behind it
+    assertEquals((before + luminance(SurfaceDark)) / 2, photoLuminance(), 0.05)
+
+    // Back to full brightness for the patient to check it once nothing could be read
+    state.value = state.value.copy(isReading = false, nothingRead = NothingRead.NO_TEXT)
+    compose.waitForIdle()
+    assertEquals(before, photoLuminance(), 0.01)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun shutter_fadesWhileAPhotoCantBeTaken_butNotWhileOneIsBeingTaken() {
+    val state = mutableStateOf(granted())
+    compose.setContent {
+      ScanContent(uiState = state.value, onBack = {}, onEnterManually = {}, onOpenSettings = {})
+    }
+    fun disc() =
+        compose
+            .onNodeWithTag(C.Tag.prescription_scan_capture_button)
+            .captureToImage()
+            .toPixelMap()
+            .let { luminance(it[it.width / 2, it.height / 2]) }
+    val ready = disc()
+
+    state.value = granted(CameraStatus.STARTING)
+    compose.waitForIdle()
+    // 38% of the disc over the dark screen
+    assertEquals(0.38 * ready + 0.62 * luminance(SurfaceDark), disc(), 0.05)
+
+    state.value = granted().copy(isCapturing = true)
+    compose.waitForIdle()
+    assertEquals(ready, disc(), 0.05)
+  }
+
+  /** The node's bounds in dp, to compare with the Figma. */
+  private fun boundsDp(node: SemanticsNodeInteraction) =
+      node.fetchSemanticsNode().boundsInRoot.let {
+        val d = compose.density.density
+        androidx.compose.ui.geometry.Rect(it.left / d, it.top / d, it.right / d, it.bottom / d)
+      }
+
+  @Test
+  @Config(qualifiers = "w390dp-h844dp-xhdpi")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun photoStates_layOutAsInTheFigma() {
+    // An A4 page, as the Figma's placeholder
+    val photo = photoFile(300, 424)
+    // Each state: what is under the photo, how far under it, and the two buttons (or none)
+    data class Case(
+        val state: ScanUiState,
+        val under: () -> SemanticsNodeInteraction,
+        val gap: Float,
+        val buttons: Pair<String, String>?,
+    )
+    val cases =
+        listOf(
+            Case(
+                granted().copy(photo = photo),
+                { compose.onNodeWithText(string(R.string.prescription_scan_check_hint)) },
+                16f,
+                C.Tag.prescription_scan_use_photo_button to C.Tag.prescription_scan_retake_button,
+            ),
+            Case(
+                granted().copy(photo = photo, nothingRead = NothingRead.NO_TEXT),
+                { compose.onNodeWithText(string(R.string.prescription_scan_nothing_read)) },
+                16f,
+                C.Tag.prescription_scan_nothing_read_enter_manually_button to
+                    C.Tag.prescription_scan_nothing_read_retake_button,
+            ),
+            Case(
+                granted().copy(photo = photo, isReading = true),
+                { compose.onNodeWithTag(C.Tag.prescription_scan_reading) },
+                52f,
+                null,
+            ),
+        )
+    var state by mutableStateOf(cases.first().state)
+    val dispatcher = StandardTestDispatcher()
+    compose.setContent {
+      ScanContent(
+          uiState = state,
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          photoDispatcher = dispatcher,
+      )
+    }
+    val screen = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_screen))
+    cases.forEach { case ->
+      state = case.state
+      compose.waitForIdle()
+      dispatcher.scheduler.advanceUntilIdle()
+      compose.waitForIdle()
+      val content = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_photo_preview))
+      val image = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_photo))
+      // 45 dp from each side, 12 dp under the top bar
+      assertEquals(45f, image.left, 1f)
+      assertEquals(screen.right - 45f, image.right, 1f)
+      assertEquals(content.top + 12f, image.top, 1f)
+      assertEquals(image.bottom + case.gap, boundsDp(case.under()).top, 1f)
+      case.buttons?.let { (primary, secondary) ->
+        val first = boundsDp(compose.onNodeWithTag(primary))
+        val second = boundsDp(compose.onNodeWithTag(secondary))
+        // Stacked at the bottom, 8 dp apart, 16 dp from the edges
+        assertEquals(16f, first.left, 1f)
+        assertEquals(first.bottom + 8f, second.top, 1f)
+        assertEquals(screen.bottom - 16f, second.bottom, 1f)
+      }
+    }
+  }
+
+  @Test
+  @Config(qualifiers = "w390dp-h844dp-xhdpi")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun cameraOff_isTheSharedMessageState_withItsButtonsStackedAtTheBottom() {
+    var state by mutableStateOf(ScanUiState(permission = CameraPermission.REFUSED))
+    compose.setContent {
+      ScanContent(uiState = state, onBack = {}, onEnterManually = {}, onOpenSettings = {})
+    }
+    val screen = boundsDp(compose.onNodeWithTag(C.Tag.prescription_scan_screen))
+    fun button(tag: String) = compose.onNodeWithTag(tag)
+    fun colorOf(tag: String) =
+        button(tag).captureToImage().toPixelMap().let { it[it.width / 8, it.height / 2] }
+
+    // Refused: "Open settings" first and filled, then "Enter manually" on the tonal container
+    compose
+        .onNodeWithTag(C.Tag.prescription_scan_camera_off)
+        .onChildren()
+        .filterToOne(hasTestTag(C.Tag.message_state_icon))
+        .assertIsDisplayed()
+    val settings = boundsDp(button(C.Tag.prescription_scan_open_settings_button))
+    val manual = boundsDp(button(C.Tag.prescription_scan_enter_manually_button))
+    assertEquals(16f, settings.left, 1f)
+    assertEquals(screen.right - 16f, manual.right, 1f)
+    assertEquals(settings.bottom + 8f, manual.top, 1f)
+    assertEquals(screen.bottom - 16f, manual.bottom, 1f)
+    assertEquals(PrimaryDark, colorOf(C.Tag.prescription_scan_open_settings_button))
+    assertEquals(PrimaryContainerDark, colorOf(C.Tag.prescription_scan_enter_manually_button))
+
+    // No camera: "Enter manually" alone, as the main button
+    state = granted(CameraStatus.UNAVAILABLE)
+    compose.waitForIdle()
+    button(C.Tag.prescription_scan_open_settings_button).assertDoesNotExist()
+    assertEquals(PrimaryDark, colorOf(C.Tag.prescription_scan_enter_manually_button))
+  }
+
+  /**
+   * At 200% font scale, what the patient reads and acts on in each state stays whole on screen: the
+   * shutter, even when the viewfinder takes the space, the buttons, and the message that explains
+   * each state.
+   */
+  private fun eachState_staysWholeAtTwiceTheFontSize() {
+    val photo = photoFile(300, 424)
+    fun tag(tag: String) = hasTestTag(tag)
+    fun text(id: Int) = hasText(string(id))
+    val cases =
+        listOf(
+            granted() to listOf(tag(C.Tag.prescription_scan_capture_button)),
+            granted().copy(photo = photo) to
+                listOf(
+                    text(R.string.prescription_scan_check_hint),
+                    tag(C.Tag.prescription_scan_use_photo_button),
+                    tag(C.Tag.prescription_scan_retake_button),
+                ),
+            granted().copy(photo = photo, isReading = true) to
+                listOf(tag(C.Tag.prescription_scan_reading)),
+            granted().copy(photo = photo, nothingRead = NothingRead.NO_TEXT) to
+                listOf(
+                    text(R.string.prescription_scan_nothing_read),
+                    tag(C.Tag.prescription_scan_nothing_read_enter_manually_button),
+                    tag(C.Tag.prescription_scan_nothing_read_retake_button),
+                ),
+            granted().copy(photo = photo, nothingRead = NothingRead.NOT_A_PRESCRIPTION) to
+                listOf(
+                    text(R.string.prescription_scan_not_a_prescription),
+                    tag(C.Tag.prescription_scan_nothing_read_enter_manually_button),
+                    tag(C.Tag.prescription_scan_nothing_read_retake_button),
+                ),
+            ScanUiState(permission = CameraPermission.REFUSED) to
+                listOf(
+                    text(R.string.prescription_scan_camera_off_title),
+                    text(R.string.prescription_scan_camera_off_explanation),
+                    tag(C.Tag.prescription_scan_open_settings_button),
+                    tag(C.Tag.prescription_scan_enter_manually_button),
+                ),
+        )
+    var state by mutableStateOf(cases.first().first)
+    compose.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+        ScanContent(
+            uiState = state,
+            onBack = {},
+            onEnterManually = {},
+            onOpenSettings = {},
+            viewfinder = { camera.Viewfinder(it) },
+        )
+      }
+    }
+    val screen = compose.onNodeWithTag(C.Tag.prescription_scan_screen).fetchSemanticsNode()
+    cases.forEach { (case, matchers) ->
+      state = case
+      compose.waitForIdle()
+      matchers.forEach { matcher ->
+        val node = compose.onNode(matcher).fetchSemanticsNode()
+        val name = matcher.description
+        val bounds = node.boundsInRoot
+        // Not squeezed away, not cut by the screen's edges, and its whole height drawn
+        assertTrue("$name has no height", node.size.height > 0)
+        assertTrue("$name at $bounds is off the screen", bounds.top >= 0f)
+        assertTrue("$name at $bounds is off the screen", bounds.bottom <= screen.size.height)
+        assertEquals("$name is cut", node.size.height.toFloat(), bounds.height, 1f)
+      }
+    }
+  }
+
+  @Test
+  fun atTwiceTheFontSize_eachStateStaysWhole_inPortrait() = eachState_staysWholeAtTwiceTheFontSize()
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun atTwiceTheFontSize_eachStateStaysWhole_inLandscape() =
+      eachState_staysWholeAtTwiceTheFontSize()
+
+  private fun luminance(color: androidx.compose.ui.graphics.Color) =
+      0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)

@@ -6,7 +6,9 @@ package com.github.se.oncompanion.domain.planning
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.planning.*
+import com.github.se.oncompanion.model.planning.observeItems
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -193,5 +195,33 @@ class MedicationPlanningSourceTest {
     val failure = runCatching { source.observeItems("patient", range).first() }.exceptionOrNull()
 
     assertEquals("Read failed", failure?.message)
+  }
+
+  /** A caregiver's prescription says who added it, and shows only while it isn't rejected. */
+  @Test
+  fun aCaregiversPrescription_saysWhoAddedIt_andWhetherItIsConfirmed() = runTest {
+    val cases =
+        listOf(
+            PrescriptionConfirmation.PENDING to false,
+            PrescriptionConfirmation.CONFIRMED to true,
+            PrescriptionConfirmation.REJECTED to null,
+        )
+    for ((confirmation, expected) in cases) {
+      medications.seed(
+          "patient",
+          prescription(medication(duration = 1))
+              .copy(addedBy = "sam", addedByName = "Sam", confirmation = confirmation),
+      )
+
+      val items = source.observeItems("patient", range).first()
+
+      if (expected == null) {
+        assertEquals("$confirmation", emptyList<PlanningItem>(), items)
+      } else {
+        val item = items.single()
+        assertEquals("$confirmation", expected, item.isConfirmed)
+        assertEquals(listOf("sam", "Sam"), listOf(item.addedBy, item.addedByName))
+      }
+    }
   }
 }

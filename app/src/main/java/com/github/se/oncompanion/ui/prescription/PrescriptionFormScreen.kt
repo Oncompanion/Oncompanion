@@ -7,14 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +21,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,13 +28,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -51,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,11 +63,21 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
+import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.LakeTextField
+import com.github.se.oncompanion.ui.common.PaperLakeBand
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
+import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -89,6 +94,10 @@ private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENG
  *
  * @param onClose called when the user leaves the form without saving
  * @param onSaved called once the prescription is saved
+ * @param caregiverOf the first name of the patient a caregiver adds the prescription for (US-43),
+ *   `null` for a patient
+ * @param onRejected called once the patient rejected the prescription a caregiver added: it no
+ *   longer exists, so the form doesn't return to its detail
  */
 @Composable
 fun PrescriptionFormScreen(
@@ -96,12 +105,19 @@ fun PrescriptionFormScreen(
     onClose: () -> Unit,
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
+    caregiverOf: String? = null,
+    onRejected: () -> Unit = onSaved,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-  // Leaves the form once the prescription is saved
+  // Leaves the form once the prescription is saved, or rejected
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
+  val currentOnRejected by rememberUpdatedState(onRejected)
+  LaunchedEffect(uiState.save) {
+    if (uiState.save == SavePhase.SAVED) {
+      if (uiState.wasRejected) currentOnRejected() else currentOnSaved()
+    }
+  }
 
   PrescriptionFormContent(
       uiState = uiState,
@@ -122,6 +138,10 @@ fun PrescriptionFormScreen(
       modifier = modifier,
       onKeepEditing = viewModel::keepEditing,
       onSaveAnyway = viewModel::saveAnyway,
+      onReject = viewModel::requestRejection,
+      onConfirmRejection = viewModel::reject,
+      onCancelRejection = viewModel::cancelRejection,
+      caregiverOf = caregiverOf,
   )
 }
 
@@ -133,6 +153,11 @@ fun PrescriptionFormScreen(
  * @param onRetry reads the saved prescription again after it couldn't be loaded
  * @param onKeepEditing closes the "already saved" question without saving
  * @param onSaveAnyway saves although the prescription is already saved
+ * @param onReject asks to reject the prescription a caregiver added (US-43)
+ * @param onConfirmRejection rejects it, once asked
+ * @param onCancelRejection keeps reviewing it
+ * @param caregiverOf the patient's first name when a caregiver adds for them: the title says whose
+ *   prescriptions it goes to
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -155,9 +180,28 @@ fun PrescriptionFormContent(
     modifier: Modifier = Modifier,
     onKeepEditing: () -> Unit = {},
     onSaveAnyway: () -> Unit = {},
+    onReject: () -> Unit = {},
+    onConfirmRejection: () -> Unit = {},
+    onCancelRejection: () -> Unit = {},
+    caregiverOf: String? = null,
 ) {
   // Asks before saving a prescription already saved (US-39)
-  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway) }
+  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway, caregiverOf) }
+  // Asks before rejecting a prescription a caregiver added (US-43)
+  if (uiState.isConfirmingRejection) {
+    DeleteConfirmationDialog(
+        title = stringResource(R.string.prescription_reject_title),
+        message = stringResource(R.string.prescription_reject_message),
+        error = "",
+        confirmLabel = stringResource(R.string.prescription_reject),
+        cancelLabel = stringResource(R.string.prescription_reject_cancel),
+        isDeleting = uiState.save == SavePhase.SAVING,
+        hasError = false,
+        onConfirm = onConfirmRejection,
+        onCancel = onCancelRejection,
+        tags = rejectDialogTags,
+    )
+  }
 
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
@@ -180,10 +224,10 @@ fun PrescriptionFormContent(
       // Ends the screen at the keyboard (the activity is adjustResize): Save sits just above it
       modifier = modifier.testTag(C.Tag.prescription_form_screen).imePadding(),
       // Without fields there is no keyboard, so the top bar can stay fixed
-      topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose) },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
+      topBar = { if (!scrollsEverything || !isReady) FormTopBar(uiState, onClose, caregiverOf) },
+      snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
-      bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave) },
+      bottomBar = { if (!scrollsEverything && isReady) FormSaveButton(uiState, onSave, onReject) },
   ) { innerPadding ->
     if (!isReady) {
       LoadState(uiState.load, onRetry, Modifier.padding(innerPadding))
@@ -194,27 +238,27 @@ fun PrescriptionFormContent(
             Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
     ) {
       // The Scaffold already keeps the content clear of the status bar
-      if (scrollsEverything) FormTopBar(uiState, onClose, WindowInsets(0))
+      if (scrollsEverything) FormTopBar(uiState, onClose, caregiverOf, WindowInsets(0))
       Column(
           modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         // Same medications as a saved prescription: most likely its renewal (US-39)
-        uiState.renewalOf?.let { RenewalNotice(it) }
+        uiState.renewalOf?.let { RenewalNotice(it, caregiverOf) }
         // A scanned prescription says what was read and what the patient should check
         if (uiState.isScanned) ReviewNotice(uiState)
+        // A prescription a caregiver added asks the patient to check it before confirming (US-43)
+        if (uiState.isToConfirm) ConfirmNotice()
 
         // What the medications share: the doctor (optional) and the date of the prescription
         val prescribedByCheck = uiState.checkOf(ScannedField.PrescribedBy, "prescribed_by")
-        OutlinedTextField(
+        LakeTextField(
             value = uiState.draft.prescribedBy,
             onValueChange = onPrescribedByChange,
             label = { Text(stringResource(R.string.prescription_form_prescribed_by)) },
             supportingText = prescribedByCheck?.let { { CheckReason(it) } },
             trailingIcon = prescribedByCheck?.let { { CheckIcon() } },
-            colors =
-                if (prescribedByCheck != null) checkColors()
-                else OutlinedTextFieldDefaults.colors(),
+            isCheck = prescribedByCheck != null,
             singleLine = true,
             keyboardOptions = textKeyboard(KeyboardCapitalization.Words),
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_prescribed_by_field),
@@ -259,39 +303,69 @@ fun PrescriptionFormContent(
           }
         }
 
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_add_medication),
             onClick = onAddMedication,
+            style = LakeButtonStyle.Text,
             enabled = uiState.canAddMedication,
+            icon = rememberVectorPainter(Icons.Default.Add),
             modifier = Modifier.testTag(C.Tag.prescription_form_add_medication_button),
-        ) {
-          Icon(Icons.Default.Add, contentDescription = null)
-          Spacer(Modifier.width(8.dp))
-          Text(stringResource(R.string.prescription_form_add_medication))
-        }
+        )
       }
-      if (scrollsEverything) FormSaveButton(uiState, onSave)
+      if (scrollsEverything) FormSaveButton(uiState, onSave, onReject)
     }
   }
 }
 
-/** The title and the button that leaves the form without saving. */
+/**
+ * The title and the button that leaves the form without saving, on the Paper lake band (Figma
+ * "US-10 / Review – Partly read", "US-24 / Add prescription", "US-12 / Edit prescription").
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormTopBar(
     uiState: PrescriptionFormUiState,
     onClose: () -> Unit,
+    caregiverOf: String?,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
+  // The light of when the form opened: the sky doesn't change while the patient types
+  val openedAt = remember { LocalTime.now() }
+  PaperLakeBand(openedAt, Modifier.testTag(C.Tag.prescription_form_band)) {
+    FormTopAppBar(uiState, onClose, caregiverOf, windowInsets)
+  }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormTopAppBar(
+    uiState: PrescriptionFormUiState,
+    onClose: () -> Unit,
+    caregiverOf: String?,
+    windowInsets: WindowInsets,
+) {
+  val onHorizon = MaterialTheme.lakeColors.onHorizon
   TopAppBar(
+      // The band shows through, and its text colour reads on it at any time of day
+      colors =
+          TopAppBarDefaults.topAppBarColors(
+              containerColor = Color.Transparent,
+              titleContentColor = onHorizon,
+              navigationIconContentColor = onHorizon,
+          ),
       title = {
         Text(
-            stringResource(
-                when {
-                  uiState.isEditing -> R.string.prescription_form_edit_title
-                  uiState.isScanned -> R.string.prescription_review_title
-                  else -> R.string.prescription_form_add_title
-                }
-            )
+            when {
+              uiState.isToConfirm -> stringResource(R.string.prescription_confirm_title)
+              uiState.isEditing -> stringResource(R.string.prescription_form_edit_title)
+              // A caregiver's title says whose prescriptions it goes to (US-43)
+              caregiverOf != null && uiState.isScanned ->
+                  stringResource(R.string.prescription_review_title_for, caregiverOf)
+              caregiverOf != null ->
+                  stringResource(R.string.prescription_form_add_title_for, caregiverOf)
+              uiState.isScanned -> stringResource(R.string.prescription_review_title)
+              else -> stringResource(R.string.prescription_form_add_title)
+            }
         )
       },
       navigationIcon = {
@@ -345,12 +419,11 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
             R.string.prescription_form_load_error_title,
             R.string.prescription_form_load_error_hint,
         )
-        Button(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_retry),
             onClick = onRetry,
             modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_retry))
-        }
+        )
       }
       // The fields are shown instead
       PrescriptionFormLoad.READY -> Unit
@@ -398,12 +471,12 @@ private fun OpenMedication(
           modifier = Modifier.weight(1f).testTag(C.Tag.prescription_form_medication_title),
       )
       if (canRemove) {
-        TextButton(
+        LakeButton(
+            text = stringResource(R.string.prescription_form_remove_medication),
             onClick = onRemove,
+            style = LakeButtonStyle.Text,
             modifier = Modifier.testTag(C.Tag.prescription_form_remove_medication_button),
-        ) {
-          Text(stringResource(R.string.prescription_form_remove_medication))
-        }
+        )
       }
     }
 
@@ -411,7 +484,7 @@ private fun OpenMedication(
     val nameMissing = nameTouched && medication.name.isBlank()
     // A missing name blocks Save: its red warning comes before a detail to check
     val nameCheck = checks[MedicationDetail.NAME]?.takeUnless { nameMissing }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.name,
         onValueChange = onNameChange,
         label = { Text(stringResource(R.string.prescription_form_medication_name)) },
@@ -428,31 +501,31 @@ private fun OpenMedication(
         },
         trailingIcon = nameCheck?.let { { CheckIcon() } },
         isError = nameMissing,
-        colors = if (nameCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = nameCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_medication_name_field),
     )
     val dosageCheck = checks[MedicationDetail.DOSAGE]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.dosage,
         onValueChange = onDosageChange,
         label = { Text(stringResource(R.string.prescription_form_dosage)) },
         supportingText = dosageCheck?.let { { CheckReason(it) } },
         trailingIcon = dosageCheck?.let { { CheckIcon() } },
-        colors = if (dosageCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = dosageCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.None),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_dosage_field),
     )
     val frequencyCheck = checks[MedicationDetail.FREQUENCY]
-    OutlinedTextField(
+    LakeTextField(
         value = medication.frequency,
         onValueChange = onFrequencyChange,
         label = { Text(stringResource(R.string.prescription_form_frequency)) },
         supportingText = frequencyCheck?.let { { CheckReason(it) } },
         trailingIcon = frequencyCheck?.let { { CheckIcon() } },
-        colors = if (frequencyCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = frequencyCheck != null,
         singleLine = true,
         keyboardOptions = textKeyboard(KeyboardCapitalization.Sentences),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_frequency_field),
@@ -468,7 +541,7 @@ private fun OpenMedication(
     val durationInvalid = !Medication.isValidDuration(medication.durationDays)
     // A duration that can't be saved: its red warning comes before a detail to check
     val durationCheck = checks[MedicationDetail.DURATION]?.takeUnless { durationInvalid }
-    OutlinedTextField(
+    LakeTextField(
         value = medication.durationDays?.toString().orEmpty(),
         onValueChange = onDurationChange,
         label = { Text(stringResource(R.string.prescription_form_duration)) },
@@ -489,7 +562,7 @@ private fun OpenMedication(
             } else durationCheck?.let { { CheckReason(it) } },
         trailingIcon = durationCheck?.let { { CheckIcon() } },
         isError = durationInvalid,
-        colors = if (durationCheck != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+        isCheck = durationCheck != null,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.prescription_form_duration_field),
@@ -598,7 +671,7 @@ private fun DateField(
               )
             }
           },
-      colors = if (check != null) checkColors() else OutlinedTextFieldDefaults.colors(),
+      isCheck = check != null,
   )
 
   if (pickerOpen) {
@@ -625,16 +698,67 @@ private fun DateField(
  * Save, enabled when the form is valid; in the bottom bar, or after the fields on a short screen.
  */
 @Composable
-private fun FormSaveButton(uiState: PrescriptionFormUiState, onSave: () -> Unit) {
-  SaveButton(
-      text = stringResource(R.string.prescription_form_save),
-      enabled = uiState.canSave,
-      isSaving = uiState.save == SavePhase.SAVING,
-      onClick = onSave,
-      testTag = C.Tag.prescription_form_save_button,
-      savingTestTag = C.Tag.prescription_form_saving,
-  )
+private fun FormSaveButton(
+    uiState: PrescriptionFormUiState,
+    onSave: () -> Unit,
+    onReject: () -> Unit,
+) {
+  if (!uiState.isToConfirm) {
+    SaveButton(
+        text = stringResource(R.string.prescription_form_save),
+        enabled = uiState.canSave,
+        isSaving = uiState.save == SavePhase.SAVING,
+        onClick = onSave,
+        testTag = C.Tag.prescription_form_save_button,
+        savingTestTag = C.Tag.prescription_form_saving,
+    )
+    return
+  }
+  // A prescription a caregiver added: Reject next to Confirm, which saves and confirms it (US-43)
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    LakeButton(
+        text = stringResource(R.string.prescription_reject),
+        onClick = onReject,
+        style = LakeButtonStyle.Text,
+        enabled = uiState.save == SavePhase.EDITING,
+        modifier =
+            Modifier.padding(start = Spacing.lg).testTag(C.Tag.prescription_form_reject_button),
+    )
+    SaveButton(
+        text = stringResource(R.string.prescription_confirm_save),
+        enabled = uiState.canSave,
+        isSaving = uiState.save == SavePhase.SAVING && !uiState.isConfirmingRejection,
+        onClick = onSave,
+        testTag = C.Tag.prescription_form_save_button,
+        savingTestTag = C.Tag.prescription_form_saving,
+        modifier = Modifier.weight(1f),
+    )
+  }
 }
+
+/** Asks the patient to check a prescription a caregiver added before confirming it (US-43). */
+@Composable
+private fun ConfirmNotice() {
+  Surface(
+      color = MaterialTheme.colorScheme.secondaryContainer,
+      contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+      shape = MaterialTheme.shapes.medium,
+      modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(
+        text = stringResource(R.string.prescription_confirm_notice),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(Spacing.lg).testTag(C.Tag.prescription_confirm_notice),
+    )
+  }
+}
+
+private val rejectDialogTags =
+    DeleteDialogTags(
+        dialog = C.Tag.prescription_reject_dialog,
+        confirm = C.Tag.prescription_reject_confirm,
+        cancel = C.Tag.prescription_reject_cancel,
+    )
 
 private fun textKeyboard(capitalization: KeyboardCapitalization) =
     KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Next)
@@ -644,4 +768,6 @@ private fun PrescriptionFormError.messageRes(): Int =
     when (this) {
       PrescriptionFormError.NOT_SIGNED_IN -> R.string.prescription_form_error_not_signed_in
       PrescriptionFormError.SAVE_FAILED -> R.string.prescription_form_error_save_failed
+      PrescriptionFormError.REJECT_FAILED -> R.string.prescription_form_error_reject_failed
+      PrescriptionFormError.ALREADY_CONFIRMED -> R.string.prescription_form_already_confirmed
     }

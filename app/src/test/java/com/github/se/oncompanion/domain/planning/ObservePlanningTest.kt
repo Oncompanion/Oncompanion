@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.model.planning.observeItems
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -53,7 +54,7 @@ class ObservePlanningTest {
       )
 
   /** A source that always gives [items], whatever the range. */
-  private fun source(vararg items: PlanningItem) = PlanningRepository { _, _ ->
+  private fun source(vararg items: PlanningItem) = PlanningRepository { _, _, _ ->
     flowOf(items.toList())
   }
 
@@ -130,7 +131,10 @@ class ObservePlanningTest {
   fun aSourceChanging_updatesTheList() = runTest {
     val events = MutableStateFlow(listOf(event("e1", monday, 10)))
     val planning =
-        ObservePlanning(source(appointment("a", monday, 9)), PlanningRepository { _, _ -> events })
+        ObservePlanning(
+            source(appointment("a", monday, 9)),
+            PlanningRepository { _, _, _ -> events },
+        )
     val emissions = mutableListOf<List<String>>()
     backgroundScope.launch {
       planning.observeItems("alice", week).collect { emissions += it.map { i -> i.id } }
@@ -145,7 +149,7 @@ class ObservePlanningTest {
 
   @Test(expected = IllegalStateException::class)
   fun aFailingSource_failsTheList() = runTest {
-    val failing = PlanningRepository { _, _ -> flow { error("Events couldn't be read") } }
+    val failing = PlanningRepository { _, _, _ -> flow { error("Events couldn't be read") } }
 
     ObservePlanning(source(appointment("a", monday, 9)), failing)
         .observeItems("alice", week)

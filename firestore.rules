@@ -34,8 +34,8 @@ service cloud.firestore {
           && data.createdAt is timestamp;
     }
     // Who added an entry: nothing when the patient did, or the signed-in caregiver's uid and first
-    // name when a caregiver did (US-22), so nobody can add one in someone else's name.
-    // Keep in sync with SymptomEntry.MAX_ADDED_BY_NAME_LENGTH.
+    // name when a caregiver did (US-22, US-41), so nobody can add one in someone else's name.
+    // Keep in sync with SymptomEntry and Appointment (MAX_ADDED_BY_NAME_LENGTH).
     function isValidAttribution(ownerUid, data) {
       return isOwner(ownerUid)
           ? !data.keys().hasAny(['addedBy', 'addedByName'])
@@ -54,15 +54,32 @@ service cloud.firestore {
     // The fields of each medication are not checked here: rules have no loops, and checking 20
     // entries one by one exceeds the limit of 1000 expressions per request (about 4 fit). The app
     // checks them before saving (Medication.isValid) and skips the ones it can't read.
+    // A caregiver's prescription (US-43) also says who added it and whether the patient confirmed
+    // it; the patient's own is always confirmed. Keep in sync with PrescriptionConfirmation.
     function isValidPrescription(data) {
-      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications'])
+      return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications',
+                                  'addedBy', 'addedByName', 'confirmation'])
           && data.keys().hasAll(['prescribedOn', 'createdAt', 'medications'])
+          && confirmationOf(data) in ['CONFIRMED', 'PENDING', 'REJECTED']
+          && (data.get('addedBy', null) != null || confirmationOf(data) == 'CONFIRMED')
           && optionalString(data, 'prescribedBy', 100)
           && data.prescribedOn is timestamp
           && data.createdAt is timestamp
           && data.medications is list
           && data.medications.size() >= 1
           && data.medications.size() <= 20;
+    }
+
+    // Saved before US-43 without the field: the patient's own, so confirmed
+    function confirmationOf(data) {
+      return data.get('confirmation', 'CONFIRMED');
+    }
+    // Only the patient decides: a prescription waiting for them becomes confirmed or rejected, and
+    // can't be edited without being confirmed; a decided one keeps its state.
+    function decidesConfirmation(data, previous) {
+      return confirmationOf(previous) == 'PENDING'
+          ? confirmationOf(data) != 'PENDING'
+          : confirmationOf(data) == confirmationOf(previous);
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY, MAX_NOTES_LENGTH,
@@ -95,7 +112,8 @@ service cloud.firestore {
     // ---------- Appointments ----------
     // Schema: title (required nonblank string, at most 100), scheduledAt (timestamp),
     // type (recorded category), location (optional string, 200), notes (optional string, 1000),
-    // createdAt (server timestamp). Identity and ownership come from the document path.
+    // createdAt (server timestamp), and addedBy/addedByName for a caregiver's appointment (see
+    // isValidAttribution). Identity and ownership come from the document path.
     function hasAppointmentTitleText(title) {
       // Match Kotlin Char.isWhitespace, including Unicode spaces that Rules trim() preserves.
       return title.matches('(?s).*[^\\x{0009}-\\x{000D}\\x{001C}-\\x{0020}\\x{00A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}].*');
@@ -103,7 +121,8 @@ service cloud.firestore {
 
     // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
     function isValidAppointment(data) {
-      return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt'])
+      return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt',
+                                  'addedBy', 'addedByName'])
           && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
           && data.title is string
           && hasAppointmentTitleText(data.title)
@@ -216,11 +235,17 @@ service cloud.firestore {
       match /prescriptions/{prescriptionId} {
         allow read: if canRead(uid, 'PRESCRIPTIONS');
         allow delete: if isOwner(uid);
-        allow create: if isOwner(uid)
+        // A caregiver the patient lets add prescriptions creates one waiting for the patient,
+        // signed with their identity (US-43)
+        allow create: if canAddTo(uid, 'PRESCRIPTIONS')
                       && isValidPrescription(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data)
+                      && (isOwner(uid) || confirmationOf(request.resource.data) == 'PENDING')
                       && request.resource.data.createdAt == request.time;
         allow update: if isOwner(uid)
                       && isValidPrescription(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data)
+                      && decidesConfirmation(request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
@@ -242,15 +267,19 @@ service cloud.firestore {
 
       // ---------- Appointments ----------
       // /users/{uid}/appointments/{appointmentId}: read by the owner and by members the owner
-      // shares Planning with; validated writes and deletion by the owner only.
+      // shares Planning with. Created by the owner, or by a member the owner lets add to Planning
+      // (US-41), signed with their uid; edited and deleted by the owner only, who keeps who added
+      // it.
       match /appointments/{appointmentId} {
         allow read: if canRead(uid, 'PLANNING');
         allow delete: if isOwner(uid);
-        allow create: if isOwner(uid)
+        allow create: if canAddTo(uid, 'PLANNING')
                       && isValidAppointment(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data)
                       && request.resource.data.createdAt == request.time;
         allow update: if isOwner(uid)
                       && isValidAppointment(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
@@ -258,20 +287,28 @@ service cloud.firestore {
       // /users/{uid}/eventRegistrations/{eventId}: the user's own statement that they registered
       // with the organizer of /events/{eventId}. It is keyed by the event, so confirming twice
       // writes the same document instead of a duplicate. Members the owner shares Events with
-      // can read it; only the owner saves and removes it. Saving needs an existing event that
-      // hasn't started yet, by the server's clock: a confirmation made offline that only syncs
-      // once the event has started is rejected.
+      // can read it; only the owner removes it. A member the owner lets confirm events (US-42)
+      // can save one that doesn't exist yet, signed with their identity, never replace one.
+      // Saving needs an existing event that hasn't started yet, by the server's clock: a
+      // confirmation made offline that only syncs once the event has started is rejected.
       match /eventRegistrations/{eventId} {
         function isUpcomingEvent() {
           let event = /databases/$(database)/documents/events/$(eventId);
           return exists(event) && get(event).data.startAt > request.time;
         }
+        function isValidRegistration(data) {
+          return data.keys().hasOnly(['confirmedAt', 'addedBy', 'addedByName'])
+              && data.confirmedAt == request.time
+              && isUpcomingEvent();
+        }
         allow read: if canRead(uid, 'EVENTS');
         allow delete: if isOwner(uid);
-        allow create, update: if isOwner(uid)
-                      && request.resource.data.keys().hasOnly(['confirmedAt'])
-                      && request.resource.data.confirmedAt == request.time
-                      && isUpcomingEvent();
+        allow create: if canAddTo(uid, 'EVENTS')
+                      && isValidRegistration(request.resource.data)
+                      && isValidAttribution(uid, request.resource.data);
+        allow update: if isOwner(uid)
+                      && isValidRegistration(request.resource.data)
+                      && keepsAttribution(request.resource.data, resource.data);
       }
 
       // ---------- Care circle ----------

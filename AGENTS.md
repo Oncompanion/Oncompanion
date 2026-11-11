@@ -10,7 +10,7 @@ Humans on the team follow the same rules. See [README.md](README.md) for what th
 - Android app in Kotlin with Jetpack Compose (Material 3). `minSdk 28`, `targetSdk 34`, JVM target 17.
 - Backend: Firebase Authentication (Google Sign-In), Cloud Firestore, and Cloud Functions in TypeScript (`functions/`, the hospital search proxy, checked with App Check). Firebase project: `oncompanion-c4144`.
 - Package root: `com.github.se.oncompanion`. User-visible text writes the app's name **oncompanion**, all lowercase (never "OnCompanion"); #297 renames the strings that still say "Oncompanion".
-- Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved.
+- Users are cancer patients in active therapy. **The app is an organizational tool, not a medical device**: never add code that diagnoses, gives medical advice, or changes a treatment. Anything drafted automatically (e.g. from a scanned prescription) must be confirmed by the user before it is saved. A prescription a caregiver adds for the patient (US-43) is saved unconfirmed and triggers no reminder until the patient reviews and confirms it.
 
 ## Before you start a task
 
@@ -41,6 +41,7 @@ com.github.se.oncompanion/
   - Repositories access Firebase **lazily** (`by lazy`), never in their constructor: each provider builds its repository once, the first time it is used (e.g. by a ViewModel default), and Firebase isn't initialized in Robolectric tests.
 - **ViewModel**: exposes UI state as one `StateFlow<XUiState>`, takes its repositories in the constructor, no Android `Context` and no Compose imports.
   - A form tracks its save with one `SavePhase` (`ui/common`): `EDITING`, `SAVING`, then `SAVED`. Never two `isSaving` / `isSaved` Booleans, which could both be true.
+  - A detail screen that deletes its item tracks it with one `DeletePhase` (`ui/common`): `IDLE`, `CONFIRMING` (or `FAILED`), `DELETING`, then `DELETED`, through the shared `DeleteConfirmation`. Never separate Booleans for each step.
 - **View**: each screen is split in two:
   - `XScreen(viewModel, onSomething: () -> Unit, ...)` collects the state and passes events to the ViewModel.
   - `XContent(uiState, onEvent...)` is stateless. Tests use it to check every state without Firebase.
@@ -129,17 +130,19 @@ Run these before every push and make sure they pass:
   - **Hospital proxy**: the `functions/` checks above.
   - **Checks**: ktfmt, lint, unit + Robolectric tests, and the release build. A formatting, lint or unit test error shows up here in a few minutes.
   - **CI**: the connected tests on an emulator with the Firebase emulators, the coverage report and SonarCloud, which gets the lint report and the unit test coverage from Checks. When Checks fails, CI stops (before the connected tests if Checks already failed), so SonarCloud never computes a coverage without Checks' reports.
-  - The signed release APK is uploaded on `main` only, and every run keeps its test results (with each test's time) for 7 days.
+  - Every run keeps its test results (with each test's time) for 7 days.
+- **Releases**: `release.yml` publishes the signed APK as a GitHub Release every Thursday, from the latest commit on `main` whose CI passed (or by hand: Actions → Weekly release → Run workflow). Its version is `<baseVersion>.<release number>` (`app/build.gradle.kts`): bump `baseVersion` once each milestone is released. Never rename or recreate `release.yml`: its run number is the APK's `versionCode`, and a restart at 1 would block updates on phones.
 - **When a job fails on a flake, use "Re-run failed jobs"**, not "Re-run job" on Checks alone: CI must run again for SonarCloud to get Checks' reports. If only CI failed, it reruns alone and reuses Checks' reports, which are kept 7 days: after that, use "Re-run all jobs".
 - `gradle/gradle-daemon-jvm.properties` pins the Gradle daemon to Java 25, so everyone's builds run on the same Java. The first build downloads it into `~/.gradle/jdks`; on CI it's already installed.
 - Dependency versions are locked (`app/gradle.lockfile`, `settings-gradle.lockfile`). After adding or updating a dependency in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated lock files with your change.
 
 ## Issues and the Scrum board
 
-- **Titles**: a user story is `US-<n>: <what the user can do>` (e.g. `US-39: Be warned before adding a prescription I already have`); a bug is `fix: <what to fix>`; a technical task is an imperative sentence (e.g. `Make CI faster`).
-- Use the issue templates. A task belongs to a user story: link it as a **sub-issue** of the story and write `Part of US-<n>`. A technical task writes "Parent user story: None (technical task)".
-- **Labels**: `enhancement` for stories and tasks, `bug` for bugs, `documentation` for docs, plus the feature's `epic: <feature>` label.
-- **Every item on the board, stories included,** has its board fields: `Nature` (User Story or Sprint Task), `Epic`, `Priority`, and for a task `Types`, an estimate and an assignee. Its `Sprint` matches its column: empty in the Product Backlog, the current sprint in Sprint Backlog, In Development and In review, the sprint it was done in for Done. Fill in **Actual Time** when you close a task, so we can check our estimates.
+- **Epics are user goals that can be finished**, not areas of the app: an epic is a few stories that together let a user reach one goal (e.g. `Epic: A caregiver can follow the patient's care`, #412). It is done when all its stories are closed and its whole flow works in the release APK; then close it. Its issue states the goal, that definition of done and the flow (copy an existing epic, #409 to #417). A new story joins the epic whose goal it serves; if none fits, propose a new epic to the team rather than stretching one.
+- **Titles**: an epic is `Epic: <the user goal>`; a user story is `US-<n>: <what the user can do>` (e.g. `US-39: Be warned before adding a prescription I already have`); a bug is `fix: <what to fix>`; a technical task is an imperative sentence (e.g. `Make CI faster`).
+- Use the issue templates. A user story belongs to an epic: link it as a **sub-issue** of the epic. A task belongs to a user story: link it as a **sub-issue** of the story and write `Part of US-<n>`. A technical task writes "Parent user story: None (technical task)".
+- **Labels**: `enhancement` for stories and tasks, `bug` for bugs, `documentation` for docs, plus the `area: <feature>` label of the part of the app it touches. An area label is for filtering, not an epic.
+- **Every item on the board, stories included,** has its board fields: `Nature` (User Story or Sprint Task), `Epic` (the epic its story belongs to; empty for a technical task), `Priority`, and for a task `Types`, an estimate and an assignee. Its `Sprint` matches its column: empty in the Product Backlog, the current sprint in Sprint Backlog, In Development and In review, the sprint it was done in for Done. Fill in **Actual Time** when you close a task, so we can check our estimates.
 - **The status follows the work**, and each person moves their own items: Product Backlog → Sprint Backlog → In Development (when you start) → In review (when the PR opens) → Done in S<n> (when it's merged).
 - User stories are on the board next to their tasks. The Product Backlog is ordered by priority, P0 first.
 - **The Sprint Backlog is ready before the sprint starts**, holds only the current sprint (later work stays in the Product Backlog), and every member has a task in it: it is a milestone deliverable.
@@ -160,7 +163,7 @@ Run these before every push and make sure they pass:
 - Never push to `main`. Work on a branch and open a pull request. Merge only with one approving review and a green CI (tests + SonarCloud): a team rule, since `main`'s branch protection doesn't require the checks.
 - Branch names: `feature/<short-name>`, `fix/<short-name>`, `chore/<short-name>`, `ci/<short-name>`, `docs/<short-name>`. Never rename the branch of an open PR: GitHub closes the PR.
 - PR titles follow the same convention as commit titles.
-- Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md). Put `Closes #<issue>` in the description so the issue closes on merge.
+- Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md). Put `Closes #<issue>` in the description so the issue closes on merge. GitHub doesn't close a parent when its last sub-issue closes: if the PR finishes a story's last task, also write `Closes #<story>` after ticking its acceptance criteria.
 - Keep PRs small and focused on one task from the Scrum board: about **400 lines of production code** at most, and about **1,000 changed lines in total**, tests included. Generated files (lock files, diagram SVGs) and test data (fixtures) don't count. Split the data layer (model, repository, rules) from the UI when a task needs both.
   - A PR over these limits says why in its description: a mechanical refactor, a rename, code moved without change, a dependency update.
 - Keep at most 2 to 3 of your own PRs waiting for review; get them merged before opening more.

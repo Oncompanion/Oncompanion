@@ -10,10 +10,14 @@ import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
@@ -21,6 +25,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -34,6 +40,9 @@ import kotlinx.coroutines.launch
  * @property canAdd whether a prescription can be added: only to the user's own, once it is known to
  *   be theirs
  * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
+ * @property caregiverUid in caregiver mode, the signed-in caregiver: only the prescriptions they
+ *   added are grouped while they wait for the patient. Null for the patient, who sees every
+ *   caregiver's grouped.
  */
 data class PrescriptionsUiState(
     val today: LocalDate,
@@ -42,19 +51,35 @@ data class PrescriptionsUiState(
     val hasError: Boolean = false,
     val canAdd: Boolean = false,
     val isNotShared: Boolean = false,
+    val caregiverUid: String? = null,
 ) {
   /**
-   * The prescriptions prescribed on or after the first day of the current month, in the order of
-   * [prescriptions] (Figma: "This month").
+   * The prescriptions a caregiver added that wait for the patient, in the order of [prescriptions]
+   * (US-43): for the patient, every caregiver's (Figma: "Added by a caregiver"); for a caregiver,
+   * their own (Figma: "Added by you"). They show above the others.
    */
-  val thisMonth: List<Prescription>
-    get() = prescriptions.filterNot { it.prescribedOn.isBefore(today.withDayOfMonth(1)) }
+  val waiting: List<Prescription>
+    get() = prescriptions.filter {
+      !it.isConfirmed && (caregiverUid == null || it.addedBy == caregiverUid)
+    }
 
   /**
-   * The prescriptions prescribed before the current month, in the same order (Figma: "Earlier").
+   * The other prescriptions prescribed on or after the first day of the current month, in the order
+   * of [prescriptions] (Figma: "This month").
+   */
+  val thisMonth: List<Prescription>
+    get() = others.filterNot { it.prescribedOn.isBefore(today.withDayOfMonth(1)) }
+
+  /**
+   * The other prescriptions prescribed before the current month, in the same order (Figma:
+   * "Earlier").
    */
   val earlier: List<Prescription>
-    get() = prescriptions.filter { it.prescribedOn.isBefore(today.withDayOfMonth(1)) }
+    get() = others.filter { it.prescribedOn.isBefore(today.withDayOfMonth(1)) }
+
+  /** The prescriptions not in [waiting]. */
+  private val others: List<Prescription>
+    get() = waiting.toSet().let { waiting -> prescriptions.filterNot { it in waiting } }
 }
 
 /**
@@ -77,6 +102,8 @@ class PrescriptionsViewModel(
     private val patientUid: String? = null,
     resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val observeSection = ObserveCareSection(resolveSection)
@@ -96,7 +123,18 @@ class PrescriptionsViewModel(
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
-            medicationRepository.observePrescriptions(ownerUid)
+            // A rejected prescription is gone for everyone (US-43)
+            val prescriptions =
+                medicationRepository.observePrescriptions(ownerUid).map { it.visible() }
+            // The patient sees the names they gave the members who added some; a caregiver the
+            // stored ones
+            if (patientUid != null) prescriptions
+            else
+                prescriptions.combine(careCircleRepository.observeMemberNames(ownerUid)) {
+                    list,
+                    names ->
+                  list.map { it.namedBy(names) }
+                }
           }
           .collect { section -> _uiState.update { it.showing(section) } }
     }
@@ -119,7 +157,13 @@ class PrescriptionsViewModel(
         // A patient can still add one if their list fails; a caregiver can't
         is CareSection.Failed -> withoutPrescriptions(hasError = true).copy(canAdd = section.canAdd)
         is CareSection.Shown ->
-            withoutPrescriptions().copy(prescriptions = section.data, canAdd = section.canAdd)
+            withoutPrescriptions()
+                .copy(
+                    prescriptions = section.data,
+                    canAdd = section.canAdd,
+                    // A caregiver's own prescriptions waiting for the patient show apart
+                    caregiverUid = patientUid?.let { authRepository.currentUser?.uid },
+                )
       }
 
   /** No prescriptions and nothing to add, for one of the reasons given. */

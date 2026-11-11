@@ -3,6 +3,10 @@
 package com.github.se.oncompanion.ui.carecircle
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -19,12 +23,15 @@ import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.JoinedCareCircle
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class WhoseCareScreenTest {
@@ -55,6 +62,41 @@ class WhoseCareScreenTest {
           onRetry = { events += "retry" },
       )
     }
+  }
+
+  @Test
+  fun content_removedFromACircle_saysWho_thenGoesAway() {
+    // A patient with no first name stored is still named in the message, without "''s"
+    var removedFrom by mutableStateOf<String?>("Anne")
+    composeTestRule.setContent {
+      WhoseCareContent(
+          uiState = WhoseCareUiState(patients = listOf(paul), isLoading = false),
+          onBack = null,
+          onPatientClick = {},
+          onJoinAnother = { events += "join" },
+          onRetry = {},
+          removedFrom = removedFrom,
+          onRemovalShown = {
+            events += "shown $removedFrom"
+            removedFrom = null
+          },
+      )
+    }
+    val cases =
+        listOf(
+            "Anne" to string(R.string.removed_from_circle, "Anne"),
+            "" to string(R.string.removed_from_circle_unnamed),
+        )
+    for ((name, message) in cases) {
+      composeTestRule.runOnIdle { removedFrom = name }
+      composeTestRule.onNodeWithText(message).assertIsDisplayed()
+      // Joining another circle stays reachable
+      node(C.Tag.whose_care_join_another).assertIsDisplayed()
+
+      composeTestRule.mainClock.advanceTimeBy(10_000)
+      composeTestRule.onNodeWithText(message).assertDoesNotExist()
+    }
+    assertEquals(listOf("shown Anne", "shown "), events)
   }
 
   @Test
@@ -111,20 +153,49 @@ class WhoseCareScreenTest {
 
   @Test
   fun content_noPatient_offersToJoin() {
-    setContent(WhoseCareUiState(isLoading = false))
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = true))
     node(C.Tag.whose_care_empty).assertIsDisplayed()
+    node(C.Tag.whose_care_unconfirmed).assertDoesNotExist()
     node(C.Tag.whose_care_join_another).assertDoesNotExist()
     node(C.Tag.whose_care_action).performClick()
     composeTestRule.runOnIdle { assertEquals(listOf("join"), events) }
   }
 
+  @Test
+  fun content_noPatientNotConfirmed_waitsForTheSync_withRetryAndJoin() {
+    // The app doesn't know yet: never "not in a care circle anymore", and no spinner that would
+    // never end offline
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = false))
+    node(C.Tag.whose_care_unconfirmed).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.whose_care_unconfirmed_title))
+        .assertIsDisplayed()
+    node(C.Tag.whose_care_empty).assertDoesNotExist()
+    composeTestRule.onNodeWithText(string(R.string.whose_care_empty_title)).assertDoesNotExist()
+    node(C.Tag.whose_care_loading).assertDoesNotExist()
+
+    node(C.Tag.whose_care_action).performClick()
+    node(C.Tag.whose_care_secondary_action).performClick()
+    composeTestRule.runOnIdle { assertEquals(listOf("retry", "join"), events) }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun content_noPatientNotConfirmed_bothActionsFitInLandscape() {
+    setContent(WhoseCareUiState(isLoading = false, isConfirmed = false))
+    node(C.Tag.whose_care_action).assertIsFullyVisible()
+    node(C.Tag.whose_care_secondary_action).assertIsFullyVisible()
+  }
+
   // --- WhoseCareScreen with a view model ---
 
-  private fun viewModelFollowing(vararg patients: Pair<String, String>): WhoseCareViewModel {
+  private fun viewModelFollowing(
+      vararg patients: Pair<String, String>,
+      circles: FakeCareCircleRepository = FakeCareCircleRepository(),
+  ): WhoseCareViewModel {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
     val invites = FakeCareCircleInviteRepository()
-    val circles = FakeCareCircleRepository()
     for ((uid, _) in patients) {
       circles.setMembers(uid, listOf(CareCircleMember(uid = "caregiver", firstName = "Sam")))
     }
@@ -144,8 +215,100 @@ class WhoseCareScreenTest {
           onJoinAnother = {},
           autoSelectSingle = autoSelectSingle,
           onSignedOut = { events += "signed out" },
+          onNoPatient = { events += "no patient" },
       )
     }
+  }
+
+  @Test
+  fun screen_followingNobody_goesToJoinACircle() {
+    setScreen(viewModelFollowing(), autoSelectSingle = true)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
+    composeTestRule.runOnIdle { assertEquals("no patient", events.first()) }
+  }
+
+  @Test
+  fun screen_removedFromTheLastCircle_goesToJoinACircle_evenWhenSwitching() {
+    // After a removal, the app opens the list without choosing for the caregiver
+    setScreen(viewModelFollowing(), autoSelectSingle = false)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { events.isNotEmpty() }
+    composeTestRule.runOnIdle { assertEquals("no patient", events.first()) }
+  }
+
+  @Test
+  fun screen_aListNotConfirmedYet_staysHere_insteadOfGoingToJoin() {
+    // Joined again while the device still remembers the removal, or a patient that can't be read
+    val cases =
+        listOf<Pair<String, FakeCareCircleRepository.() -> Unit>>(
+            "unconfirmed" to { unconfirmedMembers = setOf("p-anne" to "caregiver") },
+            "unreadable" to { observeError = IllegalStateException("denied") },
+        )
+    var current by mutableStateOf<WhoseCareViewModel?>(null)
+    composeTestRule.setContent {
+      current?.let { viewModel ->
+        key(viewModel) {
+          WhoseCareScreen(
+              viewModel = viewModel,
+              onBack = null,
+              onPatientChosen = { events += "chose ${it.uid}" },
+              onJoinAnother = {},
+              autoSelectSingle = true,
+              onSignedOut = { events += "signed out" },
+              onNoPatient = { events += "no patient" },
+          )
+        }
+      }
+    }
+    for ((name, setUp) in cases) {
+      val viewModel =
+          viewModelFollowing("p-anne" to "Anne", circles = FakeCareCircleRepository().apply(setUp))
+      composeTestRule.runOnIdle {
+        events.clear()
+        current = viewModel
+      }
+      composeTestRule.waitUntil(timeoutMillis = 5_000) { !viewModel.uiState.value.isLoading }
+      composeTestRule.runOnIdle { assertEquals(name, emptyList<String>(), events) }
+    }
+  }
+
+  @Test
+  fun screen_onePatientConfirmed_anotherNot_isNotChosenByItself() {
+    // Right after joining Anne again while following Paul: only Paul is known so far
+    val circles = FakeCareCircleRepository()
+    val viewModel = viewModelFollowing("p-anne" to "Anne", "p-paul" to "Paul", circles = circles)
+    circles.unconfirmedMembers = setOf("p-anne" to "caregiver")
+    setScreen(viewModel, autoSelectSingle = true)
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodes(hasTestTag(C.Tag.whoseCarePatient("p-paul")))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    composeTestRule.runOnIdle {
+      assertEquals(false, viewModel.uiState.value.isConfirmed)
+      assertEquals(emptyList<String>(), events)
+    }
+  }
+
+  @Test
+  fun screen_anEmptyListFromTheCache_staysUsable_insteadOfGoingToJoin() {
+    // Offline or before the server answered: maybe a circle this phone doesn't know about yet
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val invites = FakeCareCircleInviteRepository().apply { joinedCirclesFromCache = true }
+    setScreen(
+        WhoseCareViewModel(auth, invites, FakeCareCircleRepository()),
+        autoSelectSingle = true,
+    )
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule
+          .onAllNodes(hasTestTag(C.Tag.whose_care_unconfirmed))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    node(C.Tag.whose_care_secondary_action).assertIsDisplayed()
+    composeTestRule.runOnIdle { assertEquals(emptyList<String>(), events) }
   }
 
   @Test

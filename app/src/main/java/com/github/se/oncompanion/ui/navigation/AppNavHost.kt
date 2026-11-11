@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +35,8 @@ import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
 import com.github.se.oncompanion.ui.appointment.AppointmentFormScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentFormViewModel
+import com.github.se.oncompanion.ui.auth.AccountCheckScreen
+import com.github.se.oncompanion.ui.auth.AccountSwitchViewModel
 import com.github.se.oncompanion.ui.auth.AfterSignIn
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.SessionBoundary
@@ -62,6 +67,8 @@ import com.github.se.oncompanion.ui.overview.OverviewScreen
 import com.github.se.oncompanion.ui.overview.OverviewViewModel
 import com.github.se.oncompanion.ui.planning.PlanningScreen
 import com.github.se.oncompanion.ui.planning.PlanningViewModel
+import com.github.se.oncompanion.ui.prescription.MedicationDetailScreen
+import com.github.se.oncompanion.ui.prescription.MedicationDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionDetailScreen
 import com.github.se.oncompanion.ui.prescription.PrescriptionDetailViewModel
 import com.github.se.oncompanion.ui.prescription.PrescriptionFormScreen
@@ -133,6 +140,18 @@ private fun SessionNavHost(
   // Caregiver mode: the patient chosen in "Whose care?" (null for a patient), for every screen
   val caregiverMode: CaregiverModeViewModel = viewModel { CaregiverModeViewModel(savedState) }
   val chosenPatient by caregiverMode.patient.collectAsStateWithLifecycle()
+  // Removed from the chosen patient's circle: the patients still followed, or joining a circle.
+  // The list shows even with one left, so the caregiver sees who removed them is gone
+  val lostAccess by caregiverMode.lostAccess.collectAsStateWithLifecycle()
+  // Who removed them, until the message saying so went away on the screen they land on
+  var removedFrom by rememberSaveable { mutableStateOf<String?>(null) }
+  LaunchedEffect(lostAccess) {
+    lostAccess?.let { firstName ->
+      removedFrom = firstName
+      caregiverMode.accessLossHandled()
+      navigationActions.navigateAndClearBackStack(Screen.WHOSE_CARE_SWITCH)
+    }
+  }
   val signOut = {
     caregiverMode.leave()
     navigationActions.navigateAndClearBackStack(Route.AUTH)
@@ -156,6 +175,19 @@ private fun SessionNavHost(
                   }
               )
             },
+        )
+      }
+    }
+
+    // The account couldn't be checked at startup: no role is guessed until Retry knows it
+    navigation(startDestination = Screen.ACCOUNT_CHECK, route = Route.ACCOUNT_CHECK) {
+      composable(Screen.ACCOUNT_CHECK) {
+        AccountCheckScreen(
+            viewModel = viewModel { StartViewModel(decided = Route.ACCOUNT_CHECK) },
+            switchViewModel = viewModel { AccountSwitchViewModel() },
+            credentialProvider = credentialProvider,
+            onChecked = { route -> navigationActions.navigateAndClearBackStack(route) },
+            onSignedOut = signOut,
         )
       }
     }
@@ -192,6 +224,8 @@ private fun SessionNavHost(
             onDone = { navigationActions.navigateAndClearBackStack(Route.WHOSE_CARE) },
             onOpenProfile = { navigationActions.navigateTo(Screen.PROFILE) },
             onSignedOut = signOut,
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }
@@ -214,12 +248,17 @@ private fun SessionNavHost(
                 navigationActions::goBack.takeIf { navController.previousBackStackEntry != null },
             // Their Overview, in caregiver mode
             onPatientChosen = { patient ->
+              // Chosen while the message showed: it must not come back next time
+              removedFrom = null
               caregiverMode.choose(patient)
               navigationActions.navigateAndClearBackStack(Route.OVERVIEW)
             },
             onJoinAnother = { navigationActions.navigateTo(Screen.JOIN_CIRCLE) },
             autoSelectSingle = entry.arguments?.getBoolean(Screen.WHOSE_CARE_AUTO_SELECT) ?: true,
             onSignedOut = signOut,
+            onNoPatient = { navigationActions.navigateAndClearBackStack(Route.JOIN_CIRCLE) },
+            removedFrom = removedFrom,
+            onRemovalShown = { removedFrom = null },
         )
       }
     }
@@ -260,12 +299,11 @@ private fun SessionNavHost(
         PlanningScreen(
             navigationActions,
             planningViewModel,
-            // Only the patient adds appointments
-            onAddAppointment =
-                if (chosenPatient != null) null
-                else ({ navigationActions.navigateTo(Screen.appointmentAdd(it)) }),
+            // A caregiver only sees "Add" when the patient lets them add appointments (US-41)
+            onAddAppointment = { navigationActions.navigateTo(Screen.appointmentAdd(it)) },
             onOpenAppointment = appointmentOpener(navigationActions),
             onOpenEvent = eventOpener(navigationActions),
+            onOpenMedication = medicationOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
         )
       }
@@ -321,10 +359,14 @@ private fun SessionNavHost(
             runCatching { LocalDate.parse(entry.arguments?.getString(Screen.APPOINTMENT_DATE)) }
                 .getOrNull()
                 ?.takeIf { it.year in 1..9999 } ?: LocalDate.now()
-        val form: AppointmentFormViewModel = viewModel { AppointmentFormViewModel(date) }
+        // In caregiver mode, the appointment goes in the chosen patient's planning (US-41)
+        val form: AppointmentFormViewModel = viewModel {
+          AppointmentFormViewModel(date, patientUid = chosenPatient?.uid)
+        }
         AppointmentFormScreen(
             form,
             onBack = dropUnlessResumed { navigationActions.goBack() },
+            caregiverOf = chosenPatient?.firstName,
             onSaved = { instant ->
               // A completion during an exit animation must not pop the calendar as well.
               if (navController.currentBackStackEntry == entry) {
@@ -353,8 +395,11 @@ private fun SessionNavHost(
             eventId = eventId,
             // A second tap during the exit animation must not pop the screen below as well
             onBack = dropUnlessResumed { navigationActions.goBack() },
-            viewModel = viewModel { EventDetailViewModel(eventId) },
-            readOnly = chosenPatient != null,
+            // In caregiver mode, the chosen patient's registration, read-only, when they share
+            // Events
+            viewModel =
+                viewModel { EventDetailViewModel(eventId, patientUid = chosenPatient?.uid) },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }
@@ -417,6 +462,32 @@ private fun SessionNavHost(
             onScan = dropUnlessResumed { navigationActions.navigateTo(Screen.PRESCRIPTION_SCAN) },
             onOpen = { id -> navigationActions.navigateTo(Screen.prescriptionDetail(id)) },
             caregiverOf = chosenPatient?.firstName,
+            // The patient reviews a prescription a caregiver added in the form (US-43)
+            onReview = { id -> navigationActions.navigateTo(Screen.prescriptionEdit(id)) },
+        )
+      }
+      composable(
+          Screen.MEDICATION_DETAIL,
+          arguments =
+              listOf(
+                  navArgument(Screen.PRESCRIPTION_ID) { type = NavType.StringType },
+                  navArgument(Screen.MEDICATION_ID) { type = NavType.StringType },
+              ),
+      ) { entry ->
+        MedicationDetailScreen(
+            viewModel =
+                viewModel {
+                  MedicationDetailViewModel(
+                      prescriptionId =
+                          requireNotNull(entry.arguments?.getString(Screen.PRESCRIPTION_ID)),
+                      medicationId =
+                          requireNotNull(entry.arguments?.getString(Screen.MEDICATION_ID)),
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
+            onBack = dropUnlessResumed { navigationActions.goBack() },
+            onViewPrescription = detailOpener(navigationActions, Screen::prescriptionDetail),
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -448,6 +519,8 @@ private fun SessionNavHost(
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the detail, which shows the correction
             onSaved = navigationActions::goBack,
+            // A rejected prescription has no detail any more: back to the list (US-43)
+            onRejected = { navController.popBackStack(Screen.PRESCRIPTIONS, inclusive = false) },
         )
       }
       composable(Screen.PRESCRIPTION_SCAN) { entry ->
@@ -471,8 +544,15 @@ private fun SessionNavHost(
       composable(Screen.PRESCRIPTION_ADD) { entry ->
         val handoff = scanHandoffViewModel(navController, entry)
         PrescriptionFormScreen(
-            // Reviews the scanned prescription if it was just read, empty otherwise
-            viewModel = viewModel { PrescriptionFormViewModel(scan = handoff.scanned) },
+            // Reviews the scanned prescription if it was just read, empty otherwise. In caregiver
+            // mode, it goes in the chosen patient's prescriptions, waiting for them (US-43)
+            viewModel =
+                viewModel {
+                  PrescriptionFormViewModel(
+                      scan = handoff.scanned,
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
             // A second tap while the form is already leaving is dropped, so Back happens once. The
             // scan's photo is no longer needed once the form is done
             onClose =
@@ -485,6 +565,7 @@ private fun SessionNavHost(
               handoff.finish()
               navigationActions.goBack()
             },
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }
@@ -521,6 +602,12 @@ private fun SessionNavHost(
                 else navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
               }
             },
+            // The invitation the typed email already has: Back returns to the form
+            onOpenInvite = { inviteCode ->
+              if (navController.currentBackStackEntry == entry) {
+                navigationActions.navigateTo(Screen.careCircleInvite(inviteCode))
+              }
+            },
             viewModel = viewModel { CareCircleMemberFormViewModel() },
         )
       }
@@ -531,7 +618,8 @@ private fun SessionNavHost(
       ) {
         CareCircleInviteScreen(
             onBack = dropUnlessResumed { navigationActions.goBack() },
-            // The new invite code replaces the expired one: Back still returns to the list
+            // The new invite code replaces the expired one: Back still returns to where it was
+            // opened from, the list or the add form
             onRenewed = { inviteCode ->
               navigationActions.navigateReplacing(Screen.careCircleInvite(inviteCode))
             },
@@ -557,6 +645,8 @@ private fun SessionNavHost(
                 navigationActions.goBack()
               }
             },
+            // Editing never compares the email, so it never links to an invitation
+            onOpenInvite = {},
             viewModel = viewModel { CareCircleMemberFormViewModel(memberUid = memberUid) },
         )
       }
@@ -622,16 +712,28 @@ private fun appointmentOpener(navigationActions: NavigationActions): (String) ->
 private fun eventOpener(navigationActions: NavigationActions): (String) -> Unit =
     detailOpener(navigationActions, Screen::eventDetail)
 
-/** Opens the [route] of an id only while the current entry is resumed. */
+/** Opens the [route] of a detail argument only while the current entry is resumed. */
 @Composable
-private fun detailOpener(
+private fun <T> detailOpener(
     navigationActions: NavigationActions,
-    route: (String) -> String,
-): (String) -> Unit {
+    route: (T) -> String,
+): (T) -> Unit {
   val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
   return { id ->
     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
       navigationActions.navigateTo(route(id))
     }
   }
+}
+
+/**
+ * Opens the medication's exact source while Planning is resumed, like other detail entry points.
+ */
+@Composable
+private fun medicationOpener(navigationActions: NavigationActions): (String, String) -> Unit {
+  val open =
+      detailOpener<Pair<String, String>>(navigationActions) { (prescriptionId, medicationId) ->
+        Screen.medicationDetail(prescriptionId, medicationId)
+      }
+  return { prescriptionId, medicationId -> open(prescriptionId to medicationId) }
 }

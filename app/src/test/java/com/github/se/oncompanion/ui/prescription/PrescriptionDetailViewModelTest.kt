@@ -7,14 +7,17 @@ import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +131,23 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertNull(vm.uiState.value.prescription)
+    assertTrue(vm.uiState.value.isNotFound)
+  }
+
+  @Test
+  fun rejectedPrescription_isNotFound() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.REJECTED,
+        ),
+    )
+    val vm = viewModel()
+
+    advanceUntilIdle()
+
     assertTrue(vm.uiState.value.isNotFound)
   }
 
@@ -257,8 +277,8 @@ class PrescriptionDetailViewModelTest {
             PrescriptionDetailUiState(),
             shown.copy(prescription = null),
             shown.copy(hasError = true),
-            shown.copy(delete = DeleteState(isDeleting = true)),
-            shown.copy(delete = DeleteState(isDeleted = true)),
+            shown.copy(delete = DeletePhase.DELETING),
+            shown.copy(delete = DeletePhase.DELETED),
         )
         .forEach {
           assertFalse("Delete in $it", it.canDelete)
@@ -294,8 +314,7 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.delete.isDeleted)
-    assertFalse(vm.uiState.value.delete.isDeleting)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
     // Not shown as "no longer exists" while the screen closes
     assertFalse(vm.uiState.value.isNotFound)
     assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
@@ -315,7 +334,7 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     // Done without waiting for the server
-    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
     assertEquals(emptyList<Prescription>(), medications.prescriptionsOf("alice"))
     assertEquals(0, rejectedWrites.unseen.value)
 
@@ -334,7 +353,7 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertFalse(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
 
@@ -350,7 +369,7 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertEquals(chemo, vm.uiState.value.prescription)
-    assertFalse(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
   }
 
   @Test
@@ -360,7 +379,7 @@ class PrescriptionDetailViewModelTest {
 
     vm.requestDelete()
 
-    assertFalse(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
   }
 
   @Test
@@ -371,17 +390,15 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.delete.hasError)
+    assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
     assertTrue(vm.uiState.value.isDeleteDialogShown)
-    assertFalse(vm.uiState.value.delete.isDeleted)
     assertEquals(chemo, vm.uiState.value.prescription)
 
     repository.writeError = null
     vm.confirmDelete()
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.delete.isDeleted)
-    assertFalse(vm.uiState.value.delete.hasError)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
   }
 
   @Test
@@ -394,7 +411,7 @@ class PrescriptionDetailViewModelTest {
     vm.cancelDelete()
     vm.requestDelete()
 
-    assertFalse(vm.uiState.value.delete.hasError)
+    assertEquals(DeletePhase.CONFIRMING, vm.uiState.value.delete)
   }
 
   @Test
@@ -408,8 +425,7 @@ class PrescriptionDetailViewModelTest {
 
     // Signing out shows the error, closes the confirmation and deletes nothing
     assertTrue(vm.uiState.value.hasError)
-    assertFalse(vm.uiState.value.delete.isConfirming)
-    assertFalse(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
 
@@ -429,18 +445,18 @@ class PrescriptionDetailViewModelTest {
 
     vm.confirmDelete()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.delete.isDeleting)
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
     assertTrue(vm.uiState.value.isDeleteDialogShown)
     vm.cancelDelete()
     vm.confirmDelete()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
     assertEquals(1, deletes)
 
     deleted.complete(Unit)
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
   }
 
   @Test
@@ -540,5 +556,41 @@ class PrescriptionDetailViewModelTest {
 
     assertTrue(viewModel.uiState.value.hasError)
     assertFalse(viewModel.uiState.value.isNotShared)
+  }
+
+  @Test
+  fun addedByACaregiver_followsARename_andKeepsTheStoredNameOnceTheyLeave() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "caregiver",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.PENDING,
+        ),
+    )
+    val circle = FakeCareCircleRepository()
+    fun named(firstName: String) =
+        circle.setMembers(
+            "alice",
+            listOf(CareCircleMember(uid = "caregiver", firstName = firstName)),
+        )
+    named("Samuel")
+    val viewModel =
+        PrescriptionDetailViewModel("chemo", signedIn(), repository, careCircleRepository = circle)
+    advanceUntilIdle()
+
+    // Renamed while the detail is open, then removed from the circle
+    val steps =
+        listOf({ named("Sammy") } to "Sammy", { circle.setMembers("alice", emptyList()) } to "Sam")
+    assertEquals("Samuel", viewModel.uiState.value.prescription?.addedByName)
+    for ((change, name) in steps) {
+      change()
+      advanceUntilIdle()
+      assertEquals(name, viewModel.uiState.value.prescription?.addedByName)
+    }
+    assertEquals(
+        PrescriptionConfirmation.PENDING,
+        viewModel.uiState.value.prescription?.confirmation,
+    )
   }
 }

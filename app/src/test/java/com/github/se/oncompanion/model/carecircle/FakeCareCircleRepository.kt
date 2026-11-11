@@ -2,6 +2,9 @@
 
 package com.github.se.oncompanion.model.carecircle
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,11 +23,16 @@ import kotlinx.coroutines.flow.map
  * [CareCircleMembership.Unconfirmed] until taken out of it, like a member document the server
  * hasn't confirmed yet. [updateMember] refuses invalid details and leaves a missing member out,
  * like Firestore's `update`. Test hooks: [setMembers] changes a circle, [unconfirmedMembers]
- * simulates a server that hasn't answered, [observeError], [updateError] and [removeError] make the
- * matching calls fail, [observedOwners] records who was observed, [updated] and [removed] record
- * the writes, and [activeObservations] counts the collections still running.
+ * simulates a server that hasn't answered, [membersNeverAnswer] a circle never read offline,
+ * [observeError], [updateError] and [removeError] make the matching calls fail, [observedOwners]
+ * records who was observed, [updated] and [removed] record the writes, [activeObservations] counts
+ * the collections still running, and [serverRejectsWrites] and [rejectPendingWrites] simulate a
+ * server that rejects writes after they returned.
+ *
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeCareCircleRepository : CareCircleRepository {
+class FakeCareCircleRepository(rejectedWrites: RejectedWrites = RejectedWrites()) :
+    CareCircleRepository {
 
   private val circles = MutableStateFlow<Map<String, List<CareCircleMember>>>(emptyMap())
 
@@ -41,6 +49,12 @@ class FakeCareCircleRepository : CareCircleRepository {
       unconfirmed.value = value
     }
 
+  /**
+   * When true, [observeMembers] emits nothing, like a circle never read on this device while
+   * offline.
+   */
+  var membersNeverAnswer = false
+
   /** When non-null, collecting [observeMembers], [observeMember] or [observeMembership] fails. */
   var observeError: Exception? = null
 
@@ -49,6 +63,16 @@ class FakeCareCircleRepository : CareCircleRepository {
 
   /** When non-null, [removeMember] throws it. */
   var removeError: Exception? = null
+
+  private val server = RejectingServer<Map<String, List<CareCircleMember>>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { circles.value = it }
 
   /** The member uid and details of every [updateMember] call, in order. */
   val updated = mutableListOf<Pair<String, CareCircleMemberDetails>>()
@@ -78,7 +102,11 @@ class FakeCareCircleRepository : CareCircleRepository {
 
   override fun observeMembers(ownerUid: String): Flow<List<CareCircleMember>> =
       tracked(ownerUid) {
-        circles.map { circle -> circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME) }
+        if (membersNeverAnswer) flow { awaitCancellation() }
+        else
+            circles.map { circle ->
+              circle[ownerUid].orEmpty().sortedWith(CareCircleMember.BY_NAME)
+            }
       }
 
   override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> =
@@ -110,6 +138,7 @@ class FakeCareCircleRepository : CareCircleRepository {
     updateError?.let { throw it }
     require(details.isValid()) { "Invalid care circle member details" }
     updated += memberUid to details
+    server.saving(circles.value)
     setMembers(
         ownerUid,
         members(ownerUid).map {
@@ -129,6 +158,7 @@ class FakeCareCircleRepository : CareCircleRepository {
   override suspend fun removeMember(ownerUid: String, memberUid: String) {
     removeError?.let { throw it }
     removed += memberUid
+    server.saving(circles.value)
     setMembers(ownerUid, members(ownerUid).filterNot { it.uid == memberUid })
   }
 

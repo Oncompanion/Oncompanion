@@ -2,11 +2,14 @@
 
 package com.github.se.oncompanion.model.carecircle
 
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.session.RejectingServer
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -23,17 +26,23 @@ import kotlinx.coroutines.flow.merge
  * [setInvites] replaces every invite, [observeError], [createError], [updateError] and
  * [cancelError] make the matching calls fail, [createGate] holds [createInvite] back,
  * [failObservations] makes the running observations fail, [created] records the invites created
- * (including renewed ones), and [nextInviteCode] picks the next invite code.
+ * (including renewed ones), [nextInviteCode] picks the next invite code, and [serverRejectsWrites]
+ * and [rejectPendingWrites] simulate a server that rejects the invite writes after they returned
+ * ([redeem] needs the server, so it is never rejected that way).
  *
  * [redeem] follows the rules in memory: it deletes the invite and records the caregiver's
- * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly.
- * [isOffline] makes [redeem] fail like without a connection. The caregiver's role isn't checked.
+ * [joinedCircles], which [observeJoinedCircles] emits; [setJoinedCircles] sets them directly, and
+ * [joinedCirclesFromCache] says they come from the cache only. [isOffline] makes [redeem] fail like
+ * without a connection. The caregiver's role isn't checked.
  *
  * @param circle when given, a successful [redeem] adds the member to it, so screens can watch a
  *   pending invite turn into a member
+ * @param rejectedWrites where [rejectPendingWrites] reports the writes it undoes
  */
-class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepository? = null) :
-    CareCircleInviteRepository {
+class FakeCareCircleInviteRepository(
+    private val circle: FakeCareCircleRepository? = null,
+    rejectedWrites: RejectedWrites = RejectedWrites(),
+) : CareCircleInviteRepository {
 
   private val invites = MutableStateFlow<Map<String, CareCircleInvite>>(emptyMap())
 
@@ -63,6 +72,16 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   /** When non-null, [cancelInvite] throws it. */
   var cancelError: Exception? = null
 
+  private val server = RejectingServer<Map<String, CareCircleInvite>>(rejectedWrites)
+
+  /** When true, writes still return as usual, until [rejectPendingWrites] undoes them. */
+  var serverRejectsWrites by server::rejectsWrites
+
+  /**
+   * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
+   */
+  fun rejectPendingWrites() = server.reject { invites.value = it }
+
   /** Every invite created by [createInvite] or [renewInvite], in order. */
   val created = mutableListOf<CareCircleInvite>()
 
@@ -83,14 +102,29 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     joined.value += caregiverUid to circles
   }
 
-  /** Like [observeJoinedCircles], fails with [observeError] when it is set. */
+  /**
+   * Like [observeJoinedCircles], fails with [observeError] when it is set. From the cache only
+   * ([joinedCirclesFromCache]), an empty list isn't a "no".
+   */
   override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
     observeError?.let { throw it }
-    return joinedCircles(caregiverUid).isNotEmpty()
+    return joinedCircles(caregiverUid).isNotEmpty() || joinedCirclesFromCache
   }
 
-  override fun observeJoinedCircles(caregiverUid: String): Flow<List<JoinedCareCircle>> = observed {
-    joined.map { it[caregiverUid].orEmpty() }.distinctUntilChanged()
+  private val joinedFromCache = MutableStateFlow(false)
+
+  /** Whether [observeJoinedCircles] says the circles come from the cache only, as offline. */
+  var joinedCirclesFromCache: Boolean
+    get() = joinedFromCache.value
+    set(value) {
+      joinedFromCache.value = value
+    }
+
+  override fun observeJoinedCircles(caregiverUid: String): Flow<JoinedCircles> = observed {
+    combine(joined, joinedFromCache) { circles, fromCache ->
+          JoinedCircles(circles[caregiverUid].orEmpty(), fromCache)
+        }
+        .distinctUntilChanged()
   }
 
   /** The invite stored with [inviteCode], whatever its state, or null. */
@@ -110,6 +144,7 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
     createGate?.await()
     createError?.let { throw it }
     requireValid(details, email)
+    server.saving(invites.value)
     return store(
         CareCircleInvite(nextInviteCode(), ownerUid, ownerFirstName, details, email = email)
     )
@@ -139,6 +174,7 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
   ) {
     updateError?.let { throw it }
     requireValid(details, email)
+    server.saving(invites.value)
     // Like Firestore's update (and the rules), a missing or used invite is left unchanged
     val invite = invites.value[inviteCode]?.takeIf { it.redeemerUid == null } ?: return
     invites.value += inviteCode to invite.copy(details = details, email = email)
@@ -146,12 +182,14 @@ class FakeCareCircleInviteRepository(private val circle: FakeCareCircleRepositor
 
   override suspend fun cancelInvite(inviteCode: String) {
     cancelError?.let { throw it }
+    server.saving(invites.value)
     invites.value -= inviteCode
   }
 
   override suspend fun renewInvite(expired: CareCircleInvite): CareCircleInvite {
     createError?.let { throw it }
     requireValid(expired.details, expired.email)
+    server.saving(invites.value)
     invites.value -= expired.inviteCode
     return store(expired.copy(inviteCode = nextInviteCode(), createdAt = null, redeemerUid = null))
   }

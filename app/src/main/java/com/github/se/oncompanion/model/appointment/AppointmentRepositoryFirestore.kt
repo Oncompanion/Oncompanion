@@ -78,7 +78,11 @@ class AppointmentRepositoryFirestore(
         // caller.
         val document = collection(uid).document()
         document
-            .set(fieldsOf(appointment) + (FIELD_CREATED_AT to FieldValue.serverTimestamp()))
+            .set(
+                fieldsOf(appointment) +
+                    attributionOf(appointment) +
+                    (FIELD_CREATED_AT to FieldValue.serverTimestamp())
+            )
             .addOnFailureListener { error ->
               Log.e(
                   TAG,
@@ -128,6 +132,18 @@ class AppointmentRepositoryFirestore(
           FIELD_NOTES to appointment.notes,
       )
 
+  /**
+   * Who added [appointment], only for a caregiver's: the rules refuse these fields on the patient's
+   * own appointments, and an update never changes them.
+   */
+  private fun attributionOf(appointment: Appointment): Map<String, Any?> =
+      if (appointment.addedBy == null) emptyMap()
+      else
+          mapOf(
+              FIELD_ADDED_BY to appointment.addedBy,
+              FIELD_ADDED_BY_NAME to appointment.addedByName,
+          )
+
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
 
@@ -150,6 +166,8 @@ class AppointmentRepositoryFirestore(
               location = document.getString(FIELD_LOCATION),
               notes = document.getString(FIELD_NOTES),
               createdAt = createdAt,
+              addedBy = document.getString(FIELD_ADDED_BY),
+              addedByName = document.getString(FIELD_ADDED_BY_NAME),
           )
           .also { require(it.isValid()) }
     } catch (_: RuntimeException) {
@@ -176,6 +194,10 @@ class AppointmentRepositoryFirestore(
     const val FIELD_NOTES = "notes"
     /** Server-assigned creation timestamp. */
     const val FIELD_CREATED_AT = "createdAt"
+    /** The uid of the caregiver who added it; absent when the patient did. */
+    const val FIELD_ADDED_BY = "addedBy"
+    /** That caregiver's first name, as shown in "Added by". */
+    const val FIELD_ADDED_BY_NAME = "addedByName"
     private const val TAG = "AppointmentRepository"
   }
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Two boats on the lake, when someone joins the care circle, exported from the Figma (page M2) in the dark theme. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="150dp"
+    android:height="120dp"
+    android:viewportWidth="240"
+    android:viewportHeight="192">
+    <path
+        android:fillColor="#5A3B33"
+        android:pathData="M120 180C166.392 180 204 142.392 204 96C204 49.6081 166.392 12 120 12C73.6081 12 36 49.6081 36 96C36 142.392 73.6081 180 120 180Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M153.6 79.1996C162.878 79.1996 170.4 71.678 170.4 62.3996C170.4 53.1212 162.878 45.5996 153.6 45.5996C144.322 45.5996 136.8 53.1212 136.8 62.3996C136.8 71.678 144.322 79.1996 153.6 79.1996Z" />
+    <path
+        android:fillColor="#463C66"
+        android:pathData="M43.2 108L88.8 74.3998L112.8 91.1998L144 64.7998L196.8 108H43.2Z" />
+    <path
+        android:fillColor="#134F5B"
+        android:pathData="M36.864 108C39.7532 127.988 49.7473 146.267 65.0156 159.487C80.2838 172.707 99.8038 179.983 120 179.983C140.196 179.983 159.716 172.707 174.984 159.487C190.253 146.267 200.247 127.988 203.136 108H36.864Z" />
+    <path
+        android:fillColor="#0E3F49"
+        android:pathData="M45.2881 134.4C52.3463 148.135 63.0538 159.658 76.2343 167.704C89.4148 175.749 104.558 180.006 120 180.006C135.442 180.006 150.585 175.749 163.766 167.704C176.946 159.658 187.654 148.135 194.712 134.4H45.2881Z" />
+    <path
+        android:fillColor="#082C33"
+        android:pathData="M63.7681 158.4C79.1973 172.304 99.2305 179.999 120 179.999C140.77 179.999 160.803 172.304 176.232 158.4H63.7681Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M165.6 115.2H141.6C140.274 115.2 139.2 116.275 139.2 117.6C139.2 118.926 140.274 120 141.6 120H165.6C166.925 120 168 118.926 168 117.6C168 116.275 166.925 115.2 165.6 115.2Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M76 123H92L79 101L76 123Z" />
+    <path
+        android:fillColor="#3B4448"
+        android:pathData="M62 125H106L98 134H70L62 125Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M134 124H148L137 105L134 124Z" />
+    <path
+        android:fillColor="#3B4448"
+        android:pathData="M122 125H159L153 133H129L122 125Z" />
+</vector>

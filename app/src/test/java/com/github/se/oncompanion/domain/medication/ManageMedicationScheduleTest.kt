@@ -4,12 +4,15 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import java.io.IOException
 import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -53,6 +56,29 @@ class ManageMedicationScheduleTest {
     assertEquals(5, saved.medications[0].durationDays)
     assertEquals(date.plusDays(1), saved.medications[1].startDate)
     assertNull(saved.medications[1].durationDays)
+  }
+
+  @Test
+  fun caregiversPrescription_isSigned_andWaitsForThePatient() = runTest {
+    manageMedicationSchedule.add(uid, draft, addedBy = "caregiver", addedByName = "Sam")
+    manageMedicationSchedule.add(uid, draft.copy(prescribedOn = date.plusDays(7)))
+
+    val (theirs, own) = repository.prescriptionsOf(uid).partition { it.addedBy != null }
+    assertEquals("Sam", theirs.single().addedByName)
+    assertEquals(PrescriptionConfirmation.PENDING, theirs.single().confirmation)
+    // The patient's own is confirmed and unsigned
+    assertNull(own.single().addedByName)
+    assertEquals(PrescriptionConfirmation.CONFIRMED, own.single().confirmation)
+  }
+
+  @Test
+  fun caregiversPrescription_withoutBothParts_ofTheSignature_isRefused() = runTest {
+    for ((addedBy, addedByName) in listOf("caregiver" to null, null to "Sam")) {
+      assertThrows(IllegalArgumentException::class.java) {
+        runBlocking { manageMedicationSchedule.add(uid, draft, addedBy, addedByName) }
+      }
+    }
+    assertTrue(repository.prescriptionsOf(uid).isEmpty())
   }
 
   @Test
@@ -215,6 +241,60 @@ class ManageMedicationScheduleTest {
     assertEquals(saved.medications.map { it.id }, updated.medications.map { it.id })
     assertEquals(listOf("2 tablets", "2 tablets"), updated.medications.map { it.dosage })
     assertTrue(updated.isValid())
+  }
+
+  @Test
+  fun update_keepsWhoAddedIt_andConfirmsACaregiversPending() = runTest {
+    // What the saved prescription says, and what it says once the patient saved the form
+    val cases =
+        listOf(
+            PrescriptionConfirmation.PENDING to PrescriptionConfirmation.CONFIRMED,
+            PrescriptionConfirmation.CONFIRMED to PrescriptionConfirmation.CONFIRMED,
+            // A decided prescription keeps its state, or the rules would refuse the write
+            PrescriptionConfirmation.REJECTED to PrescriptionConfirmation.REJECTED,
+        )
+    for ((before, after) in cases) {
+      val saved =
+          draft
+              .toPrescription(repository.newId(), repository::newId)
+              .copy(addedBy = "sam", addedByName = "Sam", confirmation = before)
+      repository.addPrescription(uid, saved)
+
+      val edited = saved.toDraft().copy(prescribedBy = "Dr. House")
+      manageMedicationSchedule.update(uid, saved.id, edited)
+
+      val updated = repository.prescriptionsOf(uid).single { it.id == saved.id }
+      assertEquals("Dr. House", updated.prescribedBy)
+      assertEquals(listOf("sam", "Sam"), listOf(updated.addedBy, updated.addedByName))
+      assertEquals(after, updated.confirmation)
+    }
+  }
+
+  @Test
+  fun reject_onlyRejectsAPrescriptionWaitingForThePatient() = runTest {
+    // Its state before, whether it is rejected, and its state after
+    val cases =
+        listOf(
+            PrescriptionConfirmation.PENDING to PrescriptionConfirmation.REJECTED,
+            PrescriptionConfirmation.CONFIRMED to PrescriptionConfirmation.CONFIRMED,
+            PrescriptionConfirmation.REJECTED to PrescriptionConfirmation.REJECTED,
+        )
+    for ((before, after) in cases) {
+      val saved =
+          draft
+              .toPrescription(repository.newId(), repository::newId)
+              .copy(addedBy = "sam", addedByName = "Sam", confirmation = before)
+      repository.addPrescription(uid, saved)
+
+      val rejected = manageMedicationSchedule.reject(uid, saved.id)
+
+      val now = repository.prescriptionsOf(uid).single { it.id == saved.id }
+      assertEquals("$before", before == PrescriptionConfirmation.PENDING, rejected)
+      assertEquals(after, now.confirmation)
+      // It keeps who added it, so the caregiver can see it was rejected
+      assertEquals("Sam", now.addedByName)
+    }
+    assertFalse(manageMedicationSchedule.reject(uid, "missing"))
   }
 
   @Test

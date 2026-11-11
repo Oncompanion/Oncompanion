@@ -99,7 +99,7 @@ class DeleteConfirmationDialogTest {
     assertTextInDialog("Delete")
     assertTextInDialog("Cancel")
     composeTestRule.onNodeWithTag(TAGS.error).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(C.Tag.delete_dialog_progress).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.dialog_progress).assertDoesNotExist()
   }
 
   @Test
@@ -193,8 +193,7 @@ class DeleteConfirmationDialogTest {
   fun whileDeleting_aSpinnerComesBeforeTheButtons_andDeleteIsNoLongerRed() {
     setContent(isDeleting = true)
 
-    val spinner =
-        composeTestRule.onNodeWithTag(C.Tag.delete_dialog_progress).getUnclippedBoundsInRoot()
+    val spinner = composeTestRule.onNodeWithTag(C.Tag.dialog_progress).getUnclippedBoundsInRoot()
     val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
     assertEquals(cancel.left, spinner.right)
     assertStyle("Delete", typography.buttonLabel, primaryText)
@@ -219,8 +218,7 @@ class DeleteConfirmationDialogTest {
     setContent(isDeleting = true, confirmLabel = "Delete this item and all of its notes")
 
     val dialog = composeTestRule.onNodeWithTag(TAGS.dialog).getUnclippedBoundsInRoot()
-    val spinner =
-        composeTestRule.onNodeWithTag(C.Tag.delete_dialog_progress).getUnclippedBoundsInRoot()
+    val spinner = composeTestRule.onNodeWithTag(C.Tag.dialog_progress).getUnclippedBoundsInRoot()
     val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
     assertTrue(spinner.left >= dialog.left)
     assertEquals(cancel.left, spinner.right)

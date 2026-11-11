@@ -119,8 +119,11 @@ class PrescriptionFormScreenTest {
     uiState = uiState.copy(draft = uiState.draft.copy(medications = medications))
   }
 
-  /** Shows PrescriptionFormContent like the real screen does: typing updates the state. */
-  private fun setContent(state: PrescriptionFormUiState) {
+  /**
+   * Shows PrescriptionFormContent like the real screen does: typing updates the state. A caregiver
+   * adds for [caregiverOf].
+   */
+  private fun setContent(state: PrescriptionFormUiState, caregiverOf: String? = null) {
     uiState = state
     composeTestRule.setContent {
       PrescriptionFormContent(
@@ -166,6 +169,16 @@ class PrescriptionFormScreenTest {
           onRetry = { events += "retry" },
           onKeepEditing = { events += "keepEditing" },
           onSaveAnyway = { events += "saveAnyway" },
+          onReject = {
+            events += "reject"
+            uiState = uiState.copy(isConfirmingRejection = true)
+          },
+          onConfirmRejection = { events += "confirmRejection" },
+          onCancelRejection = {
+            events += "cancelRejection"
+            uiState = uiState.copy(isConfirmingRejection = false)
+          },
+          caregiverOf = caregiverOf,
       )
     }
   }
@@ -641,6 +654,33 @@ class PrescriptionFormScreenTest {
       )
 
   @Test
+  fun theTopBarSitsOnThePaperLakeBand_whenAdding_correctingOrReviewing() = topBarSitsOnTheBand()
+
+  // Sideways, the top bar scrolls with the form: the band goes with it
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun theTopBarSitsOnThePaperLakeBand_inLandscape() = topBarSitsOnTheBand()
+
+  private fun topBarSitsOnTheBand() {
+    setContent(empty)
+    listOf(
+            empty to R.string.prescription_form_add_title,
+            filled.copy(isEditing = true) to R.string.prescription_form_edit_title,
+            filled.copy(isScanned = true) to R.string.prescription_review_title,
+        )
+        .forEach { (state, title) ->
+          uiState = state
+          composeTestRule.waitForIdle()
+          val band = node(C.Tag.prescription_form_band).fetchSemanticsNode().boundsInRoot
+          val bar = composeTestRule.onNodeWithText(string(title)).fetchSemanticsNode().boundsInRoot
+          val close = node(C.Tag.prescription_form_close_button).fetchSemanticsNode().boundsInRoot
+          assertEquals(0f, band.top)
+          assertTrue("title $bar in the band $band", band.contains(bar.center))
+          assertTrue("close $close in the band $band", band.contains(close.center))
+        }
+  }
+
+  @Test
   fun aScanIsReviewedWithWhatToCheckInTheNotice() {
     // Dexamethasone is open; Ondansetron's frequency, on its closed row, is to check
     setContent(
@@ -871,7 +911,9 @@ class PrescriptionFormScreenTest {
     setContent(filled)
     val keyboardHeight = 600
 
-    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).performClick()
+    // Focus without a tap: a tap can open the text handle, a window of its own
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).performScrollTo()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_duration_field).requestFocus()
     composeTestRule.showKeyboard(keyboardHeight)
 
     val save = composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button)
@@ -923,6 +965,116 @@ class PrescriptionFormScreenTest {
         .onNodeWithTag(C.Tag.prescription_form_close_button)
         .performScrollTo()
         .assertIsFullyVisible()
+  }
+
+  // ---------- The patient reviews a caregiver's prescription (US-43) ----------
+
+  private val toConfirm = filled.copy(isEditing = true, isToConfirm = true)
+
+  @Test
+  fun toConfirm_asksToCheckIt_thenConfirmOrReject() {
+    setContent(toConfirm)
+
+    composeTestRule.onNodeWithText(string(R.string.prescription_confirm_title)).assertExists()
+    node(C.Tag.prescription_confirm_notice).assertIsDisplayed()
+    node(C.Tag.prescription_form_save_button)
+        .assertTextContains(string(R.string.prescription_confirm_save))
+        .performClick()
+    node(C.Tag.prescription_form_reject_button).performClick()
+
+    // Rejecting asks first: Cancel keeps it, Reject rejects it
+    node(C.Tag.prescription_reject_dialog).assertIsDisplayed()
+    node(C.Tag.prescription_reject_cancel).performClick()
+    node(C.Tag.prescription_reject_dialog).assertDoesNotExist()
+    node(C.Tag.prescription_form_reject_button).performClick()
+    node(C.Tag.prescription_reject_confirm).performClick()
+    assertEquals(
+        listOf("save", "reject", "cancelRejection", "reject", "confirmRejection"),
+        events,
+    )
+  }
+
+  @Test
+  fun rejectionThatDidntHappen_saysWhy() {
+    setContent(toConfirm)
+    for ((error, message) in
+        listOf(
+            PrescriptionFormError.REJECT_FAILED to R.string.prescription_form_error_reject_failed,
+            PrescriptionFormError.ALREADY_CONFIRMED to R.string.prescription_form_already_confirmed,
+        )) {
+      composeTestRule.runOnIdle { uiState = toConfirm.copy(error = error) }
+      waitForText(string(message))
+    }
+  }
+
+  @Test
+  fun aPrescriptionNotToConfirm_hasNoReject() {
+    setContent(filled.copy(isEditing = true))
+
+    node(C.Tag.prescription_form_reject_button).assertDoesNotExist()
+    node(C.Tag.prescription_confirm_notice).assertDoesNotExist()
+    node(C.Tag.prescription_form_save_button)
+        .assertTextContains(string(R.string.prescription_form_save))
+  }
+
+  // ---------- A caregiver adds for the patient (US-43) ----------
+
+  @Test
+  fun caregiver_titleSaysWhosePrescriptionsItGoesTo() {
+    setContent(filled, caregiverOf = "Anne")
+    val cases =
+        listOf(
+            filled to R.string.prescription_form_add_title_for,
+            filled.copy(isScanned = true) to R.string.prescription_review_title_for,
+        )
+    for ((state, title) in cases) {
+      uiState = state
+      composeTestRule.onNodeWithText(context.getString(title, "Anne")).assertExists()
+    }
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_add_title))
+        .assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun toConfirm_landscape_rejectAndConfirmCanBeReached() {
+    setContent(toConfirm)
+
+    node(C.Tag.prescription_form_reject_button).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.prescription_form_save_button).performScrollTo().assertIsFullyVisible()
+  }
+
+  private fun rejectDialog_isFullyVisible() {
+    setContent(toConfirm.copy(isConfirmingRejection = true))
+
+    node(C.Tag.prescription_reject_confirm).assertIsFullyVisible()
+    node(C.Tag.prescription_reject_cancel).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun rejectDialog_landscape_isFullyVisible() = rejectDialog_isFullyVisible()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun rejectDialog_smallLandscape_isFullyVisible() = rejectDialog_isFullyVisible()
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiver_landscapeKeyboardOpen_titleCloseAndSaveCanBeScrolledTo() {
+    setContent(filled.copy(isScanned = true), caregiverOf = "Anne")
+    val keyboardHeight = 500
+    composeTestRule.showKeyboard(keyboardHeight)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_review_title_for, "Anne"))
+        .performScrollTo()
+        .assertIsFullyVisible()
+    node(C.Tag.prescription_form_close_button).performScrollTo().assertIsFullyVisible()
+    val save = node(C.Tag.prescription_form_save_button)
+    save.performScrollTo().assertIsFullyVisible()
+    save.assertIsAboveKeyboard(keyboardHeight)
   }
 
   // ---------- PrescriptionFormScreen ----------
@@ -1148,6 +1300,30 @@ class PrescriptionFormScreenTest {
       uiState = empty.copy(renewalOf = prescription)
       composeTestRule.onNodeWithTag(C.Tag.prescription_renewal_notice).assertIsDisplayed()
       composeTestRule.onNodeWithText(notice, substring = true).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun caregiver_isWarnedAboutThePatientsPrescription_notTheirOwn() {
+    // A prescription without a doctor is named after the patient, in the dialog and the notice
+    val withoutDoctor = savedBefore.copy(prescribedBy = null)
+    setContent(empty.copy(renewalOf = withoutDoctor), caregiverOf = "Anne")
+    composeTestRule
+        .onNodeWithText(
+            "Same medications as Anne's prescription from 29 Sep 2026",
+            substring = true,
+        )
+        .assertIsDisplayed()
+
+    uiState = empty.copy(alreadySaved = withoutDoctor)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_already_saved_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText("Anne's prescription from 29 Sep 2026", substring = true)
+        .assertIsDisplayed()
+    for (yours in listOf("Already in your prescriptions", "Your prescription from")) {
+      composeTestRule.onNodeWithText(yours, substring = true).assertDoesNotExist()
     }
   }
 

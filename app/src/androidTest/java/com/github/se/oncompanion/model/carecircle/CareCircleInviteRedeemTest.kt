@@ -4,6 +4,7 @@ package com.github.se.oncompanion.model.carecircle
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.FirebaseApp
@@ -34,6 +35,7 @@ import org.junit.runner.RunWith
 class CareCircleInviteRedeemTest {
 
   private lateinit var repository: CareCircleInviteRepositoryFirestore
+  private lateinit var rejectedWrites: RejectedWrites
   private lateinit var aliceUid: String
   private lateinit var bobUid: String
 
@@ -56,7 +58,8 @@ class CareCircleInviteRedeemTest {
     bobUid = EmulatorTestData.createUser("bob")
     EmulatorTestData.createProfile("CAREGIVER")
     aliceUid = EmulatorTestData.createUser("alice") // alice, the patient, stays signed in
-    repository = CareCircleInviteRepositoryFirestore(db)
+    rejectedWrites = RejectedWrites()
+    repository = CareCircleInviteRepositoryFirestore(db, rejectedWrites)
   }
 
   @After
@@ -117,18 +120,45 @@ class CareCircleInviteRedeemTest {
   fun observeJoinedCircles_isEmptyBeforeJoining_thenListsThePatient(): Unit = runBlocking {
     val invite = aliceInvite()
     EmulatorTestData.signIn("bob")
+    // Confirmed by the server: bob really joined nobody yet
     assertEquals(
-        emptyList<JoinedCareCircle>(),
-        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() },
+        JoinedCircles(emptyList(), isFromCache = false),
+        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first { !it.isFromCache } },
     )
 
     bobRedeems(invite.inviteCode)
 
     val joined =
-        withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first { it.isNotEmpty() } }
+        withTimeout(10_000) {
+          repository.observeJoinedCircles(bobUid).first { it.circles.isNotEmpty() }.circles
+        }
     assertEquals(listOf(aliceUid), joined.map { it.patientUid })
     assertEquals("Alice", joined.single().patientFirstName)
   }
+
+  @Test
+  fun observeJoinedCircles_offline_saysTheListIsFromTheCache_untilTheServerAnswers(): Unit =
+      runBlocking {
+        val invite = aliceInvite()
+        EmulatorTestData.signIn("bob")
+        db.disableNetwork().await()
+
+        // Nothing read yet on this phone: an empty list that only the cache gives
+        assertEquals(
+            JoinedCircles(emptyList(), isFromCache = true),
+            withTimeout(10_000) { repository.observeJoinedCircles(bobUid).first() },
+        )
+
+        db.enableNetwork().await()
+        bobRedeems(invite.inviteCode)
+        val online =
+            withTimeout(10_000) {
+              repository.observeJoinedCircles(bobUid).first {
+                !it.isFromCache && it.circles.isNotEmpty()
+              }
+            }
+        assertEquals(listOf(aliceUid), online.circles.map { it.patientUid })
+      }
 
   @Test
   fun hasJoinedCircle_isTrueRightAfterJoining_offlineThenOnline(): Unit = runBlocking {
@@ -146,6 +176,36 @@ class CareCircleInviteRedeemTest {
     // And online, from the server
     db.enableNetwork().await()
     assertTrue(withTimeout(10_000) { repository.hasJoinedCircle(bobUid) })
+  }
+
+  @Test
+  fun hasJoinedCircle_offlineWithAnEmptyCopy_isNotANo(): Unit = runBlocking {
+    // Bob joined Alice's circle on this phone, then starts the app offline on another phone that
+    // has never read his circles
+    bobRedeems(aliceInvite().inviteCode)
+    val app =
+        FirebaseApp.initializeApp(
+            ApplicationProvider.getApplicationContext(),
+            FirebaseApp.getInstance().options,
+            "other-phone-${System.nanoTime()}",
+        )
+    // Terminated, not deleted: deleting a Firebase app breaks the emulator setup of later ones
+    val otherPhone =
+        FirebaseFirestore.getInstance(app).apply {
+          useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+        }
+    try {
+      otherPhone.disableNetwork().await()
+
+      // Not known yet: "Whose care?" waits for the server instead of sending him to Join
+      assertTrue(
+          withTimeout(10_000) {
+            CareCircleInviteRepositoryFirestore(otherPhone).hasJoinedCircle(bobUid)
+          }
+      )
+    } finally {
+      otherPhone.terminate()
+    }
   }
 
   @Test
@@ -191,13 +251,16 @@ class CareCircleInviteRedeemTest {
   }
 
   @Test
-  fun redeem_byAPatient_isRefusedByTheServer(): Unit = runBlocking {
+  fun redeem_byAPatient_isRefusedByTheServer_andNotReportedAsUndone(): Unit = runBlocking {
     val invite = aliceInvite()
     EmulatorTestData.createUser("dave")
     EmulatorTestData.createProfile("PATIENT")
     val daveUid = FirebaseEmulator.auth.currentUser!!.uid
     val result = withTimeout(20_000) { repository.redeem(invite.inviteCode, daveUid, null) }
     assertEquals(RedeemResult.InvalidOrUsed, result)
+    // The join screen shows the answer, and nothing was saved on the device to undo
+    withTimeout(10_000) { db.waitForPendingWrites().await() }
+    assertEquals("a refused join is not a rejected write", 0, rejectedWrites.unseen.value)
   }
 
   @Test

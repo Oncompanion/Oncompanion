@@ -74,6 +74,11 @@ object C {
     const val sign_in_screen = "sign_in_screen"
     const val google_sign_in_button = "google_sign_in_button"
     const val sign_in_loading = "sign_in_loading"
+    const val sign_in_logo = "sign_in_logo"
+    const val account_check_screen = "account_check_screen"
+    const val account_check_retry = "account_check_retry"
+    const val account_check_loading = "account_check_loading"
+    const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
@@ -102,6 +107,7 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
     const val bottom_navigation_tab_overview = "bottom_navigation_tab_overview"
@@ -185,6 +191,7 @@ object C {
     const val symptom_edit_retry = "symptom_edit_retry"
     const val symptom_edit_not_found = "symptom_edit_not_found"
     const val symptom_detail_edit = "symptom_detail_edit"
+    const val symptom_detail_symptoms = "symptom_detail_symptoms"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile
@@ -224,7 +231,6 @@ object C {
     const val profile_sign_out_confirm = "profile_sign_out_confirm"
     const val profile_sign_out_cancel = "profile_sign_out_cancel"
     const val profile_sign_out_error = "profile_sign_out_error"
-    const val profile_signing_out = "profile_signing_out"
     const val profile_hospital = "profile_hospital"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
@@ -313,6 +319,9 @@ object C {
     /** The switch letting the member add to [permissionName], e.g. "SYMPTOMS". */
     fun careCircleFormCanAdd(permissionName: String) = "care_circle_form_can_add_$permissionName"
 
+    /** Under the email warning: opens the invitation that already has this email (#257). */
+    const val care_circle_form_open_invite = "care_circle_form_open_invite"
+
     // Join a care circle
     const val join_circle_screen = "join_circle_screen"
     const val join_circle_code_field = "join_circle_code_field"
@@ -331,13 +340,16 @@ object C {
     const val whose_care_empty = "whose_care_empty"
     const val whose_care_action = "whose_care_action"
     const val whose_care_join_another = "whose_care_join_another"
+    const val whose_care_unconfirmed = "whose_care_unconfirmed"
+    const val whose_care_secondary_action = "whose_care_secondary_action"
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
 
+    const val removed_from_circle_snackbar = "removed_from_circle_snackbar"
+
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
-    const val not_shared_icon = "not_shared_icon"
     // Caregiver mode: who added an entry for the patient
     const val added_by = "added_by"
 
@@ -366,6 +378,7 @@ object C {
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
+    const val prescription_form_band = "prescription_form_band"
     const val prescription_form_close_button = "prescription_form_close_button"
     const val prescription_form_prescribed_by_field = "prescription_form_prescribed_by_field"
     const val prescription_form_date_field = "prescription_form_date_field"
@@ -402,6 +415,7 @@ object C {
     const val prescriptions_earlier_header = "prescriptions_earlier_header"
     const val prescriptions_enter_manually_button = "prescriptions_enter_manually_button"
     const val prescriptions_scan_button = "prescriptions_scan_button"
+    const val prescriptions_waiting_header = "prescriptions_waiting_header"
 
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
@@ -427,10 +441,24 @@ object C {
     const val prescription_already_saved_keep_editing = "prescription_already_saved_keep_editing"
     const val prescription_already_saved_save_anyway = "prescription_already_saved_save_anyway"
     const val prescription_renewal_notice = "prescription_renewal_notice"
+    const val prescription_confirm_notice = "prescription_confirm_notice"
+    const val prescription_form_reject_button = "prescription_form_reject_button"
+    const val prescription_reject_dialog = "prescription_reject_dialog"
+    const val prescription_reject_confirm = "prescription_reject_confirm"
+    const val prescription_reject_cancel = "prescription_reject_cancel"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
+
+    // Medication detail (US-35)
+    const val medication_detail_screen = "medication_detail_screen"
+    const val medication_detail_back = "medication_detail_back"
+    const val medication_detail_content = "medication_detail_content"
+    const val medication_detail_prescription = "medication_detail_prescription"
+    const val medication_detail_loading = "medication_detail_loading"
+    const val medication_detail_feedback = "medication_detail_feedback"
+    const val medication_detail_retry = "medication_detail_retry"
 
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
@@ -468,7 +496,13 @@ object C {
     // A change the server rejected and was undone
     const val rejected_write_snackbar = "rejected_write_snackbar"
 
-    // Shared delete confirmation: the spinner while the item is being deleted
-    const val delete_dialog_progress = "delete_dialog_progress"
+    // Shared dialog: the spinner while its action is on its way
+    const val dialog_progress = "dialog_progress"
+
+    // Shared message state: its round info tile
+    const val message_state_icon = "message_state_icon"
+
+    // Shared filter chip: the check of a selected chip
+    const val filter_chip_check = "filter_chip_check"
   }
 }

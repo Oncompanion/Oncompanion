@@ -117,7 +117,7 @@ class PlanningNavigationTest {
             "Support workshop",
             "Ligue · Geneva",
         )
-    val source = PlanningRepository { _, _ -> flowOf(listOf(event, appointment, medication)) }
+    val source = PlanningRepository { _, _, _ -> flowOf(listOf(event, appointment, medication)) }
     PlanningRepositoryProvider.repository = source
     compose.setContent {
       CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {

@@ -60,6 +60,7 @@ class LandscapeRotationTest {
               vm,
               onOpenAppointment = {},
               onOpenEvent = {},
+              onOpenMedication = { _, _ -> },
           )
         }
       }

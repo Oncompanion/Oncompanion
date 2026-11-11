@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.session
 
@@ -60,7 +61,7 @@ class LocalSessionRepositoryFirestoreTest {
     restartDatabase()
     local = LocalSessionRepositoryFirestore(dbProvider = { db })
     local.prepare()
-    profiles = UserProfileRepositoryFirestore { db }
+    profiles = UserProfileRepositoryFirestore(dbProvider = { db })
   }
 
   private fun restartDatabase() {
@@ -367,7 +368,7 @@ class LocalSessionRepositoryFirestoreTest {
             medications.observePrescription(uid, "missing"),
             invites.observeJoinedCircles(uid),
             circle.observeMember(uid, "missing"),
-            registrations.observeIsRegistered(uid, "missing"),
+            registrations.observeRegistration(uid, "missing"),
         )
     val ready = flows.map { kotlinx.coroutines.CompletableDeferred<Unit>() }
     val listeners = flows.mapIndexed { index, flow ->

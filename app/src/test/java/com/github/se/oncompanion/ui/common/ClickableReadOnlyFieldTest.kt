@@ -2,7 +2,10 @@
 
 package com.github.se.oncompanion.ui.common
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -14,9 +17,12 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.ui.assertTextStyle
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -29,21 +35,30 @@ class ClickableReadOnlyFieldTest {
 
   private var clicks = 0
 
+  private lateinit var colors: ColorScheme
+  private lateinit var typography: Typography
+
   private fun setContent(
       supportingText: String? = null,
       isError: Boolean = false,
+      isCheck: Boolean = false,
   ) {
     composeTestRule.setContent {
-      ClickableReadOnlyField(
-          value = "5 Oct 2026",
-          label = "Date",
-          onClick = { clicks++ },
-          onClickLabel = "Pick a date",
-          trailingIcon = { Text("icon") },
-          supportingText = supportingText?.let { { Text(it) } },
-          isError = isError,
-          modifier = Modifier.testTag(FIELD),
-      )
+      OncompanionTheme {
+        colors = MaterialTheme.colorScheme
+        typography = MaterialTheme.typography
+        ClickableReadOnlyField(
+            value = "5 Oct 2026",
+            label = "Date",
+            onClick = { clicks++ },
+            onClickLabel = "Pick a date",
+            trailingIcon = { Text("icon") },
+            supportingText = supportingText?.let { { Text(it) } },
+            isError = isError,
+            isCheck = isCheck,
+            modifier = Modifier.testTag(FIELD),
+        )
+      }
     }
   }
 
@@ -86,6 +101,32 @@ class ClickableReadOnlyFieldTest {
     setContent(supportingText = "Later than now", isError = true)
 
     field().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
+  }
+
+  // ----- Figma: "Text field", as every other field of a form -----
+
+  @Test
+  fun looksLikeTheOtherFields_labelSmallAboveTheValue() {
+    setContent()
+
+    composeTestRule
+        .onNodeWithText("Date", useUnmergedTree = true)
+        .assertTextStyle(typography.bodySmall, colors.onSurfaceVariant)
+    composeTestRule
+        .onNodeWithText("5 Oct 2026", useUnmergedTree = true)
+        .assertTextStyle(typography.bodyLarge, colors.onSurface)
+  }
+
+  @Test
+  fun aValueToCheck_isOnDawn() {
+    setContent(supportingText = "Please check: the date was hard to read", isCheck = true)
+
+    composeTestRule
+        .onNodeWithText("Date", useUnmergedTree = true)
+        .assertTextStyle(typography.bodySmall, colors.onSecondaryContainer)
+    composeTestRule
+        .onNodeWithText("Please check: the date was hard to read", useUnmergedTree = true)
+        .assertTextStyle(typography.bodySmall, colors.secondary)
   }
 
   private companion object {

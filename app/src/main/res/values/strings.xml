@@ -90,6 +90,11 @@
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
+    <!-- US-43: on the Prescriptions shortcut, read by screen readers, e.g. "1 prescription to confirm" -->
+    <plurals name="overview_prescriptions_to_confirm">
+        <item quantity="one">%1$d prescription to confirm</item>
+        <item quantity="other">%1$d prescriptions to confirm</item>
+    </plurals>
 
     <!-- Symptoms -->
     <string name="symptom_type_fatigue">Fatigue</string>
@@ -165,6 +170,8 @@
     <string name="symptom_add_title_for">Log symptoms for %1$s</string>
     <!-- Under a symptom a caregiver logged, e.g. "Added by Sam" -->
     <string name="symptom_added_by">Added by %1$s</string>
+    <!-- Heading of the logged symptoms on the detail -->
+    <string name="symptom_detail_symptoms">Symptoms</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -174,6 +181,8 @@
     <string name="sign_in_error_no_connection">No internet connection. Check your connection and try again.</string>
     <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
     <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
+    <string name="account_check_title">Couldn\'t check your account</string>
+    <string name="account_check_body">oncompanion couldn\'t read your account on this phone yet. If you\'re offline, connect and try again.</string>
 
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
@@ -229,6 +238,11 @@
     <string name="event_detail_registration_error">Couldn\'t load or save your registration.</string>
     <string name="event_detail_website_error">Couldn\'t open the event website.</string>
     <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
+    <!-- Caregiver mode: the followed patient's first name -->
+    <string name="event_detail_registration_confirmed_by_patient">%1$s confirmed they signed up for this event.</string>
+    <string name="event_detail_registered_caregiver">%1$s is registered</string>
+    <string name="event_detail_website_error_can_confirm_caregiver">Couldn\'t open the event website. You can still tap \"%1$s is registered\".</string>
+    <string name="event_detail_registration_note_caregiver">This saves it in %1$s\'s record. It doesn\'t register %1$s with the organizer or reserve a spot.</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
@@ -299,6 +313,12 @@
     <!-- Letting a member add to a section they see (US-22), under that section's switch -->
     <string name="permission_symptoms_add">Allow adding symptoms</string>
     <string name="permission_symptoms_add_description">They can log a symptom for you</string>
+    <string name="permission_planning_add">Allow adding appointments</string>
+    <string name="permission_planning_add_description">They can add an appointment to your planning. It shows right away, with their name.</string>
+    <string name="permission_events_add">Allow confirming events</string>
+    <string name="permission_events_add_description">They can confirm that you registered for an event. It shows right away, with their name.</string>
+    <string name="permission_prescriptions_add">Allow adding prescriptions</string>
+    <string name="permission_prescriptions_add_description">They can add a prescription. It waits for you to confirm it.</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>
@@ -318,6 +338,14 @@
     <string name="care_circle_form_missing_relationship">Add a relationship to send the invitation.</string>
     <string name="care_circle_form_missing_both">Add a first name and a relationship to send the invitation.</string>
     <string name="care_circle_form_save_error">Couldn\'t add this person. Try again.</string>
+    <!-- Under the email, when someone in the circle already has it (%1$s: their first name) -->
+    <string name="care_circle_form_duplicate">%1$s is already in your care circle with this email.</string>
+    <string name="care_circle_form_duplicate_pending">%1$s already has an invitation with this email. Open it to see the code.</string>
+    <string name="care_circle_form_duplicate_expired">%1$s\'s invitation with this email has expired. Open it to get a new code.</string>
+    <!-- Under that message, opens their invitation -->
+    <string name="care_circle_form_open_invite">Open the invitation</string>
+    <!-- Under the email, when the patient typed their own -->
+    <string name="care_circle_form_own_email">This is your own email. Enter the email of the person you want to invite.</string>
     <!-- Edit a care circle member (#75) -->
     <string name="care_circle_form_edit_title">Edit member</string>
     <string name="care_circle_form_account_email">Account email. It can\'t be changed.</string>
@@ -357,6 +385,11 @@
     <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
+    <!-- Not "offline": the server may just not have answered yet -->
+    <string name="whose_care_unconfirmed_title">Your care circles will appear once this phone has synced.</string>
+    <!-- After the patient removed the caregiver from their circle (#204), e.g. "You\'re no longer in Anne\'s care circle." -->
+    <string name="removed_from_circle">You\'re no longer in %1$s\'s care circle.</string>
+    <string name="removed_from_circle_unnamed">You\'re no longer in this care circle.</string>
 
     <!-- Caregiver mode: a section the patient doesn\'t share, e.g. "Anne doesn\'t share Planning with you" (#240) -->
     <string name="not_shared_title">%1$s doesn\'t share %2$s with you</string>
@@ -428,8 +461,8 @@
     <string name="prescription_form_remove_medication">Remove</string>
     <string name="prescription_form_add_medication">Add medication</string>
     <string name="prescription_form_save">Save prescription</string>
-    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
-    <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
+    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save this prescription.</string>
+    <string name="prescription_form_error_save_failed">Couldn\'t save this prescription. Please try again.</string>
     <string name="prescription_form_edit_title">Edit prescription</string>
     <string name="prescription_form_not_found_title">This prescription no longer exists</string>
     <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
@@ -452,6 +485,16 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <!-- Medication detail (US-35) -->
+    <string name="medication_detail_title">Medication</string>
+    <string name="medication_detail_view_prescription">View prescription</string>
+    <string name="medication_detail_prescription_date">Prescription date</string>
+    <string name="medication_detail_pending">Not confirmed</string>
+    <string name="medication_detail_error">Couldn\'t load this medication</string>
+    <string name="medication_detail_error_hint">Please try again.</string>
+    <string name="medication_detail_unavailable">This medication is unavailable</string>
+    <string name="medication_detail_unavailable_hint">It may have been removed, or its prescription may not be saved on this device.</string>
+
     <string name="prescription_detail_title">Prescription</string>
     <string name="prescription_detail_back">Back</string>
     <string name="prescription_detail_prescribed_by">Prescribed by</string>
@@ -493,13 +536,26 @@
     <string name="prescriptions_list_title_for">%1$s\'s prescriptions</string>
     <string name="prescriptions_empty_hint_for">When %1$s saves a prescription, it will appear here.</string>
     <string name="prescriptions_error_title_for">Couldn\'t load %1$s\'s prescriptions</string>
+    <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
+    <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
+    <string name="prescriptions_added_by_you">Added by you</string>
+    <!-- US-43: the patient reviews a prescription a caregiver added, then confirms or rejects it -->
+    <string name="prescription_confirm_title">Review the prescription</string>
+    <string name="prescription_confirm_notice">A caregiver added this prescription. Check each field and correct it if needed, then confirm.</string>
+    <string name="prescription_confirm_save">Confirm prescription</string>
+    <string name="prescription_reject">Reject</string>
+    <string name="prescription_reject_title">Reject this prescription?</string>
+    <string name="prescription_reject_message">It will be removed from your prescriptions and never remind you.</string>
+    <string name="prescription_reject_cancel">Cancel</string>
+    <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
+    <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
     <string name="prescription_scan_close">Close</string>
     <string name="prescription_scan_frame_hint">Place the prescription inside the frame</string>
     <string name="prescription_scan_camera_off_title">Camera access is off</string>
-    <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read your prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
+    <string name="prescription_scan_camera_off_explanation">oncompanion needs the camera to read the prescription. The photo stays on your phone and is deleted once the text is read.\n\nYou can allow the camera in your phone\'s settings, or enter the prescription yourself.</string>
     <string name="prescription_scan_enter_manually">Enter manually</string>
     <string name="prescription_scan_open_settings">Open settings</string>
     <string name="prescription_scan_camera_unavailable_title">The camera can\'t be used</string>
@@ -510,7 +566,7 @@
     <string name="prescription_scan_retake">Retake</string>
     <string name="prescription_scan_use_photo">Use this photo</string>
     <string name="prescription_scan_reading_title">Reading the prescription</string>
-    <string name="prescription_scan_reading">Reading your prescription… This takes a few seconds.</string>
+    <string name="prescription_scan_reading">Reading the prescription… This takes a few seconds.</string>
     <string name="prescription_scan_nothing_read_title">Couldn\'t read the prescription</string>
     <string name="prescription_scan_nothing_read">We couldn\'t find any text on this photo. It may be handwritten, blurry or too dark.</string>
     <string name="prescription_scan_not_a_prescription_title">Not a prescription</string>
@@ -524,7 +580,7 @@
     <!-- US-10: reviewing the prescription read from a scan, in the prescription form -->
     <string name="prescription_review_title">Review prescription</string>
     <string name="prescription_review_read">We read these details from your scan.</string>
-    <string name="prescription_review_partly_read">We could only read part of your prescription.</string>
+    <string name="prescription_review_partly_read">We could only read part of the prescription.</string>
     <plurals name="prescription_review_to_check">
         <item quantity="one">1 detail needs checking: it is marked in orange.</item>
         <item quantity="other">%1$d details need checking: they are marked in orange.</item>
@@ -551,6 +607,11 @@
         <item quantity="one">Please check 1 detail</item>
         <item quantity="other">Please check %1$d details</item>
     </plurals>
+    <!-- A caregiver adds a prescription for the patient (US-43), e.g. "Add a prescription for Anne" -->
+    <string name="prescription_form_add_title_for">Add a prescription for %1$s</string>
+    <string name="prescription_review_title_for">Review %1$s\'s prescription</string>
+    <!-- US-39 for a caregiver: their patient's prescriptions, e.g. "Already in Anne\'s prescriptions" -->
+    <string name="prescription_already_saved_title_for">Already in %1$s\'s prescriptions</string>
 
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>
@@ -605,6 +666,8 @@
     <string name="appointment_edit">Edit appointment</string>
     <string name="appointment_save_changes">Save changes</string>
     <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
+    <!-- A caregiver adds an appointment for the patient (US-41), e.g. "Add an appointment for Anne" -->
+    <string name="appointment_add_for">Add an appointment for %1$s</string>
 
     <!-- A change the server rejected and was undone, shown over every screen -->
     <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>
@@ -614,4 +677,10 @@
 
     <!-- Shared snackbar: closes the message before it goes away on its own -->
     <string name="snackbar_dismiss">Dismiss</string>
+
+    <!-- Shared text field: what screen readers say about a field in error -->
+    <string name="field_error">Invalid input</string>
+
+    <!-- Shared "Added by": a prescription a caregiver added, not confirmed by the patient yet (US-43) -->
+    <string name="added_by_not_confirmed">Added by %1$s · Not confirmed</string>
 </resources>

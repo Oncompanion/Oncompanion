@@ -3,10 +3,14 @@
 package com.github.se.oncompanion.ui.prescription
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -23,10 +27,11 @@ import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -329,7 +334,7 @@ class PrescriptionDetailScreenTest {
 
   // ----- Delete (US-12) -----
 
-  private val confirming = shown.copy(delete = DeleteState(isConfirming = true))
+  private val confirming = shown.copy(delete = DeletePhase.CONFIRMING)
 
   @Test
   fun shown_deleteButtonUnderEdit_asksForConfirmation() {
@@ -387,7 +392,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun whileDeleting_theDialogsButtonsAreDisabled() {
-    setContent(confirming.copy(delete = confirming.delete.copy(isDeleting = true)))
+    setContent(confirming.copy(delete = DeletePhase.DELETING))
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.prescription_delete_cancel).assertIsNotEnabled()
@@ -395,7 +400,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun deleteError_isShownInTheDialog() {
-    setContent(confirming.copy(delete = confirming.delete.copy(hasError = true)))
+    setContent(confirming.copy(delete = DeletePhase.FAILED))
 
     assertTextInside(
         context.getString(R.string.prescription_delete_error),
@@ -514,5 +519,41 @@ class PrescriptionDetailScreenTest {
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
+  }
+
+  // ---- a prescription a caregiver added (US-43) ----
+
+  @Test
+  fun prescriptionAddedByACaregiver_saysWho_andWhetherItIsConfirmed() {
+    var confirmation by mutableStateOf(PrescriptionConfirmation.PENDING)
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState =
+              shown.copy(
+                  prescription =
+                      chemo.copy(addedBy = "sam", addedByName = "Sam", confirmation = confirmation)
+              ),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+      )
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.added_by)
+        .assertTextEquals(context.getString(R.string.added_by_not_confirmed, "Sam"))
+    confirmation = PrescriptionConfirmation.CONFIRMED
+    composeTestRule
+        .onNodeWithTag(C.Tag.added_by)
+        .assertTextEquals(context.getString(R.string.symptom_added_by, "Sam"))
+  }
+
+  @Test
+  fun patientsOwnPrescription_saysNothingAboutWhoAddedIt() {
+    setContent(shown)
+    composeTestRule.onNodeWithTag(C.Tag.added_by).assertDoesNotExist()
   }
 }

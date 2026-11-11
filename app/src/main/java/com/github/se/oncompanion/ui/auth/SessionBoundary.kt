@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
 
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +31,7 @@ import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
 
 /** Destroys active and saved authenticated ViewModels and blocks access until cleanup succeeds. */
 @Composable
@@ -59,12 +60,11 @@ fun SessionBoundary(
     ) {
       if (phase == SignOutState.FAILED) {
         Text(stringResource(R.string.auth_cleanup_failed))
-        Button(
+        LakeButton(
+            text = stringResource(R.string.profile_retry),
             onClick = { signOut.retry { credentials.clearCredentialState(context) } },
             modifier = Modifier.testTag(C.Tag.auth_cleanup_retry),
-        ) {
-          Text(stringResource(R.string.profile_retry))
-        }
+        )
       } else {
         CircularProgressIndicator()
         Text(stringResource(R.string.auth_cleanup_loading))

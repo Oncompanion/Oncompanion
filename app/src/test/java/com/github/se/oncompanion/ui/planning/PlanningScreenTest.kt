@@ -368,19 +368,24 @@ class PlanningScreenTest {
     assertEquals(item, opened)
   }
 
-  /** Each source only reaches its own page, and a medication can't be routed to either. */
+  /** Each source opens its own detail with the original identifiers. */
   @Test
   fun openingAnItemRoutesItToItsOwner() {
     val opened = mutableListOf<String>()
     val open = { planned: PlanningItem ->
-      openPlanningItem(planned, { opened += "appointment:$it" }, { opened += "event:$it" })
+      openPlanningItem(
+          planned,
+          { opened += "appointment:$it" },
+          { opened += "event:$it" },
+          { p, m -> opened += "medication:$p:$m" },
+      )
     }
 
     open(item.copy(source = PlanningSource.Appointment("a")))
     open(item.copy(source = PlanningSource.Event("e")))
     open(medication())
 
-    assertEquals(listOf("appointment:a", "event:e"), opened)
+    assertEquals(listOf("appointment:a", "event:e", "medication:prescription:med"), opened)
   }
 
   // ----- Caregiver mode (US-20) -----
@@ -423,5 +428,79 @@ class PlanningScreenTest {
     renderCaregiver(state().copy(isNotShared = true))
 
     compose.onNodeWithTag(C.Tag.not_shared).performScrollTo().assertIsFullyVisible()
+  }
+
+  // ----- A caregiver adding appointments (US-41) -----
+
+  @Test
+  fun add_isHidden_whenTheCaregiverMayNotAdd() {
+    // An add action is given, but the state says it can't be used
+    render(state().copy(canAdd = false))
+    compose.onNodeWithTag(C.Tag.planning_add).assertDoesNotExist()
+  }
+
+  @Test
+  fun appointmentAddedByACaregiver_saysWhoAddedIt() {
+    render(state(listOf(item.copy(addedBy = "sam", addedByName = "Sam"))))
+
+    compose
+        .onNodeWithTag(C.Tag.planningItem(item.key))
+        .assertTextContains("Room 3", substring = true)
+        .assertTextContains("Added by Sam", substring = true)
+  }
+
+  // ----- A prescription a caregiver added, not confirmed yet (US-43) -----
+
+  @Test
+  fun medicationOfAnUnconfirmedPrescription_saysItIsNotConfirmed() {
+    val pending =
+        medication("pending").copy(addedBy = "sam", addedByName = "Sam", isConfirmed = false)
+    val confirmed = medication("confirmed").copy(addedBy = "sam", addedByName = "Sam")
+    render(state(listOf(pending, confirmed)))
+
+    compose
+        .onNodeWithTag(C.Tag.planningItem(pending.key))
+        .assertTextContains("Added by Sam · Not confirmed", substring = true)
+    compose
+        .onNodeWithTag(C.Tag.planningItem(confirmed.key))
+        .assertTextContains("Added by Sam", substring = true)
+        .assert(!hasText("Not confirmed", substring = true))
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun medicationOfAnUnconfirmedPrescription_isFullyVisibleInLandscape() {
+    val pending =
+        medication("pending").copy(addedBy = "sam", addedByName = "Sam", isConfirmed = false)
+    render(state(listOf(pending)))
+    compose.onNodeWithTag(C.Tag.planningItem(pending.key)).performScrollTo().assertIsFullyVisible()
+  }
+
+  /** Optional location and attribution independently control the row's supporting content. */
+  @Test
+  fun appointmentSupportingContent_handlesEveryNullableCombination() {
+    val cases = listOf(null to null, "Room 3" to null, null to "Sam", "Room 3" to "Sam")
+    val rows = cases.mapIndexed { index, (location, author) ->
+      item.copy(
+          source = PlanningSource.Appointment("optional-$index"),
+          subtitle = location,
+          addedByName = author,
+      )
+    }
+    render(state(rows))
+    for ((index, values) in cases.withIndex()) {
+      val row = compose.onNodeWithTag(C.Tag.planningItem(rows[index].key))
+      compose
+          .onNodeWithTag(C.Tag.planning_list)
+          .performScrollToNode(hasTestTag(C.Tag.planningItem(rows[index].key)))
+      row.assert(
+          if (values.first == null) hasText("Room 3", substring = true).not()
+          else hasText("Room 3", substring = true)
+      )
+      row.assert(
+          if (values.second == null) hasText("Added by Sam", substring = true).not()
+          else hasText("Added by Sam", substring = true)
+      )
+    }
   }
 }

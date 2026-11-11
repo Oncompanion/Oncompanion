@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -24,6 +23,7 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -49,7 +50,10 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -66,6 +70,8 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * @param onScan starts scanning a prescription
  * @param onOpen opens the detail of the prescription with the given ID
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ * @param onReview opens the review of a prescription a caregiver added, for the patient to confirm
+ *   or reject it (US-43)
  */
 @Composable
 fun PrescriptionsScreen(
@@ -76,6 +82,7 @@ fun PrescriptionsScreen(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
     caregiverOf: String? = null,
+    onReview: (String) -> Unit = onOpen,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Keeps "This month" right while the list is on screen: refreshes when it comes back, then at
@@ -93,6 +100,7 @@ fun PrescriptionsScreen(
       onOpen = onOpen,
       modifier = modifier,
       caregiverOf = caregiverOf,
+      onReview = onReview,
   )
 }
 
@@ -104,6 +112,7 @@ fun PrescriptionsScreen(
  * @param onRetry reloads the prescriptions after an error
  * @param onOpen opens the detail of the prescription with the given ID
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
+ * @param onReview opens the review of a prescription a caregiver added, for the patient (US-43)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +125,7 @@ fun PrescriptionsContent(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
     caregiverOf: String? = null,
+    onReview: (String) -> Unit = onOpen,
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.prescriptions_screen),
@@ -162,7 +172,14 @@ fun PrescriptionsContent(
                 Modifier.align(Alignment.Center),
             )
         uiState.prescriptions.isEmpty() -> EmptyState(caregiverOf, buttonRoom)
-        else -> PrescriptionList(uiState.thisMonth, uiState.earlier, buttonRoom, onOpen)
+        else ->
+            PrescriptionList(
+                uiState,
+                isCaregiver = caregiverOf != null,
+                buttonRoom = buttonRoom,
+                onOpen = onOpen,
+                onReview = onReview,
+            )
       }
     }
   }
@@ -218,19 +235,43 @@ private fun AddButton(
   )
 }
 
-/** The two groups, each under its subheader; a group with nothing in it shows no subheader. */
+/**
+ * The groups, each under its subheader; a group with nothing in it shows no subheader. Those
+ * waiting for the patient come first (US-43): "Added by a caregiver" for the patient, "Added by
+ * you" for the caregiver who added them ([isCaregiver]).
+ */
 @Composable
 private fun PrescriptionList(
-    thisMonth: List<Prescription>,
-    earlier: List<Prescription>,
+    uiState: PrescriptionsUiState,
+    isCaregiver: Boolean,
     buttonRoom: Dp,
     onOpen: (String) -> Unit,
+    onReview: (String) -> Unit,
 ) {
+  val waiting = uiState.waiting
+  val thisMonth = uiState.thisMonth
+  val earlier = uiState.earlier
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.prescriptions_list),
       // Room for the buttons, so they never hide the last prescription
       contentPadding = PaddingValues(bottom = buttonRoom),
   ) {
+    if (waiting.isNotEmpty()) {
+      item(key = C.Tag.prescriptions_waiting_header) {
+        Subheader(
+            stringResource(
+                if (isCaregiver) R.string.prescriptions_added_by_you
+                else R.string.prescriptions_added_by_a_caregiver
+            ),
+            C.Tag.prescriptions_waiting_header,
+        )
+      }
+      // The patient reviews each on a Dawn card: tapping it opens the review (US-43)
+      items(waiting, key = { it.id }) {
+        if (isCaregiver) PrescriptionItem(it, onOpen)
+        else PrescriptionItem(it, onReview, toReview = true)
+      }
+    }
     if (thisMonth.isNotEmpty()) {
       item(key = C.Tag.prescriptions_this_month_header) {
         Subheader(
@@ -268,10 +309,15 @@ private fun Subheader(text: String, testTag: String) {
 
 /**
  * One prescription: the names of its medications, then who prescribed it and when ("Dr. Martin · 29
- * Sep 2026"), or the date alone when the prescriber wasn't entered.
+ * Sep 2026"), or the date alone when the prescriber wasn't entered. One the patient has [toReview]
+ * is on a Dawn card (`secondaryContainer`), the colour of what the app wants checked.
  */
 @Composable
-private fun PrescriptionItem(prescription: Prescription, onOpen: (String) -> Unit) {
+private fun PrescriptionItem(
+    prescription: Prescription,
+    onOpen: (String) -> Unit,
+    toReview: Boolean = false,
+) {
   val date = prescription.prescribedOn.format(dateFormatter)
   val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
   ListItem(
@@ -283,13 +329,25 @@ private fun PrescriptionItem(prescription: Prescription, onOpen: (String) -> Uni
         )
       },
       supportingContent = {
-        Text(
-            if (prescribedBy.isEmpty()) date
-            else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
-        )
+        Column {
+          Text(
+              if (prescribedBy.isEmpty()) date
+              else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
+          )
+          // A prescription a caregiver added says who did, and whether the patient confirmed it
+          prescription.addedByName?.let { AddedBy(it, isConfirmed = prescription.isConfirmed) }
+        }
       },
+      colors =
+          if (toReview)
+              ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+          else ListItemDefaults.colors(),
       modifier =
-          Modifier.clickable { onOpen(prescription.id) }
+          (if (toReview)
+                  Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+                      .clip(MaterialTheme.shapes.medium)
+              else Modifier)
+              .clickable { onOpen(prescription.id) }
               .testTag(C.Tag.prescriptionsItem(prescription.id)),
   )
 }
@@ -320,15 +378,15 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
   CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
-    MessageTexts(
+    LakeMessageState(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
                 ?: stringResource(R.string.prescriptions_error_title),
-        hint = stringResource(R.string.prescriptions_error_hint),
+        message = stringResource(R.string.prescriptions_error_hint),
+        actionLabel = stringResource(R.string.prescriptions_retry),
+        onAction = onRetry,
+        actionTestTag = C.Tag.prescriptions_retry_button,
     )
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.prescriptions_retry_button)) {
-      Text(stringResource(R.string.prescriptions_retry))
-    }
   }
 }
 

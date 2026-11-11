@@ -15,6 +15,7 @@ import java.time.LocalDate
  */
 object Route {
   const val AUTH = "auth"
+  const val ACCOUNT_CHECK = "account_check"
   const val ONBOARDING = "onboarding"
   const val JOIN_CIRCLE = "join_circle"
   const val WHOSE_CARE = "whose_care"
@@ -31,6 +32,9 @@ object Route {
 object Screen {
   // Route.AUTH
   const val SIGN_IN = "sign_in"
+
+  // Route.ACCOUNT_CHECK
+  const val ACCOUNT_CHECK = "account_check_home"
 
   // Route.ONBOARDING
   const val ONBOARDING_ROLE = "onboarding_role"
@@ -106,6 +110,14 @@ object Screen {
 
   /** The [PRESCRIPTION_DETAIL] screen of the prescription [prescriptionId]. */
   fun prescriptionDetail(prescriptionId: String) = "prescriptions_detail/$prescriptionId"
+
+  /** Identifies one medication inside the prescription document. */
+  const val MEDICATION_ID = "medicationId"
+  const val MEDICATION_DETAIL = "medication_detail/{$PRESCRIPTION_ID}/{$MEDICATION_ID}"
+
+  /** Opens the recorded medication, without replacing the originating Planning destination. */
+  fun medicationDetail(prescriptionId: String, medicationId: String) =
+      "medication_detail/${Uri.encode(prescriptionId)}/${Uri.encode(medicationId)}"
 
   const val PRESCRIPTION_EDIT = "prescriptions_edit/{$PRESCRIPTION_ID}"
 

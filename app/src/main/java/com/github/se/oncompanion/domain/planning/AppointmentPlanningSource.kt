@@ -4,6 +4,7 @@
 package com.github.se.oncompanion.domain.planning
 
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -20,7 +21,11 @@ import kotlinx.coroutines.flow.map
 class AppointmentPlanningSource(private val appointments: AppointmentRepository) :
     PlanningRepository {
 
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+  override fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> =
       appointments.observeAppointments(ownerUid).map { entries ->
         // Filtering preserves the appointment repository's time and ID ordering.
         entries
@@ -31,6 +36,8 @@ class AppointmentPlanningSource(private val appointments: AppointmentRepository)
                   timing = PlanningTiming.Timed(appointment.scheduledAt),
                   title = appointment.title,
                   subtitle = appointment.location?.takeIf { it.isNotBlank() },
+                  addedBy = appointment.addedBy,
+                  addedByName = appointment.addedByName,
               )
             }
       }

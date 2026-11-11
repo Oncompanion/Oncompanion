@@ -4,6 +4,7 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import kotlinx.coroutines.flow.first
 
 /**
@@ -24,11 +25,21 @@ class ManageMedicationSchedule(
    * Saves [draft] as a new prescription of [uid]. Returns once it is saved on the device, also
    * offline.
    *
-   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid], or if one of
-   *   its medications already has an ID: it comes from a saved prescription, which must be changed,
-   *   not added a second time
+   * A caregiver adding it for the patient (US-43) signs it with [addedBy] and [addedByName]: it is
+   * then [PrescriptionConfirmation.PENDING] until the patient checks it, and none of its
+   * medications are reminded before.
+   *
+   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid], if one of its
+   *   medications already has an ID (it comes from a saved prescription, which must be changed, not
+   *   added a second time), or if only one of [addedBy] and [addedByName] is given
    */
-  suspend fun add(uid: String, draft: PrescriptionDraft) {
+  suspend fun add(
+      uid: String,
+      draft: PrescriptionDraft,
+      addedBy: String? = null,
+      addedByName: String? = null,
+  ) {
+    require((addedBy == null) == (addedByName == null)) { "A caregiver signs with both" }
     // Adding a draft made from a saved prescription would leave two prescriptions sharing the
     // same medication IDs, the old one next to the new one
     require(draft.medications.all { it.id == null }) {
@@ -37,7 +48,15 @@ class ManageMedicationSchedule(
     require(draft.isValid()) { "Invalid prescription draft" }
     // The repository creates the IDs on the device, so this also works offline
     val prescription =
-        draft.toPrescription(medicationRepository.newId(), medicationRepository::newId)
+        draft.toPrescription(medicationRepository.newId(), medicationRepository::newId).let {
+          if (addedBy == null) it
+          else
+              it.copy(
+                  addedBy = addedBy,
+                  addedByName = addedByName,
+                  confirmation = PrescriptionConfirmation.PENDING,
+              )
+        }
     medicationRepository.addPrescription(uid, prescription)
   }
 
@@ -45,7 +64,8 @@ class ManageMedicationSchedule(
    * Replaces the content of the saved prescription [prescriptionId] of [uid] with [draft], so a
    * wrong prescription can be corrected. A medication of the draft that has an ID stays the same
    * saved medication, one without an ID is added, and a saved one that the draft leaves out is
-   * removed. Returns once it is saved on the device, also offline.
+   * removed. Returns once it is saved on the device, also offline. Who added it stays the same, and
+   * saving a prescription a caregiver added confirms it (US-43): the patient checked each field.
    *
    * The prescription is read again first, because it can have been deleted since the form was
    * opened (e.g. from another device) and the repository would then silently save nothing. The read
@@ -60,10 +80,41 @@ class ManageMedicationSchedule(
   suspend fun update(uid: String, prescriptionId: String, draft: PrescriptionDraft): Boolean {
     require(draft.isValid()) { "Invalid prescription draft" }
     // Without this read, the caller couldn't tell a saved correction from one that was dropped
-    if (medicationRepository.observePrescription(uid, prescriptionId).first() == null) return false
-    // Only the medications added in the form need an ID, the saved ones keep theirs
-    val prescription = draft.toPrescription(prescriptionId, medicationRepository::newId)
+    val saved =
+        medicationRepository.observePrescription(uid, prescriptionId).first() ?: return false
+    // Only the medications added in the form need an ID, the saved ones keep theirs. The form
+    // doesn't hold who added it or whether it is confirmed: they come from the saved one
+    val prescription =
+        draft
+            .toPrescription(prescriptionId, medicationRepository::newId)
+            .copy(
+                addedBy = saved.addedBy,
+                addedByName = saved.addedByName,
+                confirmation =
+                    if (saved.confirmation == PrescriptionConfirmation.PENDING)
+                        PrescriptionConfirmation.CONFIRMED
+                    else saved.confirmation,
+            )
     medicationRepository.updatePrescription(uid, prescription)
+    return true
+  }
+
+  /**
+   * Rejects the prescription [prescriptionId] a caregiver added to [uid]'s (US-43): it is kept as
+   * [PrescriptionConfirmation.REJECTED], so the caregiver can later see it was rejected, but it no
+   * longer shows for the patient and none of its medications are ever reminded. Returns once it is
+   * saved on the device, also offline. The caller asks the patient to confirm first.
+   *
+   * @return `false` if there is no such prescription waiting for the patient (e.g. it was deleted,
+   *   or decided on another device): nothing is written
+   */
+  suspend fun reject(uid: String, prescriptionId: String): Boolean {
+    val saved = medicationRepository.observePrescription(uid, prescriptionId).first()
+    if (saved?.confirmation != PrescriptionConfirmation.PENDING) return false
+    medicationRepository.updatePrescription(
+        uid,
+        saved.copy(confirmation = PrescriptionConfirmation.REJECTED),
+    )
     return true
   }
 

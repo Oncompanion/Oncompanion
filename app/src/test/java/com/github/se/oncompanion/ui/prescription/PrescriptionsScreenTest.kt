@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
@@ -36,10 +38,13 @@ import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.LakeButtonDefaults
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -309,6 +314,19 @@ class PrescriptionsScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun error_retryIsFullyVisibleInLandscape() {
+    composeTestRule.setContent {
+      OncompanionTheme { PrescriptionsContent(loaded.copy(hasError = true), {}, {}, {}, {}, {}) }
+    }
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptions_retry_button)
+        .assertHeightIsAtLeast(LakeButtonDefaults.MinHeight)
+        .assertIsFullyVisible()
+  }
+
+  @Test
   fun error_neverBlamesTheConnection() {
     // Offline, Firestore serves its cache: an error is not a connection problem
     setContent(loaded.copy(hasError = true))
@@ -542,6 +560,97 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
   }
 
+  // ----- Waiting for the patient (US-43) -----
+
+  @Test
+  fun waitingForThePatient_showsFirst_underWhoAddedIt() {
+    val waiting =
+        filled.copy(
+            prescriptions =
+                listOf(
+                    chemo.copy(
+                        addedBy = "caregiver",
+                        addedByName = "Sam",
+                        confirmation = PrescriptionConfirmation.PENDING,
+                    ),
+                    fever,
+                    nausea,
+                ),
+            caregiverUid = "caregiver",
+        )
+    // The patient sees "Added by a caregiver", the caregiver who added it "Added by you"
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = waiting,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = caregiverOf,
+      )
+    }
+    val cases =
+        listOf(
+            null to R.string.prescriptions_added_by_a_caregiver,
+            "Anne" to R.string.prescriptions_added_by_you,
+        )
+    for ((patient, title) in cases) {
+      composeTestRule.runOnIdle { caregiverOf = patient }
+      composeTestRule
+          .onNodeWithTag(C.Tag.prescriptions_waiting_header)
+          .assertTextEquals(context.getString(title))
+      assertTrue(
+          yOf(C.Tag.prescriptions_waiting_header) < yOf(C.Tag.prescriptionsItem("chemo")) &&
+              yOf(C.Tag.prescriptionsItem("chemo")) < yOf(C.Tag.prescriptions_this_month_header)
+      )
+    }
+  }
+
+  @Test
+  fun waitingForThePatient_tappingItOpensTheReview_forThePatientOnly() {
+    val state =
+        filled.copy(
+            prescriptions =
+                listOf(
+                    chemo.copy(
+                        addedBy = "caregiver",
+                        addedByName = "Sam",
+                        confirmation = PrescriptionConfirmation.PENDING,
+                    ),
+                    fever,
+                ),
+            caregiverUid = "caregiver",
+        )
+    val opened = mutableListOf<String>()
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = { opened += "open $it" },
+          caregiverOf = caregiverOf,
+          onReview = { opened += "review $it" },
+      )
+    }
+
+    for (patient in listOf(null, "Anne")) {
+      composeTestRule.runOnIdle { caregiverOf = patient }
+      composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("fever")).performClick()
+    }
+
+    // The caregiver who added it only opens its detail: only the patient confirms it
+    assertEquals(
+        listOf("review chemo", "open fever", "open chemo", "open fever"),
+        opened,
+    )
+  }
+
   // ----- Caregiver mode (US-20) -----
 
   private fun setCaregiverContent(state: PrescriptionsUiState) {
@@ -635,5 +744,51 @@ class PrescriptionsScreenTest {
     val last = composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("p30")).getBoundsInRoot()
     val gap = list.bottom - last.bottom
     assertTrue("gap $gap", gap < 24.dp)
+  }
+
+  // ---- a prescription a caregiver added (US-43) ----
+
+  @Test
+  fun prescriptionAddedByACaregiver_saysWho_andWhetherItIsConfirmed() {
+    val pending =
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.PENDING,
+        )
+    val confirmed = nausea.copy(addedBy = "sam", addedByName = "Sam")
+    setContent(loaded.copy(prescriptions = listOf(pending, fever, confirmed)))
+
+    assertTextInside(
+        context.getString(R.string.added_by_not_confirmed, "Sam"),
+        C.Tag.prescriptionsItem(pending.id),
+    )
+    assertTextInside(
+        context.getString(R.string.symptom_added_by, "Sam"),
+        C.Tag.prescriptionsItem(confirmed.id),
+    )
+    composeTestRule
+        .onNode(
+            hasTestTag(C.Tag.added_by) and
+                hasAnyAncestor(hasTestTag(C.Tag.prescriptionsItem(fever.id))),
+            useUnmergedTree = true,
+        )
+        .assertDoesNotExist()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun prescriptionNotConfirmed_isFullyVisibleInLandscape() {
+    val pending =
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.PENDING,
+        )
+    setContent(loaded.copy(prescriptions = listOf(pending)))
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptionsItem(pending.id))
+        .performScrollTo()
+        .assertIsFullyVisible()
   }
 }

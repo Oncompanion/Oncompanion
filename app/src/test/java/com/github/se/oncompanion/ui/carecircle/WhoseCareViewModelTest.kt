@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.carecircle
 
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
+import com.github.se.oncompanion.model.carecircle.CareCircleMembership
 import com.github.se.oncompanion.model.carecircle.CareCircleRepository
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleInviteRepository
@@ -135,9 +136,12 @@ class WhoseCareViewModelTest {
     // The rules deny Paul's member document before his circle disappears from the list
     val denying =
         object : CareCircleRepository by circles {
-          override fun observeMember(ownerUid: String, memberUid: String): Flow<CareCircleMember?> =
+          override fun observeMembership(
+              ownerUid: String,
+              memberUid: String,
+          ): Flow<CareCircleMembership> =
               if (ownerUid == "p-paul") flow { throw IllegalStateException("denied") }
-              else circles.observeMember(ownerUid, memberUid)
+              else circles.observeMembership(ownerUid, memberUid)
         }
 
     val vm = viewModel(denying)
@@ -145,6 +149,65 @@ class WhoseCareViewModelTest {
 
     assertEquals(listOf("p-anne"), vm.state.patients.map { it.uid })
     assertFalse(vm.state.hasError)
+    // Paul didn't answer: the list isn't confirmed
+    assertFalse(vm.state.isConfirmed)
+  }
+
+  @Test
+  fun theListIsConfirmed_onlyOnceEveryPatientAnswered() = runTest {
+    // Joined Paul's circle again: the device still remembers the removal until the server answers
+    follow("p-paul", "Paul", CarePermission.PLANNING)
+    circles.unconfirmedMembers = setOf("p-paul" to "caregiver")
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertEquals(emptyList<FollowedPatient>(), vm.state.patients)
+    assertFalse(vm.state.isConfirmed)
+
+    // The server confirms the member
+    circles.unconfirmedMembers = emptySet()
+    advanceUntilIdle()
+    assertEquals(listOf("p-paul"), vm.state.patients.map { it.uid })
+    assertTrue(vm.state.isConfirmed)
+
+    // Paul removes the caregiver: confirmed, and nobody left
+    circles.setMembers("p-paul", emptyList())
+    advanceUntilIdle()
+    assertEquals(emptyList<FollowedPatient>(), vm.state.patients)
+    assertTrue(vm.state.isConfirmed)
+  }
+
+  @Test
+  fun anEmptyListFromTheCache_isNotConfirmed_untilTheServerAnswers() = runTest {
+    // A circle joined on another phone: this phone's copy doesn't know about it yet
+    invites.joinedCirclesFromCache = true
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertFalse(vm.state.isLoading)
+    assertEquals(emptyList<FollowedPatient>(), vm.state.patients)
+    assertFalse(vm.state.isConfirmed)
+
+    // The server answers with the circle
+    follow("p-anne", "Anne", CarePermission.PLANNING)
+    invites.joinedCirclesFromCache = false
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), vm.state.patients.map { it.uid })
+    assertTrue(vm.state.isConfirmed)
+  }
+
+  @Test
+  fun aListFromTheCache_withPatients_isConfirmedByTheirAnswers() = runTest {
+    // Offline with Anne known: each patient answers for themselves, as before
+    follow("p-anne", "Anne", CarePermission.PLANNING)
+    invites.joinedCirclesFromCache = true
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), vm.state.patients.map { it.uid })
+    assertTrue(vm.state.isConfirmed)
+
+    // The server confirms the same list: Anne's access isn't read again
+    invites.joinedCirclesFromCache = false
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), circles.observedOwners)
   }
 
   @Test

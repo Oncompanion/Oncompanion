@@ -5,23 +5,36 @@ package com.github.se.oncompanion.ui.events
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
+import com.github.se.oncompanion.domain.carecircle.CaregiverName
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
+import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
-import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
+import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.addedByName
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistration
 import com.github.se.oncompanion.model.event.EventRegistrationRepository
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.EventRepositoryProvider
+import com.github.se.oncompanion.model.user.UserProfileRepository
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -40,32 +53,45 @@ enum class RegistrationStatus {
   CLOSED,
   /** The registration couldn't be read or changed. */
   ERROR,
+  /**
+   * The patient a caregiver follows doesn't share Events with them: the page says so, so the
+   * caregiver doesn't take it for "not registered".
+   */
+  NOT_SHARED,
+  /** Nothing is shown about it: the caregiver has no access to the patient anymore. */
+  HIDDEN,
 }
 
 /**
  * What the event detail screen shows.
  *
- * @property event the event, once loaded
+ * @property event the event, once loaded; null once loaded means no event has this id
  * @property isLoading true until the event is loaded
- * @property notFound true if no event has this id
  * @property hasError true if the event couldn't be loaded
  * @property registration what the screen offers about the patient's registration
  * @property isConfirmingRemoval the patient asked to remove their confirmation and hasn't confirmed
  *   or cancelled yet
+ * @property caregiverCanConfirm a caregiver the patient lets confirm events (US-42) may confirm the
+ *   registration for them; they can never remove it
+ * @property addedByName who confirmed it, if a caregiver did: for the patient, the name they gave
+ *   that member in their circle
  */
 data class EventDetailUiState(
     val event: Event? = null,
     val isLoading: Boolean = true,
-    val notFound: Boolean = false,
     val hasError: Boolean = false,
     val registration: RegistrationStatus = RegistrationStatus.LOADING,
     val isConfirmingRemoval: Boolean = false,
+    val caregiverCanConfirm: Boolean = false,
+    val addedByName: String? = null,
 )
 
 /**
- * Loads one of the Ligue's events for its detail screen, with whether the signed-in patient
- * confirmed their registration for it.
+ * Loads one of the Ligue's events for its detail screen, with whether the patient confirmed their
+ * registration for it: the signed-in patient, or the patient a caregiver follows when they share
+ * Events (US-20). A caregiver only reads it, unless the patient lets them confirm events (US-42).
  *
+ * @param patientUid the followed patient in caregiver mode, null for the user's own registration
  * @param clock the current time, in the time zone the event's times are given in
  */
 class EventDetailViewModel(
@@ -75,7 +101,16 @@ class EventDetailViewModel(
         EventRegistrationRepositoryProvider.repository,
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val clock: Clock = Clock.systemDefaultZone(),
+    private val patientUid: String? = null,
+    resolveSection: ResolveSectionAccess = ResolveSectionAccess(auth = authRepository),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
+    profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
 ) : ViewModel() {
+
+  private val observeSection = ObserveCareSection(resolveSection)
+
+  private val caregiverName = CaregiverName(profileRepository, authRepository)
 
   private val _uiState = MutableStateFlow(EventDetailUiState())
   val uiState: StateFlow<EventDetailUiState> = _uiState.asStateFlow()
@@ -87,6 +122,18 @@ class EventDetailViewModel(
    */
   private var lastRegistration: Pair<Event, Boolean>? = null
 
+  /** Whose registration may be removed: only the user's own, once known. */
+  private var editableOwner: String? = null
+
+  /**
+   * Whose registration may be confirmed, once known: the user's own, or the followed patient's when
+   * they let the caregiver confirm events.
+   */
+  private var confirmableOwner: String? = null
+
+  /** A caregiver's confirmation being signed, so repeated taps save only one. */
+  private var signing: Job? = null
+
   init {
     loadEvent()
   }
@@ -95,9 +142,12 @@ class EventDetailViewModel(
   fun loadEvent() {
     registrationObservation?.cancel()
     lastRegistration = null
+    editableOwner = null
+    confirmableOwner = null
     _uiState.value = EventDetailUiState()
     viewModelScope.launch {
-      val event =
+      // Null when the event no longer exists: the page then says it wasn't found
+      val event: Event? =
           try {
             repository.getEvent(eventId)
           } catch (e: CancellationException) {
@@ -107,8 +157,7 @@ class EventDetailViewModel(
             _uiState.value = EventDetailUiState(isLoading = false, hasError = true)
             return@launch
           }
-      _uiState.value =
-          EventDetailUiState(event = event, isLoading = false, notFound = event == null)
+      _uiState.value = EventDetailUiState(event = event, isLoading = false)
       if (event != null) observeRegistration(event)
     }
   }
@@ -120,8 +169,27 @@ class EventDetailViewModel(
   fun confirmRegistration() {
     // The event may have started since the status was last computed
     refreshStatus()
-    if (_uiState.value.registration != RegistrationStatus.CAN_CONFIRM) return
-    changeRegistration("confirm") { uid -> registrationRepository.confirm(uid, eventId) }
+    val owner = confirmableOwner
+    if (_uiState.value.registration != RegistrationStatus.CAN_CONFIRM || owner == null) return
+    if (patientUid == null) {
+      changeRegistration("confirm", owner) { uid -> registrationRepository.confirm(uid, eventId) }
+      return
+    }
+    // A caregiver signs it with their first name, read once per confirmation
+    if (signing?.isActive == true) return
+    signing = viewModelScope.launch {
+      val caregiverUid = authRepository.currentUser?.uid
+      val by = caregiverUid?.let { EventRegistration(it, caregiverName(it)) }
+      // The patient may have taken the permission away, or confirmed it, while the name was read
+      refreshStatus()
+      if (
+          confirmableOwner != owner || _uiState.value.registration != RegistrationStatus.CAN_CONFIRM
+      )
+          return@launch
+      changeRegistration("confirm", owner) { uid ->
+        registrationRepository.confirm(uid, eventId, by ?: error("Nobody is signed in"))
+      }
+    }
   }
 
   /**
@@ -137,7 +205,8 @@ class EventDetailViewModel(
   /** Asks the patient to confirm the removal. Nothing is removed before [removeRegistration]. */
   fun requestRemoval() {
     _uiState.update {
-      if (it.registration == RegistrationStatus.CONFIRMED) it.copy(isConfirmingRemoval = true)
+      if (it.registration == RegistrationStatus.CONFIRMED && editableOwner != null)
+          it.copy(isConfirmingRemoval = true)
       else it
     }
   }
@@ -155,26 +224,71 @@ class EventDetailViewModel(
     val state = _uiState.value
     if (!state.isConfirmingRemoval || state.registration != RegistrationStatus.CONFIRMED) return
     _uiState.update { it.copy(isConfirmingRemoval = false) }
-    changeRegistration("remove") { uid -> registrationRepository.remove(uid, eventId) }
+    changeRegistration("remove", editableOwner) { uid ->
+      registrationRepository.remove(uid, eventId)
+    }
   }
 
+  /**
+   * Shows the registration of whoever [observeSection] says the page shows, and follows changes:
+   * signing out, or the patient no longer sharing Events, hides the previous person's registration.
+   */
   private fun observeRegistration(event: Event) {
-    val uid = authRepository.signedInUid(TAG)
-    if (uid == null) {
-      showRegistration(RegistrationStatus.ERROR)
-      return
-    }
     registrationObservation = viewModelScope.launch {
-      registrationRepository
-          .observeIsRegistered(uid, eventId)
-          .catch { e ->
-            Log.e(TAG, "Failed to read the registration for event $eventId", e)
-            showError()
-          }
-          .collect { isRegistered ->
-            lastRegistration = event to isRegistered
-            showRegistration(statusOf(event, isRegistered))
-          }
+      observeSection(CarePermission.EVENTS, patientUid, ::registrationOf).collect { section ->
+        showRegistration(statusOf(event, section))
+      }
+    }
+  }
+
+  /**
+   * [ownerUid]'s registration, with who confirmed it as the patient named them in their circle (a
+   * caregiver sees the stored name instead).
+   */
+  private fun registrationOf(ownerUid: String): Flow<ShownRegistration> {
+    val registration = registrationRepository.observeRegistration(ownerUid, eventId)
+    if (patientUid != null) {
+      return registration.map { ShownRegistration(ownerUid, it, it?.addedByName) }
+    }
+    return registration.combine(careCircleRepository.observeMemberNames(ownerUid)) { it, names ->
+      ShownRegistration(ownerUid, it, it?.let { addedByName(it.addedBy, it.addedByName, names) })
+    }
+  }
+
+  /** What [section] lets the page show about [event]'s registration. */
+  private fun statusOf(
+      event: Event,
+      section: CareSection<ShownRegistration>,
+  ): RegistrationStatus {
+    if (section !is CareSection.Shown) {
+      // Another person's registration never shows, and nothing can be changed, until it is read
+      lastRegistration = null
+      editableOwner = null
+      confirmableOwner = null
+      _uiState.update { it.copy(caregiverCanConfirm = false, addedByName = null) }
+    }
+    return when (section) {
+      is CareSection.Loading -> RegistrationStatus.LOADING
+      // A patient who isn't signed in can't confirm anything
+      CareSection.NoAccess ->
+          if (patientUid == null) RegistrationStatus.ERROR else RegistrationStatus.HIDDEN
+      CareSection.NotShared -> RegistrationStatus.NOT_SHARED
+      is CareSection.Failed -> RegistrationStatus.ERROR
+      is CareSection.Shown -> {
+        val (ownerUid, registration, addedByName) = section.data
+        val isRegistered = registration != null
+        lastRegistration = event to isRegistered
+        // A caregiver never removes it, and only confirms it when the patient lets them
+        editableOwner = ownerUid.takeIf { section.canEdit }
+        confirmableOwner = ownerUid.takeIf { section.canAdd }
+        _uiState.update {
+          it.copy(
+              caregiverCanConfirm = patientUid != null && section.canAdd,
+              addedByName = addedByName,
+          )
+        }
+        statusOf(event, isRegistered)
+      }
     }
   }
 
@@ -191,10 +305,13 @@ class EventDetailViewModel(
     }
   }
 
-  /** Runs [change] for the signed-in patient; the observation then shows the new status. */
-  private fun changeRegistration(action: String, change: (uid: String) -> Unit) {
+  /**
+   * Runs [change] for [owner], whose registration this is; the observation then shows the new
+   * status. Without an owner (e.g. a caregiver removing it), nothing changes but the error.
+   */
+  private fun changeRegistration(action: String, owner: String?, change: (uid: String) -> Unit) {
     try {
-      val uid = authRepository.signedInUid(TAG) ?: error("Nobody is signed in")
+      val uid = owner ?: error("This registration can't be changed")
       change(uid)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to $action the registration for event $eventId", e)
@@ -221,6 +338,13 @@ class EventDetailViewModel(
       else -> RegistrationStatus.CLOSED
     }
   }
+
+  /** Whose registration is shown, the registration if any, and who confirmed it. */
+  private data class ShownRegistration(
+      val ownerUid: String,
+      val registration: EventRegistration?,
+      val addedByName: String?,
+  )
 
   private companion object {
     const val TAG = "EventDetailViewModel"

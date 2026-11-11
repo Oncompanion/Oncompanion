@@ -29,6 +29,43 @@ class PrescriptionTest {
   fun constantsHaveSpecifiedValues() {
     assertEquals(100, Prescription.MAX_PRESCRIBED_BY_LENGTH)
     assertEquals(20, Prescription.MAX_MEDICATIONS)
+    assertEquals(50, Prescription.MAX_ADDED_BY_NAME_LENGTH)
+  }
+
+  @Test
+  fun thePatientsOwn_isConfirmed_andACaregiversSaysWhoAddedIt() {
+    val pending = PrescriptionConfirmation.PENDING
+    val cases =
+        listOf(
+            // The patient's own: confirmed, never waiting nor rejected
+            valid to true,
+            valid.copy(confirmation = pending) to false,
+            valid.copy(confirmation = PrescriptionConfirmation.REJECTED) to false,
+            // A caregiver's, in each state, signed with a name of at most 50 characters
+            valid.copy(addedBy = "sam", addedByName = "Sam", confirmation = pending) to true,
+            valid.copy(addedBy = "sam", addedByName = "Sam") to true,
+            valid.copy(
+                addedBy = "sam",
+                addedByName = "Sam",
+                confirmation = PrescriptionConfirmation.REJECTED,
+            ) to true,
+            valid.copy(addedBy = "sam", addedByName = "a".repeat(50), confirmation = pending) to
+                true,
+            valid.copy(addedBy = "sam", addedByName = "a".repeat(51), confirmation = pending) to
+                false,
+            valid.copy(addedBy = "sam", addedByName = " ", confirmation = pending) to false,
+            valid.copy(addedBy = "sam", addedByName = null, confirmation = pending) to false,
+        )
+    for ((prescription, expected) in cases) {
+      assertEquals(prescription.toString(), expected, prescription.isValid())
+    }
+  }
+
+  @Test
+  fun isConfirmed_onlyOnceThePatientConfirmed() {
+    assertTrue(valid.isConfirmed)
+    assertFalse(valid.copy(confirmation = PrescriptionConfirmation.PENDING).isConfirmed)
+    assertFalse(valid.copy(confirmation = PrescriptionConfirmation.REJECTED).isConfirmed)
   }
 
   @Test
@@ -97,5 +134,48 @@ class PrescriptionTest {
     assertFalse(
         valid.copy(medications = listOf(medication("med-1"), medication("med-1"))).isValid()
     )
+  }
+
+  /** What reminders may schedule (US-32, US-34): only the medications the patient confirmed. */
+  @Test
+  fun confirmedMedications_leaveOutWhatThePatientHasntConfirmed_sortedByStartThenName() {
+    fun medication(id: String, prescriptionId: String, name: String, start: LocalDate) =
+        Medication(id, prescriptionId, name, startDate = start)
+    fun prescription(id: String, confirmation: PrescriptionConfirmation, vararg m: Medication) =
+        Prescription(
+            id,
+            prescribedOn = LocalDate.of(2026, 10, 1),
+            medications = m.toList(),
+            addedBy = "sam".takeIf { confirmation != PrescriptionConfirmation.CONFIRMED },
+            addedByName = "Sam",
+            confirmation = confirmation,
+        )
+    val day = LocalDate.of(2026, 10, 2)
+    val prescriptions =
+        listOf(
+            prescription(
+                "own",
+                PrescriptionConfirmation.CONFIRMED,
+                medication("b", "own", "Ondansetron", day),
+                medication("a", "own", "Dexamethasone", day.plusDays(1)),
+            ),
+            prescription(
+                "pending",
+                PrescriptionConfirmation.PENDING,
+                medication("p", "pending", "Aspirin", day),
+            ),
+            prescription(
+                "rejected",
+                PrescriptionConfirmation.REJECTED,
+                medication("r", "rejected", "Aspirin", day),
+            ),
+            prescription(
+                "confirmed",
+                PrescriptionConfirmation.CONFIRMED,
+                medication("c", "confirmed", "Cisplatin", day),
+            ),
+        )
+
+    assertEquals(listOf("c", "b", "a"), prescriptions.confirmedMedications().map { it.id })
   }
 }

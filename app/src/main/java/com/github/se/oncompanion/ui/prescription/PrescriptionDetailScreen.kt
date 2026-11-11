@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,12 +40,16 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -89,7 +92,7 @@ fun PrescriptionDetailScreen(
 
   // Back to the list, which no longer shows the prescription, once it is deleted
   val leave by rememberUpdatedState(onDeleted)
-  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) leave() }
+  LaunchedEffect(uiState.delete) { if (uiState.delete == DeletePhase.DELETED) leave() }
 
   PrescriptionDetailContent(
       uiState = uiState,
@@ -159,12 +162,11 @@ fun PrescriptionDetailContent(
                 title = stringResource(R.string.prescription_detail_error_title),
                 hint = stringResource(R.string.prescription_detail_error_hint),
             ) {
-              Button(
+              LakeButton(
+                  text = stringResource(R.string.prescription_detail_retry),
                   onClick = onRetry,
                   modifier = Modifier.testTag(C.Tag.prescription_detail_retry_button),
-              ) {
-                Text(stringResource(R.string.prescription_detail_retry))
-              }
+              )
             }
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         uiState.isNotShared && caregiverOf != null ->
@@ -208,8 +210,8 @@ fun PrescriptionDetailContent(
         error = stringResource(R.string.prescription_delete_error),
         confirmLabel = stringResource(R.string.prescription_delete_confirm),
         cancelLabel = stringResource(R.string.prescription_delete_cancel),
-        isDeleting = uiState.delete.isDeleting,
-        hasError = uiState.delete.hasError,
+        isDeleting = uiState.delete == DeletePhase.DELETING,
+        hasError = uiState.delete == DeletePhase.FAILED,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags = deleteDialogTags,
@@ -226,6 +228,14 @@ private fun PrescriptionDetail(prescription: Prescription) {
         style = MaterialTheme.typography.headlineSmall,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+    // A prescription a caregiver added says who did, and whether the patient confirmed it (US-43)
+    prescription.addedByName?.let {
+      AddedBy(
+          it,
+          modifier = Modifier.padding(horizontal = Spacing.lg),
+          isConfirmed = prescription.isConfirmed,
+      )
+    }
     // The prescriber is optional: no row when the user didn't give one
     val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
     if (prescribedBy.isNotEmpty()) {

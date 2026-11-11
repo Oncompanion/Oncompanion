@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -39,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.LakeButtonStyle
 
 /**
  * "Whose care?" (US-20, Figma: "US-20 / Whose care?"): the patients a caregiver follows, with what
@@ -51,6 +52,10 @@ import com.github.se.oncompanion.resources.C
  *   the list (when opening the app), rather than when switching on purpose
  * @param onSignedOut called when nobody is signed in anymore (e.g. the session expired), to sign in
  *   again: the list can't be read until then
+ * @param onNoPatient called when the server confirmed the caregiver follows nobody anymore (e.g.
+ *   the only patient removed them), to join a circle instead of choosing from an empty list
+ * @param removedFrom the first name of the patient who just removed the caregiver, to say so
+ * @param onRemovalShown called once that message went away
  */
 @Composable
 fun WhoseCareScreen(
@@ -60,6 +65,9 @@ fun WhoseCareScreen(
     onJoinAnother: () -> Unit,
     autoSelectSingle: Boolean,
     onSignedOut: () -> Unit,
+    onNoPatient: () -> Unit,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // Signed out: Retry can't work, so the caregiver goes to sign in, as from the join screen
@@ -68,9 +76,23 @@ fun WhoseCareScreen(
   var autoSelected by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(uiState) {
     val single = uiState.patients.singleOrNull()
-    if (autoSelectSingle && !autoSelected && !uiState.isLoading && single != null) {
+    // Only on a confirmed list: one patient known so far may not be the only one
+    if (
+        autoSelectSingle &&
+            !autoSelected &&
+            !uiState.isLoading &&
+            uiState.isConfirmed &&
+            single != null
+    ) {
       autoSelected = true
       onPatientChosen(single)
+    }
+    // Nobody to choose: straight to joining a circle, as when the caregiver signed up. Only once
+    // the server confirmed it: the device alone can still remember a removal after joining again
+    if (
+        !uiState.isLoading && !uiState.hasError && uiState.isConfirmed && uiState.patients.isEmpty()
+    ) {
+      onNoPatient()
     }
   }
   WhoseCareContent(
@@ -79,6 +101,8 @@ fun WhoseCareScreen(
       onPatientClick = onPatientChosen,
       onJoinAnother = onJoinAnother,
       onRetry = viewModel::load,
+      removedFrom = removedFrom,
+      onRemovalShown = onRemovalShown,
   )
 }
 
@@ -92,9 +116,13 @@ fun WhoseCareContent(
     onJoinAnother: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    removedFrom: String? = null,
+    onRemovalShown: () -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.whose_care_screen),
+      // Why the caregiver is here after a removal; as the bottom bar, it never covers the list
+      bottomBar = { RemovedFromCircleSnackbar(removedFrom, onRemovalShown) },
       topBar = {
         TopAppBar(
             title = { Text(stringResource(R.string.whose_care_title)) },
@@ -135,6 +163,17 @@ fun WhoseCareContent(
               onAction = onRetry,
               tag = C.Tag.whose_care_error,
               modifier = contentModifier,
+          )
+      // Nobody known yet, but not confirmed: the circles may still be on their way
+      uiState.patients.isEmpty() && !uiState.isConfirmed ->
+          Message(
+              title = stringResource(R.string.whose_care_unconfirmed_title),
+              action = stringResource(R.string.whose_care_retry),
+              onAction = onRetry,
+              tag = C.Tag.whose_care_unconfirmed,
+              modifier = contentModifier,
+              secondaryAction = stringResource(R.string.whose_care_empty_join),
+              onSecondaryAction = onJoinAnother,
           )
       uiState.patients.isEmpty() ->
           Message(
@@ -189,7 +228,10 @@ private fun PatientList(
   }
 }
 
-/** A centered message with one action: the error (Retry) and the empty state (Join). */
+/**
+ * A centered message with its action: the error (Retry), the empty state (Join), and a list not
+ * confirmed yet (Retry, with Join as [secondaryAction]).
+ */
 @Composable
 private fun Message(
     title: String,
@@ -198,6 +240,8 @@ private fun Message(
     tag: String,
     modifier: Modifier,
     body: String? = null,
+    secondaryAction: String? = null,
+    onSecondaryAction: () -> Unit = {},
 ) {
   Column(
       modifier = modifier.padding(32.dp).testTag(tag),
@@ -213,8 +257,18 @@ private fun Message(
           textAlign = TextAlign.Center,
       )
     }
-    Button(onClick = onAction, modifier = Modifier.testTag(C.Tag.whose_care_action)) {
-      Text(action)
+    LakeButton(
+        text = action,
+        onClick = onAction,
+        modifier = Modifier.testTag(C.Tag.whose_care_action),
+    )
+    if (secondaryAction != null) {
+      LakeButton(
+          text = secondaryAction,
+          onClick = onSecondaryAction,
+          modifier = Modifier.testTag(C.Tag.whose_care_secondary_action),
+          style = LakeButtonStyle.Text,
+      )
     }
   }
 }

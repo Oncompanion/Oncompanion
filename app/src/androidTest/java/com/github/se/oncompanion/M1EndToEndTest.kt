@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
@@ -94,6 +95,7 @@ class M1EndToEndTest {
     addPrescription(doctor = "Dr Martin", medication = "Tamoxifen")
     addAppointmentTomorrow(title = "Oncology check-up")
     checkPlanningLandscape(title = "Oncology check-up")
+    openMedicationAndItsPrescription("Tamoxifen")
     seeNextAppointmentOnOverview(title = "Oncology check-up")
     confirmRegistrationForLigueEvent(title = "Gentle yoga", place = "Ligue, Geneva")
     seeConfirmedEventInPlanning(title = "Gentle yoga", appointment = "Oncology check-up")
@@ -114,6 +116,32 @@ class M1EndToEndTest {
   }
 
   // ---- steps ----
+
+  /** Medication details and their source prescription return to the same selected Planning day. */
+  private fun openMedicationAndItsPrescription(name: String) {
+    val selectedDay =
+        tag(C.Tag.planning_heading).fetchSemanticsNode().config[SemanticsProperties.Text]
+    open(hasText(name), hasTestTag(C.Tag.medication_detail_prescription))
+    waitFor(hasText("20 mg")).assertIsDisplayed()
+    open(C.Tag.medication_detail_prescription, hasTestTag(C.Tag.prescription_detail_screen))
+    // The prescription heading may repeat its only medication's name; target the medication row.
+    waitFor(
+            hasText(name) and
+                SemanticsMatcher("is a prescription medication row") {
+                  it.config
+                      .getOrNull(SemanticsProperties.TestTag)
+                      ?.startsWith(C.Tag.prescriptionDetailMedication("")) == true
+                }
+        )
+        .reveal()
+        .assertIsDisplayed()
+    open(C.Tag.prescription_detail_back_button, hasTestTag(C.Tag.medication_detail_screen))
+    open(C.Tag.medication_detail_back, hasTestTag(C.Tag.planning_screen))
+    org.junit.Assert.assertEquals(
+        selectedDay,
+        tag(C.Tag.planning_heading).fetchSemanticsNode().config[SemanticsProperties.Text],
+    )
+  }
 
   /** Rotation gives the agenda a full viewport without losing the selected appointment day. */
   private fun checkPlanningLandscape(title: String) {
@@ -148,9 +176,11 @@ class M1EndToEndTest {
 
   private fun SemanticsNodeInteraction.fullyVisible() {
     val node = fetchSemanticsNode()
+    val size = node.size
+    assertTrue("The control must have drawable area", size.width > 0 && size.height > 0)
     assertTrue(
         "The whole control must fit in the viewport",
-        node.boundsInRoot.height >= node.size.height,
+        node.boundsInRoot.width >= size.width && node.boundsInRoot.height >= size.height,
     )
   }
 
