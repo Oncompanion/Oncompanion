@@ -4,6 +4,7 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.test.runTest
@@ -215,6 +216,33 @@ class ManageMedicationScheduleTest {
     assertEquals(saved.medications.map { it.id }, updated.medications.map { it.id })
     assertEquals(listOf("2 tablets", "2 tablets"), updated.medications.map { it.dosage })
     assertTrue(updated.isValid())
+  }
+
+  @Test
+  fun update_keepsWhoAddedIt_andConfirmsACaregiversPending() = runTest {
+    // What the saved prescription says, and what it says once the patient saved the form
+    val cases =
+        listOf(
+            PrescriptionConfirmation.PENDING to PrescriptionConfirmation.CONFIRMED,
+            PrescriptionConfirmation.CONFIRMED to PrescriptionConfirmation.CONFIRMED,
+            // A decided prescription keeps its state, or the rules would refuse the write
+            PrescriptionConfirmation.REJECTED to PrescriptionConfirmation.REJECTED,
+        )
+    for ((before, after) in cases) {
+      val saved =
+          draft
+              .toPrescription(repository.newId(), repository::newId)
+              .copy(addedBy = "sam", addedByName = "Sam", confirmation = before)
+      repository.addPrescription(uid, saved)
+
+      val edited = saved.toDraft().copy(prescribedBy = "Dr. House")
+      manageMedicationSchedule.update(uid, saved.id, edited)
+
+      val updated = repository.prescriptionsOf(uid).single { it.id == saved.id }
+      assertEquals("Dr. House", updated.prescribedBy)
+      assertEquals(listOf("sam", "Sam"), listOf(updated.addedBy, updated.addedByName))
+      assertEquals(after, updated.confirmation)
+    }
   }
 
   @Test

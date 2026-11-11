@@ -5,8 +5,11 @@ package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.appointment.*
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.Instant
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
@@ -164,11 +167,11 @@ class AppointmentDetailViewModelTest {
         vm.confirmDelete()
         vm.confirmDelete()
         runCurrent()
-        assertTrue(vm.uiState.value.delete.isDeleting)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertTrue(vm.uiState.value.isDeleteDialogShown)
         vm.cancelDelete()
         vm.retry()
-        assertTrue(vm.uiState.value.delete.isDeleting)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertEquals(listOf("uid-patient" to "visit"), repository.deleteRequests)
         repository.writeGate!!.complete(Unit)
         advanceUntilIdle()
@@ -191,7 +194,7 @@ class AppointmentDetailViewModelTest {
         vm.confirmDelete()
         advanceUntilIdle()
         assertEquals(appointment, (vm.uiState.value as AppointmentDetailUiState.Loaded).appointment)
-        assertTrue(vm.uiState.value.delete.hasError)
+        assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
         assertTrue(vm.uiState.value.isDeleteDialogShown)
         assertFalse(vm.canLeaveAfterDeletion())
         repository.writeError = null
@@ -306,7 +309,7 @@ class AppointmentDetailViewModelTest {
         repository.writeGate!!.complete(Unit)
         advanceUntilIdle()
         assertEquals(listOf(appointment), repository.appointments("uid-patient"))
-        assertFalse(vm.uiState.value.delete.hasError)
+        assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
         assertFalse(vm.canLeaveAfterDeletion())
       }
 
@@ -344,5 +347,53 @@ class AppointmentDetailViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AppointmentDetailUiState.NotShared, vm.uiState.value)
+      }
+
+  // ----- An appointment a caregiver added (US-41) -----
+
+  @Test
+  fun addedByACaregiver_thePatientSeesTheNameTheyGaveThem_theCaregiverTheStoredOne() =
+      runTest(dispatcher) {
+        val added = appointment.copy(addedBy = "carol", addedByName = "Carol")
+        auth.signInWithGoogle("patient")
+        repository.seed("uid-patient", added)
+        repository.seed("patient", added)
+        val circle =
+            FakeCareCircleRepository().apply {
+              setMembers("uid-patient", listOf(CareCircleMember(uid = "carol", firstName = "Sis")))
+            }
+
+        val own =
+            AppointmentDetailViewModel("visit", repository, auth, careCircleRepository = circle)
+        val followed = caregiverViewModel(CarePermission.PLANNING)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Sis",
+            (own.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
+        assertEquals(
+            "Carol",
+            (followed.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
+      }
+
+  @Test
+  fun circleNeverAnswers_thePatientStillSeesTheAppointment_withTheStoredName() =
+      runTest(dispatcher) {
+        // Offline, a circle never read on this device may not answer at all
+        val added = appointment.copy(addedBy = "carol", addedByName = "Carol")
+        auth.signInWithGoogle("patient")
+        repository.seed("uid-patient", added)
+        val circle = FakeCareCircleRepository().apply { membersNeverAnswer = true }
+
+        val vm =
+            AppointmentDetailViewModel("visit", repository, auth, careCircleRepository = circle)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Carol",
+            (vm.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
       }
 }

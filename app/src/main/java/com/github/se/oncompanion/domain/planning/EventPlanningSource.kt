@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.domain.planning
 
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRegistrationRepository
 import com.github.se.oncompanion.model.event.EventRepository
@@ -25,7 +26,11 @@ class EventPlanningSource(
 ) : PlanningRepository {
 
   /** [ownerUid]'s confirmed events starting within [range], as timed entries, updated live. */
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+  override fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> =
       combine(
           registrations.observeRegisteredEventIds(ownerUid),
           events.observeEvents(range.startInclusive, range.endExclusive),

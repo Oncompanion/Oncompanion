@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
  * @property day the illustrations from 11:00 to 18:00
  * @property dusk the illustrations from 18:00 to 05:00
  * @property onHorizon text drawn on an illustration, at any time of day
+ * @property hull the hull of the boats on the lake (members' boats, the illustrations)
  */
 @Immutable
 data class LakeColors(
@@ -32,6 +33,7 @@ data class LakeColors(
     val day: Horizon,
     val dusk: Horizon,
     val onHorizon: Color,
+    val hull: Color,
 )
 
 internal val LightLakeColors =
@@ -41,6 +43,7 @@ internal val LightLakeColors =
         day = Horizon(HorizonDayTopLight, HorizonDayBottomLight),
         dusk = Horizon(HorizonDuskTopLight, HorizonDuskBottomLight),
         onHorizon = OnHorizonLight,
+        hull = LakeHullLight,
     )
 
 internal val DarkLakeColors =
@@ -50,6 +53,7 @@ internal val DarkLakeColors =
         day = Horizon(HorizonDayTopDark, HorizonDayBottomDark),
         dusk = Horizon(HorizonDuskTopDark, HorizonDuskBottomDark),
         onHorizon = OnHorizonDark,
+        hull = LakeHullDark,
     )
 
 // Light by default, so a composable shown without OncompanionTheme (e.g. in a test) still draws.

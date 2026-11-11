@@ -174,6 +174,8 @@
     <string name="sign_in_error_no_connection">No internet connection. Check your connection and try again.</string>
     <string name="sign_in_error_no_google_account">No Google account on this device. Add one in your phone\'s settings and try again.</string>
     <string name="sign_in_error_failed">Couldn\'t sign in with Google. Please try again.</string>
+    <string name="account_check_title">Couldn\'t check your account</string>
+    <string name="account_check_body">oncompanion couldn\'t read your account on this phone yet. If you\'re offline, connect and try again.</string>
 
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
@@ -229,6 +231,11 @@
     <string name="event_detail_registration_error">Couldn\'t load or save your registration.</string>
     <string name="event_detail_website_error">Couldn\'t open the event website.</string>
     <string name="event_detail_website_error_can_confirm">Couldn\'t open the event website. You can still tap \"I\'m registered\".</string>
+    <!-- Caregiver mode: the followed patient's first name -->
+    <string name="event_detail_registration_confirmed_by_patient">%1$s confirmed they signed up for this event.</string>
+    <string name="event_detail_registered_caregiver">%1$s is registered</string>
+    <string name="event_detail_website_error_can_confirm_caregiver">Couldn\'t open the event website. You can still tap \"%1$s is registered\".</string>
+    <string name="event_detail_registration_note_caregiver">This saves it in %1$s\'s record. It doesn\'t register %1$s with the organizer or reserve a spot.</string>
 
     <!-- Care circle -->
     <string name="care_circle_back">Back</string>
@@ -299,6 +306,12 @@
     <!-- Letting a member add to a section they see (US-22), under that section's switch -->
     <string name="permission_symptoms_add">Allow adding symptoms</string>
     <string name="permission_symptoms_add_description">They can log a symptom for you</string>
+    <string name="permission_planning_add">Allow adding appointments</string>
+    <string name="permission_planning_add_description">They can add an appointment to your planning. It shows right away, with their name.</string>
+    <string name="permission_events_add">Allow confirming events</string>
+    <string name="permission_events_add_description">They can confirm that you registered for an event. It shows right away, with their name.</string>
+    <string name="permission_prescriptions_add">Allow adding prescriptions</string>
+    <string name="permission_prescriptions_add_description">They can add a prescription. It waits for you to confirm it.</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>
@@ -365,6 +378,11 @@
     <string name="whose_care_empty_title">You\'re not in a care circle anymore</string>
     <string name="whose_care_empty_body">Ask the person you support for a new invite code.</string>
     <string name="whose_care_empty_join">Join a care circle</string>
+    <!-- Not "offline": the server may just not have answered yet -->
+    <string name="whose_care_unconfirmed_title">Your care circles will appear once this phone has synced.</string>
+    <!-- After the patient removed the caregiver from their circle (#204), e.g. "You\'re no longer in Anne\'s care circle." -->
+    <string name="removed_from_circle">You\'re no longer in %1$s\'s care circle.</string>
+    <string name="removed_from_circle_unnamed">You\'re no longer in this care circle.</string>
 
     <!-- Caregiver mode: a section the patient doesn\'t share, e.g. "Anne doesn\'t share Planning with you" (#240) -->
     <string name="not_shared_title">%1$s doesn\'t share %2$s with you</string>
@@ -460,6 +478,16 @@
     <string name="prescriptions_error_hint">Please try again.</string>
     <string name="prescriptions_retry">Retry</string>
     <string name="prescriptions_scan">Scan</string>
+    <!-- Medication detail (US-35) -->
+    <string name="medication_detail_title">Medication</string>
+    <string name="medication_detail_view_prescription">View prescription</string>
+    <string name="medication_detail_prescription_date">Prescription date</string>
+    <string name="medication_detail_pending">Not confirmed</string>
+    <string name="medication_detail_error">Couldn\'t load this medication</string>
+    <string name="medication_detail_error_hint">Please try again.</string>
+    <string name="medication_detail_unavailable">This medication is unavailable</string>
+    <string name="medication_detail_unavailable_hint">It may have been removed, or its prescription may not be saved on this device.</string>
+
     <string name="prescription_detail_title">Prescription</string>
     <string name="prescription_detail_back">Back</string>
     <string name="prescription_detail_prescribed_by">Prescribed by</string>
@@ -613,6 +641,8 @@
     <string name="appointment_edit">Edit appointment</string>
     <string name="appointment_save_changes">Save changes</string>
     <string name="appointment_edit_signed_out">Sign in again to edit this appointment.</string>
+    <!-- A caregiver adds an appointment for the patient (US-41), e.g. "Add an appointment for Anne" -->
+    <string name="appointment_add_for">Add an appointment for %1$s</string>
 
     <!-- A change the server rejected and was undone, shown over every screen -->
     <string name="rejected_write_message">A change couldn\'t be saved and was undone</string>

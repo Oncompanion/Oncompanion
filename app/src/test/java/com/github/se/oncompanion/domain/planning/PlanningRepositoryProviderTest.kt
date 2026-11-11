@@ -9,6 +9,7 @@ import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.appointment.FakeAppointmentRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.event.Event
 import com.github.se.oncompanion.model.event.EventRegistrationRepositoryProvider
 import com.github.se.oncompanion.model.event.EventRepository
@@ -21,6 +22,7 @@ import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningRange
+import com.github.se.oncompanion.model.planning.observeItems
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -138,6 +140,35 @@ class PlanningRepositoryProviderTest {
     val items = original.observeItems("patient", range).first { it.size == 2 }
 
     assertEquals(listOf("Medication", "Saved consultation"), items.map { it.title })
+  }
+
+  /**
+   * A caregiver the patient only shares Planning with gets the appointments, and the medications
+   * and events are not read at all: the rules would refuse those reads.
+   */
+  @Test
+  fun planningSharedAlone_readsNeitherTheMedicationsNorTheEvents() = runTest {
+    val day = LocalDate.of(2026, 10, 25)
+    val range = PlanningRange(day, day.plusDays(1), ZoneId.of("Europe/Zurich"))
+    val appointments = FakeAppointmentRepository()
+    appointments.seed(
+        "patient",
+        Appointment(
+            "saved",
+            "Saved consultation",
+            range.startInclusive,
+            AppointmentType.CONSULTATION,
+        ),
+    )
+    AppointmentRepositoryProvider.repository = appointments
+    EventRepositoryProvider.repository = FakeEventRepository(emptyList())
+    // A read of either would fail the planning or log an error
+    medications.readError = IllegalStateException("Prescriptions aren't shared")
+    registrations.observeError = IllegalStateException("Events aren't shared")
+
+    val items = original.observeItems("patient", range, setOf(CarePermission.PLANNING)).first()
+
+    assertEquals(listOf("Saved consultation"), items.map { it.title })
   }
 
   private fun prescription(day: LocalDate, name: String = "Medication") =

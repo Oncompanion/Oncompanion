@@ -37,6 +37,7 @@ import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.showKeyboard
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,7 +67,7 @@ class JoinCareCircleScreenTest {
   private val events = mutableListOf<String>()
 
   /** Shows the content like the real screen does: typing updates the state. */
-  private fun setContent(initial: JoinCareCircleUiState) {
+  private fun setContent(initial: JoinCareCircleUiState, removedFrom: String? = null) {
     uiState = initial
     composeTestRule.setContent {
       JoinCareCircleContent(
@@ -75,6 +76,8 @@ class JoinCareCircleScreenTest {
           onJoin = { events += "join" },
           onDone = { events += "done" },
           onOpenProfile = { events += "profile" },
+          removedFrom = removedFrom,
+          onRemovalShown = { events += "removal shown" },
       )
     }
   }
@@ -204,6 +207,28 @@ class JoinCareCircleScreenTest {
 
     node(C.Tag.join_circle_code_field).performScrollTo().assertIsFullyVisible()
     node(C.Tag.join_circle_code_field).assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun content_removedFromACircle_saysSo_withoutCoveringJoin_thenGoesAway() {
+    setContent(JoinCareCircleUiState(code = "ABCDEFGHJK"), removedFrom = "Anne")
+    val message = context.getString(R.string.removed_from_circle, "Anne")
+    composeTestRule.onNodeWithText(message).assertIsDisplayed()
+
+    // The message is the screen's bottom bar: Join can be reached above it
+    node(C.Tag.join_circle_join_button).performScrollTo().assertIsFullyVisible()
+    val join = node(C.Tag.join_circle_join_button).fetchSemanticsNode().boundsInRoot
+    val bar = node(C.Tag.removed_from_circle_snackbar).fetchSemanticsNode().boundsInRoot
+    assertTrue(
+        "Join ends at ${join.bottom}, the message starts at ${bar.top}",
+        join.bottom <= bar.top,
+    )
+
+    // It goes away on its own, once
+    composeTestRule.mainClock.advanceTimeBy(10_000)
+    composeTestRule.onNodeWithText(message).assertDoesNotExist()
+    assertEquals(listOf("removal shown"), events)
   }
 
   // --- JoinCareCircleScreen with a view model ---

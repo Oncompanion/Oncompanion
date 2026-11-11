@@ -74,6 +74,11 @@ object C {
     const val sign_in_screen = "sign_in_screen"
     const val google_sign_in_button = "google_sign_in_button"
     const val sign_in_loading = "sign_in_loading"
+    const val sign_in_logo = "sign_in_logo"
+    const val account_check_screen = "account_check_screen"
+    const val account_check_retry = "account_check_retry"
+    const val account_check_loading = "account_check_loading"
+    const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
@@ -333,9 +338,13 @@ object C {
     const val whose_care_empty = "whose_care_empty"
     const val whose_care_action = "whose_care_action"
     const val whose_care_join_another = "whose_care_join_another"
+    const val whose_care_unconfirmed = "whose_care_unconfirmed"
+    const val whose_care_secondary_action = "whose_care_secondary_action"
 
     /** The row of the followed patient [uid] in "Whose care?". */
     fun whoseCarePatient(uid: String) = "whose_care_patient_$uid"
+
+    const val removed_from_circle_snackbar = "removed_from_circle_snackbar"
 
     // Caregiver mode: a section the patient doesn't share
     const val not_shared = "not_shared"
@@ -367,6 +376,7 @@ object C {
 
     // Prescriptions
     const val prescription_form_screen = "prescription_form_screen"
+    const val prescription_form_band = "prescription_form_band"
     const val prescription_form_close_button = "prescription_form_close_button"
     const val prescription_form_prescribed_by_field = "prescription_form_prescribed_by_field"
     const val prescription_form_date_field = "prescription_form_date_field"
@@ -432,6 +442,15 @@ object C {
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
+
+    // Medication detail (US-35)
+    const val medication_detail_screen = "medication_detail_screen"
+    const val medication_detail_back = "medication_detail_back"
+    const val medication_detail_content = "medication_detail_content"
+    const val medication_detail_prescription = "medication_detail_prescription"
+    const val medication_detail_loading = "medication_detail_loading"
+    const val medication_detail_feedback = "medication_detail_feedback"
+    const val medication_detail_retry = "medication_detail_retry"
 
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"

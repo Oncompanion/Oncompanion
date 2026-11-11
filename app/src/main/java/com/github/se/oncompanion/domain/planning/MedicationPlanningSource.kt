@@ -3,6 +3,7 @@
 
 package com.github.se.oncompanion.domain.planning
 
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
@@ -20,7 +21,11 @@ import kotlinx.coroutines.flow.map
  */
 class MedicationPlanningSource(private val medications: MedicationRepository) : PlanningRepository {
 
-  override fun observeItems(ownerUid: String, range: PlanningRange): Flow<List<PlanningItem>> =
+  override fun observeItems(
+      ownerUid: String,
+      range: PlanningRange,
+      sections: Set<CarePermission>,
+  ): Flow<List<PlanningItem>> =
       medications.observeMedications(ownerUid).map { entries ->
         entries.flatMap { it.occurrences(range) }
       }

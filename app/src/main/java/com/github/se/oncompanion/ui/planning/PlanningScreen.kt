@@ -35,6 +35,7 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -73,10 +74,13 @@ fun PlanningScreen(
     onAddAppointment: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (String) -> Unit,
     onOpenEvent: (String) -> Unit,
+    onOpenMedication: (String, String) -> Unit,
     caregiverOf: String? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val openItem: (PlanningItem) -> Unit = { openPlanningItem(it, onOpenAppointment, onOpenEvent) }
+  val openItem: (PlanningItem) -> Unit = {
+    openPlanningItem(it, onOpenAppointment, onOpenEvent, onOpenMedication)
+  }
   // Keeps the today marker right while Planning is on screen: refreshes when it comes back, then
   // at each midnight
   LifecycleResumeEffect(viewModel) {
@@ -96,7 +100,6 @@ fun PlanningScreen(
               viewModel::retry,
               onAddAppointment = onAddAppointment,
               onItemClick = openItem,
-              canOpenItem = { it.source !is PlanningSource.Medication },
           ),
       modifier = modifier,
       bottomBar = {
@@ -106,16 +109,17 @@ fun PlanningScreen(
   )
 }
 
-/** Opens the page of the feature that owns [item]; medications have none here. */
+/** Opens the page of the feature that owns [item], preserving its source identifiers. */
 internal fun openPlanningItem(
     item: PlanningItem,
     onOpenAppointment: (String) -> Unit,
     onOpenEvent: (String) -> Unit,
+    onOpenMedication: (String, String) -> Unit,
 ) {
   when (val source = item.source) {
     is PlanningSource.Appointment -> onOpenAppointment(source.appointmentId)
     is PlanningSource.Event -> onOpenEvent(source.eventId)
-    is PlanningSource.Medication -> Unit
+    is PlanningSource.Medication -> onOpenMedication(source.prescriptionId, source.medicationId)
   }
 }
 
@@ -159,6 +163,8 @@ fun PlanningContent(
         )
       }
       actions.onAddAppointment?.let { onAdd ->
+        // A caregiver only gets "+" when the patient lets them add appointments (US-41)
+        if (!state.canAdd) return@let
         val addLabel = stringResource(R.string.planning_add)
         FloatingActionButton(
             onClick = { onAdd(state.selectedDate) },
@@ -461,20 +467,24 @@ private fun PlanningRow(
         is PlanningSource.Medication ->
             R.drawable.ic_medication to R.string.planning_type_medication
       }
-  val supportingText =
-      if (item.source is PlanningSource.Medication) {
-        item.frequency
-            ?.takeIf { it.isNotBlank() }
-            ?.let { stringResource(R.string.planning_frequency, it) }
-            ?: stringResource(R.string.planning_frequency_unspecified)
-      } else item.subtitle
+  val supportingText = item.supportingText()
   val timed = item.timing as? PlanningTiming.Timed
   ListItem(
       leadingContent = {
         Icon(painterResource(icon), contentDescription = stringResource(typeLabel))
       },
       headlineContent = { Text(item.title) },
-      supportingContent = supportingText?.let { text -> { Text(text) } },
+      supportingContent =
+          if (supportingText == null && item.addedByName == null) null
+          else {
+            {
+              Column {
+                supportingText?.let { Text(it) }
+                // An appointment a caregiver added for the patient says who did (US-41)
+                item.addedByName?.let { AddedBy(it) }
+              }
+            }
+          },
       trailingContent =
           timed?.let { value ->
             {
@@ -492,4 +502,14 @@ private fun PlanningRow(
                   if (onItemClick == null) Modifier else Modifier.clickable { onItemClick(item) }
               ),
   )
+}
+
+/** Appointments may have no supporting text; medications always have a frequency fallback. */
+@Composable
+private fun PlanningItem.supportingText(): String? {
+  if (source !is PlanningSource.Medication) return subtitle
+  return frequency
+      ?.takeIf { it.isNotBlank() }
+      ?.let { stringResource(R.string.planning_frequency, it) }
+      ?: stringResource(R.string.planning_frequency_unspecified)
 }

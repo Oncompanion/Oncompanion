@@ -26,8 +26,10 @@ import com.github.se.oncompanion.model.appointment.Appointment
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
@@ -54,7 +56,7 @@ fun AppointmentDetailScreen(
   LaunchedEffect(viewModel, lifecycle) {
     lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
       viewModel.uiState.collect {
-        if (it.delete.isDeleted && viewModel.canLeaveAfterDeletion()) leave()
+        if (it.delete == DeletePhase.DELETED && viewModel.canLeaveAfterDeletion()) leave()
       }
     }
   }
@@ -124,7 +126,7 @@ fun AppointmentDetailContent(
                 )
               },
           ) {
-            AppointmentFields(state.appointment, zoneId)
+            AppointmentFields(state.appointment, zoneId, state.addedByName)
           }
       else ->
           Column(Modifier.fillMaxSize().padding(padding)) {
@@ -150,8 +152,8 @@ fun AppointmentDetailContent(
         error = stringResource(R.string.appointment_delete_error),
         confirmLabel = stringResource(R.string.appointment_delete_confirm),
         cancelLabel = stringResource(R.string.appointment_delete_cancel),
-        isDeleting = state.delete.isDeleting,
-        hasError = state.delete.hasError,
+        isDeleting = state.delete == DeletePhase.DELETING,
+        hasError = state.delete == DeletePhase.FAILED,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags =
@@ -179,7 +181,7 @@ private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
+private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId, addedByName: String?) {
   val type =
       when (appointment.type) {
         AppointmentType.TREATMENT -> R.string.appointment_treatment
@@ -196,6 +198,8 @@ private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId) {
         style = MaterialTheme.typography.titleSmall,
     )
     Text(appointment.title, style = MaterialTheme.typography.headlineMedium)
+    // An appointment a caregiver added for the patient says who did (US-41)
+    addedByName?.let { AddedBy(it) }
   }
   // Appointments record a start instant only; display it using the English UI language and the
   // phone's clock format.

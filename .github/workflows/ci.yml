@@ -72,25 +72,9 @@ jobs:
           distribution: "temurin"
           java-version: "21"
 
+      # Also keeps Robolectric's Android jars: Gradle downloads them like any dependency (#324)
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v6
-
-      # Robolectric downloads its Android jars (android-all) from Maven into ~/.m2, which the Gradle
-      # cache doesn't keep: a failed download failed every Robolectric test of the run (#300). The
-      # key is the Robolectric version only: another dependency's bump keeps the same entry, and an
-      # upgrade starts a new one without the old version's jars
-      - name: Robolectric version
-        id: robolectric
-        run: |
-          version=$(sed -n 's/^robolectric = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
-          [ -z "$version" ] && echo "No robolectric version in libs.versions.toml" && exit 1
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Robolectric cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.m2/repository/org/robolectric
-          key: robolectric-${{ steps.robolectric.outputs.version }}
 
       - name: Grant execute permission for gradlew
         run: |

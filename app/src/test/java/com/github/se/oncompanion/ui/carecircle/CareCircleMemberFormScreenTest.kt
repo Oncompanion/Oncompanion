@@ -710,31 +710,50 @@ class CareCircleMemberFormScreenTest {
     compose.runOnIdle { assertEquals(1, backs) }
   }
 
-  // ---- adding symptoms (US-22) ----
+  // ---- adding symptoms (US-22), appointments (US-41), confirming events (US-42) and
+  // prescriptions (US-43) ----
 
   @Test
-  fun allowAddingSymptoms_isGreyedOut_untilSymptomsAreShared() {
+  fun allowAdding_isGreyedOut_untilItsSectionIsShared() {
     content(complete)
-    val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(CarePermission.SYMPTOMS.name))
+    val allowed = mutableSetOf<CarePermission>()
+    for (section in
+        listOf(
+            CarePermission.SYMPTOMS,
+            CarePermission.PLANNING,
+            CarePermission.EVENTS,
+            CarePermission.PRESCRIPTIONS,
+        )) {
+      val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name))
 
-    canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
+      canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
 
-    compose
-        .onNodeWithTag(C.Tag.careCircleFormPermission(CarePermission.SYMPTOMS.name))
-        .performScrollTo()
-        .performClick()
-    canAdd.performScrollTo().assertIsEnabled().performClick()
+      compose
+          .onNodeWithTag(C.Tag.careCircleFormPermission(section.name))
+          .performScrollTo()
+          .performClick()
+      canAdd.performScrollTo().assertIsEnabled().performClick()
 
-    canAdd.assertIsOn()
-    assertEquals(setOf(CarePermission.SYMPTOMS), state.canAdd)
+      canAdd.assertIsOn()
+      allowed += section
+      assertEquals(allowed, state.canAdd)
+    }
   }
 
   @Test
-  fun allowAdding_isOnlyOfferedUnderSymptoms() {
+  fun allowAdding_isLabelledUnderEachSection() {
     content(complete)
 
-    for (section in CarePermission.entries - CarePermission.SYMPTOMS) {
-      compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name)).assertDoesNotExist()
+    for ((section, label) in
+        listOf(
+            CarePermission.PLANNING to "Allow adding appointments",
+            CarePermission.EVENTS to "Allow confirming events",
+            CarePermission.PRESCRIPTIONS to "Allow adding prescriptions",
+        )) {
+      compose
+          .onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name))
+          .performScrollTo()
+          .assertTextContains(label, substring = true)
     }
   }
 }

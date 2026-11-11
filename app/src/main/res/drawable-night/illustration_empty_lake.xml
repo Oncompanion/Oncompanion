@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Empty lake of empty states, exported from the Figma (page M2) in the dark theme. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="58dp"
+    android:viewportWidth="72"
+    android:viewportHeight="58">
+    <path
+        android:fillColor="#5A3B33"
+        android:pathData="M36 54C49.9176 54 61.2001 42.7176 61.2001 28.8C61.2001 14.8824 49.9176 3.59998 36 3.59998C22.0825 3.59998 10.8 14.8824 10.8 28.8C10.8 42.7176 22.0825 54 36 54Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M46.08 23.76C48.8636 23.76 51.12 21.5035 51.12 18.72C51.12 15.9365 48.8636 13.68 46.08 13.68C43.2965 13.68 41.04 15.9365 41.04 18.72C41.04 21.5035 43.2965 23.76 46.08 23.76Z" />
+    <path
+        android:fillColor="#463C66"
+        android:pathData="M12.96 32.4L26.64 22.32L33.84 27.36L43.2 19.44L59.04 32.4H12.96Z" />
+    <path
+        android:fillColor="#134F5B"
+        android:pathData="M11.0591 32.4C11.9259 38.3966 14.9241 43.8801 19.5045 47.846C24.085 51.812 29.941 53.995 35.9999 53.995C42.0587 53.995 47.9148 51.812 52.4952 47.846C57.0757 43.8801 60.0739 38.3966 60.9407 32.4H11.0591Z" />
+    <path
+        android:fillColor="#0E3F49"
+        android:pathData="M13.5864 40.32C15.7039 44.4404 18.9162 47.8973 22.8703 50.311C26.8244 52.7247 31.3674 54.0017 36 54.0017C40.6326 54.0017 45.1756 52.7247 49.1297 50.311C53.0839 47.8973 56.2962 44.4404 58.4136 40.32H13.5864Z" />
+    <path
+        android:fillColor="#082C33"
+        android:pathData="M19.1304 47.52C23.7591 51.6911 29.7691 53.9995 36 53.9995C42.2309 53.9995 48.2408 51.6911 52.8696 47.52H19.1304Z" />
+    <path
+        android:fillColor="#E3E6E7"
+        android:pathData="M49.68 34.56H42.48C42.0824 34.56 41.76 34.8824 41.76 35.28C41.76 35.6776 42.0824 36 42.48 36H49.68C50.0777 36 50.4 35.6776 50.4 35.28C50.4 34.8824 50.0777 34.56 49.68 34.56Z" />
+    <path
+        android:fillColor="#3B4448"
+        android:pathData="M28.0801 37.44H43.9201L41.4001 40.32H30.6001L28.0801 37.44Z" />
+</vector>

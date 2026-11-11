@@ -17,7 +17,7 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -112,8 +112,8 @@ class SymptomDetailViewModelTest {
     assertFalse(SymptomDetailUiState().canDelete)
     assertFalse(shown.copy(entry = null).canDelete)
     assertFalse(shown.copy(hasError = true).canDelete)
-    assertFalse(shown.copy(delete = DeleteState(isDeleting = true)).canDelete)
-    assertFalse(shown.copy(delete = DeleteState(isDeleted = true)).canDelete)
+    assertFalse(shown.copy(delete = DeletePhase.DELETING).canDelete)
+    assertFalse(shown.copy(delete = DeletePhase.DELETED).canDelete)
   }
 
   @Test
@@ -165,7 +165,7 @@ class SymptomDetailViewModelTest {
   fun requestDelete_asksForConfirmation_andDeletesNothing() {
     val vm = confirmingDelete()
 
-    assertTrue(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.CONFIRMING, vm.uiState.value.delete)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -175,7 +175,7 @@ class SymptomDetailViewModelTest {
 
     vm.cancelDelete()
 
-    assertFalse(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(fatigue, vm.uiState.value.entry)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
@@ -188,9 +188,7 @@ class SymptomDetailViewModelTest {
 
     val state = vm.uiState.value
     assertTrue(repository.symptoms("alice").isEmpty())
-    assertTrue(state.delete.isDeleted)
-    assertFalse(state.delete.isConfirming)
-    assertFalse(state.delete.isDeleting)
+    assertEquals(DeletePhase.DELETED, state.delete)
     // Still shows the entry until the screen closes, not "no longer exists"
     assertEquals(fatigue, state.entry)
     assertFalse(state.isNotFound)
@@ -208,7 +206,7 @@ class SymptomDetailViewModelTest {
     vm.confirmDelete()
 
     // Done without waiting for the server
-    assertTrue(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
     assertTrue(symptoms.symptoms("alice").isEmpty())
     assertEquals(0, rejectedWrites.unseen.value)
 
@@ -225,7 +223,7 @@ class SymptomDetailViewModelTest {
 
     vm.confirmDelete()
 
-    assertFalse(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -233,12 +231,12 @@ class SymptomDetailViewModelTest {
   fun requestDelete_isIgnoredWithoutAnEntry() {
     val notFound = viewModel("missing")
     notFound.requestDelete()
-    assertFalse(notFound.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, notFound.uiState.value.delete)
 
     repository.observeError = IllegalStateException("no cache")
     val error = viewModel()
     error.requestDelete()
-    assertFalse(error.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, error.uiState.value.delete)
   }
 
   @Test
@@ -249,12 +247,10 @@ class SymptomDetailViewModelTest {
     vm.confirmDelete()
 
     var state = vm.uiState.value
-    assertTrue(state.delete.hasError)
-    assertTrue(state.delete.isConfirming)
+    assertEquals(DeletePhase.FAILED, state.delete)
     // No loading state in between: the dialog stays open with the error
     assertFalse(state.isLoading)
     assertTrue(state.isDeleteDialogShown)
-    assertFalse(state.delete.isDeleted)
     assertEquals(fatigue, state.entry)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
 
@@ -262,8 +258,7 @@ class SymptomDetailViewModelTest {
     vm.confirmDelete()
 
     state = vm.uiState.value
-    assertTrue(state.delete.isDeleted)
-    assertFalse(state.delete.hasError)
+    assertEquals(DeletePhase.DELETED, state.delete)
     assertTrue(repository.symptoms("alice").isEmpty())
   }
 
@@ -276,8 +271,7 @@ class SymptomDetailViewModelTest {
     vm.cancelDelete()
     vm.requestDelete()
 
-    assertTrue(vm.uiState.value.delete.isConfirming)
-    assertFalse(vm.uiState.value.delete.hasError)
+    assertEquals(DeletePhase.CONFIRMING, vm.uiState.value.delete)
   }
 
   @Test
@@ -292,7 +286,7 @@ class SymptomDetailViewModelTest {
     // Signing out shows the error right away, and the symptom can't be deleted anymore
     assertTrue(vm.uiState.value.hasError)
     assertFalse(vm.uiState.value.canDelete)
-    assertFalse(vm.uiState.value.delete.isDeleted)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(fatigue), repository.symptoms("alice"))
   }
 
@@ -311,18 +305,17 @@ class SymptomDetailViewModelTest {
     val vm = confirmingDelete(symptoms = slow)
 
     vm.confirmDelete()
-    assertTrue(vm.uiState.value.delete.isDeleting)
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
     assertFalse(vm.uiState.value.canDelete)
     vm.cancelDelete()
     vm.confirmDelete()
-    assertTrue(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
     assertEquals(1, deletes)
 
     deleted.complete(Unit)
     shadowOf(Looper.getMainLooper()).idle()
 
-    assertTrue(vm.uiState.value.delete.isDeleted)
-    assertFalse(vm.uiState.value.delete.isDeleting)
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
   }
 
   @Test
@@ -331,16 +324,12 @@ class SymptomDetailViewModelTest {
         SymptomDetailUiState(
             entry = fatigue,
             isLoading = false,
-            delete = DeleteState(isConfirming = true),
+            delete = DeletePhase.CONFIRMING,
         )
 
     assertTrue(confirming.isDeleteDialogShown)
-    assertTrue(
-        confirming.copy(delete = confirming.delete.copy(isDeleting = true)).isDeleteDialogShown
-    )
-    assertFalse(
-        confirming.copy(delete = confirming.delete.copy(isConfirming = false)).isDeleteDialogShown
-    )
+    assertTrue(confirming.copy(delete = DeletePhase.DELETING).isDeleteDialogShown)
+    assertFalse(confirming.copy(delete = DeletePhase.IDLE).isDeleteDialogShown)
     assertFalse(confirming.copy(entry = null).isDeleteDialogShown)
     assertFalse(confirming.copy(isLoading = true).isDeleteDialogShown)
     assertFalse(confirming.copy(hasError = true).isDeleteDialogShown)
@@ -356,7 +345,7 @@ class SymptomDetailViewModelTest {
 
     var state = vm.uiState.value
     assertTrue(state.isNotFound)
-    assertFalse(state.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, state.delete)
     assertFalse(state.isDeleteDialogShown)
 
     // Coming back (e.g. the deletion was rolled back) doesn't reopen the dialog
@@ -377,8 +366,7 @@ class SymptomDetailViewModelTest {
 
     val state = vm.uiState.value
     assertTrue(state.hasError)
-    assertFalse(state.delete.isConfirming)
-    assertFalse(state.delete.hasError)
+    assertEquals(DeletePhase.IDLE, state.delete)
     assertFalse(state.isDeleteDialogShown)
   }
 
@@ -394,7 +382,7 @@ class SymptomDetailViewModelTest {
     shadowOf(Looper.getMainLooper()).idle()
 
     assertEquals(fatigue, vm.uiState.value.entry)
-    assertFalse(vm.uiState.value.delete.isConfirming)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
   }
 
   // ----- Caregiver mode (US-20) -----
@@ -485,10 +473,24 @@ class SymptomDetailViewModelTest {
     repository.seed("alice", addedByBob)
     circle.setMembers("alice", listOf(CareCircleMember(uid = "bob", firstName = "Robert")))
     val vm = viewModel()
+    // The stored name shows first, then the circle's once it is read
+    shadowOf(Looper.getMainLooper()).idle()
 
     assertEquals("Robert", vm.uiState.value.addedByName)
     circle.setMembers("alice", emptyList())
     shadowOf(Looper.getMainLooper()).idle()
+    assertEquals("Bob", vm.uiState.value.addedByName)
+  }
+
+  @Test
+  fun patient_circleNeverAnswers_stillSeesTheSymptom_withTheStoredName() {
+    // Offline, a circle never read on this device may not answer at all
+    repository.seed("alice", addedByBob)
+    circle.membersNeverAnswer = true
+
+    val vm = viewModel()
+
+    assertEquals(addedByBob, vm.uiState.value.entry)
     assertEquals("Bob", vm.uiState.value.addedByName)
   }
 

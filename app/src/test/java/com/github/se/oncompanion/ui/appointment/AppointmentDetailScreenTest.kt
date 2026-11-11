@@ -22,7 +22,7 @@ import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.*
 import java.util.Locale
 import kotlinx.coroutines.test.runTest
@@ -73,6 +73,20 @@ class AppointmentDetailScreenTest {
     }
     compose.onNodeWithText("Other").assertIsDisplayed()
     compose.onNodeWithText("Long note ".repeat(100)).performScrollTo().assertIsDisplayed()
+  }
+
+  /** An appointment a caregiver added says who did (US-41); the patient's own says nothing. */
+  @Test
+  fun addedByACaregiver_saysWhoAddedIt() {
+    var state by
+        mutableStateOf<AppointmentDetailUiState>(
+            AppointmentDetailUiState.Loaded(appointment, addedByName = "Sam")
+        )
+    compose.setContent { AppointmentDetailContent(state, {}, {}, ZoneId.of("Europe/Zurich")) }
+    compose.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
+
+    compose.runOnIdle { state = AppointmentDetailUiState.Loaded(appointment) }
+    compose.onNodeWithTag(C.Tag.added_by).assertDoesNotExist()
   }
 
   /** Loading, unavailable, error and retry remain distinct and Back always works. */
@@ -176,7 +190,7 @@ class AppointmentDetailScreenTest {
   /** Appointment actions use the shared confirmation and preserve error/submission states. */
   @Test
   fun sharedDeleteDialogStatesAndCallbacks() {
-    var deletion by mutableStateOf(DeleteState())
+    var deletion by mutableStateOf(DeletePhase.IDLE)
     var requests = 0
     var confirms = 0
     var cancels = 0
@@ -187,12 +201,12 @@ class AppointmentDetailScreenTest {
           {},
           onDelete = {
             requests++
-            deletion = DeleteState(isConfirming = true)
+            deletion = DeletePhase.CONFIRMING
           },
           onConfirmDelete = { confirms++ },
           onCancelDelete = {
             cancels++
-            deletion = DeleteState()
+            deletion = DeletePhase.IDLE
           },
       )
     }
@@ -204,9 +218,9 @@ class AppointmentDetailScreenTest {
     assertEquals(1, cancels)
     compose.onNodeWithTag(C.Tag.appointment_delete_dialog).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
-    compose.runOnIdle { deletion = deletion.copy(hasError = true) }
+    compose.runOnIdle { deletion = DeletePhase.FAILED }
     compose.onNodeWithTag(C.Tag.appointment_delete_error).assertIsDisplayed()
-    compose.runOnIdle { deletion = deletion.copy(isDeleting = true, hasError = false) }
+    compose.runOnIdle { deletion = DeletePhase.DELETING }
     compose.onNodeWithTag(C.Tag.appointment_delete_confirm).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.appointment_delete_cancel).assertIsNotEnabled()
     assertEquals(2, requests)

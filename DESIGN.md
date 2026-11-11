@@ -33,7 +33,7 @@ colors:
   inverse-on-surface: "#F2EEE9"
   inverse-primary: "#9AD0DC"
   horizon-dawn-top: "#F6D2B8"
-  horizon-dawn-bottom: "#EFB892"
+  horizon-dawn-bottom: "#C9D7DE"
   horizon-day-top: "#CFE5EA"
   horizon-day-bottom: "#A9CFD8"
   horizon-dusk-top: "#E3D9F0"
@@ -316,7 +316,7 @@ Each person in the care circle is a small paper boat (*Member boat*: Large 48, S
 
 ## Logo
 
-The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* component in the Tertiary colour. It appears on Sign in and as the app icon in notifications. On the launcher icon the ribbon fills about 56% of a plain tile so it survives round and squircle masks; the tile colour is chosen among the options on *Logo – Solid ribbon* (contrast ratios noted there).
+The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* component in the Tertiary colour. It appears on Sign in and as the app icon in notifications. On the launcher icon the ribbon fills about 56% of a plain tile so it survives round and squircle masks; the tile is the cream surface with the violet ribbon (*Violet on cream* on *Logo – Solid ribbon*, 5.7:1), the same in light and dark theme.
 
 ## Components
 

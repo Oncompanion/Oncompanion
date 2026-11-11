@@ -5,7 +5,11 @@ package com.github.se.oncompanion.domain.planning
 import android.util.Log
 import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.domain.carecircle.SectionAccess
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.addedByName
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -13,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -24,8 +29,13 @@ sealed interface CarePlanning {
   /** Nothing to show yet: the access or the entries aren't known. Show no entries. */
   data object Loading : CarePlanning
 
-  /** The planning's [items]. */
-  data class Shown(val items: List<PlanningItem>) : CarePlanning
+  /**
+   * The planning's [items].
+   *
+   * @property canAdd whether adding an appointment may be offered: in the user's own planning, or
+   *   when the patient lets the caregiver add to it (US-41)
+   */
+  data class Shown(val items: List<PlanningItem>, val canAdd: Boolean = false) : CarePlanning
 
   /** The patient a caregiver follows doesn't share their planning with them. */
   data object NotShared : CarePlanning
@@ -43,11 +53,13 @@ sealed interface CarePlanning {
 /**
  * The planning the signed-in user may see: their own, or that of the patient they follow when the
  * patient shares it (US-20), so Planning and the Overview have one code path for both. Whose
- * planning, and whether it is shared, comes from [resolveSection].
+ * planning, and whether it is shared, comes from [resolveSection]. In the patient's own planning,
+ * an appointment a caregiver added shows the name the patient gave them in [careCircle].
  */
 class ObserveCarePlanning(
     private val resolveSection: ResolveSectionAccess = ResolveSectionAccess(),
     private val planning: PlanningRepository = PlanningRepositoryProvider.repository,
+    private val careCircle: CareCircleRepository = CareCircleRepositoryProvider.repository,
 ) {
 
   /**
@@ -58,20 +70,40 @@ class ObserveCarePlanning(
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   operator fun invoke(patientUid: String?, range: PlanningRange): Flow<CarePlanning> =
-      resolveSection(CarePermission.PLANNING, patientUid).flatMapLatest { access ->
-        when (access) {
-          SectionAccess.Loading -> flowOf(CarePlanning.Loading)
-          SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
-          SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
-          is SectionAccess.Readable -> shown(access.ownerUid, range)
-        }
+      resolveSection
+          .withSharedSections(CarePermission.PLANNING, patientUid)
+          // Only the sections Planning reads: sharing another one (Symptoms) must not reload it
+          .map { it.copy(shared = it.shared intersect READ_SECTIONS) }
+          .distinctUntilChanged()
+          .flatMapLatest { planningFor(it.access, range, it.shared) }
+
+  /** What the user sees of the planning with [access], from its [shared] sections. */
+  private fun planningFor(
+      access: SectionAccess,
+      range: PlanningRange,
+      shared: Set<CarePermission>,
+  ): Flow<CarePlanning> =
+      when (access) {
+        SectionAccess.Loading -> flowOf(CarePlanning.Loading)
+        SectionAccess.NoAccess -> flowOf(CarePlanning.NoAccess)
+        SectionAccess.NotShared -> flowOf(CarePlanning.NotShared)
+        is SectionAccess.Readable -> shown(access, range, shared)
       }
 
-  /** [ownerUid]'s entries, from [CarePlanning.Loading]; a read failure is [CarePlanning.Failed]. */
-  private fun shown(ownerUid: String, range: PlanningRange): Flow<CarePlanning> =
+  /**
+   * The entries [access] lets the user read, of the [shared] sections (a caregiver gets medications
+   * and events only when the patient also shares Prescriptions or Events), from
+   * [CarePlanning.Loading]; a read failure is [CarePlanning.Failed].
+   */
+  private fun shown(
+      access: SectionAccess.Readable,
+      range: PlanningRange,
+      shared: Set<CarePermission>,
+  ): Flow<CarePlanning> =
       planning
-          .observeItems(ownerUid, range)
-          .map<List<PlanningItem>, CarePlanning> { CarePlanning.Shown(it) }
+          .observeItems(access.ownerUid, range, shared)
+          .withAddedByNames(access)
+          .map<List<PlanningItem>, CarePlanning> { CarePlanning.Shown(it, access.canAdd) }
           .onStart { emit(CarePlanning.Loading) }
           .catch { e ->
             if (e is CancellationException) throw e
@@ -79,7 +111,44 @@ class ObserveCarePlanning(
             emit(CarePlanning.Failed)
           }
 
+  /**
+   * For the patient, who added each entry as they named that member in their circle (a rename
+   * shows); a caregiver gets no names and keeps the stored ones. The entries never wait for the
+   * circle (offline, it may not be in the cache yet): they show with the stored names, and again
+   * with the circle's once it is read. A read error reaches the caller after the entries before it.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun Flow<List<PlanningItem>>.withAddedByNames(
+      access: SectionAccess.Readable
+  ): Flow<List<PlanningItem>> {
+    if (!access.canEdit) return this
+    val entries = this
+    return careCircle
+        .observeMemberNames(access.ownerUid)
+        .distinctUntilChanged()
+        .flatMapLatest { names ->
+          entries
+              .map { items ->
+                Result.success(
+                    items.map {
+                      it.copy(addedByName = addedByName(it.addedBy, it.addedByName, names))
+                    }
+                )
+              }
+              // Passed on as a value, so the entries emitted before it are never dropped
+              .catch { e ->
+                if (e is CancellationException) throw e
+                emit(Result.failure(e))
+              }
+        }
+        .map { it.getOrThrow() }
+  }
+
   private companion object {
     const val TAG = "ObserveCarePlanning"
+
+    /** The sections Planning shows entries of: appointments, medications and events. */
+    val READ_SECTIONS =
+        setOf(CarePermission.PLANNING, CarePermission.PRESCRIPTIONS, CarePermission.EVENTS)
   }
 }

@@ -432,14 +432,24 @@ class SymptomJournalViewModelTest {
   }
 
   @Test
-  fun patient_circleCantBeRead_stillSeesTheEntry_withTheStoredName() {
+  fun patient_circleUnreadableOrSilent_stillSeesTheEntry_withTheStoredName() {
     repository.seed("alice", addedByBob)
-    circle.observeError = IllegalStateException("denied")
+    // The circle fails, or never answers (offline, never read on this device)
+    val cases =
+        listOf<Pair<String, () -> Unit>>(
+            "unreadable" to { circle.observeError = IllegalStateException("denied") },
+            "silent" to { circle.membersNeverAnswer = true },
+        )
+    for ((name, breakCircle) in cases) {
+      circle.observeError = null
+      circle.membersNeverAnswer = false
+      breakCircle()
 
-    val vm = viewModel()
+      val vm = viewModel()
 
-    assertEquals("Bob", vm.shownAddedBy())
-    assertFalse(vm.uiState.value.hasError)
+      assertEquals(name, "Bob", vm.shownAddedBy())
+      assertFalse(name, vm.uiState.value.hasError)
+    }
   }
 
   @Test
