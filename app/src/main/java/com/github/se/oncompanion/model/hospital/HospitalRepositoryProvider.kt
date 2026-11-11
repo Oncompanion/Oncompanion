@@ -2,6 +2,8 @@
 
 package com.github.se.oncompanion.model.hospital
 
+import android.util.Log
+
 /**
  * Holds the [HospitalRepository] the app uses, so ViewModels name only the interface. Tests replace
  * [repository] with a fake; deployment wiring calls [configure] once before creating ViewModels.
@@ -25,9 +27,29 @@ object HospitalRepositoryProvider {
   }
 
   /**
+   * Applies startup configuration only to the unconfigured default, preserving installed adapters
+   * and test overrides. Blank or invalid endpoints keep manual entry available without networking.
+   */
+  fun configureAtStartup(searchEndpoint: String) {
+    if (searchEndpoint.isBlank() || repository !== UnconfiguredHospitalRepository) return
+    try {
+      configure(searchEndpoint)
+    } catch (e: IllegalArgumentException) {
+      // Endpoint validation can include the URL in its message; log only the failure type.
+      Log.w(
+          "HospitalRepositoryProvider",
+          "Invalid hospital proxy configuration: ${e.javaClass.simpleName}",
+      )
+    }
+  }
+
+  /**
    * Installs one shared authenticated proxy repository for a configured HTTPS endpoint, retaining
-   * its cache across fields. Invalid endpoints leave the current repository unchanged. This does
-   * not make a request; the deployment remains responsible for the aggregate-rate-limited proxy.
+   * its cache across fields. Invalid endpoints throw without changing the current repository. This
+   * does not make a request; the deployment remains responsible for the aggregate-rate-limited
+   * proxy.
+   *
+   * @throws IllegalArgumentException if the endpoint is not an allowed proxy HTTPS URL
    */
   fun configure(searchEndpoint: String) {
     repository = HospitalRepositoryProxy(searchEndpoint)
