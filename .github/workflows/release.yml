@@ -120,7 +120,11 @@ jobs:
         run: |
           apk="oncompanion-$VERSION.apk"
           mv app/build/outputs/apk/release/app-release.apk "$apk"
-          gh release create "v$VERSION" "$apk" \
+          # R8's mapping decodes a tester's stack trace: keep it next to the APK it belongs to
+          # (gzipped: about 6 MB instead of 90)
+          mapping="oncompanion-$VERSION-mapping.txt.gz"
+          gzip -c app/build/outputs/mapping/release/mapping.txt > "$mapping"
+          gh release create "v$VERSION" "$apk" "$mapping" \
             --target "$SHA" \
             --title "oncompanion $VERSION ($(TZ=Europe/Zurich date '+%-d %b %Y'))" \
             --generate-notes
