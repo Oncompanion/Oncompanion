@@ -135,6 +135,23 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
+  fun rejectedPrescription_isNotFound() = runTest {
+    repository.seed(
+        "alice",
+        chemo.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.REJECTED,
+        ),
+    )
+    val vm = viewModel()
+
+    advanceUntilIdle()
+
+    assertTrue(vm.uiState.value.isNotFound)
+  }
+
+  @Test
   fun anotherUsersPrescription_isNotFound() = runTest {
     repository.seed("bob", chemo)
     val vm = viewModel()

@@ -90,6 +90,11 @@
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
+    <!-- US-43: on the Prescriptions shortcut, read by screen readers, e.g. "1 prescription to confirm" -->
+    <plurals name="overview_prescriptions_to_confirm">
+        <item quantity="one">%1$d prescription to confirm</item>
+        <item quantity="other">%1$d prescriptions to confirm</item>
+    </plurals>
 
     <!-- Symptoms -->
     <string name="symptom_type_fatigue">Fatigue</string>
@@ -534,6 +539,16 @@
     <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
     <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
     <string name="prescriptions_added_by_you">Added by you</string>
+    <!-- US-43: the patient reviews a prescription a caregiver added, then confirms or rejects it -->
+    <string name="prescription_confirm_title">Review the prescription</string>
+    <string name="prescription_confirm_notice">A caregiver added this prescription. Check each field and correct it if needed, then confirm.</string>
+    <string name="prescription_confirm_save">Confirm prescription</string>
+    <string name="prescription_reject">Reject</string>
+    <string name="prescription_reject_title">Reject this prescription?</string>
+    <string name="prescription_reject_message">It will be removed from your prescriptions and never remind you.</string>
+    <string name="prescription_reject_cancel">Cancel</string>
+    <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
+    <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

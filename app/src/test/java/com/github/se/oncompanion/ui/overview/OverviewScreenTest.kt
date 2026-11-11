@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
@@ -700,5 +701,21 @@ class OverviewScreenTest {
     setCaregiverContent(loaded)
 
     composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
+  }
+
+  @Test
+  fun nothingToConfirm_showsNoBadge() {
+    setContent(loaded)
+    composeTestRule.onNodeWithTag(C.Tag.overview_prescriptions_badge).assertDoesNotExist()
+  }
+
+  @Test
+  fun prescriptionsToConfirm_badgeSaysHowMany_toScreenReadersToo() {
+    setContent(loaded.copy(prescriptionsToConfirm = 2))
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_prescriptions_badge, useUnmergedTree = true)
+        .assertIsDisplayed()
+        .assertContentDescriptionEquals("2 prescriptions to confirm")
   }
 }

@@ -17,6 +17,7 @@ import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -121,7 +123,9 @@ class PrescriptionsViewModel(
     _uiState.update { it.copy(isLoading = true, hasError = false) }
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
-            val prescriptions = medicationRepository.observePrescriptions(ownerUid)
+            // A rejected prescription is gone for everyone (US-43)
+            val prescriptions =
+                medicationRepository.observePrescriptions(ownerUid).map { it.visible() }
             // The patient sees the names they gave the members who added some; a caregiver the
             // stored ones
             if (patientUid != null) prescriptions

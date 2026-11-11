@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -121,7 +122,11 @@ class PrescriptionDetailViewModel(
     observation?.cancel()
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
-            val prescription = medicationRepository.observePrescription(ownerUid, prescriptionId)
+            // A rejected prescription is gone for everyone, as a deleted one (US-43)
+            val prescription =
+                medicationRepository.observePrescription(ownerUid, prescriptionId).map {
+                  it?.takeUnless(Prescription::isRejected)
+                }
             // The patient sees the name they gave the member who added it; a caregiver the stored
             // one
             if (patientUid != null) prescription

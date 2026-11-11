@@ -563,6 +563,34 @@ class PrescriptionsViewModelTest {
       }
 
   @Test
+  fun rejectedPrescription_isGone_forThePatientAndTheirCaregivers() =
+      runTest(dispatcher) {
+        val rejected =
+            prescription("rejected", "2026-10-02", "Ondansetron 8 mg")
+                .copy(
+                    addedBy = "caregiver",
+                    addedByName = "Sam",
+                    confirmation = PrescriptionConfirmation.REJECTED,
+                )
+        val kept = prescription("kept", "2026-10-01", "Paracetamol")
+        for (owner in listOf(uid, "patient")) {
+          listOf(rejected, kept).forEach { repository.seed(owner, it) }
+        }
+        val patient = viewModel()
+        val caregiver =
+            PrescriptionsViewModel(
+                signedIn("caregiver"),
+                repository,
+                clock,
+                patientUid = "patient",
+                resolveSection = followedPatientAccess(CarePermission.PRESCRIPTIONS),
+            )
+        advanceUntilIdle()
+
+        for (viewModel in listOf(patient, caregiver)) assertEquals(listOf("kept"), viewModel.ids)
+      }
+
+  @Test
   fun addedByACaregiver_followsARename_andOnceTheyLeave_staysPendingWithTheStoredName() =
       runTest(dispatcher) {
         val sams =

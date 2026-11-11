@@ -271,6 +271,33 @@ class ManageMedicationScheduleTest {
   }
 
   @Test
+  fun reject_onlyRejectsAPrescriptionWaitingForThePatient() = runTest {
+    // Its state before, whether it is rejected, and its state after
+    val cases =
+        listOf(
+            PrescriptionConfirmation.PENDING to PrescriptionConfirmation.REJECTED,
+            PrescriptionConfirmation.CONFIRMED to PrescriptionConfirmation.CONFIRMED,
+            PrescriptionConfirmation.REJECTED to PrescriptionConfirmation.REJECTED,
+        )
+    for ((before, after) in cases) {
+      val saved =
+          draft
+              .toPrescription(repository.newId(), repository::newId)
+              .copy(addedBy = "sam", addedByName = "Sam", confirmation = before)
+      repository.addPrescription(uid, saved)
+
+      val rejected = manageMedicationSchedule.reject(uid, saved.id)
+
+      val now = repository.prescriptionsOf(uid).single { it.id == saved.id }
+      assertEquals("$before", before == PrescriptionConfirmation.PENDING, rejected)
+      assertEquals(after, now.confirmation)
+      // It keeps who added it, so the caregiver can see it was rejected
+      assertEquals("Sam", now.addedByName)
+    }
+    assertFalse(manageMedicationSchedule.reject(uid, "missing"))
+  }
+
+  @Test
   fun updateGivesAnAddedMedicationItsOwnId() = runTest {
     val saved = savedPrescription()
     val added = MedicationDraft(name = "Paracetamol", startDate = date)

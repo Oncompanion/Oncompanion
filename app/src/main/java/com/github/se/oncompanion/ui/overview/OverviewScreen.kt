@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,8 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -234,7 +239,7 @@ fun OverviewContent(
       val tiles =
           if (caregiverOf == null) tileShortcuts
           else tileShortcuts.filter { it.section != null && it.section in uiState.sharedSections }
-      if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles)
+      if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
     }
   }
 }
@@ -323,10 +328,15 @@ private val tilePadding = 8.dp
 
 /**
  * "How do you feel today?" and one large tile per main section: three in a row, or one per row when
- * a label wouldn't fit in a third of the width (small screen or large font).
+ * a label wouldn't fit in a third of the width (small screen or large font). Prescriptions shows a
+ * badge with how many wait for the patient ([prescriptionsToConfirm], US-43).
  */
 @Composable
-private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit, tiles: List<OverviewShortcut>) {
+private fun Shortcuts(
+    onShortcutClick: (OverviewShortcut) -> Unit,
+    tiles: List<OverviewShortcut>,
+    prescriptionsToConfirm: Int = 0,
+) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
         text = stringResource(R.string.overview_subtitle),
@@ -348,7 +358,13 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit, tiles: List<O
       if (widestLabel <= labelSpaceInRow) {
         Row(horizontalArrangement = Arrangement.spacedBy(tileSpacing)) {
           tiles.forEach { shortcut ->
-            ShortcutTile(shortcut, { onShortcutClick(shortcut) }, Modifier.weight(1f))
+            ShortcutTile(
+                shortcut,
+                { onShortcutClick(shortcut) },
+                Modifier.weight(1f),
+                badge =
+                    prescriptionsToConfirm.takeIf { shortcut == OverviewShortcut.PRESCRIPTIONS },
+            )
           }
         }
       } else {
@@ -359,6 +375,8 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit, tiles: List<O
                 { onShortcutClick(shortcut) },
                 Modifier.fillMaxWidth(),
                 stacked = true,
+                badge =
+                    prescriptionsToConfirm.takeIf { shortcut == OverviewShortcut.PRESCRIPTIONS },
             )
           }
         }
@@ -367,14 +385,45 @@ private fun Shortcuts(onShortcutClick: (OverviewShortcut) -> Unit, tiles: List<O
   }
 }
 
-/** A shortcut tile: icon above the label, or next to it when [stacked] (one tile per row). */
+/**
+ * A shortcut tile: icon above the label, or next to it when [stacked] (one tile per row). A [badge]
+ * above zero shows in its corner, also read by screen readers.
+ */
 @Composable
 private fun ShortcutTile(
     shortcut: OverviewShortcut,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     stacked: Boolean = false,
+    badge: Int? = null,
 ) {
+  val count = badge?.takeIf { it > 0 }
+  val badgeDescription = count?.let {
+    pluralStringResource(R.plurals.overview_prescriptions_to_confirm, it, it)
+  }
+  BadgedBox(
+      badge = {
+        if (count != null) {
+          Badge(
+              modifier =
+                  Modifier.testTag(C.Tag.overview_prescriptions_badge).semantics {
+                    contentDescription = badgeDescription.orEmpty()
+                  }
+          ) {
+            Text("$count")
+          }
+        }
+      },
+      modifier = modifier,
+  ) {
+    ShortcutSurface(shortcut, onClick, stacked)
+  }
+}
+
+/** The tile itself, under its badge. */
+@Composable
+private fun ShortcutSurface(shortcut: OverviewShortcut, onClick: () -> Unit, stacked: Boolean) {
+  val modifier = Modifier.fillMaxWidth()
   Surface(
       onClick = onClick,
       modifier = modifier.heightIn(min = if (stacked) 72.dp else 104.dp).testTag(shortcut.testTag),

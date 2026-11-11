@@ -1789,6 +1789,68 @@ class AppNavHostTest {
   }
 
   @Test
+  fun prescriptionACaregiverAdded_thePatientReviewsAndConfirmsIt_fromTheList() {
+    val sams = samsPrescription()
+    val medications = FakeMedicationRepository().apply { seed("owner", sams) }
+    openPrescriptionsFromOverview(medications)
+
+    // Tapping it opens the review, and Confirm saves it as confirmed
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("sams")).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_confirm_notice).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_waiting_header).assertDoesNotExist()
+    composeTestRule.runOnIdle {
+      val confirmed = medications.prescriptionsOf("owner").single()
+      assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
+      assertEquals("Sam", confirmed.addedByName)
+    }
+  }
+
+  @Test
+  fun prescriptionACaregiverAdded_rejectedFromItsDetail_returnsToTheList() {
+    val medications = FakeMedicationRepository().apply { seed("owner", samsPrescription()) }
+    openPrescriptionsFromOverview(medications)
+    // Its detail, e.g. opened from Planning, offers Edit, which opens the same review
+    composeTestRule.runOnIdle { navController.navigate(Screen.prescriptionDetail("sams")) }
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_reject_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_reject_confirm).performClick()
+
+    // Its detail no longer exists: the list, not "This prescription no longer exists"
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertEquals(
+          PrescriptionConfirmation.REJECTED,
+          medications.prescriptionsOf("owner").single().confirmation,
+      )
+    }
+  }
+
+  /** A prescription Sam added for the patient "owner", waiting for them. */
+  private fun samsPrescription(): Prescription {
+    val date = LocalDate.of(2026, 9, 29)
+    return Prescription(
+        id = "sams",
+        prescribedOn = date,
+        medications =
+            listOf(
+                Medication(
+                    id = "m1",
+                    prescriptionId = "sams",
+                    name = "Ondansetron",
+                    startDate = date,
+                )
+            ),
+        addedBy = "sam",
+        addedByName = "Sam",
+        confirmation = PrescriptionConfirmation.PENDING,
+    )
+  }
+
+  @Test
   fun prescriptionItem_opensItsDetail_andBackReturnsToTheList() {
     val date = LocalDate.of(2026, 9, 29)
     val chemo =

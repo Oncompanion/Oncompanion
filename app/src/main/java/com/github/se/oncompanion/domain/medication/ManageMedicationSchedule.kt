@@ -100,6 +100,25 @@ class ManageMedicationSchedule(
   }
 
   /**
+   * Rejects the prescription [prescriptionId] a caregiver added to [uid]'s (US-43): it is kept as
+   * [PrescriptionConfirmation.REJECTED], so the caregiver can later see it was rejected, but it no
+   * longer shows for the patient and none of its medications are ever reminded. Returns once it is
+   * saved on the device, also offline. The caller asks the patient to confirm first.
+   *
+   * @return `false` if there is no such prescription waiting for the patient (e.g. it was deleted,
+   *   or decided on another device): nothing is written
+   */
+  suspend fun reject(uid: String, prescriptionId: String): Boolean {
+    val saved = medicationRepository.observePrescription(uid, prescriptionId).first()
+    if (saved?.confirmation != PrescriptionConfirmation.PENDING) return false
+    medicationRepository.updatePrescription(
+        uid,
+        saved.copy(confirmation = PrescriptionConfirmation.REJECTED),
+    )
+    return true
+  }
+
+  /**
    * Deletes the prescription [prescriptionId] of [uid] with its medications. Returns once it is
    * deleted on the device, also offline. Does nothing if the prescription doesn't exist. The caller
    * asks the user to confirm first: a deletion can't be undone.
