@@ -95,6 +95,8 @@ private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENG
  * @param onSaved called once the prescription is saved
  * @param caregiverOf the first name of the patient a caregiver adds the prescription for (US-43),
  *   `null` for a patient
+ * @param onRejected called once the patient rejected the prescription a caregiver added: it no
+ *   longer exists, so the form doesn't return to its detail
  */
 @Composable
 fun PrescriptionFormScreen(
@@ -103,12 +105,18 @@ fun PrescriptionFormScreen(
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
     caregiverOf: String? = null,
+    onRejected: () -> Unit = onSaved,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-  // Leaves the form once the prescription is saved
+  // Leaves the form once the prescription is saved, or rejected
   val currentOnSaved by rememberUpdatedState(onSaved)
-  LaunchedEffect(uiState.save) { if (uiState.save == SavePhase.SAVED) currentOnSaved() }
+  val currentOnRejected by rememberUpdatedState(onRejected)
+  LaunchedEffect(uiState.save) {
+    if (uiState.save == SavePhase.SAVED) {
+      if (uiState.wasRejected) currentOnRejected() else currentOnSaved()
+    }
+  }
 
   PrescriptionFormContent(
       uiState = uiState,

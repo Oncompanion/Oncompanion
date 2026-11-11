@@ -519,6 +519,8 @@ private fun SessionNavHost(
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the detail, which shows the correction
             onSaved = navigationActions::goBack,
+            // A rejected prescription has no detail any more: back to the list (US-43)
+            onRejected = { navController.popBackStack(Screen.PRESCRIPTIONS, inclusive = false) },
         )
       }
       composable(Screen.PRESCRIPTION_SCAN) { entry ->

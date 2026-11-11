@@ -1790,24 +1790,7 @@ class AppNavHostTest {
 
   @Test
   fun prescriptionACaregiverAdded_thePatientReviewsAndConfirmsIt_fromTheList() {
-    val date = LocalDate.of(2026, 9, 29)
-    val sams =
-        Prescription(
-            id = "sams",
-            prescribedOn = date,
-            medications =
-                listOf(
-                    Medication(
-                        id = "m1",
-                        prescriptionId = "sams",
-                        name = "Ondansetron",
-                        startDate = date,
-                    )
-                ),
-            addedBy = "sam",
-            addedByName = "Sam",
-            confirmation = PrescriptionConfirmation.PENDING,
-        )
+    val sams = samsPrescription()
     val medications = FakeMedicationRepository().apply { seed("owner", sams) }
     openPrescriptionsFromOverview(medications)
 
@@ -1823,6 +1806,48 @@ class AppNavHostTest {
       assertEquals(PrescriptionConfirmation.CONFIRMED, confirmed.confirmation)
       assertEquals("Sam", confirmed.addedByName)
     }
+  }
+
+  @Test
+  fun prescriptionACaregiverAdded_rejectedFromItsDetail_returnsToTheList() {
+    val medications = FakeMedicationRepository().apply { seed("owner", samsPrescription()) }
+    openPrescriptionsFromOverview(medications)
+    // Its detail, e.g. opened from Planning, offers Edit, which opens the same review
+    composeTestRule.runOnIdle { navController.navigate(Screen.prescriptionDetail("sams")) }
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_reject_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_reject_confirm).performClick()
+
+    // Its detail no longer exists: the list, not "This prescription no longer exists"
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
+    composeTestRule.runOnIdle {
+      assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
+      assertEquals(
+          PrescriptionConfirmation.REJECTED,
+          medications.prescriptionsOf("owner").single().confirmation,
+      )
+    }
+  }
+
+  /** A prescription Sam added for the patient "owner", waiting for them. */
+  private fun samsPrescription(): Prescription {
+    val date = LocalDate.of(2026, 9, 29)
+    return Prescription(
+        id = "sams",
+        prescribedOn = date,
+        medications =
+            listOf(
+                Medication(
+                    id = "m1",
+                    prescriptionId = "sams",
+                    name = "Ondansetron",
+                    startDate = date,
+                )
+            ),
+        addedBy = "sam",
+        addedByName = "Sam",
+        confirmation = PrescriptionConfirmation.PENDING,
+    )
   }
 
   @Test

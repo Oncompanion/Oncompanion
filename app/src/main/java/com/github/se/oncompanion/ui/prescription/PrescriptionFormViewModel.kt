@@ -96,6 +96,8 @@ enum class PrescriptionFormLoad {
  *   (US-43): saving it confirms it, and it can be rejected instead
  * @property isConfirmingRejection the patient asked to reject it and hasn't confirmed or cancelled
  *   yet
+ * @property wasRejected the form is done because the patient rejected it: it no longer exists
+ *   anywhere, not even its detail
  */
 data class PrescriptionFormUiState(
     val draft: PrescriptionDraft,
@@ -114,6 +116,7 @@ data class PrescriptionFormUiState(
     val alreadySaved: Prescription? = null,
     val isToConfirm: Boolean = false,
     val isConfirmingRejection: Boolean = false,
+    val wasRejected: Boolean = false,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -626,6 +629,7 @@ class PrescriptionFormViewModel(
               save = if (rejected) SavePhase.SAVED else SavePhase.EDITING,
               isConfirmingRejection = false,
               isToConfirm = rejected,
+              wasRejected = rejected,
           )
         }
       } catch (e: CancellationException) {
