@@ -4,6 +4,7 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import kotlinx.coroutines.flow.first
 
 /**
@@ -45,7 +46,8 @@ class ManageMedicationSchedule(
    * Replaces the content of the saved prescription [prescriptionId] of [uid] with [draft], so a
    * wrong prescription can be corrected. A medication of the draft that has an ID stays the same
    * saved medication, one without an ID is added, and a saved one that the draft leaves out is
-   * removed. Returns once it is saved on the device, also offline.
+   * removed. Returns once it is saved on the device, also offline. Who added it stays the same, and
+   * saving a prescription a caregiver added confirms it (US-43): the patient checked each field.
    *
    * The prescription is read again first, because it can have been deleted since the form was
    * opened (e.g. from another device) and the repository would then silently save nothing. The read
@@ -60,9 +62,21 @@ class ManageMedicationSchedule(
   suspend fun update(uid: String, prescriptionId: String, draft: PrescriptionDraft): Boolean {
     require(draft.isValid()) { "Invalid prescription draft" }
     // Without this read, the caller couldn't tell a saved correction from one that was dropped
-    if (medicationRepository.observePrescription(uid, prescriptionId).first() == null) return false
-    // Only the medications added in the form need an ID, the saved ones keep theirs
-    val prescription = draft.toPrescription(prescriptionId, medicationRepository::newId)
+    val saved =
+        medicationRepository.observePrescription(uid, prescriptionId).first() ?: return false
+    // Only the medications added in the form need an ID, the saved ones keep theirs. The form
+    // doesn't hold who added it or whether it is confirmed: they come from the saved one
+    val prescription =
+        draft
+            .toPrescription(prescriptionId, medicationRepository::newId)
+            .copy(
+                addedBy = saved.addedBy,
+                addedByName = saved.addedByName,
+                confirmation =
+                    if (saved.confirmation == PrescriptionConfirmation.PENDING)
+                        PrescriptionConfirmation.CONFIRMED
+                    else saved.confirmation,
+            )
     medicationRepository.updatePrescription(uid, prescription)
     return true
   }

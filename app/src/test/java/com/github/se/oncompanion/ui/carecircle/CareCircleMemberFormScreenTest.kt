@@ -710,13 +710,20 @@ class CareCircleMemberFormScreenTest {
     compose.runOnIdle { assertEquals(1, backs) }
   }
 
-  // ---- adding symptoms (US-22) and appointments (US-41) ----
+  // ---- adding symptoms (US-22), appointments (US-41), confirming events (US-42) and
+  // prescriptions (US-43) ----
 
   @Test
   fun allowAdding_isGreyedOut_untilItsSectionIsShared() {
     content(complete)
     val allowed = mutableSetOf<CarePermission>()
-    for (section in listOf(CarePermission.SYMPTOMS, CarePermission.PLANNING)) {
+    for (section in
+        listOf(
+            CarePermission.SYMPTOMS,
+            CarePermission.PLANNING,
+            CarePermission.EVENTS,
+            CarePermission.PRESCRIPTIONS,
+        )) {
       val canAdd = compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name))
 
       canAdd.performScrollTo().assertIsNotEnabled().assertIsOff()
@@ -734,15 +741,19 @@ class CareCircleMemberFormScreenTest {
   }
 
   @Test
-  fun allowAdding_isOfferedUnderPlanningAndSymptomsOnly() {
+  fun allowAdding_isLabelledUnderEachSection() {
     content(complete)
 
-    for (section in listOf(CarePermission.EVENTS, CarePermission.PRESCRIPTIONS)) {
-      compose.onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name)).assertDoesNotExist()
+    for ((section, label) in
+        listOf(
+            CarePermission.PLANNING to "Allow adding appointments",
+            CarePermission.EVENTS to "Allow confirming events",
+            CarePermission.PRESCRIPTIONS to "Allow adding prescriptions",
+        )) {
+      compose
+          .onNodeWithTag(C.Tag.careCircleFormCanAdd(section.name))
+          .performScrollTo()
+          .assertTextContains(label, substring = true)
     }
-    compose
-        .onNodeWithTag(C.Tag.careCircleFormCanAdd(CarePermission.PLANNING.name))
-        .performScrollTo()
-        .assertTextContains("Allow adding appointments", substring = true)
   }
 }

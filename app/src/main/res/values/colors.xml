@@ -10,4 +10,7 @@
     <color name="white">#FFFFFFFF</color>
     <!-- Splash screen background: the app's surface color (Morning on the lake) -->
     <color name="splash_background">#FFFBF8F4</color>
+    <!-- Home screen icon tile: SurfaceLight in both themes (no night value), so the violet
+         ribbon keeps its contrast -->
+    <color name="ic_launcher_background">#FFFBF8F4</color>
 </resources>

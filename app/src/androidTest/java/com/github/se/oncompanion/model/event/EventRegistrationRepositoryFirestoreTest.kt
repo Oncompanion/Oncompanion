@@ -86,7 +86,9 @@ class EventRegistrationRepositoryFirestoreTest {
       expected: Boolean,
       repo: EventRegistrationRepository = repository,
   ) {
-    withTimeout(10_000) { repo.observeIsRegistered(uid, eventId).first { it == expected } }
+    withTimeout(10_000) {
+      repo.observeRegistration(uid, eventId).first { (it != null) == expected }
+    }
   }
 
   /** Waits until the server has acknowledged (or rejected) every write made on this phone. */
@@ -103,7 +105,9 @@ class EventRegistrationRepositoryFirestoreTest {
 
   @Test
   fun nothingIsConfirmed_atFirst(): Unit = runBlocking {
-    assertFalse(withTimeout(10_000) { repository.observeIsRegistered(uid, upcomingId).first() })
+    assertFalse(
+        withTimeout(10_000) { repository.observeRegistration(uid, upcomingId).first() != null }
+    )
   }
 
   @Test
@@ -314,7 +318,7 @@ class EventRegistrationRepositoryFirestoreTest {
   @Test
   fun invalidIds_areRejected() {
     assertThrows(IllegalArgumentException::class.java) {
-      repository.observeIsRegistered(uid, "a/b")
+      repository.observeRegistration(uid, "a/b")
     }
     assertThrows(IllegalArgumentException::class.java) { repository.confirm("", upcomingId) }
     assertThrows(IllegalArgumentException::class.java) { repository.remove(uid, " ") }

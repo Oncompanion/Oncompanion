@@ -641,6 +641,33 @@ class PrescriptionFormScreenTest {
       )
 
   @Test
+  fun theTopBarSitsOnThePaperLakeBand_whenAdding_correctingOrReviewing() = topBarSitsOnTheBand()
+
+  // Sideways, the top bar scrolls with the form: the band goes with it
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun theTopBarSitsOnThePaperLakeBand_inLandscape() = topBarSitsOnTheBand()
+
+  private fun topBarSitsOnTheBand() {
+    setContent(empty)
+    listOf(
+            empty to R.string.prescription_form_add_title,
+            filled.copy(isEditing = true) to R.string.prescription_form_edit_title,
+            filled.copy(isScanned = true) to R.string.prescription_review_title,
+        )
+        .forEach { (state, title) ->
+          uiState = state
+          composeTestRule.waitForIdle()
+          val band = node(C.Tag.prescription_form_band).fetchSemanticsNode().boundsInRoot
+          val bar = composeTestRule.onNodeWithText(string(title)).fetchSemanticsNode().boundsInRoot
+          val close = node(C.Tag.prescription_form_close_button).fetchSemanticsNode().boundsInRoot
+          assertEquals(0f, band.top)
+          assertTrue("title $bar in the band $band", band.contains(bar.center))
+          assertTrue("close $close in the band $band", band.contains(close.center))
+        }
+  }
+
+  @Test
   fun aScanIsReviewedWithWhatToCheckInTheNotice() {
     // Dexamethasone is open; Ondansetron's frequency, on its closed row, is to check
     setContent(

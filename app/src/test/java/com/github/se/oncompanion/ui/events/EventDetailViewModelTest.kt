@@ -6,12 +6,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CareCircleMember
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.event.Event
+import com.github.se.oncompanion.model.event.EventRegistration
+import com.github.se.oncompanion.model.event.EventRegistrationRepository
 import com.github.se.oncompanion.model.event.EventRepository
 import com.github.se.oncompanion.model.event.FakeEventRegistrationRepository
 import com.github.se.oncompanion.model.event.FakeEventRepository
 import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
 import java.time.Instant
@@ -19,6 +25,8 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -466,16 +474,45 @@ class EventDetailViewModelTest {
   }
 
   /** The event page of the caregiver of [patient], who follows "patient". */
-  private fun caregiverViewModel(patient: FollowedPatient, now: LocalDateTime = beforeYoga) =
+  private fun caregiverViewModel(
+      patient: FollowedPatient,
+      now: LocalDateTime = beforeYoga,
+      registrationRepository: EventRegistrationRepository = registrations,
+      profiles: UserProfileRepository = patient.profiles,
+  ) =
       EventDetailViewModel(
           yoga.id,
           FakeEventRepository(listOf(yoga)),
-          registrations,
+          registrationRepository,
           patient.auth,
           clockAt(now),
           patientUid = "patient",
           resolveSection = patient.sectionAccess,
+          careCircleRepository = patient.circle,
+          profileRepository = profiles,
       )
+
+  /** [profiles], whose reads wait for [release], like a slow cache. */
+  private class SlowProfiles(private val profiles: UserProfileRepository) :
+      UserProfileRepository by profiles {
+    val release = CompletableDeferred<Unit>()
+
+    override fun observeProfile(uid: String): Flow<UserProfile?> = flow {
+      release.await()
+      emitAll(profiles.observeProfile(uid))
+    }
+  }
+
+  /** [registrations], counting the confirmations saved. */
+  private class CountingRegistrations(private val registrations: FakeEventRegistrationRepository) :
+      EventRegistrationRepository by registrations {
+    var confirms = 0
+
+    override fun confirm(uid: String, eventId: String, by: EventRegistration) {
+      confirms++
+      registrations.confirm(uid, eventId, by)
+    }
+  }
 
   @Test
   fun caregiver_eventsShared_seesThePatientsConfirmation_notTheirOwn() {
@@ -490,14 +527,14 @@ class EventDetailViewModelTest {
   }
 
   @Test
-  fun caregiver_eventsNotShared_seesNothing_andReadsNoRegistration() {
+  fun caregiver_eventsNotShared_isToldSo_andReadsNoRegistration() {
     // A read would fail and show an error instead of nothing
     registrations.observeError = IllegalStateException("must not be read")
 
     val state = caregiverViewModel(FollowedPatient(CarePermission.PLANNING)).uiState.value
 
     assertEquals(yoga, state.event)
-    assertEquals(RegistrationStatus.HIDDEN, state.registration)
+    assertEquals(RegistrationStatus.NOT_SHARED, state.registration)
   }
 
   @Test
@@ -510,7 +547,7 @@ class EventDetailViewModelTest {
     // The patient stops sharing Events, then shares it again, then removes the caregiver
     val steps =
         listOf(
-            { patient.shares(CarePermission.PLANNING) } to RegistrationStatus.HIDDEN,
+            { patient.shares(CarePermission.PLANNING) } to RegistrationStatus.NOT_SHARED,
             { patient.shares(CarePermission.EVENTS) } to RegistrationStatus.CONFIRMED,
             { patient.removesTheCaregiver() } to RegistrationStatus.HIDDEN,
         )
@@ -522,7 +559,7 @@ class EventDetailViewModelTest {
   }
 
   @Test
-  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsHidden() {
+  fun caregiver_readRefusedBeforeTheAccessChange_stillEndsNotShared() {
     // The patient stops sharing Events: the server refuses the open read before the access change
     // arrives
     registrations.observeError = IllegalStateException("permission denied")
@@ -533,7 +570,7 @@ class EventDetailViewModelTest {
     patient.shares(CarePermission.PLANNING)
     ShadowLooper.idleMainLooper()
 
-    assertEquals(RegistrationStatus.HIDDEN, viewModel.uiState.value.registration)
+    assertEquals(RegistrationStatus.NOT_SHARED, viewModel.uiState.value.registration)
   }
 
   @Test
@@ -553,5 +590,125 @@ class EventDetailViewModelTest {
     assertFalse(viewModel.uiState.value.isConfirmingRemoval)
     assertEquals(setOf("yoga"), registrations.registeredEventIds("patient"))
     assertEquals(RegistrationStatus.CONFIRMED, viewModel.uiState.value.registration)
+  }
+
+  @Test
+  fun caregiver_cantConfirm_untilThePatientAllowsIt() {
+    val patient = FollowedPatient(CarePermission.EVENTS)
+    val viewModel = caregiverViewModel(patient)
+    assertFalse(viewModel.uiState.value.caregiverCanConfirm)
+
+    patient.shares(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
+    ShadowLooper.idleMainLooper()
+    assertTrue(viewModel.uiState.value.caregiverCanConfirm)
+
+    // Turning Events off takes the permission away with it
+    patient.shares(CarePermission.PLANNING)
+    ShadowLooper.idleMainLooper()
+    assertFalse(viewModel.uiState.value.caregiverCanConfirm)
+  }
+
+  @Test
+  fun caregiver_allowedToConfirm_confirmsOnce_signedWithTheirName_andCantRemoveIt() {
+    val patient = FollowedPatient(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
+    val counting = CountingRegistrations(registrations)
+    val slowProfiles = SlowProfiles(patient.profiles)
+    val viewModel =
+        caregiverViewModel(patient, registrationRepository = counting, profiles = slowProfiles)
+
+    // Tapped twice before the name is read: a second write would be refused, replacing the first
+    viewModel.confirmRegistration()
+    viewModel.confirmRegistration()
+    slowProfiles.release.complete(Unit)
+    ShadowLooper.idleMainLooper()
+    viewModel.confirmRegistration()
+    ShadowLooper.idleMainLooper()
+
+    assertEquals(1, counting.confirms)
+    assertEquals(
+        EventRegistration("caregiver", "Sam"),
+        registrations.registration("patient", "yoga"),
+    )
+    assertTrue(registrations.registeredEventIds("caregiver").isEmpty())
+    val state = viewModel.uiState.value
+    assertEquals(RegistrationStatus.CONFIRMED, state.registration)
+    assertEquals("Sam", state.addedByName)
+
+    viewModel.requestRemoval()
+    assertFalse(viewModel.uiState.value.isConfirmingRemoval)
+  }
+
+  @Test
+  fun caregiver_changesWhileTheirNameIsRead_areKept() {
+    // What happens on the patient's side while the caregiver's name is still being read
+    val cases =
+        listOf<Pair<(FollowedPatient) -> Unit, EventRegistration?>>(
+            // The patient stops letting them confirm: nothing is saved
+            { p: FollowedPatient -> p.shares(CarePermission.EVENTS) } to null,
+            // The patient confirms it themselves: their confirmation is kept, unsigned
+            { _: FollowedPatient ->
+              registrations.confirm("patient", "yoga")
+            } to EventRegistration(),
+        )
+    for ((change, expected) in cases) {
+      registrations.remove("patient", "yoga")
+      val patient = FollowedPatient(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
+      val counting = CountingRegistrations(registrations)
+      val slowProfiles = SlowProfiles(patient.profiles)
+      val viewModel =
+          caregiverViewModel(patient, registrationRepository = counting, profiles = slowProfiles)
+
+      viewModel.confirmRegistration()
+      change(patient)
+      ShadowLooper.idleMainLooper()
+      slowProfiles.release.complete(Unit)
+      ShadowLooper.idleMainLooper()
+
+      assertEquals(0, counting.confirms)
+      assertEquals(expected, registrations.registration("patient", "yoga"))
+      assertNull(viewModel.uiState.value.addedByName)
+    }
+  }
+
+  @Test
+  fun caregiver_allowedToConfirm_cantConfirmAnEventThatStarted() {
+    val patient = FollowedPatient(CarePermission.EVENTS, canAdd = setOf(CarePermission.EVENTS))
+    val viewModel = caregiverViewModel(patient, now = yoga.startDateTime.plusMinutes(1))
+    assertEquals(RegistrationStatus.CLOSED, viewModel.uiState.value.registration)
+
+    viewModel.confirmRegistration()
+    ShadowLooper.idleMainLooper()
+
+    assertNull(registrations.registration("patient", "yoga"))
+  }
+
+  @Test
+  fun patient_seesWhoConfirmedIt_asTheyNamedThem_andConfirmsUnsignedAfterRemoving() {
+    val circle =
+        FakeCareCircleRepository().apply {
+          setMembers("alice", listOf(CareCircleMember(uid = "sam", firstName = "Samuel")))
+        }
+    registrations.confirm("alice", "yoga", EventRegistration("sam", "Sam"))
+    val viewModel =
+        EventDetailViewModel(
+            yoga.id,
+            FakeEventRepository(listOf(yoga)),
+            registrations,
+            signedIn(),
+            clockAt(beforeYoga),
+            careCircleRepository = circle,
+        )
+    ShadowLooper.idleMainLooper()
+    assertEquals("Samuel", viewModel.uiState.value.addedByName)
+    assertFalse(viewModel.uiState.value.caregiverCanConfirm)
+
+    viewModel.requestRemoval()
+    viewModel.removeRegistration()
+    ShadowLooper.idleMainLooper()
+    viewModel.confirmRegistration()
+    ShadowLooper.idleMainLooper()
+
+    assertEquals(EventRegistration(), registrations.registration("alice", "yoga"))
+    assertNull(viewModel.uiState.value.addedByName)
   }
 }

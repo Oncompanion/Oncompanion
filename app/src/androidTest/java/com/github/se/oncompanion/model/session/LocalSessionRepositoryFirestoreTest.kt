@@ -368,7 +368,7 @@ class LocalSessionRepositoryFirestoreTest {
             medications.observePrescription(uid, "missing"),
             invites.observeJoinedCircles(uid),
             circle.observeMember(uid, "missing"),
-            registrations.observeIsRegistered(uid, "missing"),
+            registrations.observeRegistration(uid, "missing"),
         )
     val ready = flows.map { kotlinx.coroutines.CompletableDeferred<Unit>() }
     val listeners = flows.mapIndexed { index, flow ->

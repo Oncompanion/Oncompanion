@@ -29,6 +29,43 @@ class PrescriptionTest {
   fun constantsHaveSpecifiedValues() {
     assertEquals(100, Prescription.MAX_PRESCRIBED_BY_LENGTH)
     assertEquals(20, Prescription.MAX_MEDICATIONS)
+    assertEquals(50, Prescription.MAX_ADDED_BY_NAME_LENGTH)
+  }
+
+  @Test
+  fun thePatientsOwn_isConfirmed_andACaregiversSaysWhoAddedIt() {
+    val pending = PrescriptionConfirmation.PENDING
+    val cases =
+        listOf(
+            // The patient's own: confirmed, never waiting nor rejected
+            valid to true,
+            valid.copy(confirmation = pending) to false,
+            valid.copy(confirmation = PrescriptionConfirmation.REJECTED) to false,
+            // A caregiver's, in each state, signed with a name of at most 50 characters
+            valid.copy(addedBy = "sam", addedByName = "Sam", confirmation = pending) to true,
+            valid.copy(addedBy = "sam", addedByName = "Sam") to true,
+            valid.copy(
+                addedBy = "sam",
+                addedByName = "Sam",
+                confirmation = PrescriptionConfirmation.REJECTED,
+            ) to true,
+            valid.copy(addedBy = "sam", addedByName = "a".repeat(50), confirmation = pending) to
+                true,
+            valid.copy(addedBy = "sam", addedByName = "a".repeat(51), confirmation = pending) to
+                false,
+            valid.copy(addedBy = "sam", addedByName = " ", confirmation = pending) to false,
+            valid.copy(addedBy = "sam", addedByName = null, confirmation = pending) to false,
+        )
+    for ((prescription, expected) in cases) {
+      assertEquals(prescription.toString(), expected, prescription.isValid())
+    }
+  }
+
+  @Test
+  fun isConfirmed_onlyOnceThePatientConfirmed() {
+    assertTrue(valid.isConfirmed)
+    assertFalse(valid.copy(confirmation = PrescriptionConfirmation.PENDING).isConfirmed)
+    assertFalse(valid.copy(confirmation = PrescriptionConfirmation.REJECTED).isConfirmed)
   }
 
   @Test
