@@ -27,22 +27,27 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
 /**
  * Asks before saving a prescription that is the same as [saved] (Figma "US-39 / Save – Same
  * prescription already saved"). Keep editing, like tapping outside, goes back to the form; to
- * discard it, the patient closes the form.
+ * discard it, the patient closes the form. For a caregiver, it names the patient ([caregiverOf]):
+ * "Already in Anne's prescriptions".
  */
 @Composable
 internal fun AlreadySavedDialog(
     saved: Prescription,
     onKeepEditing: () -> Unit,
     onSaveAnyway: () -> Unit,
+    caregiverOf: String? = null,
 ) {
   val date = saved.prescribedOn.format(dateFormatter)
   val count = saved.medications.size
+  // Whose prescription it is: the doctor's name, else the patient's for a caregiver
   val message =
-      saved.prescribedBy?.let {
+      (saved.prescribedBy ?: caregiverOf)?.let {
         pluralStringResource(R.plurals.prescription_already_saved_by, count, it, date, count)
       } ?: pluralStringResource(R.plurals.prescription_already_saved, count, date, count)
   LakeDialog(
-      title = stringResource(R.string.prescription_already_saved_title),
+      title =
+          caregiverOf?.let { stringResource(R.string.prescription_already_saved_title_for, it) }
+              ?: stringResource(R.string.prescription_already_saved_title),
       message = message,
       confirmLabel = stringResource(R.string.prescription_already_saved_save_anyway),
       cancelLabel = stringResource(R.string.prescription_already_saved_keep_editing),
@@ -59,10 +64,11 @@ internal fun AlreadySavedDialog(
 
 /**
  * Says that the prescription looks like a renewal of [previous] (Figma "US-39 / Review – Looks like
- * a renewal"), in another color than the scan's notice: it's information, nothing to check.
+ * a renewal"), in another color than the scan's notice: it's information, nothing to check. For a
+ * caregiver, a prescription without a doctor is named after the patient ([caregiverOf]).
  */
 @Composable
-internal fun RenewalNotice(previous: Prescription) {
+internal fun RenewalNotice(previous: Prescription, caregiverOf: String? = null) {
   val date = previous.prescribedOn.format(dateFormatter)
   Surface(
       color = MaterialTheme.colorScheme.secondaryContainer,
@@ -72,7 +78,7 @@ internal fun RenewalNotice(previous: Prescription) {
   ) {
     Text(
         text =
-            previous.prescribedBy?.let {
+            (previous.prescribedBy ?: caregiverOf)?.let {
               stringResource(R.string.prescription_renewal_by, date, it)
             } ?: stringResource(R.string.prescription_renewal, date),
         style = MaterialTheme.typography.bodyMedium,

@@ -25,11 +25,21 @@ class ManageMedicationSchedule(
    * Saves [draft] as a new prescription of [uid]. Returns once it is saved on the device, also
    * offline.
    *
-   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid], or if one of
-   *   its medications already has an ID: it comes from a saved prescription, which must be changed,
-   *   not added a second time
+   * A caregiver adding it for the patient (US-43) signs it with [addedBy] and [addedByName]: it is
+   * then [PrescriptionConfirmation.PENDING] until the patient checks it, and none of its
+   * medications are reminded before.
+   *
+   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid], if one of its
+   *   medications already has an ID (it comes from a saved prescription, which must be changed, not
+   *   added a second time), or if only one of [addedBy] and [addedByName] is given
    */
-  suspend fun add(uid: String, draft: PrescriptionDraft) {
+  suspend fun add(
+      uid: String,
+      draft: PrescriptionDraft,
+      addedBy: String? = null,
+      addedByName: String? = null,
+  ) {
+    require((addedBy == null) == (addedByName == null)) { "A caregiver signs with both" }
     // Adding a draft made from a saved prescription would leave two prescriptions sharing the
     // same medication IDs, the old one next to the new one
     require(draft.medications.all { it.id == null }) {
@@ -38,7 +48,15 @@ class ManageMedicationSchedule(
     require(draft.isValid()) { "Invalid prescription draft" }
     // The repository creates the IDs on the device, so this also works offline
     val prescription =
-        draft.toPrescription(medicationRepository.newId(), medicationRepository::newId)
+        draft.toPrescription(medicationRepository.newId(), medicationRepository::newId).let {
+          if (addedBy == null) it
+          else
+              it.copy(
+                  addedBy = addedBy,
+                  addedByName = addedByName,
+                  confirmation = PrescriptionConfirmation.PENDING,
+              )
+        }
     medicationRepository.addPrescription(uid, prescription)
   }
 

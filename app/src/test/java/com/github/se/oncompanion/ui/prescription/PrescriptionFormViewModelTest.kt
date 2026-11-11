@@ -15,6 +15,10 @@ import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -25,6 +29,9 @@ import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -37,6 +44,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -2030,5 +2038,124 @@ class PrescriptionFormViewModelTest {
     advanceUntilIdle()
 
     assertFalse(viewModel.state.isToConfirm)
+  }
+
+  // ---------- A caregiver adds a prescription for the patient (US-43) ----------
+
+  private val patient = "patient-2"
+
+  /** The caregiver's profile, whose reads wait for [gate] when it is set. */
+  private class CaregiverProfiles : UserProfileRepository by FakeUserProfileRepository() {
+    private val profiles =
+        FakeUserProfileRepository().apply {
+          seed(UserProfile(CAREGIVER, Role.CAREGIVER, firstName = "Sam"))
+        }
+    var gate: CompletableDeferred<Unit>? = null
+
+    override fun observeProfile(uid: String): Flow<UserProfile?> = flow {
+      gate?.await()
+      emitAll(profiles.observeProfile(uid))
+    }
+  }
+
+  private val caregiverProfiles = CaregiverProfiles()
+
+  /** The form of the caregiver following [patient], signed in, filled in with Ondansetron. */
+  private fun caregiverForm(initialDraft: PrescriptionDraft? = null): PrescriptionFormViewModel {
+    auth = FakeAuthRepository(onSignIn = { AuthUser(uid = CAREGIVER) })
+    runBlocking { auth.signInWithGoogle("token") }
+    return PrescriptionFormViewModel(
+            auth,
+            medications,
+            clock = clock,
+            initialDraft = initialDraft,
+            patientUid = patient,
+            profileRepository = caregiverProfiles,
+        )
+        .also { if (initialDraft == null) it.onMedicationNameChange("Ondansetron 8 mg") }
+  }
+
+  @Test
+  fun caregiver_savesInThePatientsPrescriptions_signed_andWaitingForThePatient() = runTest {
+    val viewModel = caregiverForm()
+
+    viewModel.save()
+    advanceUntilIdle()
+
+    val added = fakeMedications.prescriptionsOf(patient).single()
+    assertEquals("Ondansetron 8 mg", added.medications.single().name)
+    assertEquals(CAREGIVER, added.addedBy)
+    assertEquals("Sam", added.addedByName)
+    assertEquals(PrescriptionConfirmation.PENDING, added.confirmation)
+    assertTrue(fakeMedications.prescriptionsOf(CAREGIVER).isEmpty())
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
+  }
+
+  @Test
+  fun caregiver_tappingSaveAgainWhileTheirNameIsRead_savesOnce() = runTest {
+    caregiverProfiles.gate = CompletableDeferred()
+    val viewModel = caregiverForm()
+
+    viewModel.save()
+    advanceUntilIdle()
+    viewModel.save()
+    caregiverProfiles.gate?.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(1, fakeMedications.prescriptionsOf(patient).size)
+  }
+
+  @Test
+  fun caregiver_signingOutWhileTheirNameIsRead_savesNothing() = runTest {
+    caregiverProfiles.gate = CompletableDeferred()
+    val viewModel = caregiverForm()
+
+    viewModel.save()
+    advanceUntilIdle()
+    auth.signOut()
+    caregiverProfiles.gate?.complete(Unit)
+    advanceUntilIdle()
+
+    assertTrue(fakeMedications.prescriptionsOf(patient).isEmpty())
+    assertEquals(PrescriptionFormError.NOT_SIGNED_IN, viewModel.state.error)
+    assertEquals(SavePhase.EDITING, viewModel.state.save)
+  }
+
+  @Test
+  fun caregiver_isWarnedAboutThePatientsPrescriptions_confirmedOrNot_butNotRejectedOnes() =
+      runTest {
+        // Where the same prescription is saved, and whether the caregiver is asked first
+        val cases =
+            listOf(
+                patient to PrescriptionConfirmation.CONFIRMED to true,
+                patient to PrescriptionConfirmation.PENDING to true,
+                patient to PrescriptionConfirmation.REJECTED to false,
+                CAREGIVER to PrescriptionConfirmation.CONFIRMED to false,
+            )
+        for ((where, asks) in cases) {
+          val (owner, confirmation) = where
+          fakeMedications = FakeMedicationRepository()
+          medications = GatedMedicationRepository(fakeMedications)
+          val same = saved.copy(confirmation = confirmation)
+          fakeMedications.seed(owner, same)
+          val viewModel = caregiverForm(draftLikeSaved())
+          advanceUntilIdle()
+
+          viewModel.save()
+          advanceUntilIdle()
+
+          assertEquals("$where", if (asks) same else null, viewModel.state.alreadySaved)
+        }
+      }
+
+  @Test
+  fun caregiver_cantCorrectASavedPrescription() {
+    assertThrows(IllegalArgumentException::class.java) {
+      PrescriptionFormViewModel(auth, medications, prescriptionId = "presc-1", patientUid = patient)
+    }
+  }
+
+  private companion object {
+    const val CAREGIVER = "caregiver"
   }
 }
