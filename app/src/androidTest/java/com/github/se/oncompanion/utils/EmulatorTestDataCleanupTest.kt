@@ -85,7 +85,8 @@ class EmulatorTestDataCleanupTest {
     val path = "users/cleanup-error-${UUID.randomUUID()}/symptoms"
     val failure = runCatching {
       EmulatorTestData.createRawDocument(path, "invalid", "not-json")
-    }.exceptionOrNull()
+    }
+        .exceptionOrNull()
     assertTrue("Malformed JSON must be rejected", failure is IllegalStateException)
     assertTrue(
         "The failure must include the emulator's response body",

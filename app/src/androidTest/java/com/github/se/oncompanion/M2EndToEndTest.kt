@@ -5,7 +5,6 @@ package com.github.se.oncompanion
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,25 +14,19 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.printToString
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
-import com.github.se.oncompanion.ui.navigation.AppNavHost
-import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
+import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.auth.FirebaseAuth
 import java.util.UUID
@@ -61,6 +54,8 @@ import org.junit.runner.RunWith
 class M2EndToEndTest {
   @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
 
+  private val ui = EndToEndTestDriver(compose)
+
   private val run = UUID.randomUUID().toString()
   private val patient = Account("patient", "Sam")
   private val caregiver = Account("caregiver", "Julie")
@@ -82,6 +77,7 @@ class M2EndToEndTest {
   @Before
   fun setUp() {
     EmulatorTestData.signOut()
+    for (account in listOf(patient, caregiver)) ui.redact(account.email, "<test email>")
     FirebaseEmulator.auth.addAuthStateListener(authListener)
   }
 
@@ -138,13 +134,13 @@ class M2EndToEndTest {
    */
   @Test
   fun patientAndCaregiver_shareAndLogSymptoms() {
-    startApp()
+    ui.startApp(credentials)
     signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
     openSymptoms()
     logSymptom("FATIGUE", patientNotes)
-    open(C.Tag.symptom_back_button, patientGreeting())
+    ui.open(C.Tag.symptom_back_button, patientGreeting())
     inviteCaregiver()
-    open(C.Tag.care_circle_back_button, patientGreeting())
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
     signOutThroughProfile()
 
     credentials.select(caregiver)
@@ -158,70 +154,59 @@ class M2EndToEndTest {
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     assertReadOnly(patientNotes)
-    tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
+    ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
     logSymptom("NAUSEA", caregiverNotes)
     assertCaregiverAttribution()
     assertSymptom("FATIGUE", patientNotes)
-    open(C.Tag.symptom_back_button, caregiverTitle())
+    ui.open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
     // Sign-out clears local data: an existing circle must be found again through Whose care.
-    open(C.Tag.google_sign_in_button, caregiverTitle())
+    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
     assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     assertSymptom("NAUSEA", caregiverNotes)
     assertReadOnly(patientNotes)
     assertCaregiverAttribution()
-    open(C.Tag.symptom_back_button, caregiverTitle())
+    ui.open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
     credentials.select(patient)
-    open(C.Tag.google_sign_in_button, patientGreeting())
+    ui.open(C.Tag.google_sign_in_button, patientGreeting())
     assertEquals(patient.uid, FirebaseEmulator.auth.currentUser?.uid)
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     val addedBy = compose.activity.getString(R.string.symptom_added_by, circleName)
     val caregiverRow = symptomRow(caregiverNotes)
-    tag(C.Tag.symptom_journal_list).performScrollToNode(caregiverRow)
-    waitFor(caregiverRow and text(addedBy)).assertIsDisplayed()
+    ui.tag(C.Tag.symptom_journal_list).performScrollToNode(caregiverRow)
+    ui.waitFor(caregiverRow and text(addedBy)).assertIsDisplayed()
     // Detail proves the full notes and attribution belong to this exact saved entry.
-    open(caregiverRow, hasTestTag(C.Tag.symptom_detail_content))
+    ui.open(caregiverRow, hasTestTag(C.Tag.symptom_detail_content))
     // The restyled detail puts notes and attribution after the recorded symptom fields.
-    waitFor(hasText(caregiverNotes)).reveal().assertIsDisplayed()
-    waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes)).assertIsDisplayed()
-    waitFor(hasTestTag(C.Tag.added_by) and hasText(addedBy), unmerged = true)
+    ui.waitFor(hasText(caregiverNotes)).reveal().assertIsDisplayed()
+    ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes)).assertIsDisplayed()
+    ui.waitFor(hasTestTag(C.Tag.added_by) and hasText(addedBy), unmerged = true)
         .reveal()
         .assertIsDisplayed()
-    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
-    open(C.Tag.symptom_back_button, patientGreeting())
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+    ui.open(C.Tag.symptom_back_button, patientGreeting())
     assertAcceptedMember()
     // #360 appends revocation here: patient signed in, same circle and cleanup still active.
   }
 
-  private fun startApp() {
-    compose.runOnUiThread {
-      AppHostActivity.content.value = {
-        OncompanionTheme { AppNavHost(credentialProvider = credentials) }
-      }
-    }
-  }
-
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
-    open(C.Tag.google_sign_in_button, hasTestTag(roleTag)).performClick()
+    ui.signInAndOnboard(account.firstName, roleTag, destination)
     checkNotNull(account.uid) { "The new account wasn't recorded" }
-    open(C.Tag.onboarding_continue_button, hasTestTag(C.Tag.onboarding_first_name_field))
-        .replaceText(account.firstName)
-    open(C.Tag.onboarding_save_button, destination)
   }
 
   private fun openSymptoms() =
-      open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
+      ui.open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
 
   private fun logSymptom(type: String, notes: String) {
-    open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType(type))).performClick()
-    tag(C.Tag.symptom_add_notes).reveal().replaceText(notes)
-    open(C.Tag.symptom_add_save, hasTestTag(C.Tag.symptom_journal_list))
+    ui.open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType(type))).performClick()
+    ui.tag(C.Tag.symptom_add_notes).reveal().replaceText(notes)
+    ui.open(C.Tag.symptom_add_save, hasTestTag(C.Tag.symptom_journal_list))
     assertSymptom(type, notes)
   }
 
@@ -231,90 +216,92 @@ class M2EndToEndTest {
             if (type == "FATIGUE") R.string.symptom_type_fatigue else R.string.symptom_type_nausea
         )
     val row = symptomRow(notes)
-    tag(C.Tag.symptom_journal_list).performScrollToNode(row)
-    waitFor(row and text(title)).assertIsDisplayed()
+    ui.tag(C.Tag.symptom_journal_list).performScrollToNode(row)
+    ui.waitFor(row and text(title)).assertIsDisplayed()
   }
 
   /** A caregiver can read a patient's recorded entry without being offered changes. */
   private fun assertReadOnly(notes: String) {
-    open(symptomRow(notes), hasTestTag(C.Tag.symptom_detail_content))
-    waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(notes)).reveal().assertIsDisplayed()
+    ui.open(symptomRow(notes), hasTestTag(C.Tag.symptom_detail_content))
+    ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(notes)).reveal().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.symptom_detail_edit).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.symptom_detail_delete).assertDoesNotExist()
-    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
   }
 
   /** The caregiver sees their own name, never the patient's private contact name. */
   private fun assertCaregiverAttribution() {
     val ownName = compose.activity.getString(R.string.symptom_added_by, caregiver.firstName)
     val row = symptomRow(caregiverNotes)
-    tag(C.Tag.symptom_journal_list).performScrollToNode(row)
-    waitFor(row and text(ownName)).assertIsDisplayed()
+    ui.tag(C.Tag.symptom_journal_list).performScrollToNode(row)
+    ui.waitFor(row and text(ownName)).assertIsDisplayed()
     assertPrivateNameAbsent()
-    open(row, hasTestTag(C.Tag.symptom_detail_content))
-    waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes))
+    ui.open(row, hasTestTag(C.Tag.symptom_detail_content))
+    ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(caregiverNotes))
         .reveal()
         .assertIsDisplayed()
-    waitFor(hasTestTag(C.Tag.added_by) and hasText(ownName), unmerged = true)
+    ui.waitFor(hasTestTag(C.Tag.added_by) and hasText(ownName), unmerged = true)
         .reveal()
         .assertIsDisplayed()
     assertPrivateNameAbsent()
-    open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
   }
 
   private fun assertPrivateNameAbsent() {
     assertFalse(
         "The caregiver must never see what the patient calls them",
-        exists(hasText(circleName, substring = true), unmerged = true),
+        ui.exists(hasText(circleName, substring = true), unmerged = true),
     )
   }
 
   private fun inviteCaregiver() {
-    open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_empty_add_button))
-    open(C.Tag.care_circle_empty_add_button, hasTestTag(C.Tag.care_circle_form_first_name))
+    ui.open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_empty_add_button))
+    ui.open(C.Tag.care_circle_empty_add_button, hasTestTag(C.Tag.care_circle_form_first_name))
         .replaceText(circleName)
-    tag(C.Tag.care_circle_form_relationship).reveal().performClick()
-    tag(C.Tag.careCircleFormRelationshipOption("DAUGHTER")).reveal().performClick()
-    waitFor(
+    ui.tag(C.Tag.care_circle_form_relationship).reveal().performClick()
+    ui.tag(C.Tag.careCircleFormRelationshipOption("DAUGHTER")).reveal().performClick()
+    ui.waitFor(
         hasTestTag(C.Tag.care_circle_form_relationship) and
             text(compose.activity.getString(R.string.relationship_daughter))
     )
     val view = C.Tag.careCircleFormPermission("SYMPTOMS")
     val add = C.Tag.careCircleFormCanAdd("SYMPTOMS")
-    tag(view).reveal().assertIsOff().performClick()
-    tag(view).assertIsOn()
-    tag(add).reveal().assertIsEnabled().assertIsOff().performClick()
-    tag(add).assertIsOn()
-    open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_invite_code))
+    ui.tag(view).reveal().assertIsOff().performClick()
+    ui.tag(view).assertIsOn()
+    ui.tag(add).reveal().assertIsEnabled().assertIsOff().performClick()
+    ui.tag(add).assertIsOn()
+    ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_invite_code))
     val displayed =
-        tag(C.Tag.care_circle_invite_code)
+        ui.tag(C.Tag.care_circle_invite_code)
             .fetchSemanticsNode()
             .config[SemanticsProperties.Text]
             .single()
             .text
     inviteCode = CareCircleInvite.normalizeInviteCode(displayed)
+    ui.redact(displayed, "<invite code>")
+    ui.redact(inviteCode, "<invite code>")
     assertTrue(
         "The displayed invitation must contain a usable code",
         CareCircleInvite.isWellFormedInviteCode(inviteCode),
     )
-    open(C.Tag.care_circle_invite_back_button, hasTestTag(C.Tag.careCircleInvite(inviteCode)))
-    waitFor(hasTestTag(C.Tag.care_circle_pending_label), unmerged = true).assertIsDisplayed()
+    ui.open(C.Tag.care_circle_invite_back_button, hasTestTag(C.Tag.careCircleInvite(inviteCode)))
+    ui.waitFor(hasTestTag(C.Tag.care_circle_pending_label), unmerged = true).assertIsDisplayed()
   }
 
   private fun joinCareCircle() {
-    tag(C.Tag.join_circle_code_field).reveal().replaceText(inviteCode)
-    open(
+    ui.tag(C.Tag.join_circle_code_field).reveal().replaceText(inviteCode)
+    ui.open(
         C.Tag.join_circle_join_button,
         hasTestTag(C.Tag.join_circle_joined) and text(patient.firstName),
     )
-    open(C.Tag.join_circle_continue, caregiverTitle())
+    ui.open(C.Tag.join_circle_continue, caregiverTitle())
   }
 
   private fun assertAcceptedMember() {
     val member = C.Tag.careCircleMember(checkNotNull(caregiver.uid))
-    open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_member_list))
-    tag(C.Tag.care_circle_member_list).performScrollToNode(hasTestTag(member))
-    waitFor(hasTestTag(member) and text(circleName)).assertIsDisplayed()
+    ui.open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_member_list))
+    ui.tag(C.Tag.care_circle_member_list).performScrollToNode(hasTestTag(member))
+    ui.waitFor(hasTestTag(member) and text(circleName)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.careCircleInvite(inviteCode)).assertDoesNotExist()
     compose
         .onNodeWithTag(C.Tag.care_circle_pending_label, useUnmergedTree = true)
@@ -323,9 +310,9 @@ class M2EndToEndTest {
   }
 
   private fun signOutThroughProfile() {
-    open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_sign_out))
-    open(C.Tag.profile_sign_out, hasTestTag(C.Tag.profile_sign_out_confirm))
-    open(C.Tag.profile_sign_out_confirm, hasTestTag(C.Tag.sign_in_screen))
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_sign_out))
+    ui.open(C.Tag.profile_sign_out, hasTestTag(C.Tag.profile_sign_out_confirm))
+    ui.open(C.Tag.profile_sign_out_confirm, hasTestTag(C.Tag.sign_in_screen))
     assertEquals(null, FirebaseEmulator.auth.currentUser)
   }
 
@@ -344,74 +331,10 @@ class M2EndToEndTest {
             true
       } and text(notes)
 
-  private fun tag(value: String) = waitFor(hasTestTag(value))
+  // Keep fluent journey steps while sharing all interaction behavior with M1.
+  private fun SemanticsNodeInteraction.replaceText(value: String) = ui.replaceText(this, value)
 
-  private fun open(from: String, destination: SemanticsMatcher) =
-      open(hasTestTag(from), destination)
-
-  private fun open(
-      from: SemanticsMatcher,
-      destination: SemanticsMatcher,
-  ): SemanticsNodeInteraction {
-    waitFor(from)
-    compose.waitUntil(TIMEOUT_MS) { !exists(loading) }
-    compose.waitForIdle()
-    waitFor(from).reveal().assertIsDisplayed().assertIsEnabled().performClick()
-    return waitFor(destination)
-  }
-
-  private fun SemanticsNodeInteraction.replaceText(value: String) {
-    performTextReplacement(value)
-    Espresso.closeSoftKeyboard()
-    compose.waitForIdle()
-  }
-
-  private fun SemanticsNodeInteraction.reveal() = apply {
-    try {
-      performScrollTo()
-    } catch (error: AssertionError) {
-      if (error.message?.contains("has no parent layout with a Scroll SemanticsAction") != true)
-          throw error
-    }
-  }
-
-  private fun exists(matcher: SemanticsMatcher, unmerged: Boolean = false) =
-      try {
-        compose.onAllNodes(matcher, useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty()
-      } catch (error: IllegalStateException) {
-        if (error.message?.startsWith("No compose hierarchies found") != true) throw error
-        false
-      }
-
-  private fun waitFor(
-      matcher: SemanticsMatcher,
-      unmerged: Boolean = false,
-  ): SemanticsNodeInteraction {
-    try {
-      compose.waitUntil(TIMEOUT_MS) { exists(matcher, unmerged) }
-    } catch (error: ComposeTimeoutException) {
-      val screen =
-          try {
-            compose
-                .onAllNodes(isRoot(), useUnmergedTree = true)
-                .printToString(maxDepth = Int.MAX_VALUE)
-          } catch (_: IllegalStateException) {
-            "No Compose hierarchy available."
-          }
-      // Diagnostics must not put invitation codes or account emails into CI logs.
-      var diagnostic = "M2 didn't reach ${matcher.description}.\n$screen"
-      for (account in listOf(patient, caregiver)) diagnostic =
-          diagnostic.replace(account.email, "<test email>")
-      if (::inviteCode.isInitialized) {
-        diagnostic =
-            diagnostic
-                .replace(inviteCode, "<invite code>")
-                .replace(inviteCode.chunked(5).joinToString("-"), "<invite code>")
-      }
-      throw AssertionError(diagnostic, error)
-    }
-    return compose.onNode(matcher, useUnmergedTree = unmerged)
-  }
+  private fun SemanticsNodeInteraction.reveal() = ui.reveal(this)
 
   private inner class Account(role: String, val firstName: String) {
     val email = "m2-$role-$run@example.com"
@@ -438,13 +361,5 @@ class M2EndToEndTest {
         selected.provider.getGoogleIdToken(context)
 
     override suspend fun clearCredentialState(context: Context) = Unit
-  }
-
-  private companion object {
-    const val TIMEOUT_MS = 15_000L
-    val loading =
-        SemanticsMatcher("a loading screen") {
-          it.config.getOrNull(SemanticsProperties.TestTag)?.endsWith("_loading") == true
-        }
   }
 }
