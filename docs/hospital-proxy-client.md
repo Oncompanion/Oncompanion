@@ -38,8 +38,9 @@ Cancellation disconnects an active platform connection immediately. Blocking rea
 session cleanup does not wait for a late response, and cancelled callers cannot receive it. Streams
 and connections are also closed when the worker exits.
 
-App Check is not installed globally at startup in this step. Its variant-specific factory is lazily
-installed before this client's first App Check token request, on the existing default app. This keeps
+App Check is installed lazily, as introduced in
+[HTTP client #303](https://github.com/Oncompanion/Oncompanion/pull/303): the variant-specific factory
+is installed before this client's first App Check token request, on the existing default app. This keeps
 an unused client inert and does not activate UI networking. The SDK installation affects that app's
 App Check instance; coordinate any future global initializer rather than installing competing factories.
 The existing Firebase BoM is retained; only App Check core/debug/Play Integrity dependencies are added,
@@ -71,9 +72,10 @@ After authorized deployment, App Check registration and rollout review, applicat
 `hospital_proxy_endpoint` string resource. It is empty by default, so shipped builds remain manual-only.
 After deployment and rollout approval, set that resource to the actual verified HTTPS endpoint;
 the URL is public configuration, not a credential. Do not guess it from the project name.
-Startup configuration reuses an installed adapter across activity recreation, preserving its cache
-and retry gate. Blank configuration leaves the current repository untouched. Changing a configured
-endpoint requires a new app build/process, rather than replacing live consumers or bypassing a wait.
+Startup configuration preserves any installed repository, including test overrides, across activity
+recreation. Blank or invalid configuration leaves the repository untouched and manual entry usable;
+validation failures log only their type. Explicit `configure()` throws on invalid endpoints without
+changing the repository. Changing a configured endpoint requires a new app build/process, rather than replacing live consumers or bypassing a wait.
 `disable()` restores the unconfigured provider for new consumers. Configuration is a startup boundary,
 not a reactive remote flag: recreate existing field consumers after endpoint/configuration changes.
 The provider installs the shared proxy adapter, never the legacy Nominatim HTTP repository, and

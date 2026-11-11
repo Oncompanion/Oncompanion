@@ -2,34 +2,28 @@
 
 # Hospital proxy deployment and operations
 
-Status (10 November 2026): billing is enabled and the authorized Cloud Functions, Cloud Run,
-Cloud Build, Artifact Registry and Secret Manager API activations are verified for
-`oncompanion-c4144` (project number `782199763007`). `hospitalSearch` is ACTIVE in `europe-west1`.
-The separately approved public invoker binding is verified on its `hospitalsearch` service;
-existing service bindings and project IAM were preserved. Firebase Auth and approved App Check
-remain mandatory in the verified deployed source. No live search has been performed. See DEPLOYMENT.md.
-The quota secret was created with approval; version 1 is ENABLED with automatic replication.
-Its value was generated in memory and not printed or saved locally. Both cache/quota TTL policies
-are ACTIVE, with single-field indexing disabled on their `expiresAt` fields. The field-specific
-operations completed successfully; unrelated field settings, composite indexes, security-rule
-releases and coordinator field settings were unchanged. One approved email notification channel
-is created and enabled; delivery is not yet tested. The separately approved CHF 5/month project
-budget is created and verified, with actual-spend thresholds at 50%, 90%, 100% and a 100% forecast
-threshold. Budget API enablement is verified; existing budgets were preserved. No proxy alert
-policies are configured. Play Integrity configuration exists, but real token verification
-is outstanding. The dedicated `hospital-search` runtime account was created with separate approval,
-with project-level `roles/datastore.user` and `roles/secretmanager.secretAccessor` on the quota
-secret only. Existing bindings were preserved; this runtime has no Editor grant or user-managed
-keys. Unexpected Google-managed bindings are a separate [security follow-up](../docs/hospital-proxy-iam-follow-up.md).
-The approved `hospital_proxy_request_urls` exclusion is enabled for platform request logs of the
-verified `hospitalsearch` service only. Existing exclusions, unrelated sink settings and monitoring
-configuration were preserved. Application stdout/stderr are not excluded. Proxy alert policies remain
-inactive. Authenticated live search, server-cache and release App Check verification are deferred.
-Obtain separate authorization before executing any cloud mutation below.
-See [README](README.md) for the contract, privacy constraints and coordinator proof.
-See the [current rollout plan](DEPLOYMENT.md) for audited state and separately approved steps.
-The [minimal course-project monitoring proposal](MONITORING.md) is prepared but not active;
-the project owner is the primary operator and the backup remains TBD by agreement.
+## Deployment status
+
+Related: [deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435),
+[deployment task #217](https://github.com/Oncompanion/Oncompanion/issues/217).
+Re-read live metadata before any action; historical evidence belongs in #435.
+
+| Area | Configuration / limitation |
+| --- | --- |
+| Function | `hospitalSearch`, `europe-west1`, ACTIVE; Run service `hospitalsearch` |
+| Invocation | Public Run invocation; Firebase Auth and approved App Check required by handler |
+| Runtime | Dedicated `hospital-search` account; Datastore User, secret-scoped Secret Accessor; no Editor/keys |
+| Secret | `HOSPITAL_QUOTA_SECRET`, version 1 ENABLED; never log/export its value |
+| TTL/indexes | Cache/quota `expiresAt` TTL ACTIVE, single-field indexing disabled; no coordinator TTL |
+| Request logs | `hospital_proxy_request_urls` excludes only this service's platform request logs; app logs retained |
+| Monitoring | Email channel and CHF 5 project budget exist; proxy policies inactive, delivery unverified |
+| Verification | Authenticated search, server cache and release App Check deferred; Android search inactive |
+| Operators | Primary: project owner; backup: TBD |
+| Governance | Discussion recorded in #435; obtain team agreement and authorization for further live changes |
+
+See [README](README.md) for the contract, [DEPLOYMENT.md](DEPLOYMENT.md) for deployment/rollback,
+[MONITORING.md](MONITORING.md) for the proposed policies and the separate
+[IAM investigation](../docs/hospital-proxy-iam-follow-up.md). No live mutation is authorized by this runbook.
 
 ## Before deployment
 

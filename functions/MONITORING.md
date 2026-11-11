@@ -2,22 +2,21 @@
 
 # Minimal course-project proxy monitoring proposal
 
-**Proxy alert policies are prepared only; channel and budget setup are approved and completed.** Related to #217.
-The email channel was separately approved, created and enabled:
-`projects/oncompanion-c4144/notificationChannels/4564218546212057707`.
-Its metadata matches the approved recipient; Google reports `VERIFICATION_STATUS_UNSPECIFIED`.
-No test notification was sent and delivery is not verified. No alert policies were created or changed.
-The CHF 5/month project budget was separately approved, created and verified. Its actual-spend
-thresholds are 50%, 90%, 100%, plus 100% forecast spending, using this email channel.
-The Budget API was enabled in `oncompanion-c4144` only, using it as the explicit quota project;
-the Firebase CLI's Google-owned OAuth client project was not changed. Existing budgets were preserved.
-Primary operator: project owner. Backup: **TBD**. The owner selected the previously supplied
-contact email for alerts; keep the actual address in the private workstation proposal.
-A missing backup is a documented course-project limitation, not a claim of continuous coverage.
+Deployment task: [#217](https://github.com/Oncompanion/Oncompanion/issues/217).
+Deployment evidence: [#435](https://github.com/Oncompanion/Oncompanion/pull/435).
 
-## Proposed resources
+| Resource | State |
+| --- | --- |
+| Email channel | `projects/oncompanion-c4144/notificationChannels/4564218546212057707`, enabled; delivery unverified |
+| Project budget | CHF 5/month, actual 50/90/100%, forecast 100%; alerts only, not a spend cap |
+| Proxy alert policies | Two proposals below; not created or activated |
+| Operators | Primary: project owner; backup: TBD |
 
-- One email notification channel.
+Do not recreate the existing channel or budget. Historical setup/approvals are in #435. Obtain
+team agreement and separate authorization before live monitoring changes. Keep the recipient address
+private; no patient data, credentials or query text belongs in alert configuration or notifications.
+
+## Policy design
 - One log-match policy for unexpected failures, exhausted release retries, retained oversized waits,
   and storage/upstream failures. It uses only fixed sanitized event names, with notifications limited
   to once per hour. No request-derived labels or message/exception parsing.
@@ -25,40 +24,33 @@ A missing backup is a documented course-project limitation, not a claim of conti
   **3 HTTP 503** responses in five minutes. Sum across every revision/instance of only the verified
   proxy service; use no per-instance average. Native request counts also cover platform responses
   that do not reach the handler. Normal contention can cause 429; this is not proof of a stuck lock.
-- Approved and created **CHF 5/month alerts-only budget** for the whole `oncompanion-c4144` project, not just
-  the proxy, with actual-spend emails at 50%, 90%, 100% and a 100% forecast threshold.
-  CHF is the verified billing currency. Credits are included,
-  so this tracks net billed spend. Budget emails can lag and do not stop spending.
+
+The existing budget covers the whole project, includes credits and tracks net billed spend. Budget
+emails can lag and do not stop spending.
 
 No custom log-based metrics, uptime checks, scheduled searches, queue, Pub/Sub automation, dashboard,
-new IAM grants or billing auto-shutdown. The native request-count descriptor was read and confirms
+new IAM grants or billing auto-shutdown. The native request-count descriptor uses
 `response_code`, DELTA metric kind and INT64 values.
 
 ## Bind and approve before applying
 
-The ACTIVE function's actual service name has been read and verified as `hospitalsearch`.
-Use that exact name in the filters; never silently monitor the entire project's unrelated services.
-Public invocation is now set under separate approval; alert policies remain uncreated. See DEPLOYMENT.md.
-The approved email channel exists; verify delivery with a separately approved test, then substitute its resource name for
+Verify the function's actual service name against `hospitalsearch` in DEPLOYMENT.md.
+Bind the filters to that service/location, never the entire project. Preserve existing invocation IAM.
+The email channel exists; verify delivery with a separately authorized test, then substitute its resource name for
 `__CREATED_EMAIL_CHANNEL_RESOURCE_NAME__`. The policy examples are disabled as a safeguard; activating them
 requires explicit approval. Local JSON validation is not a cloud API or delivery test.
 
-Only after approval, use these endpoints with the corresponding bodies below:
-
-- `POST https://monitoring.googleapis.com/v3/projects/oncompanion-c4144/notificationChannels`
-- `POST https://monitoring.googleapis.com/v3/projects/oncompanion-c4144/alertPolicies` (twice)
-- `POST https://billingbudgets.googleapis.com/v1/billingAccounts/{verifiedAccountId}/budgets`
-
-The read-only budget listing was blocked by the Budget API's consumer-project configuration.
-Do not change the Firebase CLI's Google-owned OAuth client project. For authorized API use, explicitly
-select `oncompanion-c4144` as the consumer/quota project. Enabling `billingbudgets.googleapis.com`
-there was separately approved and completed before budget creation. No billing-account IAM change
-was needed. Stop for review if future account access is denied; do not grant permissions implicitly.
+After approval, submit each fully configured policy to:
+`POST https://monitoring.googleapis.com/v3/projects/oncompanion-c4144/alertPolicies`.
+Read the existing policies first and preserve unrelated resources. Enable only the two reviewed
+policies. Use `oncompanion-c4144` as the quota project for authorized API calls; stop on an access
+error rather than granting permissions or enabling APIs implicitly.
 
 ## Configuration bodies
 
-The wrapper below is a review artifact: submit only each `notificationChannel`, `alertPolicies`
-entry or `budget` body to its respective endpoint. Replace all placeholders and obtain approval first.
+The wrapper below is a review artifact. The channel/budget bodies document existing settings, not
+instructions to create duplicates. Submit only each reviewed `alertPolicies` entry. Replace channel
+placeholders with the existing resource name and obtain authorization before enabling a policy.
 
 ```json
 {

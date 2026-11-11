@@ -3,7 +3,8 @@
 # Follow-up security review: deployment service agents
 
 Separate from the hospital-proxy deployment PR. **Investigation only; no IAM or API cleanup is
-included in PR 4.** This is a follow-up task specification, not an approved permission change.
+included in [deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435).**
+This is a follow-up task specification, not an approved permission change.
 
 ## Observed evidence
 
@@ -45,7 +46,8 @@ secret value and coordinator contract must remain separate from this follow-up.
       tests; record residual permissions and reasoning. Do not run Nominatim load tests.
 
 Standard Google-managed identities are not automatically necessary dependencies of this proxy.
-PR 4 leaves their existing state unchanged and does not claim their broad permissions are justified.
+[Deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435) leaves their existing state
+unchanged and does not claim their broad permissions are justified.
 
 Sources: [service-agent reference](https://docs.cloud.google.com/iam/docs/service-agents),
 [service-account types and automatic role grants](https://docs.cloud.google.com/iam/docs/service-account-types),

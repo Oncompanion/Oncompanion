@@ -1,36 +1,24 @@
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 
-# PR 4 end-to-end verification
+# Hospital proxy verification procedure
 
-## Completed without an upstream search
+Deployment evidence and completed negative checks are recorded in
+[#435](https://github.com/Oncompanion/Oncompanion/pull/435). Current configuration:
+[DEPLOYMENT.md](DEPLOYMENT.md). This runbook describes verification steps, not proof that they ran.
 
-Deployed endpoint: `https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch`.
-Service: `hospitalsearch`, `europe-west1`; dedicated runtime account; existing quota secret version 1.
-Deployed archive matches the tested local authorization, handler, service, client and dependencies.
+## Negative endpoint verification
 
-Five sequential requests used only a random non-sensitive marker and deliberately invalid credentials:
-
-| Case | Observed status/code |
-| --- | --- |
-| Valid query shape, no Auth | 401 / `unauthorized` |
-| Invalid Auth and App Check strings | 401 / `unauthorized` |
-| Missing App Check (invalid bearer supplied) | 403 / `app_check_required` |
-| Missing query | 400 / `invalid_query` |
-| POST | 405 / `method_not_allowed` |
-
-Coordinator existence/update metadata was unchanged. The verified handler authorizes before calling
-the service, so these rejections do not access Nominatim. The missing-App-Check check does **not**
-prove validation of an App Check token with otherwise valid Auth; that remains a separate live case.
-After more than four minutes of log-ingestion time, no retained platform request entries, test marker,
-invalid-token string or request URL fields were found in the inspected request/container logs.
-The enabled exclusion matches the actual service and only `run.googleapis.com/requests`.
-The logger code still emits fixed events and allowlisted codes; privacy tests pass. This is bounded
-evidence for these requests, not a claim that all future credentials or every infrastructure system
-have been tested. No real Auth/App Check tokens or patient information were used.
+Use non-sensitive synthetic markers and invalid credential strings only. Check GET with no Auth
+(401), invalid Auth/App Check (401), missing App Check with a bearer string (403), missing query
+(400), and POST (405). These must stop before service/quota/upstream access; compare coordinator
+metadata and inspect retained scoped logs after ingestion. No marker, URL or credential string should
+be retained. Missing App Check with an invalid bearer does not test App Check validation with valid Auth.
+Never substitute real patient information. An absent entry is bounded evidence, not universal privacy.
 
 ## Deferred live-search plan; prerequisites still pending
 
-The owner postponed authenticated live-search and server-cache verification for this draft PR.
+Authenticated live-search and server-cache verification remain deferred in
+[deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435).
 The procedure below is retained for a future explicitly resumed test, limited to one public query
 and one identical repeat with at most one upstream request. Do not execute it while deferred.
 No IAM, Auth-provider or security-rule changes are authorized. No authenticated search has been
@@ -41,8 +29,8 @@ project; this tests the debug-token path, not release Play Integrity attestation
 
 1. Have an authorized administrator create one dedicated Firebase test UID and a short-lived custom
    sign-in token using existing trusted administration tooling. No separate Google account is
-   required by Firebase custom authentication. The current CLI session has no `signBlob` permission
-   on the existing Admin SDK identity; no token was minted, key created or role granted.
+   required by Firebase custom authentication. Verify that the existing administration tooling can
+   sign tokens; do not add signing permissions or create keys to make this test possible.
    Email/password and anonymous providers are disabled and will not be enabled for this test.
 2. The production UI remains Google sign-in only. A trusted local test bootstrap must call the
    existing Firebase SDK's `signInWithCustomToken` for that dedicated UID; the Auth repository's
@@ -83,7 +71,7 @@ available here. The existing UI accepts Google sign-in only. A plain Firebase UI
 through that UI. The procedure below uses a dedicated Google test account (no patient information),
 not a real patient's existing account. If no dedicated Google identity is available, use the custom
 Firebase route described above only with already-authorized signing/bootstrap tooling; that route
-is not runnable in the current environment. No new Auth provider, IAM grant or login UI is proposed.
+is not available unless those prerequisites are provided. No new Auth provider, IAM grant or login UI is proposed.
 
 1. Open the project in Android Studio, select the **debug** build variant, and start an existing
    Google APIs emulator in Device Manager (API 34+). Run/debug the normal `app` configuration,
@@ -148,22 +136,15 @@ must not be wired to those emulators. No release keystore or production sign-in 
 
 ## How to report results
 
-| Area | Evidence already available | Live result still needed |
-| --- | --- | --- |
-| Authenticated search | Five deployed rejection cases; auth-before-upstream tests | Genuine Auth + debug App Check success and suggestions |
-| Cache | Backend/emulator shared-cache tests; Android adapter tests | First query plus identical fresh-process repeat and metadata comparison |
-| Quota/rate limiting | Rolling quota/concurrency tests pass in Firestore emulator | Not live-exhausted; the two-request budget cannot validate quota thresholds |
-| Logging | Exclusion matches actual service; negative-test marker/fake token absent after ingestion window | Bounded post-success log check without exposing real tokens |
-| Android/manual entry | 2,627 unit/Robolectric and all 500 local-emulator device tests pass; earlier 100 focused tests and two Profile device tests pass | Deployed-proxy suggestions with the real debug credentials |
+Record status, result count, attribution and safe cache/coordinator metadata in the verification issue.
+Distinguish emulator evidence, deployed negative cases and actual authenticated success. Record
+unverified cases explicitly: authenticated success/server cache, valid-Auth App Check rejection,
+successful-request logging, release Play Integrity and Android activation. Live quota exhaustion is
+not covered by the two-request budget; use automated tests instead. Monitoring delivery is separate.
 
-Record response status, result count, whether attribution appeared, and safe metadata only.
-No passwords, Firebase/App Check tokens, debug enrollment secrets, request URLs or full Logcat in
-reports. An absent log entry alone does not prove universal non-retention. Do not claim a live quota
-or Play Integrity release test from a successful debug-provider request.
-
-The deployed authenticated success/shared-cache path, actual token issuance, debug enrollment,
-Play Integrity release flow and production Android integration are not yet verified. Android endpoint
-activation remains pending. Monitoring alert policies and notification delivery also remain unverified.
+Never include passwords, Firebase/App Check tokens, enrollment secrets, request URLs or full Logcat.
+A debug-provider request does not verify release attestation. The server-cache repeat must bypass
+Android's in-memory cache and must not create a second upstream request. Stop if unsure.
 
 Sources: [Firebase custom tokens](https://firebase.google.com/docs/auth/admin/create-custom-tokens),
 [Android custom sign-in](https://firebase.google.com/docs/auth/android/custom-auth),
