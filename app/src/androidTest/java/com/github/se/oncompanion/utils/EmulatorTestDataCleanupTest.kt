@@ -5,6 +5,7 @@ package com.github.se.oncompanion.utils
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -26,6 +27,7 @@ class EmulatorTestDataCleanupTest {
     val survivorInvite = "cleanup-survivor-$survivor"
     try {
       EmulatorTestData.createProfile("PATIENT")
+      EmulatorTestData.createRawDocument("users/$survivor/$futureCollection", "entry", "{}")
       EmulatorTestData.createRawDocument("invites", survivorInvite, ownerFields(survivor))
       for (stage in listOf("before-profile", "pending", "joined")) {
         val uid = EmulatorTestData.createUser("m2-cleanup-$stage")
@@ -33,7 +35,7 @@ class EmulatorTestDataCleanupTest {
         try {
           if (stage != "before-profile") {
             EmulatorTestData.createProfile("PATIENT")
-            for (collection in collections) {
+            for (collection in collections + futureCollection) {
               EmulatorTestData.createRawDocument("users/$uid/$collection", "entry", "{}")
             }
           }
@@ -51,7 +53,7 @@ class EmulatorTestDataCleanupTest {
           EmulatorTestData.deleteUserData(uid)
 
           assertEquals(404, documentStatus("users/$uid"))
-          for (collection in collections) {
+          for (collection in collections + futureCollection) {
             assertEquals(404, documentStatus("users/$uid/$collection/entry"))
           }
           assertEquals(404, documentStatus("invites/$invite"))
@@ -64,6 +66,7 @@ class EmulatorTestDataCleanupTest {
           assertFalse("The test's Auth account must be removed", uid in identities)
           assertTrue("Another test's Auth account must survive", survivor in identities)
           assertEquals(200, documentStatus("users/$survivor"))
+          assertEquals(200, documentStatus("users/$survivor/$futureCollection/entry"))
           assertEquals(200, documentStatus("invites/$survivorInvite"))
         } finally {
           EmulatorTestData.signOut()
@@ -74,6 +77,20 @@ class EmulatorTestDataCleanupTest {
       EmulatorTestData.signOut()
       EmulatorTestData.deleteUserData(survivor)
     }
+  }
+
+  /** A rejected raw write reports the emulator's explanation, not just an HTTP status. */
+  @Test
+  fun rawRequestFailure_includesEmulatorExplanation(): Unit = runBlocking {
+    val path = "users/cleanup-error-${UUID.randomUUID()}/symptoms"
+    val failure = runCatching {
+      EmulatorTestData.createRawDocument(path, "invalid", "not-json")
+    }.exceptionOrNull()
+    assertTrue("Malformed JSON must be rejected", failure is IllegalStateException)
+    assertTrue(
+        "The failure must include the emulator's response body",
+        failure?.message.orEmpty().substringAfter("HTTP 400: ", "").isNotBlank(),
+    )
   }
 
   private fun ownerFields(uid: String) =
@@ -127,6 +144,8 @@ class EmulatorTestDataCleanupTest {
       }
 
   private companion object {
+    // This fictional future feature must be cleaned without being named by the cleanup helper.
+    const val futureCollection = "cleanupFutureFeature"
     val collections =
         listOf(
             "symptoms",

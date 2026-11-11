@@ -107,7 +107,7 @@ object EmulatorTestData {
 
   /**
    * Removes one fresh test account's documents, remaining invitations and Auth identity. Child
-   * collections are explicit: deleting a profile alone leaves its subcollections behind. Never
+   * collections are discovered: deleting a profile alone leaves its subcollections behind. Never
    * clears the emulator, which may be shared with other tests.
    */
   suspend fun deleteUserData(uid: String) {
@@ -133,15 +133,19 @@ object EmulatorTestData {
         }
       }
     }
-    for (collection in
-        listOf(
-            "symptoms",
-            "circle",
-            "patients",
-            "prescriptions",
-            "appointments",
-            "eventRegistrations",
-        )) {
+    // Discover this account's collections so future features cannot silently leave test data
+    // behind.
+    val collections =
+        try {
+          val ids =
+              JSONObject(request("POST", "$FIRESTORE_REST/users/$uid:listCollectionIds", "{}"))
+                  .optJSONArray("collectionIds") ?: JSONArray()
+          (0 until ids.length()).map(ids::getString)
+        } catch (error: Exception) {
+          failures += error
+          emptyList()
+        }
+    for (collection in collections) {
       attempt {
         var page = ""
         do {
@@ -231,7 +235,9 @@ object EmulatorTestData {
               else null
           if (allowMissing && code == 400 && error?.contains("USER_NOT_FOUND") == true)
               return@withContext ""
-          check(code in 200..299) { "$method emulator request failed with HTTP $code" }
+          check(code in 200..299) {
+            "$method emulator request failed with HTTP $code: ${error.orEmpty()}"
+          }
           connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
           connection.disconnect()
