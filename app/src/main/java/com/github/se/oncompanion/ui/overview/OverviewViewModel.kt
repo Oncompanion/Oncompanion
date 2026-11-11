@@ -12,6 +12,7 @@ import com.github.se.oncompanion.domain.planning.CarePlanning
 import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
@@ -155,22 +156,26 @@ class OverviewViewModel(
   /** Follows which sections the patient shares, in caregiver mode. */
   private var sharedObservation: Job? = null
 
+  /** Follows how many prescriptions wait for the patient, in patient mode. */
+  private var countObservation: Job? = null
+
   /** The planning entries as the repository gave them; what they show depends on the time. */
   private var items: List<PlanningItem> = emptyList()
 
   init {
     loadFirstName()
     loadDay()
-    if (patientUid == null) countPrescriptionsToConfirm()
   }
 
   /**
    * Follows how many prescriptions a caregiver added wait for the patient (US-43), from the
-   * device's cache when offline. It is only a reminder: if they can't be read, no badge shows.
+   * device's cache when offline. It is only a reminder: if they can't be read, no badge shows until
+   * Retry.
    */
   private fun countPrescriptionsToConfirm() {
-    val uid = runCatching { authRepository.currentUser?.uid }.getOrNull() ?: return
-    viewModelScope.launch {
+    countObservation?.cancel()
+    val uid = authRepository.signedInUid(TAG) ?: return
+    countObservation = viewModelScope.launch {
       try {
         medicationRepository.observePrescriptions(uid).collect { prescriptions ->
           val waiting = prescriptions.count { it.confirmation == PrescriptionConfirmation.PENDING }
@@ -207,11 +212,12 @@ class OverviewViewModel(
   /**
    * Starts (or, after an error, restarts) observing the planning data from today to [LOOKAHEAD]
    * later, so the next appointment is found even months ahead, as between two oncology check-ups.
-   * In caregiver mode, it also (re)starts following the shared sections.
+   * In caregiver mode, it also (re)starts following the shared sections; for the patient, how many
+   * prescriptions wait for them.
    */
   fun loadDay() {
     dayObservation?.cancel()
-    if (patientUid != null) followSharedSections(patientUid)
+    if (patientUid != null) followSharedSections(patientUid) else countPrescriptionsToConfirm()
     val now = now()
     _uiState.update { it.copy(now = now, isLoading = true, hasError = false) }
     val today = now.toLocalDate()
