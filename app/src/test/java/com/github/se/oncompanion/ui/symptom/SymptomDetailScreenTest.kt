@@ -36,7 +36,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
-import com.github.se.oncompanion.ui.common.DeleteState
+import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
 import java.time.Instant
@@ -289,7 +289,7 @@ class SymptomDetailScreenTest {
             loaded,
             loaded.copy(
                 entry = fatigue,
-                delete = DeleteState(isConfirming = true, isDeleting = true),
+                delete = DeletePhase.DELETING,
             ),
         )) {
       state = hidden
@@ -302,7 +302,7 @@ class SymptomDetailScreenTest {
     var confirms = 0
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true)),
+        loaded.copy(entry = fatigue, delete = DeletePhase.CONFIRMING),
         onConfirmDelete = { confirms++ },
         onCancelDelete = { cancels++ },
     )
@@ -323,7 +323,7 @@ class SymptomDetailScreenTest {
 
   @Test
   fun confirmingWithoutAnEntry_showsNoDialog() {
-    setContent(loaded.copy(delete = DeleteState(isConfirming = true)))
+    setContent(loaded.copy(delete = DeletePhase.CONFIRMING))
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_not_found).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertDoesNotExist()
@@ -333,7 +333,7 @@ class SymptomDetailScreenTest {
   fun backInTheDialog_cancelsTheDeletion() {
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true)),
+        loaded.copy(entry = fatigue, delete = DeletePhase.CONFIRMING),
         onCancelDelete = { cancels++ },
     )
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
@@ -347,7 +347,7 @@ class SymptomDetailScreenTest {
   fun backWhileDeleting_doesNotCancel() {
     var cancels = 0
     setContent(
-        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, isDeleting = true)),
+        loaded.copy(entry = fatigue, delete = DeletePhase.DELETING),
         onCancelDelete = { cancels++ },
     )
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
@@ -359,9 +359,7 @@ class SymptomDetailScreenTest {
 
   @Test
   fun whileDeleting_theDialogButtonsAreDisabled() {
-    setContent(
-        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, isDeleting = true))
-    )
+    setContent(loaded.copy(entry = fatigue, delete = DeletePhase.DELETING))
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).assertIsNotEnabled()
@@ -370,9 +368,7 @@ class SymptomDetailScreenTest {
 
   @Test
   fun deleteError_isShownInTheDialog() {
-    setContent(
-        loaded.copy(entry = fatigue, delete = DeleteState(isConfirming = true, hasError = true))
-    )
+    setContent(loaded.copy(entry = fatigue, delete = DeletePhase.FAILED))
 
     composeTestRule
         .onNode(

@@ -66,11 +66,14 @@ import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
+import com.github.se.oncompanion.ui.common.PaperLakeBand
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -276,7 +279,10 @@ fun PrescriptionFormContent(
   }
 }
 
-/** The title and the button that leaves the form without saving. */
+/**
+ * The title and the button that leaves the form without saving, on the Paper lake band (Figma
+ * "US-10 / Review – Partly read", "US-24 / Add prescription", "US-12 / Edit prescription").
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormTopBar(
@@ -285,7 +291,30 @@ private fun FormTopBar(
     caregiverOf: String?,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
+  // The light of when the form opened: the sky doesn't change while the patient types
+  val openedAt = remember { LocalTime.now() }
+  PaperLakeBand(openedAt, Modifier.testTag(C.Tag.prescription_form_band)) {
+    FormTopAppBar(uiState, onClose, caregiverOf, windowInsets)
+  }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormTopAppBar(
+    uiState: PrescriptionFormUiState,
+    onClose: () -> Unit,
+    caregiverOf: String?,
+    windowInsets: WindowInsets,
+) {
+  val onHorizon = MaterialTheme.lakeColors.onHorizon
   TopAppBar(
+      // The band shows through, and its text colour reads on it at any time of day
+      colors =
+          TopAppBarDefaults.topAppBarColors(
+              containerColor = Color.Transparent,
+              titleContentColor = onHorizon,
+              navigationIconContentColor = onHorizon,
+          ),
       title = {
         Text(
             when {

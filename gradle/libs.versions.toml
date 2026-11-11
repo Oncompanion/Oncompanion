@@ -1,4 +1,5 @@
 # Co-authored-by: ChatGPT <noreply@openai.com>
+# Co-authored-by: Claude Code <noreply@anthropic.com>
 [versions]
 agp = "9.3.0"
 kotlin = "2.3.0"
@@ -72,6 +73,17 @@ kaspresso = { group = "com.kaspersky.android-components", name = "kaspresso", ve
 kaspresso-compose = { group = "com.kaspersky.android-components", name = "kaspresso-compose-support", version.ref = "kaspresso" }
 
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+# Robolectric's Android jars, one per SDK the tests run on: targetSdk (34), and the ones in
+# @Config(sdk = [...]). The versions are the ones Robolectric 4.16.1 asks for: when Robolectric is
+# upgraded or a test needs another SDK, take them from its DefaultSdkProvider, or run the tests and
+# read the missing jar's name in the error (#324).
+robolectric-android-28 = { module = "org.robolectric:android-all-instrumented", version = "9-robolectric-4913185-2-i7" }
+robolectric-android-32 = { module = "org.robolectric:android-all-instrumented", version = "12.1-robolectric-8229987-i7" }
+robolectric-android-33 = { module = "org.robolectric:android-all-instrumented", version = "13-robolectric-9030017-i7" }
+robolectric-android-34 = { module = "org.robolectric:android-all-instrumented", version = "14-robolectric-10818077-i7" }
+
+[bundles]
+robolectric-android = ["robolectric-android-28", "robolectric-android-32", "robolectric-android-33", "robolectric-android-34"]
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

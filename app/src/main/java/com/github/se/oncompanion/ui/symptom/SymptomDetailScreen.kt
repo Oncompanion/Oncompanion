@@ -35,6 +35,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
+import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
@@ -75,7 +76,7 @@ fun SymptomDetailScreen(
 
   // Back to the journal, which no longer shows the symptom, once it is deleted
   val goBack by rememberUpdatedState(navigationActions::goBack)
-  LaunchedEffect(uiState.delete.isDeleted) { if (uiState.delete.isDeleted) goBack() }
+  LaunchedEffect(uiState.delete) { if (uiState.delete == DeletePhase.DELETED) goBack() }
 
   SymptomDetailContent(
       uiState = uiState,
@@ -178,8 +179,8 @@ fun SymptomDetailContent(
         error = stringResource(R.string.symptom_delete_error),
         confirmLabel = stringResource(R.string.symptom_delete_confirm),
         cancelLabel = stringResource(R.string.symptom_delete_cancel),
-        isDeleting = uiState.delete.isDeleting,
-        hasError = uiState.delete.hasError,
+        isDeleting = uiState.delete == DeletePhase.DELETING,
+        hasError = uiState.delete == DeletePhase.FAILED,
         onConfirm = onConfirmDelete,
         onCancel = onCancelDelete,
         tags = deleteDialogTags,

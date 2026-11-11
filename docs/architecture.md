@@ -288,7 +288,7 @@ times respect the phone clock preference and display zone.
 Planning appointment rows and Overview's next-appointment card open the same detail destination.
 Overview preserves the source appointment ID rather than deriving it from display text. Back pops
 the destination to its origin, retaining Planning's selected day and saved agenda scroll position.
-Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete asks for confirmation.
+Medication rows open MedicationDetailScreen (US-35), then the containing prescription through View prescription. Unsupported Planning rows do not expose a clickable action. Edit opens the shared form; Delete asks for confirmation.
 
 ### Appointment edit recovery
 
@@ -532,3 +532,19 @@ and actions share one scroll instead of pinning them around a small details view
 keeps the existing fixed headers. Calendar selection remains in PlanningViewModel; scroll positions
 use saveable state. Navigation, access rules and repositories are unchanged. The Account and Planning
 feature diagrams document the layout behavior; the overview is unchanged.
+
+## Medication details (issue #197)
+
+Planning passes the prescription and medication IDs to `MedicationDetailViewModel`. It observes
+one prescription through `ObserveCareSection(PRESCRIPTIONS)` and selects that medication by ID,
+so cached reads, edits, deletion and access changes all use the existing repository boundary.
+Rejected prescriptions and missing medications are unavailable; a cache miss never claims a
+server-confirmed deletion. A read error hides stale content and offers Retry. Pending prescriptions
+keep their attribution and explicit confirmation state; the patient sees their circle member's
+current name, while a caregiver sees the stored name.
+
+The read-only page follows appointment details for M2: the standard Material toolbar,
+`DetailWithActions`, theme tokens, `LakeButton` and shared feedback. This intentionally defers the
+Paper lake toolbar and full Figma restyle. It shows recorded fields only, with no inferred intake
+times or unsaved Notes field. View prescription pushes the existing prescription detail, and Back
+pops to the medication and then the original Planning day and scroll position.
