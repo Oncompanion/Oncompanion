@@ -250,6 +250,22 @@ class SymptomDetailScreenTest {
     }
   }
 
+  // The same order as the log form: what, how strong, when, then the notes
+  @Test
+  fun fields_followTheOrderOfTheLogForm() {
+    setContent(loaded.copy(entry = fatigue))
+
+    val tops =
+        listOf(
+                C.Tag.symptom_detail_symptoms,
+                C.Tag.symptom_detail_intensity,
+                C.Tag.symptom_detail_when,
+                C.Tag.symptom_detail_notes,
+            )
+            .map { composeTestRule.onNodeWithTag(it).getUnclippedBoundsInRoot().top }
+    assertEquals(tops.sorted(), tops)
+  }
+
   @Test
   fun severalSymptoms_showAllTheirLabelsInTheTitle() {
     setContent(

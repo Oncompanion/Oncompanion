@@ -196,8 +196,8 @@ fun SymptomDetailContent(
 }
 
 /**
- * The symptom: what was felt, then when and how strong in one card, the notes and who logged it.
- * The symptoms are listed in full, since the title shows only the first line.
+ * The symptom in the order of the log form: what was felt, how strong and when, then the notes and
+ * who logged it. The symptoms are listed in full, since the title shows only the first line.
  */
 @Composable
 private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
@@ -260,7 +260,7 @@ private fun SymptomsSection(entry: SymptomEntry) {
   }
 }
 
-/** When it was felt and, if given, how strong: rows of one white card, split by a divider. */
+/** If given, how strong it felt, then when: rows of one white card, split by a divider. */
 @Composable
 private fun InfoCard(entry: SymptomEntry, zone: ZoneId) {
   Surface(
@@ -269,22 +269,10 @@ private fun InfoCard(entry: SymptomEntry, zone: ZoneId) {
       color = MaterialTheme.colorScheme.surfaceContainerLowest,
   ) {
     Column(Modifier.padding(vertical = Spacing.xs)) {
-      InfoRow(
-          value = entry.occurredAt.atZone(zone).format(detailDateFormatter),
-          label = stringResource(R.string.symptom_detail_when),
-          testTag = C.Tag.symptom_detail_when,
-      ) {
-        // Decorative: the label says what the row is
-        Icon(painterResource(R.drawable.ic_schedule), contentDescription = null)
-      }
       // The intensity is optional: no row when the user didn't give one
       val intensity = entry.intensity
       val severity = entry.severity
       if (intensity != null && severity != null) {
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = Spacing.lg),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
         InfoRow(
             value = stringResource(severity.label),
             label = stringResource(R.string.symptom_detail_intensity),
@@ -292,6 +280,18 @@ private fun InfoCard(entry: SymptomEntry, zone: ZoneId) {
         ) {
           IntensityBadge(intensity)
         }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+      }
+      InfoRow(
+          value = entry.occurredAt.atZone(zone).format(detailDateFormatter),
+          label = stringResource(R.string.symptom_detail_when),
+          testTag = C.Tag.symptom_detail_when,
+      ) {
+        // Decorative: the label says what the row is
+        Icon(painterResource(R.drawable.ic_schedule), contentDescription = null)
       }
     }
   }
