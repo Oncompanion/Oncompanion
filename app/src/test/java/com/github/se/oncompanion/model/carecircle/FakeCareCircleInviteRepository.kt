@@ -102,10 +102,13 @@ class FakeCareCircleInviteRepository(
     joined.value += caregiverUid to circles
   }
 
-  /** Like [observeJoinedCircles], fails with [observeError] when it is set. */
+  /**
+   * Like [observeJoinedCircles], fails with [observeError] when it is set. From the cache only
+   * ([joinedCirclesFromCache]), an empty list isn't a "no".
+   */
   override suspend fun hasJoinedCircle(caregiverUid: String): Boolean {
     observeError?.let { throw it }
-    return joinedCircles(caregiverUid).isNotEmpty()
+    return joinedCircles(caregiverUid).isNotEmpty() || joinedCirclesFromCache
   }
 
   private val joinedFromCache = MutableStateFlow(false)

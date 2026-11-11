@@ -179,6 +179,36 @@ class CareCircleInviteRedeemTest {
   }
 
   @Test
+  fun hasJoinedCircle_offlineWithAnEmptyCopy_isNotANo(): Unit = runBlocking {
+    // Bob joined Alice's circle on this phone, then starts the app offline on another phone that
+    // has never read his circles
+    bobRedeems(aliceInvite().inviteCode)
+    val app =
+        FirebaseApp.initializeApp(
+            ApplicationProvider.getApplicationContext(),
+            FirebaseApp.getInstance().options,
+            "other-phone-${System.nanoTime()}",
+        )
+    // Terminated, not deleted: deleting a Firebase app breaks the emulator setup of later ones
+    val otherPhone =
+        FirebaseFirestore.getInstance(app).apply {
+          useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+        }
+    try {
+      otherPhone.disableNetwork().await()
+
+      // Not known yet: "Whose care?" waits for the server instead of sending him to Join
+      assertTrue(
+          withTimeout(10_000) {
+            CareCircleInviteRepositoryFirestore(otherPhone).hasJoinedCircle(bobUid)
+          }
+      )
+    } finally {
+      otherPhone.terminate()
+    }
+  }
+
+  @Test
   fun redeem_aUsedInviteCode_isInvalid(): Unit = runBlocking {
     val invite = aliceInvite()
     bobRedeems(invite.inviteCode)

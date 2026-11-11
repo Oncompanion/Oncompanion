@@ -88,7 +88,8 @@ interface CareCircleInviteRepository {
   /**
    * Whether [caregiverUid] joined at least one care circle, so the app can open the join screen for
    * a caregiver who hasn't yet. Asks the server, which knows about a circle joined a moment ago,
-   * and answers from the phone when offline.
+   * and answers from the phone when offline. `false` only once the server says there is none:
+   * offline, an empty copy on the phone may miss a circle joined on another phone.
    */
   suspend fun hasJoinedCircle(caregiverUid: String): Boolean
 }

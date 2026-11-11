@@ -207,7 +207,9 @@ class CareCircleInviteRepositoryFirestore(
           if (e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
           patients(caregiverUid).get(Source.CACHE).await()
         }
-    return@operation !snapshot.isEmpty
+    // Offline, an empty copy may only miss a circle joined on another phone: not known yet, so not
+    // a "no". "Whose care?" then waits for the server, with Join offered meanwhile
+    return@operation !snapshot.isEmpty || snapshot.metadata.isFromCache
   }
 
   /**
