@@ -49,6 +49,7 @@ import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -231,7 +232,7 @@ private fun PrescriptionDetail(prescription: Prescription) {
     prescription.addedByName?.let {
       AddedBy(
           it,
-          modifier = Modifier.padding(horizontal = 16.dp),
+          modifier = Modifier.padding(horizontal = Spacing.lg),
           isConfirmed = prescription.isConfirmed,
       )
     }

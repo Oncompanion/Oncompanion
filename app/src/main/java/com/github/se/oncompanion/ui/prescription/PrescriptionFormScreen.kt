@@ -74,6 +74,7 @@ import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
 import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalDate
 import java.time.LocalTime
@@ -720,7 +721,8 @@ private fun FormSaveButton(
         onClick = onReject,
         style = LakeButtonStyle.Text,
         enabled = uiState.save == SavePhase.EDITING,
-        modifier = Modifier.padding(start = 16.dp).testTag(C.Tag.prescription_form_reject_button),
+        modifier =
+            Modifier.padding(start = Spacing.lg).testTag(C.Tag.prescription_form_reject_button),
     )
     SaveButton(
         text = stringResource(R.string.prescription_confirm_save),
@@ -746,7 +748,7 @@ private fun ConfirmNotice() {
     Text(
         text = stringResource(R.string.prescription_confirm_notice),
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(16.dp).testTag(C.Tag.prescription_confirm_notice),
+        modifier = Modifier.padding(Spacing.lg).testTag(C.Tag.prescription_confirm_notice),
     )
   }
 }

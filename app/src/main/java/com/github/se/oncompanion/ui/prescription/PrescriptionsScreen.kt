@@ -53,6 +53,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -343,7 +344,7 @@ private fun PrescriptionItem(
           else ListItemDefaults.colors(),
       modifier =
           (if (toReview)
-                  Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                  Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                       .clip(MaterialTheme.shapes.medium)
               else Modifier)
               .clickable { onOpen(prescription.id) }
