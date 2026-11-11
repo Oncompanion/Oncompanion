@@ -5,6 +5,8 @@ package com.github.se.oncompanion.ui.symptom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +44,7 @@ import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeFilterChip
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeTopAppBar
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -193,8 +196,8 @@ fun SymptomDetailContent(
 }
 
 /**
- * The symptom as the Figma draws it: when and how strong in one card, in the order of the log form,
- * then the notes and who logged it.
+ * The symptom: what was felt, then when and how strong in one card, the notes and who logged it.
+ * The symptoms are listed in full, since the title shows only the first line.
  */
 @Composable
 private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
@@ -204,6 +207,7 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?)
               .padding(start = Spacing.lg, top = Spacing.md, end = Spacing.lg, bottom = Spacing.lg),
       verticalArrangement = Arrangement.spacedBy(Spacing.lg),
   ) {
+    SymptomsSection(entry)
     InfoCard(entry, zone)
     val notes = entry.notes?.takeIf { it.isNotBlank() }
     if (notes != null) {
@@ -225,6 +229,34 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?)
     }
     // A symptom a caregiver logged for the patient says who did
     addedByName?.let { AddedBy(it) }
+  }
+}
+
+/**
+ * Every symptom of the entry, as dawn chips like the ones picked on the log form, right under their
+ * heading.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SymptomsSection(entry: SymptomEntry) {
+  Column(
+      modifier = Modifier.testTag(C.Tag.symptom_detail_symptoms),
+      verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+  ) {
+    Text(
+        text = stringResource(R.string.symptom_detail_symptoms),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.semantics { heading() },
+    )
+    // Read-only chips: they show what was logged, nothing to toggle here
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+      entry.types.forEach { type ->
+        LakeFilterChip(selected = true, onClick = null, label = stringResource(type.label))
+      }
+    }
   }
 }
 

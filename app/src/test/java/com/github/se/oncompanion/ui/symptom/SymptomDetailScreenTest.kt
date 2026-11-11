@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -22,11 +23,13 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -50,6 +53,7 @@ import java.time.ZoneOffset
 import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -113,9 +117,14 @@ class SymptomDetailScreenTest {
   }
 
   private fun assertTextInside(text: String, parentTag: String) {
-    composeTestRule
-        .onNode(hasText(text) and hasAnyAncestor(hasTestTag(parentTag)), useUnmergedTree = true)
-        .assertExists()
+    val found =
+        composeTestRule
+            .onAllNodes(
+                hasText(text) and hasAnyAncestor(hasTestTag(parentTag)),
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNodes()
+    assertTrue("\"$text\" inside $parentTag", found.isNotEmpty())
   }
 
   private fun signedInAsAlice() =
@@ -176,6 +185,9 @@ class SymptomDetailScreenTest {
         )
         .assertExists()
     assertTextInside("After the walk", C.Tag.symptom_detail_notes)
+    for (heading in listOf(R.string.symptom_detail_symptoms, R.string.symptom_detail_notes)) {
+      composeTestRule.onNode(hasText(context.getString(heading)) and isHeading()).assertExists()
+    }
   }
 
   @Test
@@ -215,6 +227,26 @@ class SymptomDetailScreenTest {
               abs(container.green - fill.green) < 0.02f &&
               abs(container.blue - fill.blue) < 0.02f
       assertTrue("$value: expected $container, was $fill", same)
+    }
+  }
+
+  // The title shows one line: the card is where every symptom can be read, whatever the font
+  @Test
+  @Config(qualifiers = "w411dp-h891dp", fontScale = 2f)
+  fun everySymptom_isShownInFull_atALargeFont() {
+    setContent(loaded.copy(entry = fatigue.copy(types = SymptomType.entries)))
+
+    for (type in SymptomType.entries) {
+      val label = context.getString(type.label)
+      val chip = hasText(label) and hasAnyAncestor(hasTestTag(C.Tag.symptom_detail_symptoms))
+      composeTestRule.onNodeWithTag(C.Tag.symptom_detail_content).performScrollToNode(chip)
+      val node = composeTestRule.onNode(chip, useUnmergedTree = true).assertIsDisplayed()
+      val layouts = mutableListOf<TextLayoutResult>()
+      node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(layouts)
+      // Every character is laid out on a visible line, none cut off below or behind an ellipsis
+      val layout = layouts.single()
+      assertFalse("$label is cut at the bottom", layout.didOverflowHeight)
+      assertEquals(label, label.length, layout.getLineEnd(layout.lineCount - 1, visibleEnd = true))
     }
   }
 
