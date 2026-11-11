@@ -83,6 +83,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.auth.signedInUid
 import com.github.se.oncompanion.model.medication.scan.PreferencesScanTipSettings
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
 import com.github.se.oncompanion.resources.C
@@ -213,7 +215,8 @@ fun ScanScreen(
 }
 
 /**
- * The scan view model, with its photos kept in the app's cache and its tip setting on the phone.
+ * The scan view model, with its photos kept in the app's cache and its tip setting on the phone,
+ * for the signed-in user.
  */
 @Composable
 private fun scanViewModel(): ScanViewModel {
@@ -222,7 +225,8 @@ private fun scanViewModel(): ScanViewModel {
     ScanViewModel(
         ScanPhotoStore(context.cacheDir),
         PreferencesScanTipSettings(
-            context.getSharedPreferences(SCAN_SETTINGS, Context.MODE_PRIVATE)
+            context.getSharedPreferences(SCAN_SETTINGS, Context.MODE_PRIVATE),
+            AuthRepositoryProvider.repository.signedInUid(TAG),
         ),
     )
   }

@@ -20,13 +20,32 @@ class PreferencesScanTipSettingsTest {
 
   @Test
   fun theTipShowsUntilHidden_andStaysHiddenAfterTheAppRestarts() {
-    val settings = PreferencesScanTipSettings(preferences())
+    val settings = PreferencesScanTipSettings(preferences(), "alice")
     assertTrue(settings.showUprightTip)
 
     settings.hideUprightTip()
 
     assertFalse(settings.showUprightTip)
     // As read again when the app is opened next time
-    assertFalse(PreferencesScanTipSettings(preferences()).showUprightTip)
+    assertFalse(PreferencesScanTipSettings(preferences(), "alice").showUprightTip)
+  }
+
+  @Test
+  fun oneUserHidingTheTip_doesntHideItForAnother_andAfterSigningBackIn() {
+    PreferencesScanTipSettings(preferences(), "alice").hideUprightTip()
+
+    // Bob signs in on the same phone, then Alice again
+    assertTrue(PreferencesScanTipSettings(preferences(), "bob").showUprightTip)
+    assertFalse(PreferencesScanTipSettings(preferences(), "alice").showUprightTip)
+  }
+
+  @Test
+  fun withNobodySignedIn_theTipShows_andHidingItIsntKept() {
+    val settings = PreferencesScanTipSettings(preferences(), null)
+
+    settings.hideUprightTip()
+
+    assertTrue(settings.showUprightTip)
+    assertTrue(PreferencesScanTipSettings(preferences(), "alice").showUprightTip)
   }
 }
