@@ -6,10 +6,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLog
 
 /**
  * Checks provisioning without a public endpoint, stable configured instances and fake overrides.
  */
+@RunWith(RobolectricTestRunner::class)
 class HospitalRepositoryProviderTest {
   private val original = HospitalRepositoryProvider.repository
 
@@ -77,12 +81,24 @@ class HospitalRepositoryProviderTest {
         listOf("http://example.invalid/search", "https://nominatim.openstreetmap.org/search")) {
       HospitalRepositoryProvider.disable()
       val unconfigured = HospitalRepositoryProvider.repository
-      assertThrows(IllegalArgumentException::class.java) {
-        HospitalRepositoryProvider.configureAtStartup(endpoint)
-      }
+      ShadowLog.clear()
+      HospitalRepositoryProvider.configureAtStartup(endpoint)
       assertSame(unconfigured, HospitalRepositoryProvider.repository)
       assertFalse(HospitalRepositoryProvider.isConfigured)
+      val log = ShadowLog.getLogsForTag("HospitalRepositoryProvider").single()
+      assertEquals("Invalid hospital proxy configuration: IllegalArgumentException", log.msg)
+      assertNull(log.throwable)
     }
+  }
+
+  /** Startup must not replace a fake with real credentials and networking when a URL is set. */
+  @Test
+  fun nonBlankStartupConfigurationPreservesTestOverrides() {
+    val fake = FakeHospitalRepository()
+    HospitalRepositoryProvider.repository = fake
+    HospitalRepositoryProvider.configureAtStartup("https://example.invalid/search")
+    assertSame(fake, HospitalRepositoryProvider.repository)
+    assertFalse(HospitalRepositoryProvider.isConfigured)
   }
 
   /** Configuration constructs the HTTP implementation once, without issuing a request. */
