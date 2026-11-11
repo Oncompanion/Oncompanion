@@ -216,8 +216,9 @@ class PrescriptionFormViewModel(
   /**
    * Follows the prescriptions already saved, from the device's cache when offline, so a new one can
    * be compared with them: the patient's, confirmed or not, also when a caregiver adds one. A
-   * rejected prescription is left out, as it is for the patient. Comparing is only a warning: if
-   * they can't be read, the form works as before.
+   * rejected prescription is no longer a duplicate, also for the patient, so it is left out; the
+   * list doesn't hide it yet (#339 does). Comparing is only a warning: if they can't be read, the
+   * form works as before.
    */
   private fun observeSaved() {
     val uid = authRepository.signedInUid(TAG) ?: return
