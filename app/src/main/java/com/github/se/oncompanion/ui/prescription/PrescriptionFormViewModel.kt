@@ -30,6 +30,8 @@ import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -540,6 +542,8 @@ class PrescriptionFormViewModel(
       draft: PrescriptionDraft,
   ): Boolean {
     val name = caregiverName(uid)
+    // Reading the name can take a while: the form may be gone, or the account changed, meanwhile
+    currentCoroutineContext().ensureActive()
     if (authRepository.signedInUid(TAG) != uid) throw NotSignedIn()
     manageMedicationSchedule.add(patientUid, draft, addedBy = uid, addedByName = name)
     return true
