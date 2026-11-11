@@ -165,7 +165,7 @@ fun PrescriptionFormContent(
     caregiverOf: String? = null,
 ) {
   // Asks before saving a prescription already saved (US-39)
-  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway) }
+  uiState.alreadySaved?.let { AlreadySavedDialog(it, onKeepEditing, onSaveAnyway, caregiverOf) }
 
   // Shows each saving error once in a snackbar, then tells the view model it was shown
   val snackbarHostState = remember { SnackbarHostState() }
@@ -208,7 +208,7 @@ fun PrescriptionFormContent(
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         // Same medications as a saved prescription: most likely its renewal (US-39)
-        uiState.renewalOf?.let { RenewalNotice(it) }
+        uiState.renewalOf?.let { RenewalNotice(it, caregiverOf) }
         // A scanned prescription says what was read and what the patient should check
         if (uiState.isScanned) ReviewNotice(uiState)
 

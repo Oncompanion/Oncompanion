@@ -454,7 +454,7 @@
     <string name="prescription_form_remove_medication">Remove</string>
     <string name="prescription_form_add_medication">Add medication</string>
     <string name="prescription_form_save">Save prescription</string>
-    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save your prescription.</string>
+    <string name="prescription_form_error_not_signed_in">You\'re signed out. Sign in again to save this prescription.</string>
     <string name="prescription_form_error_save_failed">Couldn\'t save your prescription. Please try again.</string>
     <string name="prescription_form_edit_title">Edit prescription</string>
     <string name="prescription_form_not_found_title">This prescription no longer exists</string>
@@ -590,6 +590,8 @@
     <!-- A caregiver adds a prescription for the patient (US-43), e.g. "Add a prescription for Anne" -->
     <string name="prescription_form_add_title_for">Add a prescription for %1$s</string>
     <string name="prescription_review_title_for">Review %1$s\'s prescription</string>
+    <!-- US-39 for a caregiver: their patient's prescriptions, e.g. "Already in Anne\'s prescriptions" -->
+    <string name="prescription_already_saved_title_for">Already in %1$s\'s prescriptions</string>
 
     <!-- Hospital field -->
     <string name="hospital_field_label">Hospital or location</string>

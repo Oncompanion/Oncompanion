@@ -1221,6 +1221,30 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun caregiver_isWarnedAboutThePatientsPrescription_notTheirOwn() {
+    // A prescription without a doctor is named after the patient, in the dialog and the notice
+    val withoutDoctor = savedBefore.copy(prescribedBy = null)
+    setContent(empty.copy(renewalOf = withoutDoctor), caregiverOf = "Anne")
+    composeTestRule
+        .onNodeWithText(
+            "Same medications as Anne's prescription from 29 Sep 2026",
+            substring = true,
+        )
+        .assertIsDisplayed()
+
+    uiState = empty.copy(alreadySaved = withoutDoctor)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_already_saved_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText("Anne's prescription from 29 Sep 2026", substring = true)
+        .assertIsDisplayed()
+    for (yours in listOf("Already in your prescriptions", "Your prescription from")) {
+      composeTestRule.onNodeWithText(yours, substring = true).assertDoesNotExist()
+    }
+  }
+
+  @Test
   fun phoneRotated_whileAskingAboutAPrescriptionAlreadySaved_stillAsks() {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "patient-1") })
     runBlocking { auth.signInWithGoogle("token") }
