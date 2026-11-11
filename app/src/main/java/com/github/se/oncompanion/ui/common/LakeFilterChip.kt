@@ -30,47 +30,71 @@ import com.github.se.oncompanion.ui.theme.Spacing
  * The Figma "Filter chip": 48 dp tall, a full touch target (Material's chip is 32 dp), with Medium
  * corners. White with an Outline border, or dawn with a check before its [label] once [selected].
  *
+ * @param onClick toggles the chip; `null` shows a read-only chip (e.g. what was logged, on a
+ *   detail): the same colours without the check, since nothing can be picked there, and it can't be
+ *   tapped nor is it announced as a checkbox
  * @param role what screen readers call it: a checkbox when several chips can be picked, as on
  *   Material's chip, or [Role.RadioButton] when only one can
  */
 @Composable
 fun LakeFilterChip(
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     role: Role = Role.Checkbox,
 ) {
   val colors = MaterialTheme.colorScheme
+  val color = if (selected) colors.secondaryContainer else colors.surfaceContainerLowest
+  val contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface
+  val border = if (selected) null else BorderStroke(1.dp, colors.outline)
+  if (onClick == null) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = color,
+        contentColor = contentColor,
+        border = border,
+        modifier = modifier,
+    ) {
+      ChipContent(showCheck = false, label)
+    }
+    return
+  }
   Surface(
       selected = selected,
       onClick = onClick,
       enabled = enabled,
       shape = MaterialTheme.shapes.medium,
-      color = if (selected) colors.secondaryContainer else colors.surfaceContainerLowest,
-      contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
-      border = if (selected) null else BorderStroke(1.dp, colors.outline),
+      color = color,
+      contentColor = contentColor,
+      border = border,
       modifier =
           modifier
               .semantics { this.role = role }
               .alpha(if (enabled) 1f else LakeButtonDefaults.DISABLED_ALPHA),
   ) {
-    // The check takes some of the start padding, so the label moves less when it appears
-    Row(
-        Modifier.heightIn(min = 48.dp)
-            .padding(start = if (selected) Spacing.md else Spacing.lg, end = Spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-      if (selected) {
-        Icon(
-            painterResource(R.drawable.ic_check),
-            contentDescription = null,
-            modifier = Modifier.size(20.dp).testTag(C.Tag.filter_chip_check),
-        )
-      }
-      Text(label, style = MaterialTheme.typography.labelLarge)
+    ChipContent(showCheck = selected, label)
+  }
+}
+
+/** The check, if [showCheck], then the label. */
+@Composable
+private fun ChipContent(showCheck: Boolean, label: String) {
+  // The check takes some of the start padding, so the label moves less when it appears
+  Row(
+      Modifier.heightIn(min = 48.dp)
+          .padding(start = if (showCheck) Spacing.md else Spacing.lg, end = Spacing.lg),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    if (showCheck) {
+      Icon(
+          painterResource(R.drawable.ic_check),
+          contentDescription = null,
+          modifier = Modifier.size(20.dp).testTag(C.Tag.filter_chip_check),
+      )
     }
+    Text(label, style = MaterialTheme.typography.labelLarge)
   }
 }
