@@ -17,7 +17,7 @@ import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.ui.common.currentDay
 import java.time.Clock
 import java.time.LocalDate
@@ -125,9 +125,7 @@ class PrescriptionsViewModel(
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
             // A rejected prescription is gone for everyone (US-43)
             val prescriptions =
-                medicationRepository.observePrescriptions(ownerUid).map { list ->
-                  list.filterNot { it.confirmation == PrescriptionConfirmation.REJECTED }
-                }
+                medicationRepository.observePrescriptions(ownerUid).map { it.visible() }
             // The patient sees the names they gave the members who added some; a caregiver the
             // stored ones
             if (patientUid != null) prescriptions

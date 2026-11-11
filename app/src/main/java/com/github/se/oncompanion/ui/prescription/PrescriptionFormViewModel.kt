@@ -23,6 +23,7 @@ import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
@@ -233,7 +234,7 @@ class PrescriptionFormViewModel(
     viewModelScope.launch {
       try {
         medicationRepository.observePrescriptions(patientUid ?: uid).collect { prescriptions ->
-          saved = prescriptions.filter { it.confirmation != PrescriptionConfirmation.REJECTED }
+          saved = prescriptions.visible()
           _uiState.update { it.withRenewal() }
         }
       } catch (e: CancellationException) {
@@ -295,7 +296,7 @@ class PrescriptionFormViewModel(
     // Once saved, the form is done: what arrives next is its own save
     if (state.save == SavePhase.SAVED) return
     // A rejected prescription is gone for the patient, as a deleted one
-    if (saved == null || saved.confirmation == PrescriptionConfirmation.REJECTED) {
+    if (saved == null || saved.isRejected) {
       _uiState.value = state.copy(load = PrescriptionFormLoad.NOT_FOUND)
       return
     }

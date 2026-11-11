@@ -7,7 +7,7 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
+import com.github.se.oncompanion.model.medication.visible
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
@@ -31,7 +31,7 @@ class MedicationPlanningSource(private val medications: MedicationRepository) : 
   ): Flow<List<PlanningItem>> =
       medications.observePrescriptions(ownerUid).map { prescriptions ->
         prescriptions
-            .filter { it.confirmation != PrescriptionConfirmation.REJECTED }
+            .visible()
             .flatMap { prescription -> prescription.medications.map { it to prescription } }
             .sortedWith(compareBy({ it.first.startDate }, { it.first.name }))
             .flatMap { (medication, prescription) -> medication.occurrences(range, prescription) }

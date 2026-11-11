@@ -19,7 +19,6 @@ import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.HasDeletePhase
@@ -126,7 +125,7 @@ class PrescriptionDetailViewModel(
             // A rejected prescription is gone for everyone, as a deleted one (US-43)
             val prescription =
                 medicationRepository.observePrescription(ownerUid, prescriptionId).map {
-                  it?.takeIf { saved -> saved.confirmation != PrescriptionConfirmation.REJECTED }
+                  it?.takeUnless(Prescription::isRejected)
                 }
             // The patient sees the name they gave the member who added it; a caregiver the stored
             // one

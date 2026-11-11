@@ -1871,6 +1871,30 @@ class PrescriptionFormViewModelTest {
   }
 
   @Test
+  fun aPrescriptionThePatientRejected_isNeitherTheSameNorARenewal() = runTest {
+    // Rejected, it shows nowhere: the patient adding the same one is told nothing about it
+    val rejected =
+        saved.copy(
+            addedBy = "sam",
+            addedByName = "Sam",
+            confirmation = PrescriptionConfirmation.REJECTED,
+        )
+    for (on in listOf(saved.prescribedOn, saved.prescribedOn.plusDays(7))) {
+      fakeMedications = FakeMedicationRepository()
+      medications = GatedMedicationRepository(fakeMedications)
+      fakeMedications.seed(uid, rejected)
+      val viewModel = viewModel(draftLikeSaved(on)).also { advanceUntilIdle() }
+      assertNull(viewModel.state.renewalOf)
+
+      viewModel.save()
+      advanceUntilIdle()
+
+      assertNull(viewModel.state.alreadySaved)
+      assertEquals(SavePhase.SAVED, viewModel.state.save)
+    }
+  }
+
+  @Test
   fun correctingASavedPrescription_isNeverComparedWithIt() = runTest {
     // Even with an identical copy saved too: corrections aren't compared
     fakeMedications.seed(uid, saved.copy(id = "presc-2"))
