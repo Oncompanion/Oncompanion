@@ -434,6 +434,23 @@ class OverviewScreenTest {
   }
 
   @Test
+  fun medicationOfAnUnconfirmedPrescription_saysItIsNotConfirmed() {
+    setContent(
+        loaded.copy(
+            todayEntries =
+                listOf(
+                    entry("med", null, null, TodayItemKind.MEDICATION)
+                        .copy(notConfirmedAddedBy = "Sam")
+                )
+        )
+    )
+    assertTextInside(
+        context.getString(R.string.added_by_not_confirmed, "Sam"),
+        C.Tag.overviewTodayItem("med"),
+    )
+  }
+
+  @Test
   fun screen_refreshesTheTime_whenItComesBack() {
     var time = morning
     val clock =

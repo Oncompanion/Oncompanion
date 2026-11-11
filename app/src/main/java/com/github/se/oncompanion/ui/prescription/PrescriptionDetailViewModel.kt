@@ -12,7 +12,10 @@ import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.carecircle.CareCircleRepository
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryProvider
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.carecircle.observeMemberNames
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.medication.Prescription
@@ -23,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -81,6 +85,8 @@ class PrescriptionDetailViewModel(
     private val patientUid: String? = null,
     resolveSection: ResolveSectionAccess =
         ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
+    private val careCircleRepository: CareCircleRepository =
+        CareCircleRepositoryProvider.repository,
 ) : ViewModel() {
 
   private val observeSection = ObserveCareSection(resolveSection)
@@ -115,7 +121,15 @@ class PrescriptionDetailViewModel(
     observation?.cancel()
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
-            medicationRepository.observePrescription(ownerUid, prescriptionId)
+            val prescription = medicationRepository.observePrescription(ownerUid, prescriptionId)
+            // The patient sees the name they gave the member who added it; a caregiver the stored
+            // one
+            if (patientUid != null) prescription
+            else
+                prescription.combine(careCircleRepository.observeMemberNames(ownerUid)) { it, names
+                  ->
+                  it?.namedBy(names)
+                }
           }
           .collect { section -> _uiState.update { it.showing(section) } }
     }

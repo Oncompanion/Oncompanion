@@ -11,6 +11,8 @@ import java.time.ZoneId
  *
  * @property addedBy the uid of the caregiver who added it for the patient (US-41), or `null`
  * @property addedByName who added it, shown as "Added by Sam"
+ * @property isConfirmed false for a medication of a prescription a caregiver added that the patient
+ *   hasn't confirmed yet (US-43): it shows as not confirmed
  */
 data class PlanningItem(
     val source: PlanningSource,
@@ -20,6 +22,7 @@ data class PlanningItem(
     val frequency: String? = null,
     val addedBy: String? = null,
     val addedByName: String? = null,
+    val isConfirmed: Boolean = true,
 ) {
   init {
     require((source is PlanningSource.Medication) == (timing is PlanningTiming.DateOnly)) {

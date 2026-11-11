@@ -414,6 +414,7 @@ object C {
     const val prescriptions_earlier_header = "prescriptions_earlier_header"
     const val prescriptions_enter_manually_button = "prescriptions_enter_manually_button"
     const val prescriptions_scan_button = "prescriptions_scan_button"
+    const val prescriptions_waiting_header = "prescriptions_waiting_header"
 
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"

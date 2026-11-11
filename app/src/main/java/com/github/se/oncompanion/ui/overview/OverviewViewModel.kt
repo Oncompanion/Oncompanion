@@ -79,6 +79,8 @@ data class NextAppointment(
  * @property subtitle a short detail line (place, recorded frequency...), if any
  * @property status where a timed entry stands now; `null` for an entry without a time, since the
  *   app never decides whether a medication was taken
+ * @property notConfirmedAddedBy who added a medication whose prescription the patient hasn't
+ *   confirmed yet (US-43), shown as "Added by Sam · Not confirmed"; `null` otherwise
  */
 data class TodayEntry(
     val key: String,
@@ -87,6 +89,7 @@ data class TodayEntry(
     val title: String,
     val subtitle: String? = null,
     val status: TodayItemStatus? = null,
+    val notConfirmedAddedBy: String? = null,
 )
 
 /**
@@ -291,6 +294,7 @@ class OverviewViewModel(
           // A medication's detail is its recorded frequency, as in Planning
           subtitle = subtitle ?: frequency,
           status = status,
+          notConfirmedAddedBy = addedByName.takeIf { !isConfirmed },
       )
 
   /**

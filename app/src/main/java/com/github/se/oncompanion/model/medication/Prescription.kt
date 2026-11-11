@@ -66,3 +66,13 @@ enum class PrescriptionConfirmation {
   /** The patient rejected it. */
   REJECTED,
 }
+
+/**
+ * The medications of the prescriptions the patient confirmed, earliest start date first, then by
+ * name: what may be scheduled or reminded (US-32, US-34). A prescription a caregiver added counts
+ * only once the patient confirmed it (US-43).
+ */
+fun List<Prescription>.confirmedMedications(): List<Medication> {
+  val confirmed = filter { it.isConfirmed }
+  return confirmed.flatMap { it.medications }.sortedWith(compareBy({ it.startDate }, { it.name }))
+}

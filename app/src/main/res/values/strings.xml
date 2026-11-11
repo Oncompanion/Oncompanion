@@ -531,6 +531,9 @@
     <string name="prescriptions_list_title_for">%1$s\'s prescriptions</string>
     <string name="prescriptions_empty_hint_for">When %1$s saves a prescription, it will appear here.</string>
     <string name="prescriptions_error_title_for">Couldn\'t load %1$s\'s prescriptions</string>
+    <!-- US-43: above the other groups, the prescriptions a caregiver added that wait for the patient -->
+    <string name="prescriptions_added_by_a_caregiver">Added by a caregiver</string>
+    <string name="prescriptions_added_by_you">Added by you</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -662,4 +665,7 @@
 
     <!-- Shared text field: what screen readers say about a field in error -->
     <string name="field_error">Invalid input</string>
+
+    <!-- Shared "Added by": a prescription a caregiver added, not confirmed by the patient yet (US-43) -->
+    <string name="added_by_not_confirmed">Added by %1$s · Not confirmed</string>
 </resources>
