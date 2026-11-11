@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -52,7 +53,8 @@ data class FollowedPatient(
  *   can't work, the caregiver has to sign in again
  * @property isConfirmed true when the server confirmed whether the caregiver is in each circle. An
  *   empty list only means they follow nobody once it is confirmed: right after joining again, the
- *   device can still remember the removal, and a patient who can't be read isn't known either
+ *   device can still remember the removal, a patient who can't be read isn't known either, and an
+ *   empty list of circles from the cache may miss one joined on another phone
  */
 data class WhoseCareUiState(
     val patients: List<FollowedPatient> = emptyList(),
@@ -97,13 +99,19 @@ class WhoseCareViewModel(
     observation = viewModelScope.launch {
       inviteRepository
           .observeJoinedCircles(uid)
-          .flatMapLatest { circles -> followed(circles, uid) }
+          // An empty list from the cache only: maybe a circle this phone doesn't know about yet.
+          // Otherwise where the list came from doesn't matter: each patient answers for itself
+          .map { it.circles to (it.circles.isEmpty() && it.isFromCache) }
+          .distinctUntilChanged()
+          .flatMapLatest { (circles, emptyFromCache) ->
+            followed(circles, uid).map { answers -> answers to emptyFromCache }
+          }
           .catch { e ->
             if (e is CancellationException) throw e
             Log.e(TAG, "Failed to load the followed patients", e)
             _uiState.update { it.copy(isLoading = false, hasError = true) }
           }
-          .collect { answers ->
+          .collect { (answers, emptyFromCache) ->
             _uiState.update {
               WhoseCareUiState(
                   patients =
@@ -112,7 +120,7 @@ class WhoseCareViewModel(
                           .map { it.patient }
                           .sortedBy { it.firstName.lowercase() },
                   isLoading = false,
-                  isConfirmed = answers.none { it == Answer.Unknown },
+                  isConfirmed = !emptyFromCache && answers.none { it == Answer.Unknown },
               )
             }
           }

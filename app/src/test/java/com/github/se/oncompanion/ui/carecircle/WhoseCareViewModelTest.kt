@@ -177,6 +177,40 @@ class WhoseCareViewModelTest {
   }
 
   @Test
+  fun anEmptyListFromTheCache_isNotConfirmed_untilTheServerAnswers() = runTest {
+    // A circle joined on another phone: this phone's copy doesn't know about it yet
+    invites.joinedCirclesFromCache = true
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertFalse(vm.state.isLoading)
+    assertEquals(emptyList<FollowedPatient>(), vm.state.patients)
+    assertFalse(vm.state.isConfirmed)
+
+    // The server answers with the circle
+    follow("p-anne", "Anne", CarePermission.PLANNING)
+    invites.joinedCirclesFromCache = false
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), vm.state.patients.map { it.uid })
+    assertTrue(vm.state.isConfirmed)
+  }
+
+  @Test
+  fun aListFromTheCache_withPatients_isConfirmedByTheirAnswers() = runTest {
+    // Offline with Anne known: each patient answers for themselves, as before
+    follow("p-anne", "Anne", CarePermission.PLANNING)
+    invites.joinedCirclesFromCache = true
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), vm.state.patients.map { it.uid })
+    assertTrue(vm.state.isConfirmed)
+
+    // The server confirms the same list: Anne's access isn't read again
+    invites.joinedCirclesFromCache = false
+    advanceUntilIdle()
+    assertEquals(listOf("p-anne"), circles.observedOwners)
+  }
+
+  @Test
   fun followsChanges_inTheSharedSections_andTheCircles() = runTest {
     follow("p-anne", "Anne", CarePermission.PLANNING)
     val vm = viewModel()
