@@ -4,6 +4,8 @@
   <img src="docs/banner.png" alt="oncompanion" width="100%">
 </p>
 
+<h1 align="center">oncompanion</h1>
+
 <p align="center">
   <b>Cancer care, kept in one place with as little effort as possible, and shared with the people who help.</b>
 </p>
@@ -20,7 +22,7 @@
 People in active cancer therapy live with exhaustion, "chemo brain" and complicated medication schedules. Too often they rely on memory or scattered paper notes, on exactly the days they have the least energy for it. oncompanion keeps today's care in one place: what's coming up, how they've been feeling, what they take, and who helps them. Relatives in the patient's care circle can follow what the patient shares and, if allowed, log symptoms or add prescriptions for them. Logging takes a tap or two, so it still works on a bad day.
 
 > [!NOTE]
-> oncompanion is an organizational tool, **not a medical device**. It makes no diagnosis, gives no medical advice and never changes a treatment. Anything drafted for the patient, such as a scanned prescription, is saved only once they have checked and confirmed it.
+> oncompanion is an organizational tool, **not a medical device**. It makes no diagnosis, gives no medical advice and never changes a treatment. Anything drafted for the patient, such as a scanned prescription, is only used once they have checked and confirmed it.
 
 ## Screenshots
 
@@ -36,9 +38,9 @@ People in active cancer therapy live with exhaustion, "chemo brain" and complica
 
 ## Features
 
-- **Your day at a glance.** The Overview shows the next appointment, today's medications and the events organised by the [Ligue Genevoise Contre Le Cancer](https://geneve.liguecancer.ch/) you signed up for.
+- **Your day at a glance.** The Overview shows the next appointment, today's medications and the events organized by the [Ligue genevoise contre le cancer](https://geneve.liguecancer.ch/) you signed up for.
 - **Planning.** A week calendar of appointments, active medications and confirmed events. Appointments can be added, edited and deleted.
-- **Symptom journal.** Tap what you feel, choose how bad it is, add a voice note if you want, and look back over your history.
+- **Symptom journal.** Tap what you feel, choose how bad it is, add a note if you want, and look back over your history.
 - **Prescriptions without retyping.** Photograph a prescription and on-device text recognition (ML Kit) drafts it. You check every field before anything is saved. The app warns you when a prescription is already saved or looks like a renewal.
 - **Ligue events.** Browse the Ligue genevoise's events and note that you registered with the organizer.
 - **Care circle.** Invite relatives with a code and choose which sections each one can see: planning, symptoms, prescriptions, events. You can also let a relative add entries for you, signed with their name. A prescription a relative adds stays unconfirmed until you have checked it.
@@ -112,4 +114,4 @@ Read [AGENTS.md](AGENTS.md) first. It covers the architecture rules, code style,
 
 ## Acknowledgements
 
-Thanks to the staff of the Ligue Genevoise Contre Le Cancer for validating the problem with us and organizing testing sessions with patients and relatives.
+Thanks to the staff of the Ligue genevoise contre le cancer for validating the problem with us and organizing testing sessions with patients and relatives.
