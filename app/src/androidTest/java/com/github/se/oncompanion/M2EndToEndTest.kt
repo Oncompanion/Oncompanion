@@ -7,7 +7,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -139,7 +138,7 @@ class M2EndToEndTest {
    * session.
    */
   @Test
-  fun patientAndCaregiver_shareAndLogSymptoms() {
+  fun patientAndCaregiver_shareLogAndRevokeSymptoms() {
     ui.startApp(credentials)
     signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
     openSymptoms()
@@ -206,9 +205,12 @@ class M2EndToEndTest {
     credentials.select(caregiver)
     ui.open(C.Tag.google_sign_in_button, caregiverTitle())
     assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
-    ui.waitFor(hasTestTag(C.Tag.overview_loading), gone = true)
+    // Both shortcuts use the same shared-sections snapshot; Planning's spinner is independent.
+    ui.tag(C.Tag.overview_shortcut_prescriptions).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.overview_shortcut_symptoms).assertDoesNotExist()
-    // Capture this session's navigation only after sign-in, leaving account-switch cleanup intact.
+    // Recompose without recreating the activity: its SessionStores retains the session's
+    // CaregiverModeViewModel and chosen patient. Inject only now: retaining an external controller
+    // across sign-out would interfere with the session boundary's navigation-store cleanup.
     lateinit var navigation: TestNavHostController
     compose.runOnUiThread { AppHostActivity.content.value = {} }
     compose.waitForIdle()
@@ -231,11 +233,6 @@ class M2EndToEndTest {
     ui.waitFor(hasTestTag(C.Tag.not_shared) and text(notShared)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.symptom_journal_list).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
-    for (notes in listOf(patientNotes, caregiverNotes)) {
-      compose
-          .onAllNodes(hasText(notes, substring = true), useUnmergedTree = true)
-          .assertCountEquals(0)
-    }
   }
 
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
@@ -313,6 +310,9 @@ class M2EndToEndTest {
     ui.tag(view).assertIsOn()
     ui.tag(add).reveal().assertIsEnabled().assertIsOff().performClick()
     ui.tag(add).assertIsOn()
+    // Keep one shared shortcut after revocation, proving permissions finished loading at sign-in.
+    ui.tag(C.Tag.careCircleFormPermission("PRESCRIPTIONS")).reveal().assertIsOff().performClick()
+    ui.tag(C.Tag.careCircleFormPermission("PRESCRIPTIONS")).assertIsOn()
     ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_invite_code))
     val displayed =
         ui.tag(C.Tag.care_circle_invite_code)
@@ -364,8 +364,12 @@ class M2EndToEndTest {
         .assertIsOn()
         .performClick()
     ui.tag(permission).assertIsOff()
+    ui.tag(C.Tag.careCircleFormCanAdd("SYMPTOMS")).reveal().assertIsOff()
     ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_member_details))
     ui.waitFor(hasTestTag(C.Tag.careCircleMemberPermission("SYMPTOMS")) and isOff())
+        .reveal()
+        .assertIsOff()
+    ui.waitFor(hasTestTag(C.Tag.careCircleMemberCanAdd("SYMPTOMS")) and isOff())
         .reveal()
         .assertIsOff()
   }

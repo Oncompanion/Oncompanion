@@ -38,7 +38,8 @@ internal class EndToEndTestDriver(private val compose: AndroidComposeTestRule<*,
   }
 
   /**
-   * Shows the real app with emulator credentials; an optional controller exercises guarded routes.
+   * Shows the real app with emulator credentials, including after rotation. An optional controller
+   * exercises guarded routes.
    */
   fun startApp(credentials: GoogleCredentialProvider, navController: NavHostController? = null) {
     compose.runOnUiThread {
