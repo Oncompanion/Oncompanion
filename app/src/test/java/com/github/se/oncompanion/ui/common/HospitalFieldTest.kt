@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -108,7 +110,8 @@ class HospitalFieldTest {
   /** Missing deployment configuration reports an error without blocking offline manual entry. */
   @Test
   fun unconfiguredProviderKeepsManualEntryUsableAfterSearchFailure() {
-    field(originalRepository, "Geneva")
+    HospitalRepositoryProvider.disable()
+    field(HospitalRepositoryProvider.repository, "Geneva")
     search()
     node(C.Tag.hospital_error).assertIsDisplayed()
     node(C.Tag.hospital_field).assertTextContains("Geneva").performTextReplacement("Home")
@@ -407,6 +410,10 @@ class HospitalFieldTest {
     node(C.Tag.hospital_empty).assertIsDisplayed()
     compose.runOnIdle { state = HospitalFieldUiState.Error }
     node(C.Tag.hospital_error).assertIsDisplayed()
+    node(C.Tag.hospital_error)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+    compose.runOnIdle { state = HospitalFieldUiState.RateLimited }
+    node(C.Tag.hospital_error).assertTextContains("Too many searches", substring = true)
     node(C.Tag.hospital_field).assertTextContains("Draft").assertIsEnabled()
     compose.runOnIdle { state = HospitalFieldUiState.Idle }
     node(C.Tag.hospital_error).assertDoesNotExist()

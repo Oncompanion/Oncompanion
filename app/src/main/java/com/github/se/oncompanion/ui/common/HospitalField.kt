@@ -24,7 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -131,15 +134,26 @@ private fun HospitalSearchFeedback(
     HospitalFieldUiState.Idle -> Unit
     HospitalFieldUiState.Loading ->
         CircularProgressIndicator(Modifier.testTag(C.Tag.hospital_loading))
-    HospitalFieldUiState.Error ->
+    HospitalFieldUiState.Error,
+    HospitalFieldUiState.RateLimited ->
         Text(
-            stringResource(R.string.hospital_search_error),
+            stringResource(
+                if (uiState == HospitalFieldUiState.RateLimited)
+                    R.string.hospital_search_rate_limited
+                else R.string.hospital_search_error
+            ),
             color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag(C.Tag.hospital_error),
+            modifier =
+                Modifier.testTag(C.Tag.hospital_error).semantics {
+                  liveRegion = LiveRegionMode.Polite
+                },
         )
     is HospitalFieldUiState.Results -> {
       if (uiState.hospitals.isEmpty()) {
-        Text(stringResource(R.string.hospital_search_empty), Modifier.testTag(C.Tag.hospital_empty))
+        Text(
+            stringResource(R.string.hospital_search_empty),
+            Modifier.testTag(C.Tag.hospital_empty).semantics { liveRegion = LiveRegionMode.Polite },
+        )
       } else {
         // The results as rows of one card, as lists are (Figma: "Edit profile – Hospital results")
         Surface(

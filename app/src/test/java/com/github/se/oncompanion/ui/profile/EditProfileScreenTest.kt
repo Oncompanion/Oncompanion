@@ -345,7 +345,12 @@ class EditProfileScreenTest {
     profiles.seed(profiles.profiles["uid-1"]!!.copy(hospital = "Saved"))
     var completed = 0
     compose.setContent {
-      EditProfileScreen(onBack = {}, onSaved = { completed++ }, viewModel = model)
+      EditProfileScreen(
+          onBack = {},
+          onSaved = { completed++ },
+          viewModel = model,
+          hospitalSearchEnabled = false,
+      )
     }
     node(C.Tag.hospital_field)
         .performScrollTo()
