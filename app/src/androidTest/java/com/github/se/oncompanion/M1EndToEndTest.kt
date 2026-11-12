@@ -304,7 +304,9 @@ class M1EndToEndTest {
     )
 
     ui.open(C.Tag.profile_edit, hasTestTag(C.Tag.hospital_field)).reveal().typeText(hospital)
-    // Not ui.open(): typing starts a hospital search, whose spinner Save doesn't wait for
+    // Typing remains manual: only an explicit Search may start a lookup, and Save stays usable.
+    compose.onNodeWithTag(C.Tag.hospital_loading).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.hospital_results).assertDoesNotExist()
     ui.tag(C.Tag.edit_profile_save).reveal().performClick()
 
     ui.waitFor(

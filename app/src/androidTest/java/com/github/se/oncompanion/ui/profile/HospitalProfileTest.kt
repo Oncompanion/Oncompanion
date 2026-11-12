@@ -9,6 +9,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepositoryFirestore
@@ -26,6 +27,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,11 +37,19 @@ import org.junit.runner.RunWith
 class HospitalProfileTest {
   @get:Rule val compose = createComposeRule()
   private val originalRepository = UserProfileRepositoryProvider.repository
+  private val originalHospitals = HospitalRepositoryProvider.repository
+
+  /** These emulator persistence tests deliberately exercise the unconfigured/manual fallback. */
+  @Before
+  fun disableHospitalSearch() {
+    HospitalRepositoryProvider.disable()
+  }
 
   /** Restores networking and authentication after the offline profile interaction. */
   @After
   fun restoreEmulator(): Unit = runBlocking {
     UserProfileRepositoryProvider.repository = originalRepository
+    HospitalRepositoryProvider.repository = originalHospitals
     FirebaseEmulator.firestore.enableNetwork().await()
     EmulatorTestData.signOut()
   }
