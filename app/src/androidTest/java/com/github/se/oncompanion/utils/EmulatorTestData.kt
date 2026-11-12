@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.utils
 
@@ -8,12 +9,15 @@ import com.google.firebase.firestore.Source
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Test data helpers for the Firebase emulators. Emulator data is never wiped (other test runs may
@@ -98,7 +102,86 @@ object EmulatorTestData {
    * [documentPath] is relative to the database root, like `users/{uid}/circle/{memberUid}`.
    */
   suspend fun deleteRawDocument(documentPath: String) {
-    request("DELETE", "$FIRESTORE_REST/$documentPath")
+    request("DELETE", "$FIRESTORE_REST/$documentPath", allowMissing = true)
+  }
+
+  /**
+   * Removes one fresh test account's documents, remaining invitations and Auth identity. Child
+   * collections are discovered: deleting a profile alone leaves its subcollections behind. Never
+   * clears the emulator, which may be shared with other tests.
+   */
+  suspend fun deleteUserData(uid: String) {
+    require(uid.isNotBlank() && '/' !in uid)
+    val failures = mutableListOf<Exception>()
+    suspend fun attempt(block: suspend () -> Unit) {
+      try {
+        block()
+      } catch (error: Exception) {
+        failures += error
+      }
+    }
+    // Query by owner, including invitations whose code the UI never got a chance to display.
+    attempt {
+      val query =
+          JSONObject(
+              """{"structuredQuery":{"from":[{"collectionId":"invites"}],"where":{"fieldFilter":{"field":{"fieldPath":"ownerUid"},"op":"EQUAL","value":{"stringValue":"$uid"}}}}}"""
+          )
+      val results = JSONArray(request("POST", "$FIRESTORE_REST:runQuery", query.toString()))
+      for (index in 0 until results.length()) {
+        results.getJSONObject(index).optJSONObject("document")?.let { document ->
+          attempt { deleteRawDocument(document.getString("name").substringAfter("/documents/")) }
+        }
+      }
+    }
+    // Discover this account's collections so future features cannot silently leave test data
+    // behind.
+    val collections =
+        try {
+          val ids =
+              JSONObject(request("POST", "$FIRESTORE_REST/users/$uid:listCollectionIds", "{}"))
+                  .optJSONArray("collectionIds") ?: JSONArray()
+          (0 until ids.length()).map(ids::getString)
+        } catch (error: Exception) {
+          failures += error
+          emptyList()
+        }
+    for (collection in collections) {
+      attempt {
+        var page = ""
+        do {
+          val response =
+              JSONObject(
+                  request(
+                      "GET",
+                      "$FIRESTORE_REST/users/$uid/$collection?pageSize=100&pageToken=${URLEncoder.encode(page, "UTF-8")}",
+                  )
+              )
+          val documents = response.optJSONArray("documents") ?: JSONArray()
+          for (index in 0 until documents.length()) {
+            attempt {
+              deleteRawDocument(
+                  documents.getJSONObject(index).getString("name").substringAfter("/documents/")
+              )
+            }
+          }
+          page = response.optString("nextPageToken")
+        } while (page.isNotEmpty())
+      }
+    }
+    attempt { deleteRawDocument("users/$uid") }
+    attempt {
+      request(
+          "POST",
+          "http://${FirebaseEmulator.HOST}:${FirebaseEmulator.AUTH_PORT}/identitytoolkit.googleapis.com/v1/accounts:delete",
+          JSONObject().put("localId", uid).toString(),
+          allowMissing = true,
+      )
+    }
+    if (failures.isNotEmpty()) {
+      throw AssertionError("Couldn't clean up the test account", failures.first()).apply {
+        failures.drop(1).forEach(::addSuppressed)
+      }
+    }
   }
 
   /**
@@ -110,11 +193,16 @@ object EmulatorTestData {
   }
 
   /** Retries a few times: the emulator's host loopback can refuse the very first connections. */
-  private suspend fun request(method: String, url: String, body: String? = null) {
+  private suspend fun request(
+      method: String,
+      url: String,
+      body: String? = null,
+      allowMissing: Boolean = false,
+  ): String {
     var attempt = 0
     while (true) {
       try {
-        return requestOnce(method, url, body)
+        return requestOnce(method, url, body, allowMissing)
       } catch (e: IOException) {
         if (++attempt >= 5) throw e
         delay(1_000)
@@ -122,11 +210,18 @@ object EmulatorTestData {
     }
   }
 
-  private suspend fun requestOnce(method: String, url: String, body: String?) =
+  private suspend fun requestOnce(
+      method: String,
+      url: String,
+      body: String?,
+      allowMissing: Boolean,
+  ): String =
       withContext(Dispatchers.IO) {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
           connection.requestMethod = method
+          connection.connectTimeout = 10_000
+          connection.readTimeout = 10_000
           connection.setRequestProperty("Authorization", "Bearer owner")
           if (body != null) {
             connection.doOutput = true
@@ -134,10 +229,16 @@ object EmulatorTestData {
             connection.outputStream.use { it.write(body.toByteArray()) }
           }
           val code = connection.responseCode
+          if (allowMissing && code == 404) return@withContext ""
+          val error =
+              if (code !in 200..299) connection.errorStream?.bufferedReader()?.use { it.readText() }
+              else null
+          if (allowMissing && code == 400 && error?.contains("USER_NOT_FOUND") == true)
+              return@withContext ""
           check(code in 200..299) {
-            "$method $url failed with HTTP $code: " +
-                (connection.errorStream?.bufferedReader()?.readText() ?: "")
+            "$method emulator request failed with HTTP $code: ${error.orEmpty()}"
           }
+          connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
           connection.disconnect()
         }
