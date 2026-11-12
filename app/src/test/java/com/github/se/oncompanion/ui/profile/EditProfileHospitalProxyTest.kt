@@ -7,11 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.hospital.*
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
+import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
@@ -36,15 +38,18 @@ import org.robolectric.annotation.Config
 class EditProfileHospitalProxyTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val previous = HospitalRepositoryProvider.repository
+  private val previousAuth = AuthRepositoryProvider.repository
+  private val previousProfiles = UserProfileRepositoryProvider.repository
   private val fixture = HospitalProxyTestFixture()
   private val profiles = FakeUserProfileRepository()
   private val visible = mutableStateOf(true)
   private val timeSource = TestTimeSource()
-  private lateinit var hospitalModel: HospitalFieldViewModel
 
   @After
   fun restoreProvider() {
     HospitalRepositoryProvider.repository = previous
+    AuthRepositoryProvider.repository = previousAuth
+    UserProfileRepositoryProvider.repository = previousProfiles
   }
 
   private fun show(configured: Boolean = true): EditProfileViewModel {
@@ -56,7 +61,7 @@ class EditProfileHospitalProxyTest {
             HospitalRepositoryProxy(fixture.client(Dispatchers.Main), timeSource)
     else HospitalRepositoryProvider.disable()
     val model = EditProfileViewModel(auth, profiles)
-    hospitalModel = HospitalFieldViewModel()
+    val hospitalModel = HospitalFieldViewModel()
     compose.setContent { if (visible.value) EditProfileScreen({}, {}, model, hospitalModel) }
     compose.waitUntil(5000) { model.uiState.value.status == EditProfileStatus.READY }
     return model
@@ -156,17 +161,26 @@ class EditProfileHospitalProxyTest {
   fun resultsAndSaveRemainReachableWithKeyboardInLandscape() =
       resultsAndSaveRemainReachableWithKeyboard()
 
-  /** Recreation preserves the selected text without submitting another search. */
+  /** Normal screen-owned ViewModels retain selection across recreation without another search. */
   @Test
   fun selectedHospitalSurvivesRotationWithoutAnotherRequest() {
     fixture.body = "[${HospitalProxyTestFixture.HOSPITAL}]"
-    val model = show()
+    val auth = FakeAuthRepository { AuthUser("proxy-patient") }
+    runBlocking { auth.signInWithGoogle("fake-token") }
+    profiles.seed(UserProfile("proxy-patient", Role.PATIENT, "Alex"))
+    AuthRepositoryProvider.repository = auth
+    UserProfileRepositoryProvider.repository = profiles
+    HospitalRepositoryProvider.repository =
+        HospitalRepositoryProxy(fixture.client(Dispatchers.Main), timeSource)
+    // Leave ViewModel creation and retrieval to the screen's normal lifecycle owner.
+    compose.setContent { EditProfileScreen(onBack = {}, onSaved = {}) }
+    compose.waitUntil(5000) { runCatching { field().assertIsEnabled() }.isSuccess }
     field().performScrollTo().performTextReplacement("Genève")
     search()
     compose.onNodeWithTag(C.Tag.hospital_result).performScrollTo().performClick()
     compose.activityRule.scenario.recreate()
     compose.runOnUiThread {
-      compose.activity.setContent { EditProfileScreen({}, {}, model, hospitalModel) }
+      compose.activity.setContent { EditProfileScreen(onBack = {}, onSaved = {}) }
     }
     field().performScrollTo().assertTextContains("Hôpital")
     compose.runOnIdle { assertEquals(1, fixture.requests.size) }
