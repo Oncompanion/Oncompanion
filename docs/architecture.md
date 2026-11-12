@@ -105,8 +105,9 @@ enforces ten initial shared-cache misses per rolling hour and fifty per rolling 
 server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
 deployable TTL policy; logical expiry remains enforced.
 The Account, Appointments and overview diagrams identify the deployed backend. The
-repository-to-proxy path is enabled for debug Profile searches through a variant resource. Release
-keeps the empty endpoint pending authenticated live verification and Play Integrity verification.
+repository-to-proxy path is enabled for debug and release Profile searches through variant resources.
+Debug authenticated search and server caching were verified; physical-device release attestation
+verification remains a rollout prerequisite before merging release activation.
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -138,10 +139,10 @@ The prior local HTTP repository remains legacy code for its tests, not an integr
 
 `MainActivity` passes the variant-specific `hospital_proxy_endpoint` resource to
 `HospitalRepositoryProvider.configureAtStartup` before creating fields. An installed adapter is
-reused across activity recreation, keeping its cache and retry gate. The debug resource selects the
-verified deployed HTTPS endpoint; release remains manual-only. Debug requires a dedicated signed-in
-test account and separately authorized App Check enrollment before live verification. `FirebaseHospitalProxyTokens` obtains Auth/App Check
-tokens lazily.
+reused across activity recreation, keeping its cache and retry gate. Debug and release resources select
+the deployed HTTPS endpoint; release uses Play Integrity and debug uses private debug enrollment.
+Debug requires a dedicated signed-in test account and separately authorized App Check enrollment
+before live verification. `FirebaseHospitalProxyTokens` obtains Auth/App Check tokens lazily.
 Profile Search is enabled only for an installed proxy adapter. The existing
 HospitalFieldViewModel owns explicit Search actions and stale-result cancellation, while edits,
 selection, saving and leaving Profile clear obsolete feedback. Rate-limited searches show a distinct

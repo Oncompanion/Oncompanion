@@ -65,19 +65,20 @@ Before approved staging/release use:
 - The implemented repository/UI integration uses the HTTP contract. Any callable migration remains
   a separate reviewed change; this does not resolve the prior callable recommendation or the
   [GET URL privacy constraints](../functions/OPERATIONS.md). The backend is deployed with a scoped
-  request-log exclusion; authenticated live verification remains deferred. Debug Profile search is
-  configured, while release activation remains gated.
+  request-log exclusion. Debug authenticated search and the server-cache repeat have now passed;
+  signed-release attestation on a physical phone remains outstanding.
 
 ## Opt-in repository and Profile integration
 
 After authorized deployment, App Check registration and rollout review, application setup may call
 `HospitalRepositoryProvider.configure(trustedProxyUrl)` **before** creating hospital field ViewModels.
 `MainActivity` calls `configureAtStartup` before creating field consumers, using the non-translatable
-`hospital_proxy_endpoint` string resource. The main resource stays empty, keeping release manual-only.
-`app/src/debug/res/values/hospital_proxy.xml` overrides it with the verified deployed HTTPS endpoint
-for debug builds only. No build script, signing configuration or credential is required for this URL.
-Debug token enrollment and real searches still require separate authorization; configuration does
-not establish successful live verification. Release activation belongs to a later verified rollout.
+`hospital_proxy_endpoint` string resource. The main fallback stays empty; debug and release overlays
+in `app/src/{debug,release}/res/values/hospital_proxy.xml` supply the deployed HTTPS endpoint.
+The release overlay enables the existing Profile Search action in signed weekly APKs without changing
+the build or signing workflow. Debug token enrollment and real searches require separate authorization.
+Configuration alone does not establish working release attestation; verify a signed candidate on a
+qualifying physical Android phone before merging this activation.
 Startup configuration preserves any installed repository, including test overrides, across activity
 recreation. Blank or invalid configuration leaves the repository untouched and manual entry usable;
 validation failures log only their type. Explicit `configure()` throws on invalid endpoints without
@@ -110,21 +111,42 @@ ViewModel generation check prevents late responses replacing newer results. Onbo
 Appointment remain unchanged. New unit tests use the real adapter/client with fake tokens/HTTP and fake user
 repositories; they do not require or mutate shared Firebase emulator state.
 
-## Deployment verification and debug-emulator handoff
+## Deployment verification and release handoff
 
-The authenticated live attempt displayed "Search is unavailable. Try again later or enter the
-hospital manually." Successful suggestions and server-side caching remain unverified. The cause
-has not been established; investigation and remaining live verification are deferred to a follow-up
-after M2. This Android PR does not claim working end-to-end integration. Release search stays disabled
-until the required live verification and release App Check verification are complete.
+On 12 November 2026, the authorized debug-emulator test returned a hospital suggestion for
+“Hôpitaux universitaires de Genève”. After restarting the app to clear its in-memory cache, one
+identical repeat returned the same suggestion. The server cache and upstream coordinator timestamps
+remained unchanged, consistent with a server-cache hit without another upstream request. Firebase
+Auth and debug App Check were verified. “Hôpital Genève” returned a successful empty result.
 
-The backend endpoint is verified as
-`https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch`; only the debug resource
-is populated. Release remains empty until the authenticated live plan and release attestation are
-verified. No release-signing change is needed for the
-owner-requested debug-emulator path. A temporary debug enrollment in the existing project requires
-explicit approval and private handling/revocation; it does not prove release Play Integrity works.
-See [LIVE_VERIFICATION.md](../functions/LIVE_VERIFICATION.md) for the five completed rejection checks,
-current custom-auth/bootstrap limitations, Android Studio steps and the one-upstream-request plan.
-IAM concerns are a [separate security follow-up](hospital-proxy-iam-follow-up.md), not changes to make
-in this deployment PR.
+The earlier error, “Search is unavailable. Try again later or enter the hospital manually.”,
+corresponded to an upstream timeout on the previous deployed revision. Its cause has not been
+established; later successful requests do not prove that failure is fixed. Backend diagnostics and
+the unexpected Google-managed IAM bindings remain separate follow-ups.
+
+With explicit owner approval, `playintegrity.googleapis.com` was enabled in `oncompanion-c4144`
+on 12 November 2026. The existing Android app's App Check configuration now allows unrecognized
+app versions (`allowUnrecognizedVersion=true`), does not require Play licensing, and explicitly
+requires `MEETS_DEVICE_INTEGRITY`. This supports signed APKs distributed outside Google Play.
+It removes Play app-version recognition as a requirement while retaining device attestation;
+it does not prove installation through Play. This configuration is Android-app-wide, not
+hospital-function-specific. Token lifetime remains 3600 seconds; existing debug registrations and
+Firebase service enforcement settings were verified unchanged. No Auth provider, IAM, security
+rule, APK signing or release-workflow change was made. Backend Auth/App Check remain mandatory.
+See [Firebase's distribution guidance](https://firebase.google.com/docs/app-check/android/play-integrity-provider).
+
+Before merging release activation, a teammate must install a signed candidate built from this branch
+on a qualifying physical Android phone with Google Play services, sign in with the dedicated test
+account, and verify Profile → Edit profile → Search returns suggestions without debug enrollment.
+Use an agreed bounded public-hospital query; do not submit patient data. Check failure/manual-entry
+behavior as well. Do not embed a debug token, disable verification, or alter release signing to pass
+this test. The current published APK predates this endpoint overlay and cannot verify this activation.
+A release-candidate signing/distribution arrangement still needs coordination through the team's
+existing trusted signing process. Merely building an unsigned release APK is not attestation proof.
+
+**Outstanding:** signed-release App Check token issuance and authenticated search on a physical phone,
+live quota-exhaustion behavior and alert delivery. No additional live searches or deployment are
+needed for the automated configuration tests. Historical deployment details and Android Studio debug
+enrollment steps remain in [LIVE_VERIFICATION.md](../functions/LIVE_VERIFICATION.md); the successful
+debug results above supersede its deferred debug-search status. IAM concerns are a
+[separate security follow-up](hospital-proxy-iam-follow-up.md).
