@@ -13,7 +13,7 @@ plugins {
 }
 
 // MAJOR.MINOR, bumped by hand once each milestone is released
-val baseVersion = "0.1" // 0.1 for M1, 0.2 for M2, 0.3 for M3, 1.0 for the final version
+val baseVersion = "0.2" // 0.1 for M1, 0.2 for M2, 0.3 for M3, 1.0 for the final version
 // Release number, set by release.yml only: it goes up with each run, so each APK installs over
 // the previous one. Null in CI and on a personal computer.
 val releaseNumber = System.getenv("RELEASE_NUMBER")?.toInt()
