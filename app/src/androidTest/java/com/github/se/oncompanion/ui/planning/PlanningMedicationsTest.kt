@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
 
@@ -94,6 +95,7 @@ class PlanningMedicationsTest {
       }
     }
     compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
+    awaitMedication(today, a.name)
     compose.onNodeWithText(a.name).assertIsDisplayed()
     compose.onNodeWithText("Frequency: Mondays and Thursdays").assertIsDisplayed()
     compose.onNodeWithText("Frequency not specified").assertIsDisplayed()
@@ -101,6 +103,7 @@ class PlanningMedicationsTest {
     compose.onNodeWithTag(C.Tag.planning_scheduled).assertIsDisplayed()
     screenshot("planning-medications-mixed.png")
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
+    awaitMedication(today.plusWeeks(1), a.name)
     compose.onNodeWithText(a.name).assertIsDisplayed()
     screenshot("planning-medications-next-week.png")
     // Open the second medication offline, then its prescription, without replacing this week.
@@ -117,22 +120,28 @@ class PlanningMedicationsTest {
           .fetchSemanticsNodes()
           .isNotEmpty()
     }
+    awaitDisplayed(hasText(b.name))
     compose.onNodeWithText(b.name).assertIsDisplayed()
     compose.onNodeWithText(a.name).assertDoesNotExist()
     screenshot("medication-detail-offline.png")
     compose.onNodeWithTag(C.Tag.medication_detail_prescription).performTouchInput { doubleClick() }
     compose.waitUntil(10_000) {
-      compose.onAllNodesWithTag(C.Tag.prescription_detail_screen).fetchSemanticsNodes().isNotEmpty()
+      compose
+          .onAllNodesWithTag(C.Tag.prescription_detail_content)
+          .fetchSemanticsNodes()
+          .isNotEmpty() && compose.onAllNodesWithText(b.name).fetchSemanticsNodes().size == 1
     }
     compose.onNodeWithText(b.name).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.prescription_detail_back_button).performClick()
     compose.waitUntil(10_000) {
-      compose.onAllNodesWithTag(C.Tag.medication_detail_screen).fetchSemanticsNodes().isNotEmpty()
+      compose.onAllNodesWithTag(C.Tag.medication_detail_content).fetchSemanticsNodes().isNotEmpty()
     }
+    awaitDisplayed(hasText(b.name))
     compose.onNodeWithTag(C.Tag.medication_detail_back).performClick()
     compose.waitUntil(10_000) {
       compose.onAllNodesWithTag(C.Tag.planning_screen).fetchSemanticsNodes().isNotEmpty()
     }
+    awaitMedication(today.plusWeeks(1), a.name)
     assertEquals(
         selectedDay,
         compose
@@ -146,9 +155,7 @@ class PlanningMedicationsTest {
             medications = listOf(a.copy(name = "Edited medication", frequency = null))
         )
     runBlocking { withTimeout(10_000) { repository.updatePrescription(uid, edited) } }
-    compose.waitUntil(10_000) {
-      compose.onAllNodesWithText("Edited medication").fetchSemanticsNodes().size == 1
-    }
+    awaitMedication(today, "Edited medication")
     compose.onNodeWithText(a.name).assertDoesNotExist()
     compose.onNodeWithText(b.name).assertDoesNotExist()
     compose.onNodeWithText("Frequency not specified").assertIsDisplayed()
@@ -156,6 +163,7 @@ class PlanningMedicationsTest {
     // Reopen the observed range offline; entries are derived, never appended to a second store.
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
     compose.onNodeWithTag(C.Tag.planning_previous).performClick()
+    awaitMedication(today, "Edited medication")
     compose.onAllNodesWithText("Edited medication").assertCountEquals(1)
     runBlocking {
       withTimeout(15_000) {
@@ -171,6 +179,7 @@ class PlanningMedicationsTest {
         assertEquals(1, (stored.get("medications") as List<*>).size)
       }
     }
+    awaitMedication(today, "Edited medication")
     compose.onAllNodesWithText("Edited medication").assertCountEquals(1)
     runBlocking {
       withTimeout(10_000) {
@@ -178,15 +187,15 @@ class PlanningMedicationsTest {
         repository.deletePrescription(uid, "p")
       }
     }
-    compose.waitUntil(10_000) {
-      compose.onAllNodesWithText("Edited medication").fetchSemanticsNodes().isEmpty()
+    compose.waitUntil("the deleted medication and its section to leave loaded Planning", 10_000) {
+      planningIsReady(today) &&
+          compose.onAllNodesWithText("Edited medication").fetchSemanticsNodes().isEmpty() &&
+          compose.onAllNodesWithTag(C.Tag.planning_no_set_time).fetchSemanticsNodes().isEmpty()
     }
     compose.onNodeWithTag(C.Tag.planning_no_set_time).assertDoesNotExist()
     // Adding again while disconnected must restore exactly one row.
     runBlocking { withTimeout(10_000) { repository.addPrescription(uid, edited) } }
-    compose.waitUntil(10_000) {
-      compose.onAllNodesWithText("Edited medication").fetchSemanticsNodes().size == 1
-    }
+    awaitMedication(today, "Edited medication")
     runBlocking {
       withTimeout(15_000) {
         db.enableNetwork().await()
@@ -195,7 +204,36 @@ class PlanningMedicationsTest {
     }
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
     compose.onNodeWithTag(C.Tag.planning_previous).performClick()
+    awaitMedication(today, "Edited medication")
     compose.onAllNodesWithText("Edited medication").assertCountEquals(1)
+  }
+
+  // Date changes restart observation; neither a calendar heading nor an empty list proves
+  // readiness.
+  private fun planningIsReady(date: LocalDate): Boolean =
+      compose
+          .onAllNodes(
+              hasTestTag(C.Tag.planning_heading) and
+                  hasText(PlanningDates.format(date), substring = true)
+          )
+          .fetchSemanticsNodes()
+          .size == 1 &&
+          compose.onAllNodesWithTag(C.Tag.planning_loading).fetchSemanticsNodes().isEmpty() &&
+          compose.onAllNodesWithTag(C.Tag.planning_error).fetchSemanticsNodes().isEmpty()
+
+  private fun awaitMedication(date: LocalDate, name: String) {
+    compose.waitUntil("one visible medication on the expected loaded Planning day", 10_000) {
+      planningIsReady(date) &&
+          compose.onAllNodesWithText(name).fetchSemanticsNodes().size == 1 &&
+          compose.onNodeWithText(name).isDisplayed()
+    }
+  }
+
+  private fun awaitDisplayed(matcher: SemanticsMatcher) {
+    compose.waitUntil("one visible expected detail node", 10_000) {
+      compose.onAllNodes(matcher).fetchSemanticsNodes().size == 1 &&
+          compose.onNode(matcher).isDisplayed()
+    }
   }
 
   private fun screenshot(name: String) {
