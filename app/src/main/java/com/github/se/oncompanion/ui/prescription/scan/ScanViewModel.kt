@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.medication.scan.DraftPrescriptionFromScan
 import com.github.se.oncompanion.domain.medication.scan.ScanOutcome
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
+import com.github.se.oncompanion.model.medication.scan.ScanTipSettings
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,8 @@ enum class CameraStatus {
 /**
  * What the scan screen shows.
  *
+ * @property showUprightTip the tip to hold the phone upright shows, before the camera is asked for
+ *   and opened
  * @property permission whether the camera can be used
  * @property permissionRequested Android's permission dialog was already shown on this screen, so it
  *   isn't shown again (e.g. after the phone is rotated)
@@ -62,6 +65,7 @@ enum class NothingRead {
 }
 
 data class ScanUiState(
+    val showUprightTip: Boolean = false,
     val permission: CameraPermission = CameraPermission.UNKNOWN,
     val permissionRequested: Boolean = false,
     val camera: CameraStatus = CameraStatus.STARTING,
@@ -93,14 +97,16 @@ data class ScanUiState(
  * Photos left by an earlier scan (e.g. the app was killed) are deleted when the screen opens. Once
  * a prescription is read on it, the photo goes with it to the form (see [ScanUiState.read]).
  *
+ * @param tipSettings whether to show the tip to hold the phone upright before the camera opens
  * @param draftFromScan reads the prescription on the photo
  */
 class ScanViewModel(
     private val photoStore: ScanPhotoStore,
+    private val tipSettings: ScanTipSettings,
     private val draftFromScan: DraftPrescriptionFromScan = DraftPrescriptionFromScan(),
 ) : ViewModel() {
 
-  private val _uiState = MutableStateFlow(ScanUiState())
+  private val _uiState = MutableStateFlow(ScanUiState(showUprightTip = tipSettings.showUprightTip))
   val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
 
   /** The user closed the screen: a photo that finishes after that must not be kept. */
@@ -108,6 +114,15 @@ class ScanViewModel(
 
   init {
     photoStore.clear()
+  }
+
+  /**
+   * The user closed the tip to hold the phone upright; with [dontShowAgain] it never shows again on
+   * this phone. The camera can now be asked for and opened.
+   */
+  fun onUprightTipDismissed(dontShowAgain: Boolean) {
+    if (dontShowAgain) tipSettings.hideUprightTip()
+    _uiState.update { it.copy(showUprightTip = false) }
   }
 
   /** Android's permission dialog is about to be shown. */

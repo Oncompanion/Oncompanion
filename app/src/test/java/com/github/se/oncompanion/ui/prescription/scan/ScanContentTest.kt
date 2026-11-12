@@ -14,11 +14,13 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onChildren
@@ -28,10 +30,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
 import com.github.se.oncompanion.ui.theme.PrimaryDark
@@ -720,6 +725,63 @@ class ScanContentTest {
   @Config(qualifiers = LANDSCAPE_PHONE)
   fun atTwiceTheFontSize_eachStateStaysWhole_inLandscape() =
       eachState_staysWholeAtTwiceTheFontSize()
+
+  /** The tip's checkbox and button stay whole on screen, and Back closes it. */
+  private fun tip_staysWhole(fontScale: Float = 1f) {
+    var dismissed: Boolean? = null
+    compose.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+        ScanContent(
+            uiState = granted().copy(showUprightTip = true),
+            onBack = {},
+            onEnterManually = {},
+            onOpenSettings = {},
+            onUprightTipDismissed = { dismissed = it },
+        )
+      }
+    }
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_dont_show_again).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).assertIsFullyVisible()
+    Espresso.pressBack()
+    compose.waitForIdle()
+    assertEquals(false, dismissed)
+  }
+
+  @Test
+  fun tip_keepsItsTickedBox_whenThePhoneIsRotated() {
+    val restoration = StateRestorationTester(compose)
+    var dismissed: Boolean? = null
+    restoration.setContent {
+      ScanContent(
+          uiState = granted().copy(showUprightTip = true),
+          onBack = {},
+          onEnterManually = {},
+          onOpenSettings = {},
+          onUprightTipDismissed = { dismissed = it },
+      )
+    }
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_dont_show_again).performClick()
+
+    restoration.emulateSavedInstanceStateRestore()
+
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_dont_show_again).assertIsOn()
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
+    assertEquals(true, dismissed)
+  }
+
+  @Test fun tip_staysWhole_atTwiceTheFontSize() = tip_staysWhole(fontScale = 2f)
+
+  @Test @Config(qualifiers = LANDSCAPE_PHONE) fun tip_staysWhole_inLandscape() = tip_staysWhole()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun tip_staysWhole_onASmallPhoneInLandscape() = tip_staysWhole()
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun tip_staysWhole_onASmallPhoneInLandscape_atTwiceTheFontSize() = tip_staysWhole(fontScale = 2f)
 
   private fun luminance(color: androidx.compose.ui.graphics.Color) =
       0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue

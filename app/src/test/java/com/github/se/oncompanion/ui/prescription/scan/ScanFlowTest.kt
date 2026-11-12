@@ -94,6 +94,9 @@ class ScanFlowTest {
     compose.setContent { AppNavHost(startRoute = Route.OVERVIEW) }
     compose.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.prescriptions_scan_button).performClick()
+    // The tip to hold the phone upright shows first, as on a first scan
+    waitFor(hasTestTag(C.Tag.prescription_scan_tip_got_it))
+    compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
     waitFor(hasTestTag(C.Tag.prescription_scan_capture_button) and isEnabled())
     compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
     waitFor(hasTestTag(C.Tag.prescription_scan_use_photo_button))

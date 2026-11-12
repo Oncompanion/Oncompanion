@@ -45,6 +45,7 @@ class ScanViewModelTest {
 
   private val dispatcher = StandardTestDispatcher()
   private lateinit var cacheDir: File
+  private val tips = FakeScanTipSettings()
   private lateinit var viewModel: ScanViewModel
 
   // Reads sheet 01 of the test prescriptions, unless a test says otherwise
@@ -64,12 +65,30 @@ class ScanViewModelTest {
     Dispatchers.setMain(dispatcher)
     cacheDir = temporaryFolder.newFolder("cache")
     viewModel =
-        ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer, clock))
+        ScanViewModel(ScanPhotoStore(cacheDir), tips, DraftPrescriptionFromScan(recognizer, clock))
   }
 
   @After
   fun tearDown() {
     Dispatchers.resetMain()
+  }
+
+  // ---- the tip to hold the phone upright (#356) ----
+
+  @Test
+  fun uprightTip_showsUntilClosed_andStopsShowingOnlyWhenAsked() {
+    // Closed with or without "Don't show this again": is it shown on the next scan?
+    listOf(false to true, true to false).forEach { (dontShowAgain, shownNextTime) ->
+      val settings = FakeScanTipSettings(showUprightTip = true)
+      val scan = ScanViewModel(ScanPhotoStore(cacheDir), settings)
+      assertTrue(scan.uiState.value.showUprightTip)
+
+      scan.onUprightTipDismissed(dontShowAgain)
+
+      assertFalse(scan.uiState.value.showUprightTip)
+      val next = ScanViewModel(ScanPhotoStore(cacheDir), settings)
+      assertEquals("dontShowAgain=$dontShowAgain", shownNextTime, next.uiState.value.showUprightTip)
+    }
   }
 
   /** Permission granted and camera on: a photo can be taken. */
@@ -532,7 +551,7 @@ class ScanViewModelTest {
         val scoped =
             ViewModelProvider(
                 store,
-                viewModelFactory { initializer { ScanViewModel(ScanPhotoStore(cacheDir)) } },
+                viewModelFactory { initializer { ScanViewModel(ScanPhotoStore(cacheDir), tips) } },
             )[ScanViewModel::class.java]
         scoped.onPermissionGranted()
         scoped.onCameraReady()
@@ -552,7 +571,7 @@ class ScanViewModelTest {
         val scoped =
             ViewModelProvider(
                 store,
-                viewModelFactory { initializer { ScanViewModel(ScanPhotoStore(cacheDir)) } },
+                viewModelFactory { initializer { ScanViewModel(ScanPhotoStore(cacheDir), tips) } },
             )[ScanViewModel::class.java]
         scoped.onPermissionGranted()
         scoped.onCameraReady()
@@ -575,7 +594,11 @@ class ScanViewModelTest {
           store,
           viewModelFactory {
             initializer {
-              ScanViewModel(ScanPhotoStore(cacheDir), DraftPrescriptionFromScan(recognizer, clock))
+              ScanViewModel(
+                  ScanPhotoStore(cacheDir),
+                  tips,
+                  DraftPrescriptionFromScan(recognizer, clock),
+              )
             }
           },
       )[ScanViewModel::class.java]
@@ -683,7 +706,7 @@ class ScanViewModelTest {
   fun openingTheScreen_deletesPhotosLeftByAnEarlierScan() {
     val leftover = ScanPhotoStore(cacheDir).newPhotoFile().apply { writeText("old photo") }
 
-    ScanViewModel(ScanPhotoStore(cacheDir))
+    ScanViewModel(ScanPhotoStore(cacheDir), tips)
 
     assertFalse(leftover.exists())
   }

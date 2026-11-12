@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -40,10 +41,13 @@ class DialogTags(
  * [cancelLabel] and [confirmLabel] at its end, so every decision looks the same. While [isWorking],
  * both buttons and Back do nothing, and a spinner next to Cancel shows the action is on its way.
  *
+ * @param cancelLabel null for a dialog with [confirmLabel] alone, e.g. a tip to acknowledge; Back
+ *   and a tap outside still call [onCancel]
  * @param error shown in red under [message] when not null, e.g. after a failed deletion
  * @param isDestructive makes [confirmLabel] red, for an action that can't be undone
  * @param focusCancel puts the focus on [cancelLabel] first, when it is the safer choice (e.g.
  *   staying signed in with changes not yet saved online)
+ * @param content shown under [message], scrolling with it, e.g. a "Don't show this again" checkbox
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +55,7 @@ fun LakeDialog(
     title: String,
     message: String,
     confirmLabel: String,
-    cancelLabel: String,
+    cancelLabel: String?,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     tags: DialogTags,
@@ -59,10 +63,11 @@ fun LakeDialog(
     isWorking: Boolean = false,
     error: String? = null,
     focusCancel: Boolean = false,
+    content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   val cancelFocus = remember { FocusRequester() }
-  LaunchedEffect(focusCancel) { if (focusCancel) cancelFocus.requestFocus() }
+  LaunchedEffect(focusCancel) { if (focusCancel && cancelLabel != null) cancelFocus.requestFocus() }
   BasicAlertDialog(onDismissRequest = { if (!isWorking) onCancel() }) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
@@ -97,6 +102,7 @@ fun LakeDialog(
                 modifier = Modifier.testTag(tags.error),
             )
           }
+          content?.invoke(this)
         }
         DialogButtons(
             progress = {
@@ -105,13 +111,15 @@ fun LakeDialog(
               } else Spacer(Modifier)
             },
             dismiss = {
-              LakeButton(
-                  text = cancelLabel,
-                  onClick = onCancel,
-                  style = LakeButtonStyle.Text,
-                  enabled = !isWorking,
-                  modifier = Modifier.testTag(tags.cancel).focusRequester(cancelFocus),
-              )
+              if (cancelLabel != null) {
+                LakeButton(
+                    text = cancelLabel,
+                    onClick = onCancel,
+                    style = LakeButtonStyle.Text,
+                    enabled = !isWorking,
+                    modifier = Modifier.testTag(tags.cancel).focusRequester(cancelFocus),
+                )
+              } else Spacer(Modifier)
             },
             confirm = {
               LakeButton(

@@ -465,6 +465,9 @@ object C {
 
     // Prescription scan
     const val prescription_scan_screen = "prescription_scan_screen"
+    const val prescription_scan_tip = "prescription_scan_tip"
+    const val prescription_scan_tip_dont_show_again = "prescription_scan_tip_dont_show_again"
+    const val prescription_scan_tip_got_it = "prescription_scan_tip_got_it"
     const val prescription_scan_close_button = "prescription_scan_close_button"
     const val prescription_scan_permission_pending = "prescription_scan_permission_pending"
     const val prescription_scan_viewfinder = "prescription_scan_viewfinder"

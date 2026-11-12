@@ -72,6 +72,15 @@ class ScanCameraTest {
   fun realPhoto_isShown_deletedOnRetake_andDeletedOnClose() {
     var closed = false
     compose.setContent { ScanScreen(onEnterManually = {}, onBack = { closed = true }, onRead = {}) }
+    // The tip to hold the phone upright shows before the camera opens, unless this device was told
+    // not to show it again
+    fun tipShown() =
+        compose
+            .onAllNodesWithTag(C.Tag.prescription_scan_tip_got_it)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+    waitUntil { tipShown() || cameraReady() || cameraUnavailable() }
+    if (tipShown()) compose.onNodeWithTag(C.Tag.prescription_scan_tip_got_it).performClick()
 
     // The real camera turns on (the shutter becomes usable), or the screen says it can't be used
     waitUntil { cameraReady() || cameraUnavailable() }
