@@ -7,7 +7,6 @@ package com.github.se.oncompanion.ui.planning
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
@@ -32,6 +31,7 @@ import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.awaitDisplayed
 import com.google.firebase.firestore.Source
 import java.io.File
 import java.time.LocalDate
@@ -91,7 +91,7 @@ class PlanningAppointmentsTest {
     // No provider is replaced: the app's own repositories read the emulator
     compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
     awaitPlanning()
-    awaitDisplayed(hasText("Offline consultation"))
+    compose.awaitDisplayed(hasText("Offline consultation"))
     compose.onNodeWithText("Offline consultation").assertIsDisplayed()
     compose.onNodeWithText("HUG").assertIsDisplayed()
     // Keep the populated offline agenda as a device-rendered artifact for the PR review.
@@ -105,7 +105,7 @@ class PlanningAppointmentsTest {
     }
     // The same cached document remains readable in details without reconnecting.
     compose.onNodeWithText("Offline consultation").performClick()
-    awaitDisplayed(hasText("Bring appointment documents"))
+    compose.awaitDisplayed(hasText("Bring appointment documents"))
     compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
     File(context.cacheDir, "appointment-details-offline.png").outputStream().use {
@@ -117,12 +117,12 @@ class PlanningAppointmentsTest {
     }
     compose.onNodeWithTag(C.Tag.appointment_back).performClick()
     awaitPlanning()
-    awaitDisplayed(hasText("Offline consultation"))
+    compose.awaitDisplayed(hasText("Offline consultation"))
     compose.onNodeWithText("Offline consultation").assertIsDisplayed()
     compose.onNodeWithText("Offline consultation").performClick()
-    awaitDisplayed(hasTestTag(C.Tag.appointment_detail_delete_button))
+    compose.awaitDisplayed(hasTestTag(C.Tag.appointment_detail_delete_button))
     compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
-    awaitDisplayed(hasTestTag(C.Tag.appointment_delete_dialog))
+    compose.awaitDisplayed(hasTestTag(C.Tag.appointment_delete_dialog))
     compose.onNodeWithTag(C.Tag.appointment_delete_dialog).assertIsDisplayed()
     // Keep an unmodified native screenshot of the destructive-action confirmation for review.
     File(context.cacheDir, "appointment-delete-confirmation.png").outputStream().use {
@@ -132,10 +132,10 @@ class PlanningAppointmentsTest {
           .compress(Bitmap.CompressFormat.PNG, 100, it)
     }
     compose.onNodeWithTag(C.Tag.appointment_delete_cancel).performClick()
-    awaitDisplayed(hasText("Bring appointment documents"))
+    compose.awaitDisplayed(hasText("Bring appointment documents"))
     compose.onNodeWithText("Bring appointment documents").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
-    awaitDisplayed(hasTestTag(C.Tag.appointment_delete_confirm))
+    compose.awaitDisplayed(hasTestTag(C.Tag.appointment_delete_confirm))
     compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
     awaitPlanning()
     compose.waitUntil("the deleted appointment to leave Planning", 10_000) {
@@ -176,16 +176,16 @@ class PlanningAppointmentsTest {
     compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
     awaitPlanning()
     compose.onNodeWithTag(C.Tag.planning_add).performClick()
-    awaitDisplayed(hasTestTag(C.Tag.appointment_title))
+    compose.awaitDisplayed(hasTestTag(C.Tag.appointment_title))
     compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Offline form visit")
     compose.onNodeWithTag(C.Tag.appointment_time).performClick()
-    awaitDisplayed(hasTestTag(C.Tag.appointment_confirm))
+    compose.awaitDisplayed(hasTestTag(C.Tag.appointment_confirm))
     compose.onNodeWithTag(C.Tag.appointment_confirm).performClick()
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().performTextInput("Room 12")
     // The form scrolls above the IME; avoid Espresso's separate window-focus-dependent dismissal.
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
     awaitPlanning()
-    awaitDisplayed(hasText("Offline form visit"))
+    compose.awaitDisplayed(hasText("Offline form visit"))
     compose.onNodeWithText("Offline form visit").assertIsDisplayed()
     compose.onNodeWithText("Room 12").assertIsDisplayed()
     runBlocking {
@@ -198,14 +198,6 @@ class PlanningAppointmentsTest {
         db.waitForPendingWrites().await()
         assertEquals(local.id, query.get(Source.SERVER).await().documents.single().id)
       }
-    }
-  }
-
-  // A screen container can exist before its asynchronous content has been laid out.
-  private fun awaitDisplayed(matcher: SemanticsMatcher) {
-    compose.waitUntil("one visible expected content node", 10_000) {
-      compose.onAllNodes(matcher).fetchSemanticsNodes().size == 1 &&
-          compose.onNode(matcher).isDisplayed()
     }
   }
 

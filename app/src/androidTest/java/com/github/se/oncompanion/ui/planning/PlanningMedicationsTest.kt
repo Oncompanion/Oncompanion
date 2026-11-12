@@ -22,6 +22,7 @@ import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.awaitDisplayed
 import com.google.firebase.firestore.Source
 import java.io.File
 import java.time.LocalDate
@@ -120,7 +121,7 @@ class PlanningMedicationsTest {
           .fetchSemanticsNodes()
           .isNotEmpty()
     }
-    awaitDisplayed(hasText(b.name))
+    compose.awaitDisplayed(hasText(b.name))
     compose.onNodeWithText(b.name).assertIsDisplayed()
     compose.onNodeWithText(a.name).assertDoesNotExist()
     screenshot("medication-detail-offline.png")
@@ -136,7 +137,7 @@ class PlanningMedicationsTest {
     compose.waitUntil(10_000) {
       compose.onAllNodesWithTag(C.Tag.medication_detail_content).fetchSemanticsNodes().isNotEmpty()
     }
-    awaitDisplayed(hasText(b.name))
+    compose.awaitDisplayed(hasText(b.name))
     compose.onNodeWithTag(C.Tag.medication_detail_back).performClick()
     compose.waitUntil(10_000) {
       compose.onAllNodesWithTag(C.Tag.planning_screen).fetchSemanticsNodes().isNotEmpty()
@@ -226,13 +227,6 @@ class PlanningMedicationsTest {
       planningIsReady(date) &&
           compose.onAllNodesWithText(name).fetchSemanticsNodes().size == 1 &&
           compose.onNodeWithText(name).isDisplayed()
-    }
-  }
-
-  private fun awaitDisplayed(matcher: SemanticsMatcher) {
-    compose.waitUntil("one visible expected detail node", 10_000) {
-      compose.onAllNodes(matcher).fetchSemanticsNodes().size == 1 &&
-          compose.onNode(matcher).isDisplayed()
     }
   }
 
