@@ -13,6 +13,8 @@ import { HospitalSearchService } from "./service.js";
 
 const contact = defineString("NOMINATIM_CONTACT_EMAIL", { default: "" });
 const appIds = defineString("HOSPITAL_APP_IDS", { default: "" });
+// Deployment must select a reviewed identity rather than inheriting the default Editor account.
+const runtimeAccount = defineString("HOSPITAL_RUNTIME_SERVICE_ACCOUNT");
 const quotaSecret = defineSecret("HOSPITAL_QUOTA_SECRET");
 let handler: ReturnType<typeof createHandler> | undefined;
 
@@ -20,6 +22,7 @@ let handler: ReturnType<typeof createHandler> | undefined;
 export const hospitalSearch = onRequest(
   {
     secrets: [quotaSecret],
+    serviceAccount: runtimeAccount,
     region: "europe-west1",
     maxInstances: 1,
     concurrency: 1,

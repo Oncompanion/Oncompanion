@@ -45,6 +45,9 @@ class FakeMedicationRepository(
 
   // uid -> prescription ID -> prescription
   private val store = MutableStateFlow<Map<String, Map<String, Prescription>>>(emptyMap())
+
+  // uid -> prescription ID -> rejected prescription, kept apart (US-43)
+  private val rejected = MutableStateFlow<Map<String, Map<String, Prescription>>>(emptyMap())
   private var lastId = 0
 
   /**
@@ -80,6 +83,9 @@ class FakeMedicationRepository(
    * The server rejects the writes saved since [serverRejectsWrites]: they are undone and reported.
    */
   fun rejectPendingWrites() = server.reject { store.value = it }
+
+  /** Snapshot of the prescriptions [uid] rejected. */
+  fun rejectedOf(uid: String): List<Prescription> = rejected.value[uid].orEmpty().values.toList()
 
   /** Snapshot of the prescriptions stored for [uid], in the order of [observePrescriptions]. */
   fun prescriptionsOf(uid: String): List<Prescription> = sorted(store.value[uid])
@@ -121,6 +127,25 @@ class FakeMedicationRepository(
     writeError?.let { throw it }
     server.saving(store.value)
     store.update { all -> all + (uid to all[uid].orEmpty() - id) }
+  }
+
+  override suspend fun rejectPrescription(uid: String, prescription: Prescription) {
+    writeError?.let { throw it }
+    val moved = prescription.copy(confirmation = PrescriptionConfirmation.REJECTED)
+    require(moved.isValid() && moved.addedBy != null) { "Invalid rejected prescription: $moved" }
+    store.update { all -> all + (uid to all[uid].orEmpty() - prescription.id) }
+    rejected.update { all -> all + (uid to all[uid].orEmpty() + (moved.id to moved)) }
+  }
+
+  override fun observeRejectedPrescriptions(
+      uid: String,
+      addedBy: String,
+  ): Flow<List<Prescription>> =
+      read(rejected.map { all -> all[uid].orEmpty().values.filter { it.addedBy == addedBy } })
+
+  override suspend fun deleteRejectedPrescription(uid: String, id: String) {
+    writeError?.let { throw it }
+    rejected.update { all -> all + (uid to all[uid].orEmpty() - id) }
   }
 
   /**

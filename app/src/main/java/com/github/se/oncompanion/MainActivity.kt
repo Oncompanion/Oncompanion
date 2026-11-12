@@ -18,6 +18,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
+import com.github.se.oncompanion.model.medication.SeenPrescriptionsPreferences
+import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.model.session.PreferencesCleanupJournal
 import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.resources.C
@@ -38,12 +41,17 @@ class MainActivity : ComponentActivity() {
     SignOutProvider.signOut.initialize(journal)
     // The phone's speech recognizer keeps the app's context, so ViewModels never handle one
     SpeechRecognizerProvider.install(applicationContext)
+    // Which accepted prescriptions a caregiver closed is kept on the phone (US-43)
+    SeenPrescriptionsProvider.store =
+        SeenPrescriptionsPreferences(getSharedPreferences("seen_prescriptions", MODE_PRIVATE))
     // Never restore an authenticated navigation stack after interrupted or completed sign-out.
     val restore =
         !journal.pending &&
             runCatching { AuthRepositoryProvider.repository.currentUser != null }
                 .getOrDefault(false)
     super.onCreate(if (restore) savedInstanceState else null)
+    // Install the shared search adapter before fields capture it; blank configuration stays manual.
+    HospitalRepositoryProvider.configureAtStartup(getString(R.string.hospital_proxy_endpoint))
     splashScreen.setKeepOnScreenCondition { startViewModel.startRoute.value == null }
     // Transparent status and navigation bars: the app's background shows behind them, instead of
     // the old XML theme's purple status bar. Screens use Scaffold, which keeps content clear of

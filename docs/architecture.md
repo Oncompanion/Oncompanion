@@ -104,8 +104,9 @@ enforces ten initial shared-cache misses per rolling hour and fifty per rolling 
 `hospitalSearchQuota/{HMAC-SHA256}` retains bounded miss timestamps with one-day TTL using a
 server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
 deployable TTL policy; logical expiry remains enforced.
-The Account, Appointments and overview diagrams identify this implemented but undeployed backend.
-The repository-to-proxy client path is implemented and opt-in; the service remains undeployed.
+The Account, Appointments and overview diagrams identify the deployed backend. The
+repository-to-proxy path is enabled for debug Profile searches through a variant resource. Release
+keeps the empty endpoint pending authenticated live verification and Play Integrity verification.
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -135,15 +136,24 @@ the block for that adapter's lifetime instead of shortening the provider wait. C
 once before creating field ViewModels; endpoint changes/disable require recreating existing consumers.
 The prior local HTTP repository remains legacy code for its tests, not an integrated search path.
 
-`FirebaseHospitalProxyTokens` still obtains Auth/App Check tokens lazily; production has no endpoint
-configured by this change. Profile Search is enabled only for an installed proxy adapter. The existing
+`MainActivity` passes the variant-specific `hospital_proxy_endpoint` resource to
+`HospitalRepositoryProvider.configureAtStartup` before creating fields. An installed adapter is
+reused across activity recreation, keeping its cache and retry gate. The debug resource selects the
+verified deployed HTTPS endpoint; release remains manual-only. Debug requires a dedicated signed-in
+test account and separately authorized App Check enrollment before live verification. `FirebaseHospitalProxyTokens` obtains Auth/App Check
+tokens lazily.
+Profile Search is enabled only for an installed proxy adapter. The existing
 HospitalFieldViewModel owns explicit Search actions and stale-result cancellation, while edits,
-selection, saving and leaving Profile clear obsolete feedback. Calls join `SessionAccess.operation`.
+selection, saving and leaving Profile clear obsolete feedback. Rate-limited searches show a distinct
+wait/manual-entry message; errors and empty results announce updates through a polite live region.
+No countdown, automatic retry or queue is introduced. Calls join `SessionAccess.operation`.
 See [Android proxy setup](hospital-proxy-client.md) for registration and the opt-in configuration API.
-The backend CI job runs type, format, unit and demo Firestore tests. `onCall` remains a team
-decision before Android integration: it improves token handling and URL privacy but requires a
-new Android SDK and transport contract. See the backend runbook for the comparison.
-No production deployment or automatic Functions deployment workflow is included.
+The backend CI job runs type, format, unit and demo Firestore tests. The Android integration
+uses the existing HTTP contract; any future `onCall` migration remains a team decision requiring
+a new Android SDK and transport contract. The deployed service has a scoped platform request-log
+exclusion; application logs remain sanitized.
+See the backend runbook and verification record for the remaining live/token/monitoring checks.
+Deployment is manual; no automatic Functions deployment workflow is included.
 
 ## Reusable hospital field (issue #143)
 
@@ -498,6 +508,9 @@ See the [Firebase Android lifecycle reference](https://firebase.google.com/docs/
 /users/{uid}/symptoms/{id}
 /users/{uid}/prescriptions/{id}       doctor, date and the list of its medications; who added it and
                                       whether the patient confirmed it (US-43)
+/users/{uid}/rejectedPrescriptions/{id}
+                                      a caregiver's prescription the patient rejected, for that
+                                      caregiver to see (US-43)
 /users/{uid}/appointments/{id}
 /users/{uid}/circle/{memberUid}       permissions granted to a care-circle member
 /users/{uid}/patients/{patientUid}    circles this caregiver joined
@@ -520,7 +533,7 @@ Care-circle members read a patient's data through rules that check `/users/{uid}
 
 **Adding for the patient.** The patient can also let a member add to a section they see (US-22): `canAdd` on the invite and the member, a list of `CarePermission` names copied when the invite is redeemed. It is empty by default and for members saved before it existed, and the rules refuse a section that isn't also in `permissions`. The member form only offers it where a story lets a caregiver write (`CareCircleMemberDetails.ADDABLE_SECTIONS`: Symptoms, Planning, Events and Prescriptions), as "Allow adding symptoms" under Symptoms. In `firestore.rules`, `canAddTo(uid, section)` lets such a member **create** a document in that section, never edit or delete one. A caregiver's symptom is signed: `addedBy` must be their own uid and `addedByName` their first name, the patient's own entries carry neither, and an update never changes them. `ResolveSectionAccess` gives screens `canAdd`, so the caregiver's journal shows "Add"; the form saves in the patient's journal, and the journal and detail show "Added by Sam" (`ui/common/AddedBy`). The patient sees the first name they gave that member in their circle (`observeMemberNames`, so a rename shows), and the stored `addedByName` once the member is removed; a caregiver always sees the stored name, never what the patient calls them. Appointments (US-41) work the same way: "Allow adding appointments" under Planning, a member allowed to can create an appointment signed the same way (`Appointment.addedBy`, `addedByName`), and only the patient edits or deletes it, keeping who added it. `ObserveCarePlanning` gives Planning `canAdd`, so the caregiver's Planning shows "+"; the form ("Add an appointment for Anne") saves in the patient's planning, and Planning and the appointment page show "Added by Sam", with the name the patient gave that member. Confirming an event (US-42) works the same way: "Allow confirming events" under Events, and the caregiver's event page offers "Anne is registered", saying it only goes on the patient's record. The confirmation (`EventRegistration.addedBy`, `addedByName`) can only be **created** by the caregiver, for an upcoming event: it never replaces an existing one, and only the patient removes it. The patient's own confirmation is unsigned, and confirming over a caregiver's can't take their name off it. The page shows "Added by Sam" in the confirmation banner. All three sign with `CaregiverName` (`domain/carecircle`): the caregiver's profile first name, else their Google first name. Another section adds its rule with `canAddTo`, its section to `ADDABLE_SECTIONS` and its form.
 
-**A caregiver's prescription waits for the patient** (US-43, decided in #332). It is signed like a symptom, and also has a `confirmation`: `PENDING` when a caregiver adds it, then `CONFIRMED` or `REJECTED` once the patient decides (`PrescriptionConfirmation`). The rules let a caregiver create it only as `PENDING`, and only the patient changes it (`decidesConfirmation`): a pending prescription can't be edited without being confirmed, and a decided one keeps its state. The patient's own prescriptions, and those saved before this field existed, are `CONFIRMED`: a missing field reads as confirmed. Until the patient confirms it, a prescription reads "Added by Sam · Not confirmed" (`AddedBy`, `ui/common`) in the list, its detail, Planning and the Overview; the list shows it first, under "Added by a caregiver" for the patient and "Added by you" for the caregiver who added it (`PrescriptionsUiState.waiting`), and none of its medications may be reminded: `observeMedications`, what reminders read, gives only `confirmedMedications()`. The patient reviews it from the list: tapping its Dawn card opens the form ("Review the prescription"), where Confirm saves it as confirmed, keeping who added it (`ManageMedicationSchedule.update`), and Reject asks first, then keeps it as `REJECTED` (`ManageMedicationSchedule.reject`): it then shows nowhere, for the patient or their members, and is never reminded. The Overview's Prescriptions shortcut shows how many wait (`OverviewUiState.prescriptionsToConfirm`). A caregiver the patient lets add prescriptions ("Allow adding prescriptions" under Prescriptions) sees Scan and Add on the patient's list, and uses the same scan and form ("Add a prescription for Anne"): `PrescriptionFormViewModel` saves it in the patient's prescriptions through `ManageMedicationSchedule.add`, signed with `CaregiverName`, and warns about a duplicate among the patient's prescriptions, confirmed or not (US-39). Only the patient corrects a saved one.
+**A caregiver's prescription waits for the patient** (US-43, decided in #332). It is signed like a symptom, and also has a `confirmation`: `PENDING` when a caregiver adds it, then `CONFIRMED` or `REJECTED` once the patient decides (`PrescriptionConfirmation`). The rules let a caregiver create it only as `PENDING`, and only the patient changes it (`decidesConfirmation`): a pending prescription can't be edited without being confirmed, and a decided one keeps its state. The patient's own prescriptions, and those saved before this field existed, are `CONFIRMED`: a missing field reads as confirmed. Until the patient confirms it, a prescription reads "Added by Sam · Not confirmed" (`AddedBy`, `ui/common`) in the list, its detail, Planning and the Overview; the list shows it first, under "Added by a caregiver" for the patient and "Added by you" for the caregiver who added it (`PrescriptionsUiState.waiting`), and none of its medications may be reminded: `observeMedications`, what reminders read, gives only `confirmedMedications()`. The patient reviews it from the list: tapping its Dawn card opens the form ("Review the prescription"), where Confirm saves it as confirmed, keeping who added it (`ManageMedicationSchedule.update`), and Reject asks first, then moves it, in one write, to `/users/{uid}/rejectedPrescriptions` as `REJECTED` (`ManageMedicationSchedule.reject`): it then shows nowhere for the patient or their other members, and is never reminded. The caregiver who added it sees their own under "Added by you": "Waiting for Anne", "Accepted by Anne" or "Rejected by Anne" (`PrescriptionsUiState.waiting`). The rules let only the patient and that caregiver read a rejected one (the caregiver's query filters on `addedBy`, so the rules can prove it), and only that caregiver delete it, even without seeing the patient's prescriptions any more. Once decided, a close button (×) deletes a rejected one (`ManageMedicationSchedule.dismissRejected`), or hides the state of an accepted one, which is remembered on the phone only (`SeenPrescriptions`, one entry per account, holding record IDs). The Overview's Prescriptions shortcut shows how many wait (`OverviewUiState.prescriptionsToConfirm`). A caregiver the patient lets add prescriptions ("Allow adding prescriptions" under Prescriptions) sees Scan and Add on the patient's list, and uses the same scan and form ("Add a prescription for Anne"): `PrescriptionFormViewModel` saves it in the patient's prescriptions through `ManageMedicationSchedule.add`, signed with `CaregiverName`, and warns about a duplicate among the patient's prescriptions, confirmed or not (US-39). Only the patient corrects a saved one.
 
 It is read only, except adding where `canAdd` allows it: editing and deleting stay with the patient in every collection. The profile (`/users/{uid}`) is never shared; the caregiver gets the patient's first name from their own `patients/{patientUid}` link. The rule reads the member doc on every request, so removing the member or turning a permission off stops the next server read and ends open listeners with `PERMISSION_DENIED`. Rules can't reach what is already cached on the caregiver's phone: the screens must stop showing a patient's section as soon as it is no longer shared or the caregiver is removed, and never fall back to the cache for it.
 

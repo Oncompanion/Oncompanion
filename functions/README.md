@@ -3,9 +3,12 @@
 # Hospital search proxy
 
 This is Oncompanion's explicit hospital search backend, implemented with second-generation
-Firebase Functions and TypeScript. It is **not deployed** by this change. Profile's Search button
-stays disabled. No Android files, Firebase rules or production resources are changed. Backend
-tests run in CI; deployment stays manual. This endpoint is public at the network layer;
+Firebase Functions and TypeScript. `hospitalSearch` is deployed and ACTIVE in `europe-west1`
+with its dedicated runtime identity, Auth/App Check and scoped request-log exclusion. Profile's
+Search button stays disabled while `hospital_proxy_endpoint` is empty; authenticated live and
+Android verification remain pending approval/prerequisites. See [verification status](LIVE_VERIFICATION.md).
+The Android HTTP client and repository integration are implemented (PRs #303 and #320).
+Backend tests run in CI; deployment stays manual. This endpoint is public at the network layer;
 Firebase Auth and App Check are
 mandatory in its handler.
 
@@ -86,9 +89,10 @@ A successful response is a JSON array, including `[]`. Each hospital contains `o
 remain the identity. Response size is bounded to 256 KiB, results to ten, coordinates and required
 fields are validated, including decimal coordinate syntax accepted by Kotlin. Android's parser
 and generated request parameters remain compatible for supported hospital queries.
-**Its current transport does not send the required headers**: add Auth/App Check support and
-remote endpoint configuration in a later PR before enabling Search. Do not configure a public
-Nominatim URL directly.
+The Android `HospitalProxyClient` sends both required headers; `HospitalRepositoryProxy` adapts
+its results to the field. See [Android startup configuration](../docs/hospital-proxy-client.md).
+Authenticated live verification and Android endpoint activation remain outstanding/deferred.
+Do not configure a public Nominatim URL directly.
 
 Errors have the shape `{"error":{"code":"invalid_query"}}`, with no upstream bodies,
 queries, credentials, stack traces or internal exception details:
@@ -213,7 +217,7 @@ The Functions/Cloud Run request timeout is not proof of process termination; cod
 running after the response times out. Automatic recovery would need verified termination of every
 potential owner (including old revisions), or a separate final egress service that enforces fencing
 and spacing itself. Neither exists in this deployment. Keep this fail-closed design for the
-undeployed backend; an assigned recovery operator and monitoring for stuck control state are
+backend; an assigned recovery operator and monitoring for stuck control state are
 required before rollout. Do not replace it with TTL-based unlocking to improve availability.
 
 These guarantees assume all Oncompanion Nominatim calls use this same coordinator and operators
@@ -234,6 +238,9 @@ Copy `.env.example` to an ignored `.env.<project-id>` in `functions/` and supply
   Missing/invalid configuration prevents upstream calls. It appears in the descriptive User-Agent.
 - `HOSPITAL_APP_IDS`: comma-separated Firebase Android App IDs permitted by the App Check verifier.
   Missing configuration denies all apps. Tokens are verified against the function's Firebase project.
+- `HOSPITAL_RUNTIME_SERVICE_ACCOUNT`: reviewed service-account email used by the function.
+  This required parameter prevents silently using the default account, which the deployment audit
+  found has Editor. Account creation and grants require separate approval; see the operations runbook.
 
 Before a separately approved deployment:
 
@@ -242,12 +249,11 @@ Before a separately approved deployment:
    traffic and Firestore reads/writes/storage can incur charges. Set budgets/alerts; they are
    not hard spending limits. Keep minimum instances zero.
 2. Register the Android app with App Check (Play Integrity for production), initialize its SDK,
-   and implement Auth/App Check headers in the Android transport. Use the **Firebase Auth ID
+   and verify the existing Auth/App Check headers in the Android transport. It uses the **Firebase Auth ID
    token** obtained from the signed-in Firebase user, not the Google ID token passed into
-   `AuthRepository.signInWithGoogle`. The current auth interface has no ID-token accessor and
-   the Android app has no App Check integration. Add an injectable token-provider boundary in
-   the model/transport layer in that later PR, with lazy Firebase access; ViewModels and
-   composables must not fetch tokens directly. Console enforcement alone
+   `AuthRepository.signInWithGoogle`. The existing injectable `FirebaseHospitalProxyTokens`
+   boundary accesses Firebase lazily; debug builds use the debug provider and release builds
+   use Play Integrity. ViewModels and composables do not fetch tokens. Console enforcement alone
    does not protect a custom `onRequest` endpoint; this handler explicitly verifies the token
    and app ID. Debug tokens belong only in approved staging/local testing.
 3. Select/review runtime service-account IAM, generated endpoint permissions and the single
@@ -272,8 +278,9 @@ Before a separately approved deployment:
 
 `firebase.json` adds only the Functions codebase and emulator port, retaining existing services.
 The rule deployment workflow remains limited to `firestore:rules`; it does not deploy Functions.
-No production deploy command has been run. Do not run an unrestricted `firebase deploy` by habit;
-future Functions rollout must be separately authorized and scoped to the hospital-search codebase.
+The scoped first deployment has run; its state and the interrupted CLI side effect are recorded
+in [DEPLOYMENT.md](DEPLOYMENT.md). Do not run an unrestricted `firebase deploy` by habit;
+future deployments and infrastructure changes need approval and the hospital-search scope.
 
 References: [Firebase scaling and runtime](https://firebase.google.com/docs/functions/manage-functions),
 [custom-backend App Check verification](https://firebase.google.com/docs/app-check/custom-resource-backend),
@@ -289,15 +296,15 @@ must still require `request.auth` and restrict approved app IDs. Callable POST d
 strings in request URLs (body/APM logging still needs review). This is the preferred candidate
 for a coordinated Android integration if the team approves the Functions Android SDK dependency.
 
-For this PR retain `onRequest`: the current `HospitalRepositoryNominatim` and provider generate
-GET requests and parse a bare JSON array. Callable functions require a different transport,
+The implemented Android integration retains `onRequest`: `HospitalProxyClient` generates
+GET requests and parses a bare JSON array. Callable functions would require a different transport,
 request/response envelope and error mapping, plus the new Android dependency. The provider can
 still expose `HospitalRepository` and preserve the existing explicit-search UI, manual entry,
 attribution and memory-cache behavior, but its present `configure(endpoint)` cannot simply be
 pointed at a callable endpoint. Neither API supplies offline network search; local cached results
-and manual entry must remain available. Auth/App Check enforcement remains explicit and mandatory
-in this HTTP handler. Do not enable Search until the team chooses the contract and implements
-its authenticated transport. No dependency or Android activation is added here.
+and manual entry remain available. Auth/App Check enforcement remains explicit and mandatory
+in this HTTP handler. The transport is implemented; GET URL privacy remains a rollout review
+requirement. This deployment preparation does not migrate the API or activate Android search.
 
 The GET endpoint may put public hospital names in infrastructure request logs. Application code
 cannot fix that with a logging exclusion alone: review platform collection, sinks and retention
