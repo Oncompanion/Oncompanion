@@ -5,8 +5,10 @@
 This is Oncompanion's explicit hospital search backend, implemented with second-generation
 Firebase Functions and TypeScript. `hospitalSearch` is deployed and ACTIVE in `europe-west1`
 with its dedicated runtime identity, Auth/App Check and scoped request-log exclusion. Profile's
-Search button stays disabled while `hospital_proxy_endpoint` is empty; authenticated live and
-Android verification remain pending approval/prerequisites. See [verification status](LIVE_VERIFICATION.md).
+explicit Search uses the shared `hospital_proxy_endpoint` from Android main resources in both builds.
+Release uses Play Integrity and debug uses privately enrolled debug attestation. Failed attestation
+shows the existing search error; manual entry remains available. See [verification status](LIVE_VERIFICATION.md)
+for completed debug checks and outstanding signed-release verification.
 The Android HTTP client and repository integration are implemented (PRs #303 and #320).
 Backend tests run in CI; deployment stays manual. This endpoint is public at the network layer;
 Firebase Auth and App Check are

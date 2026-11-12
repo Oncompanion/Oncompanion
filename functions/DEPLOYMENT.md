@@ -4,7 +4,8 @@
 
 Deployment task: [#217](https://github.com/Oncompanion/Oncompanion/issues/217).
 Deployment evidence: [#435](https://github.com/Oncompanion/Oncompanion/pull/435).
-Android activation is separate: [#266](https://github.com/Oncompanion/Oncompanion/issues/266).
+Android integration: [#266](https://github.com/Oncompanion/Oncompanion/issues/266) and
+[release activation #446](https://github.com/Oncompanion/Oncompanion/pull/446).
 
 ## Current configuration
 
@@ -79,15 +80,20 @@ non-retention guarantee. Native request metrics remain available.
 
 6. Verify the function state, actual Run service/endpoint, scaling, runtime account, secret version,
    mandatory Auth/App Check and exact logging filter. Preserve unrelated resources and bindings.
-7. Follow [LIVE_VERIFICATION.md](LIVE_VERIFICATION.md) only when the deferred test is explicitly
-   resumed and its credentials/enrollment are authorized. Do not claim authenticated success from
+7. Follow [LIVE_VERIFICATION.md](LIVE_VERIFICATION.md) only with separately authorized live-search
+   scope and credentials/enrollment. Do not claim authenticated success from
    malformed-request rejections or emulator tokens.
 
-## Rollout gates and rollback
+## Android configuration and rollback
 
-Authenticated live search, server-cache verification and successful-request log inspection remain
-unverified. Android's `hospital_proxy_endpoint` stays empty until #266's activation review;
-release App Check is unverified. Proxy alerts and notification delivery are also unverified.
+Android main resources supply one shared `hospital_proxy_endpoint` for debug and release. Release
+uses Play Integrity; debug uses separately authorized debug enrollment. Missing or rejected tokens
+produce the existing search error without preventing manual hospital entry. Completed and outstanding
+checks are recorded only in [LIVE_VERIFICATION.md](LIVE_VERIFICATION.md).
+
+To disable Android search in a replacement APK, clear the shared endpoint and update the configuration
+test accordingly. This makes both builds manual-only; it does not undeploy the backend or change
+Auth/App Check enforcement. Already installed APKs retain their packaged configuration.
 No request queue, automatic retries, load tests or production fault injection are authorized here.
 
 Keep the previous reviewed source, parameters and secret version before deploying. Roll back by
