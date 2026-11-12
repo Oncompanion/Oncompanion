@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
+import androidx.navigation.NavHostController
 import androidx.test.espresso.Espresso
 import com.github.se.oncompanion.AppHostActivity
 import com.github.se.oncompanion.resources.C
@@ -37,12 +38,15 @@ internal class EndToEndTestDriver(private val compose: AndroidComposeTestRule<*,
   }
 
   /**
-   * Shows the real app with the journey's emulator credential provider, including after rotation.
+   * Shows the real app with emulator credentials, including after rotation. An optional controller
+   * exercises guarded routes.
    */
-  fun startApp(credentials: GoogleCredentialProvider) {
+  fun startApp(credentials: GoogleCredentialProvider, navController: NavHostController? = null) {
     compose.runOnUiThread {
       AppHostActivity.content.value = {
-        OncompanionTheme { AppNavHost(credentialProvider = credentials) }
+        OncompanionTheme {
+          AppNavHost(credentialProvider = credentials, navController = navController)
+        }
       }
     }
   }
