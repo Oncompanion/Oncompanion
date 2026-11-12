@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -14,16 +15,20 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isOff
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.navigation.compose.ComposeNavigator
+import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
+import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.EndToEndTestDriver
@@ -47,8 +52,8 @@ import org.junit.runner.RunWith
 
 /**
  * M2's two-account journey through real screens and Firebase emulators. Only Google's account
- * picker is replaced. #360 extends this same journey with revocation, reusing its accounts, sign-in
- * helpers and cleanup rather than relying on another test running first.
+ * picker is replaced. Revocation reuses the same accounts, sign-in helpers and cleanup rather than
+ * relying on another test running first.
  */
 @RunWith(AndroidJUnit4::class)
 class M2EndToEndTest {
@@ -130,7 +135,8 @@ class M2EndToEndTest {
   }
 
   /**
-   * Checks invitation, joining, shared reads, caregiver creation and patient-visible attribution.
+   * Checks shared symptoms and attribution, then revokes access and checks a fresh caregiver
+   * session.
    */
   @Test
   fun patientAndCaregiver_shareAndLogSymptoms() {
@@ -192,7 +198,44 @@ class M2EndToEndTest {
     ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
     ui.open(C.Tag.symptom_back_button, patientGreeting())
     assertAcceptedMember()
-    // #360 appends revocation here: patient signed in, same circle and cleanup still active.
+    revokeSymptomSharing()
+    ui.open(C.Tag.care_circle_member_back_button, hasTestTag(C.Tag.care_circle_member_list))
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    signOutThroughProfile()
+
+    credentials.select(caregiver)
+    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
+    assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
+    ui.waitFor(hasTestTag(C.Tag.overview_loading), gone = true)
+    compose.onNodeWithTag(C.Tag.overview_shortcut_symptoms).assertDoesNotExist()
+    // Capture this session's navigation only after sign-in, leaving account-switch cleanup intact.
+    lateinit var navigation: TestNavHostController
+    compose.runOnUiThread { AppHostActivity.content.value = {} }
+    compose.waitForIdle()
+    compose.runOnUiThread {
+      navigation =
+          TestNavHostController(compose.activity).apply {
+            navigatorProvider.addNavigator(ComposeNavigator())
+          }
+    }
+    ui.startApp(credentials, navigation)
+    ui.waitFor(caregiverTitle()).assertIsDisplayed()
+    // The shortcut is hidden; opening the guarded route must still show no symptom data.
+    compose.runOnUiThread { navigation.navigate(Route.SYMPTOMS) }
+    val notShared =
+        compose.activity.getString(
+            R.string.not_shared_title,
+            patient.firstName,
+            compose.activity.getString(R.string.permission_symptoms),
+        )
+    ui.waitFor(hasTestTag(C.Tag.not_shared) and text(notShared)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.symptom_journal_list).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
+    for (notes in listOf(patientNotes, caregiverNotes)) {
+      compose
+          .onAllNodes(hasText(notes, substring = true), useUnmergedTree = true)
+          .assertCountEquals(0)
+    }
   }
 
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
@@ -307,6 +350,24 @@ class M2EndToEndTest {
         .onNodeWithTag(C.Tag.care_circle_pending_label, useUnmergedTree = true)
         .assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.care_circle_pending_section).assertDoesNotExist()
+  }
+
+  /** Revokes the accepted member's symptom access using the same form a patient uses. */
+  private fun revokeSymptomSharing() {
+    ui.open(
+        C.Tag.careCircleMember(checkNotNull(caregiver.uid)),
+        hasTestTag(C.Tag.care_circle_member_details),
+    )
+    val permission = C.Tag.careCircleFormPermission("SYMPTOMS")
+    ui.open(C.Tag.care_circle_member_edit_button, hasTestTag(permission))
+        .reveal()
+        .assertIsOn()
+        .performClick()
+    ui.tag(permission).assertIsOff()
+    ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_member_details))
+    ui.waitFor(hasTestTag(C.Tag.careCircleMemberPermission("SYMPTOMS")) and isOff())
+        .reveal()
+        .assertIsOff()
   }
 
   private fun signOutThroughProfile() {
