@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -648,6 +649,57 @@ class PrescriptionsScreenTest {
     assertEquals(
         listOf("review chemo", "open fever", "open chemo", "open fever"),
         opened,
+    )
+  }
+
+  @Test
+  fun addedByYou_showsWhereEachIs_andClosesOnlyTheDecidedOnes() {
+    fun added(p: Prescription, confirmation: PrescriptionConfirmation) =
+        p.copy(addedBy = "caregiver", addedByName = "Sam", confirmation = confirmation)
+    val state =
+        filled.copy(
+            prescriptions =
+                listOf(
+                    added(chemo, PrescriptionConfirmation.PENDING),
+                    added(fever, PrescriptionConfirmation.CONFIRMED),
+                    added(nausea, PrescriptionConfirmation.REJECTED),
+                ),
+            caregiverUid = "caregiver",
+        )
+    val events = mutableListOf<String>()
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = { events += "open $it" },
+          caregiverOf = "Anne",
+          onDismiss = { events += "dismiss $it" },
+      )
+    }
+    // Each says where it is, and only a decided one can be closed
+    val cases =
+        listOf(
+            Triple("chemo", R.string.prescriptions_waiting_for, false),
+            Triple("fever", R.string.prescriptions_accepted_by, true),
+            Triple("nausea", R.string.prescriptions_rejected_by, true),
+        )
+    for ((id, stateText, canClose) in cases) {
+      composeTestRule
+          .onNodeWithTag(C.Tag.prescriptionsItem(id))
+          .performScrollTo()
+          .assertTextContains(context.getString(stateText, "Anne"), substring = true)
+      val close = composeTestRule.onNodeWithTag(C.Tag.prescriptionsDismiss(id))
+      if (canClose) close.performClick() else close.assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem(id)).performClick()
+    }
+
+    // A rejected one has no detail to open
+    assertEquals(
+        listOf("open chemo", "dismiss fever", "open fever", "dismiss nausea"),
+        events,
     )
   }
 

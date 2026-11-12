@@ -1937,7 +1937,9 @@ class PrescriptionFormViewModelTest {
     return editViewModel().also { advanceUntilIdle() }
   }
 
-  private fun savedConfirmation() = fakeMedications.prescriptionsOf(uid).single().confirmation
+  /** What is saved of [sams]: in the prescriptions, or kept apart once rejected. */
+  private fun savedConfirmation() =
+      (fakeMedications.prescriptionsOf(uid) + fakeMedications.rejectedOf(uid)).single().confirmation
 
   @Test
   fun caregiversPrescription_isToConfirm_andSavingConfirmsIt_keepingWhoAddedIt() = runTest {
@@ -1980,12 +1982,12 @@ class PrescriptionFormViewModelTest {
 
   @Test
   fun ownRejection_arrivingBeforeItReturns_isNotTakenForADeletion() = runTest {
-    // The rejection is saved on the device, and heard back, before reject() returns
+    // The rejection moves it apart on the device, and is heard back, before reject() returns
     val returned = CompletableDeferred<Unit>()
     val writesThenWaits =
         object : MedicationRepository by fakeMedications {
-          override suspend fun updatePrescription(uid: String, prescription: Prescription) {
-            fakeMedications.updatePrescription(uid, prescription)
+          override suspend fun rejectPrescription(uid: String, prescription: Prescription) {
+            fakeMedications.rejectPrescription(uid, prescription)
             returned.await()
           }
         }
@@ -2068,12 +2070,7 @@ class PrescriptionFormViewModelTest {
       assertFalse(name, viewModel.state.isConfirmingRejection)
       check(viewModel.state)
       assertTrue(name, before.isToConfirm)
-      assertTrue(
-          name,
-          fakeMedications.prescriptionsOf(uid).none {
-            it.confirmation == PrescriptionConfirmation.REJECTED
-          },
-      )
+      assertTrue(name, fakeMedications.rejectedOf(uid).isEmpty())
     }
   }
 

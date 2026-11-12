@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
@@ -72,6 +74,7 @@ private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENG
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onReview opens the review of a prescription a caregiver added, for the patient to confirm
  *   or reject it (US-43)
+ * @param onDismiss closes the state of a prescription the caregiver added, once decided (US-43)
  */
 @Composable
 fun PrescriptionsScreen(
@@ -101,6 +104,7 @@ fun PrescriptionsScreen(
       modifier = modifier,
       caregiverOf = caregiverOf,
       onReview = onReview,
+      onDismiss = viewModel::dismiss,
   )
 }
 
@@ -113,6 +117,7 @@ fun PrescriptionsScreen(
  * @param onOpen opens the detail of the prescription with the given ID
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onReview opens the review of a prescription a caregiver added, for the patient (US-43)
+ * @param onDismiss closes the state of a prescription the caregiver added, once decided (US-43)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,6 +131,7 @@ fun PrescriptionsContent(
     modifier: Modifier = Modifier,
     caregiverOf: String? = null,
     onReview: (String) -> Unit = onOpen,
+    onDismiss: (String) -> Unit = {},
 ) {
   Scaffold(
       modifier = modifier.testTag(C.Tag.prescriptions_screen),
@@ -175,10 +181,11 @@ fun PrescriptionsContent(
         else ->
             PrescriptionList(
                 uiState,
-                isCaregiver = caregiverOf != null,
+                caregiverOf = caregiverOf,
                 buttonRoom = buttonRoom,
                 onOpen = onOpen,
                 onReview = onReview,
+                onDismiss = onDismiss,
             )
       }
     }
@@ -243,10 +250,11 @@ private fun AddButton(
 @Composable
 private fun PrescriptionList(
     uiState: PrescriptionsUiState,
-    isCaregiver: Boolean,
+    caregiverOf: String?,
     buttonRoom: Dp,
     onOpen: (String) -> Unit,
     onReview: (String) -> Unit,
+    onDismiss: (String) -> Unit,
 ) {
   val waiting = uiState.waiting
   val thisMonth = uiState.thisMonth
@@ -260,7 +268,7 @@ private fun PrescriptionList(
       item(key = C.Tag.prescriptions_waiting_header) {
         Subheader(
             stringResource(
-                if (isCaregiver) R.string.prescriptions_added_by_you
+                if (caregiverOf != null) R.string.prescriptions_added_by_you
                 else R.string.prescriptions_added_by_a_caregiver
             ),
             C.Tag.prescriptions_waiting_header,
@@ -268,7 +276,7 @@ private fun PrescriptionList(
       }
       // The patient reviews each on a Dawn card: tapping it opens the review (US-43)
       items(waiting, key = { it.id }) {
-        if (isCaregiver) PrescriptionItem(it, onOpen)
+        if (caregiverOf != null) AddedByYouItem(it, caregiverOf, onOpen, onDismiss)
         else PrescriptionItem(it, onReview, toReview = true)
       }
     }
@@ -315,8 +323,10 @@ private fun Subheader(text: String, testTag: String) {
 @Composable
 private fun PrescriptionItem(
     prescription: Prescription,
-    onOpen: (String) -> Unit,
+    onOpen: ((String) -> Unit)?,
     toReview: Boolean = false,
+    state: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
   val date = prescription.prescribedOn.format(dateFormatter)
   val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
@@ -334,8 +344,10 @@ private fun PrescriptionItem(
               if (prescribedBy.isEmpty()) date
               else stringResource(R.string.prescriptions_item_supporting, prescribedBy, date)
           )
-          // A prescription a caregiver added says who did, and whether the patient confirmed it
-          prescription.addedByName?.let { AddedBy(it, isConfirmed = prescription.isConfirmed) }
+          // The caregiver who added it sees where it is; others see who added it, and whether the
+          // patient confirmed it
+          if (state != null) Text(state, color = MaterialTheme.colorScheme.secondary)
+          else prescription.addedByName?.let { AddedBy(it, isConfirmed = prescription.isConfirmed) }
         }
       },
       colors =
@@ -347,8 +359,55 @@ private fun PrescriptionItem(
                   Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                       .clip(MaterialTheme.shapes.medium)
               else Modifier)
-              .clickable { onOpen(prescription.id) }
+              .then(
+                  if (onOpen != null) Modifier.clickable { onOpen(prescription.id) } else Modifier
+              )
               .testTag(C.Tag.prescriptionsItem(prescription.id)),
+      trailingContent = trailing,
+  )
+}
+
+/**
+ * A prescription the caregiver added, under "Added by you" (US-43): where it is for [patient]
+ * ("Waiting for Anne", "Accepted by Anne", "Rejected by Anne"), and once decided a close button
+ * ([onDismiss]). A rejected one has no detail to open.
+ */
+@Composable
+private fun AddedByYouItem(
+    prescription: Prescription,
+    patient: String,
+    onOpen: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+  val confirmation = prescription.confirmation
+  val state =
+      stringResource(
+          when (confirmation) {
+            PrescriptionConfirmation.PENDING -> R.string.prescriptions_waiting_for
+            PrescriptionConfirmation.CONFIRMED -> R.string.prescriptions_accepted_by
+            PrescriptionConfirmation.REJECTED -> R.string.prescriptions_rejected_by
+          },
+          patient,
+      )
+  PrescriptionItem(
+      prescription,
+      onOpen.takeIf { confirmation != PrescriptionConfirmation.REJECTED },
+      state = state,
+      trailing =
+          if (confirmation == PrescriptionConfirmation.PENDING) null
+          else {
+            {
+              IconButton(
+                  onClick = { onDismiss(prescription.id) },
+                  modifier = Modifier.testTag(C.Tag.prescriptionsDismiss(prescription.id)),
+              ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.prescriptions_dismiss),
+                )
+              }
+            }
+          },
   )
 }
 

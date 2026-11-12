@@ -420,6 +420,9 @@ object C {
     /** One prescription of the list. */
     fun prescriptionsItem(prescriptionId: String) = "prescriptions_item_$prescriptionId"
 
+    /** The close button of a prescription the caregiver added, once decided (US-43). */
+    fun prescriptionsDismiss(prescriptionId: String) = "prescriptions_dismiss_$prescriptionId"
+
     const val prescription_detail_screen = "prescription_detail_screen"
     const val prescription_detail_back_button = "prescription_detail_back_button"
     const val prescription_detail_loading = "prescription_detail_loading"

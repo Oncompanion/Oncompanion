@@ -1822,10 +1822,8 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_screen).assertIsDisplayed()
     composeTestRule.runOnIdle {
       assertEquals(Screen.PRESCRIPTIONS, NavigationActions(navController).currentRoute())
-      assertEquals(
-          PrescriptionConfirmation.REJECTED,
-          medications.prescriptionsOf("owner").single().confirmation,
-      )
+      assertTrue(medications.prescriptionsOf("owner").isEmpty())
+      assertEquals(listOf("sams"), medications.rejectedOf("owner").map { it.id })
     }
   }
 
