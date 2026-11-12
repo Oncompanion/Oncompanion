@@ -170,6 +170,8 @@
     <string name="symptom_add_title_for">Log symptoms for %1$s</string>
     <!-- Under a symptom a caregiver logged, e.g. "Added by Sam" -->
     <string name="symptom_added_by">Added by %1$s</string>
+    <!-- Heading of the logged symptoms on the detail -->
+    <string name="symptom_detail_symptoms">Symptoms</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>
@@ -622,7 +624,10 @@
     <string name="hospital_search">Search</string>
     <string name="hospital_search_empty">No hospitals found. You can keep your text.</string>
     <string name="hospital_search_error">Search is unavailable. Try again later or enter the hospital manually.</string>
+    <string name="hospital_search_rate_limited">Too many searches. Wait before trying again, or enter the hospital manually.</string>
     <string name="hospital_attribution">© OpenStreetMap contributors</string>
+    <!-- Set only to the verified proxy HTTPS URL after authorized deployment and rollout review. -->
+    <string name="hospital_proxy_endpoint" translatable="false"></string>
     <!-- Appointment detail -->
     <string name="appointment_detail_retry">Retry</string>
     <string name="appointment_detail">Entry details</string>

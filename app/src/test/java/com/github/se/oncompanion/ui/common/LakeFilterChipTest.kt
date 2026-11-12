@@ -9,6 +9,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -46,7 +47,11 @@ class LakeFilterChipTest {
   private lateinit var typography: Typography
   private var clicks = 0
 
-  private fun setContent(selected: Boolean, enabled: Boolean = true) {
+  private fun setContent(
+      selected: Boolean,
+      enabled: Boolean = true,
+      onClick: (() -> Unit)? = { clicks++ },
+  ) {
     composeTestRule.setContent {
       OncompanionTheme {
         colors = MaterialTheme.colorScheme
@@ -54,7 +59,7 @@ class LakeFilterChipTest {
         Surface(color = MaterialTheme.colorScheme.surface) {
           LakeFilterChip(
               selected = selected,
-              onClick = { clicks++ },
+              onClick = onClick,
               label = "Fatigue",
               enabled = enabled,
               modifier = Modifier.testTag(CHIP),
@@ -118,6 +123,27 @@ class LakeFilterChipTest {
     chip().assertIsNotEnabled().performClick()
 
     assertEquals(0, clicks)
+  }
+
+  // A detail shows what was logged: the same colours, but no check and nothing to tap
+  @Test
+  fun readOnly_isDawnWithoutACheck_andCantBeTappedNorHeardAsACheckbox() {
+    setContent(selected = true, onClick = null)
+
+    chip().assertHeightIsEqualTo(48.dp)
+    composeTestRule
+        .onNodeWithTag(C.Tag.filter_chip_check, useUnmergedTree = true)
+        .assertDoesNotExist()
+    // The label sits 16 dp from each side, as without a check
+    val chipBounds = chip().getUnclippedBoundsInRoot()
+    val label =
+        composeTestRule.onNodeWithText("Fatigue", useUnmergedTree = true).getUnclippedBoundsInRoot()
+    assertEquals(16.dp, label.left - chipBounds.left)
+    assertSameColor("edge", colors.secondaryContainer, colorAcross(0.5.dp))
+    chip()
+        .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+        .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
   }
 
   // Material's chip was a checkbox for TalkBack; a single choice reads as a radio button

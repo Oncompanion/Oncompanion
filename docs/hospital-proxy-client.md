@@ -38,8 +38,9 @@ Cancellation disconnects an active platform connection immediately. Blocking rea
 session cleanup does not wait for a late response, and cancelled callers cannot receive it. Streams
 and connections are also closed when the worker exits.
 
-App Check is not installed globally at startup in this step. Its variant-specific factory is lazily
-installed before this client's first App Check token request, on the existing default app. This keeps
+App Check is installed lazily, as introduced in
+[HTTP client #303](https://github.com/Oncompanion/Oncompanion/pull/303): the variant-specific factory
+is installed before this client's first App Check token request, on the existing default app. This keeps
 an unused client inert and does not activate UI networking. The SDK installation affects that app's
 App Check instance; coordinate any future global initializer rather than installing competing factories.
 The existing Firebase BoM is retained; only App Check core/debug/Play Integrity dependencies are added,
@@ -54,20 +55,33 @@ Before approved staging/release use:
   The SDK generates a local debug secret and emits it to local Logcat on first token use for enrollment.
   Treat that log as a credential: never upload/share it or commit the value, screenshots or collected
   Logcat; register it privately in staging, revoke when no longer needed, and do not enroll debug
-  secrets in production. This PR does not fetch, register or store any debug secret.
+  secrets in production by default. There is no separate staging project for this course deployment;
+  temporary enrollment in the existing project requires separate owner authorization and cleanup
+  through the [bounded verification procedure](../functions/LIVE_VERIFICATION.md). No enrollment
+  is performed by the Android activation code or its automated tests.
 - Unit tests inject `HospitalProxyTokens` and transport/connection fakes and never need real credentials.
-  Firebase emulators have no App Check emulator; real end-to-end verification requires authorized
-  staging registration. Do not disable backend verification to make tests pass.
-- Choose HTTP versus callable before later repository/UI integration. This PR implements the current
-  HTTP contract requested for PR 2; it does not resolve the prior callable recommendation or the
-  [GET URL logging rollout blocker](../functions/OPERATIONS.md). It does not deploy resources,
-  configure production enforcement, set an endpoint or make live proxy/Nominatim requests.
+  Firebase emulators have no App Check emulator; real end-to-end verification requires separately
+  authorized debug enrollment or valid release Play Integrity attestation. Do not disable backend verification to make tests pass.
+- The implemented repository/UI integration uses the HTTP contract. Any callable migration remains
+  a separate reviewed change; this does not resolve the prior callable recommendation or the
+  [GET URL privacy constraints](../functions/OPERATIONS.md). The backend is deployed with a scoped
+  request-log exclusion; authenticated live verification remains deferred. Debug Profile search is
+  configured, while release activation remains gated.
 
 ## Opt-in repository and Profile integration
 
 After authorized deployment, App Check registration and rollout review, application setup may call
 `HospitalRepositoryProvider.configure(trustedProxyUrl)` **before** creating hospital field ViewModels.
-There is no default URL and no call in startup code in this PR, so shipped builds remain manual-only.
+`MainActivity` calls `configureAtStartup` before creating field consumers, using the non-translatable
+`hospital_proxy_endpoint` string resource. The main resource stays empty, keeping release manual-only.
+`app/src/debug/res/values/hospital_proxy.xml` overrides it with the verified deployed HTTPS endpoint
+for debug builds only. No build script, signing configuration or credential is required for this URL.
+Debug token enrollment and real searches still require separate authorization; configuration does
+not establish successful live verification. Release activation belongs to a later verified rollout.
+Startup configuration preserves any installed repository, including test overrides, across activity
+recreation. Blank or invalid configuration leaves the repository untouched and manual entry usable;
+validation failures log only their type. Explicit `configure()` throws on invalid endpoints without
+changing the repository. Changing a configured endpoint requires a new app build/process, rather than replacing live consumers or bypassing a wait.
 `disable()` restores the unconfigured provider for new consumers. Configuration is a startup boundary,
 not a reactive remote flag: recreate existing field consumers after endpoint/configuration changes.
 The provider installs the shared proxy adapter, never the legacy Nominatim HTTP repository, and
@@ -79,6 +93,10 @@ identical work. New cache misses use the existing client's Auth/App Check, statu
 There is no second HTTP implementation or Retry-After parser and no fallback to direct Nominatim.
 Missing auth/App Check and other service failures retain generic search feedback and manual entry.
 Network/timeouts, invalid responses and 429 retain the existing repository error distinctions.
+The field presents 429 as "Too many searches" and asks the user to wait or enter text manually.
+Other failures keep the existing generic error. Error and empty feedback are polite accessibility
+live regions. The shared retry gate prevents new HTTP during cooldown; only a later explicit Search
+can retry after expiry, with no automatic request or countdown.
 
 Parsed retry hints block every uncached query in the shared adapter until a monotonic deadline;
 cache hits are still served. BeyondLimit blocks that adapter indefinitely; do not recreate adapters
@@ -91,3 +109,22 @@ OpenStreetMap attribution and navigation. Editing/saving/disposal cancels old se
 ViewModel generation check prevents late responses replacing newer results. Onboarding and Add
 Appointment remain unchanged. New unit tests use the real adapter/client with fake tokens/HTTP and fake user
 repositories; they do not require or mutate shared Firebase emulator state.
+
+## Deployment verification and debug-emulator handoff
+
+The authenticated live attempt displayed "Search is unavailable. Try again later or enter the
+hospital manually." Successful suggestions and server-side caching remain unverified. The cause
+has not been established; investigation and remaining live verification are deferred to a follow-up
+after M2. This Android PR does not claim working end-to-end integration. Release search stays disabled
+until the required live verification and release App Check verification are complete.
+
+The backend endpoint is verified as
+`https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch`; only the debug resource
+is populated. Release remains empty until the authenticated live plan and release attestation are
+verified. No release-signing change is needed for the
+owner-requested debug-emulator path. A temporary debug enrollment in the existing project requires
+explicit approval and private handling/revocation; it does not prove release Play Integrity works.
+See [LIVE_VERIFICATION.md](../functions/LIVE_VERIFICATION.md) for the five completed rejection checks,
+current custom-auth/bootstrap limitations, Android Studio steps and the one-upstream-request plan.
+IAM concerns are a [separate security follow-up](hospital-proxy-iam-follow-up.md), not changes to make
+in this deployment PR.
