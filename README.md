@@ -1,30 +1,115 @@
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
-# Oncompanion
-Cancer patients undergoing active therapy face extreme physical exhaustion, complex medication schedules, and cognitive overwhelm that make it hard to track symptoms, prepare for appointments, and stay engaged in their own care, often forcing them to rely on memory or scattered paper notes when they are least equipped to manage it. We validated this problem with the Ligue genevoise contre le cancer, a Geneva-based association supporting cancer patients, whose staff confirmed these struggles are widespread and expressed support for the app; they will also help us gather feedback from real patients and caregivers through regular testing sessions during development. The app's insight is that health tracking has to adapt to the patient's energy level, so it replaces manual data entry with low-effort logging (one-tap and voice entries), a directory of emergency contacts and support programs maintained by Ligue staff, appointment tools, an interactive symptom tracker, a medical question notepad, and a care circle that lets relatives help, all designed around minimal cognitive load. oncompanion is an organizational tool, not a medical device: it makes no diagnosis, gives no medical advice, and never changes a treatment. Every medication entry drafted from a scanned prescription must be confirmed by the patient, and health data is protected by per-user access rules and only shared with people the patient explicitly chooses. As a P2 stretch goal, we are exploring an on-device chatbot based on EPFL's Meditron3-Gemma2-2B, strictly limited to empathetic support and help phrasing questions for the care team, never medical information; it would be an optional download, only offered on devices with enough memory, and we will evaluate its answer quality and battery impact before shipping it. The core personas are: an outpatient managing severe chemotherapy fatigue who needs the lowest possible effort to record how she feels; a patient following a complex multi-drug regimen who needs help turning prescription labels into a schedule; and a family member who wants to support a loved one's treatment day to day.
 
+<p align="center">
+  <img src="docs/banner.png" alt="oncompanion" width="100%">
+</p>
 
-## ===== SPLIT-APP MODEL =====
-The app uses Google Firebase. Firebase Authentication handles Google Sign-In. Cloud Firestore stores each patient's symptom history, medication schedule, and appointments: data is kept locally on the device and synced to Firestore, so it is available across the patient's devices and to the care-circle members they have authorized. Firestore also hosts the Ligue directory of contacts, support programs, and events, which staff edit and patients read. Firestore security rules ensure users can only access their own data, data explicitly shared with them, and, for staff, the directory.
+<p align="center">
+  <b>Cancer care, kept in one place with as little effort as possible, and shared with the people who help.</b>
+</p>
 
+<p align="center">
+  <a href="https://github.com/Oncompanion/Oncompanion/actions/workflows/ci.yml"><img src="https://github.com/Oncompanion/Oncompanion/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=Oncompanion_Oncompanion"><img src="https://sonarcloud.io/api/project_badges/measure?project=Oncompanion_Oncompanion&metric=alert_status" alt="Quality gate"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=Oncompanion_Oncompanion"><img src="https://sonarcloud.io/api/project_badges/measure?project=Oncompanion_Oncompanion&metric=coverage" alt="Coverage"></a>
+  <a href="https://github.com/Oncompanion/Oncompanion/releases/latest"><img src="https://img.shields.io/github/v/release/Oncompanion/Oncompanion?label=APK" alt="Latest APK"></a>
+</p>
 
-## ===== MULTI-USER SUPPORT =====
-Users sign in with Google Sign-In through Firebase Authentication. Security rules ensure each user only sees their own data, plus anything explicitly shared with them.
+## About
 
-- Care circle: a patient invites family or friends with an invite code and chooses which parts of their care each person can see. Access is read-only, with one exception the patient chooses per member: they can let a member log symptoms for them, signed with that member's name. Members never edit or delete anything. It can be changed or revoked at any time, and circle members get reminders.
-- Ligue staff: staff accounts are granted by our team, never self-assigned. Staff keep the directory of contacts and support programs up to date and post events, which patients see in the app. Staff have no access to patients' health data. As a stretch feature, the staff could also create group chats between patients.
-- Doctors: no account needed. Before an appointment, the patient can generate a symptom summary to show on screen or export as a PDF, choosing what goes in it.
+People in active cancer therapy live with exhaustion, "chemo brain" and complicated medication schedules. Too often they rely on memory or scattered paper notes, on exactly the days they have the least energy for it. oncompanion keeps today's care in one place: what's coming up, how they've been feeling, what they take, and who helps them. Relatives in the patient's care circle can follow what the patient shares and, if allowed, log symptoms or add prescriptions for them. Logging takes a tap or two, so it still works on a bad day.
 
+> [!NOTE]
+> oncompanion is an organizational tool, **not a medical device**. It makes no diagnosis, gives no medical advice and never changes a treatment. Anything drafted for the patient, such as a scanned prescription, is saved only once they have checked and confirmed it.
 
-## ===== SENSOR USE =====
-The core sensor feature uses the phone's camera and on-device text recognition (ML Kit) to scan prescription labels. The app drafts a medication schedule entry, shown next to the photo of the label, and the patient must review and confirm every field before it is saved: nothing is added automatically, and uncertain fields are highlighted. The microphone enables voice-to-text journaling to log symptoms effortlessly. As a stretch goal, GPS could detect when the patient arrives at an appointment location and switch to a "consultation mode" showing a symptom summary for that appointment; location is processed on the device only and never uploaded.
+## Screenshots
 
+<p align="center">
+  <img src="docs/readme/planning.png" alt="Planning: today's medications and appointments" width="19%">
+  <img src="docs/readme/log-symptoms.png" alt="Log symptoms: tap what you feel and how bad it is" width="19%">
+  <img src="docs/readme/prescriptions.png" alt="My prescriptions, with Scan and Enter manually" width="19%">
+  <img src="docs/readme/events.png" alt="Upcoming Ligue events" width="19%">
+  <img src="docs/readme/care-circle.png" alt="Care circle: members and what each one can see" width="19%">
+</p>
 
-## ===== OFFLINE MODE =====
-The app works fully offline for its essential functions: logging and viewing symptoms, checking the medication schedule and reminders, and reaching emergency contacts. Data is stored locally and synced to Firebase automatically once a connection returns. The Ligue directory is cached on the phone so it stays available offline. Updates from staff appear once back online, and care circle members see the patient's latest data once they are online too. Text recognition runs fully offline. Voice journaling uses on-device speech recognition where the device supports it, and otherwise records the audio locally and transcribes it once connectivity returns.
+<p align="center"><sub>Designs from our <a href="https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion">Figma file</a>, with fictional data.</sub></p>
 
-## ===== FIGMA =====
-[Figma design file](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion?t=XIxG9NcnbbcxOcOR-1)
+## Features
 
+- **Your day at a glance.** The Overview shows the next appointment, today's medications and the events organised by the [Ligue Genevoise Contre Le Cancer](https://geneve.liguecancer.ch/) you signed up for.
+- **Planning.** A week calendar of appointments, active medications and confirmed events. Appointments can be added, edited and deleted.
+- **Symptom journal.** Tap what you feel, choose how bad it is, add a voice note if you want, and look back over your history.
+- **Prescriptions without retyping.** Photograph a prescription and on-device text recognition (ML Kit) drafts it. You check every field before anything is saved. The app warns you when a prescription is already saved or looks like a renewal.
+- **Ligue events.** Browse the Ligue genevoise's events and note that you registered with the organizer.
+- **Care circle.** Invite relatives with a code and choose which sections each one can see: planning, symptoms, prescriptions, events. You can also let a relative add entries for you, signed with their name. A prescription a relative adds stays unconfirmed until you have checked it.
+- **Works offline.** Everything is saved on the phone first and syncs once you're back online. Prescription scanning works offline too.
+- **Made for tired days.** Light and dark themes, landscape, and text that stays usable at 200% font size.
 
-## ===== DOWNLOAD =====
-The latest APK is in the [Releases](../../releases) tab, published every Thursday.
+**Coming next:** reminders for appointments, events and medications; logging a symptom by voice; a summary of how you've been to show your doctor (on screen or as a PDF); a hospital search in your profile; and the Ligue's directory of contacts and support programs.
+
+## Design
+
+The theme is called *Morning on the lake*. It is warm and quiet, and Lake Geneva is drawn in cut paper behind each screen title, coloured for the time of day. Everyone in the care circle is a small paper boat on the lake. The tokens, components and rules are in [DESIGN.md](DESIGN.md), and every screen with its states is in [Figma](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion).
+
+## Download
+
+The signed APK is on the [Releases](https://github.com/Oncompanion/Oncompanion/releases) page. A new one is published every Thursday. It requires Android 9 or later.
+
+## For developers
+
+### Tech stack
+
+| | |
+| --- | --- |
+| App | Kotlin, Jetpack Compose, Material 3, MVVM with manual dependency injection |
+| Backend | Firebase Authentication (Google Sign-In), Cloud Firestore with its offline cache, Cloud Functions in TypeScript with App Check |
+| On device | ML Kit text recognition, Android speech recognition |
+| Tests | JUnit, Robolectric, Compose UI tests, Kaspresso, Firebase emulators |
+| Quality | ktfmt, Android lint, JaCoCo, SonarCloud (90% coverage on new code) |
+
+### Architecture
+
+Each feature has a UI layer (screens and their ViewModels), an optional domain layer (use cases combining several repositories) and a data layer (repositories that hide Firebase behind an interface). A caregiver uses the same screens as the patient: every read of patient data goes through one access check, and `firestore.rules` enforces the same check on the server.
+
+![Architecture overview](docs/architecture-overview.svg)
+
+The layers, the Firestore layout and one diagram per feature are in [docs/architecture.md](docs/architecture.md).
+
+### Getting started
+
+1. Clone the repository and open it in Android Studio.
+2. Build. Gradle runs on Java 25 and downloads it on the first build ([gradle-daemon-jvm.properties](gradle/gradle-daemon-jvm.properties)). The Firebase client config, `app/google-services.json`, is committed on purpose.
+3. For tests that touch Firestore or Auth, start the Firebase emulators (Node 22 and the [Firebase CLI](https://firebase.google.com/docs/cli)):
+
+   ```bash
+   firebase emulators:start --only auth,firestore --project oncompanion-c4144
+   ```
+
+   Tests always use the emulators (Auth on port 9099, Firestore on 8080), never the production project.
+
+### Build and test
+
+```bash
+./gradlew ktfmtFormat      # format Kotlin sources (CI fails on ktfmtCheck otherwise)
+./gradlew check            # unit + Robolectric tests, lint
+./gradlew connectedCheck   # instrumented tests, needs an emulator or device and the Firebase emulators
+```
+
+The hospital search proxy in [functions/](functions/) has its own checks and tests; see [functions/README.md](functions/README.md).
+
+### CI and releases
+
+Every pull request runs three jobs ([ci.yml](.github/workflows/ci.yml)):
+- **Hospital proxy** checks and tests `functions/`.
+- **Checks** runs ktfmt, lint, the unit and Robolectric tests and the release build.
+- **CI** runs the connected tests on an emulator with the Firebase emulators, then the coverage report and SonarCloud.
+
+Every Thursday, [release.yml](.github/workflows/release.yml) publishes the signed APK built from the latest green commit on `main`. Its version is `<milestone>.<release number>`.
+
+### Contributing
+
+Read [AGENTS.md](AGENTS.md) first. It covers the architecture rules, code style, tests, commits, pull requests and the Scrum board, for people and coding agents alike. Work on a branch, open a pull request with the [template](.github/PULL_REQUEST_TEMPLATE.md), and merge once it has an approving review and a green CI.
+
+## Acknowledgements
+
+Thanks to the staff of the Ligue Genevoise Contre Le Cancer for validating the problem with us and organizing testing sessions with patients and relatives.
