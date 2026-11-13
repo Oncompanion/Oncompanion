@@ -157,6 +157,7 @@ object C {
     const val symptom_journal_retry = "symptom_journal_retry"
     const val symptom_journal_empty = "symptom_journal_empty"
     const val symptom_journal_list = "symptom_journal_list"
+    const val symptom_journal_week = "symptom_journal_week"
     const val symptom_detail_screen = "symptom_detail_screen"
     const val symptom_detail_loading = "symptom_detail_loading"
     const val symptom_detail_error = "symptom_detail_error"
@@ -242,6 +243,9 @@ object C {
 
     /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
     fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
+
+    /** The bar of a day in the journal's "This week" chart; [date] is ISO. */
+    fun symptomJournalWeekDay(date: String) = "symptom_journal_week_day_$date"
 
     /** The chip of a symptom type on the add screen; [type] is its enum name, e.g. `FATIGUE`. */
     fun symptomAddType(type: String) = "symptom_add_type_$type"

@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -201,6 +202,8 @@ private fun JournalList(
     hasAddButton: Boolean,
     onEntryClick: (String) -> Unit,
 ) {
+  // The week's summary, if something was logged this week
+  val week = remember(days, today) { weekSummaryOf(days, today) }
   LazyColumn(
       modifier = Modifier.fillMaxSize().testTag(C.Tag.symptom_journal_list),
       // The bottom padding keeps the last entry above the add button, when there is one
@@ -213,6 +216,7 @@ private fun JournalList(
                   if (hasAddButton) LakeButtonDefaults.MinHeight + Spacing.lg * 2 else Spacing.lg,
           ),
   ) {
+    week?.let { item(key = "week") { WeekCard(it, Modifier.padding(top = Spacing.sm)) } }
     days.forEach { day ->
       item(key = "day-${day.date}") { DayHeader(day.date, today) }
       itemsIndexed(day.entries, key = { _, it -> it.entry.id }) { index, journalEntry ->

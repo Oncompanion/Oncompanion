@@ -497,4 +497,72 @@ class SymptomJournalScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
     composeTestRule.onNodeWithText("Added by Robert", useUnmergedTree = true).assertExists()
   }
+
+  @Test
+  fun weekCard_summarisesTheWeek_withABarPerDay() {
+    // Monday 5 October: fatigue 7/10 today; the fever on Saturday 3 is last week's
+    val state =
+        filled.copy(
+            days =
+                listOf(
+                    day(
+                        today,
+                        fatigue to "14:30",
+                        fatigue.copy(id = "f2", intensity = null) to "09:00",
+                    ),
+                    day(LocalDate.of(2026, 10, 3), fever to "08:05"),
+                )
+        )
+    setContent(state)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsDisplayed()
+    assertTextInside("This week", C.Tag.symptom_journal_week)
+    assertTextInside("2 entries · Most often: Fatigue", C.Tag.symptom_journal_week)
+    val descriptions =
+        listOf(
+            "2026-10-05" to "Monday, Severe",
+            "2026-10-06" to "Tuesday, nothing logged",
+            "2026-10-11" to "Sunday, nothing logged",
+        )
+    for ((date, description) in descriptions) {
+      composeTestRule
+          .onNodeWithTag(C.Tag.symptomJournalWeekDay(date), useUnmergedTree = true)
+          .assert(androidx.compose.ui.test.hasContentDescription(description))
+    }
+  }
+
+  @Test
+  fun weekCard_isHiddenWhenNothingWasLoggedThisWeek() {
+    setContent(filled.copy(days = listOf(day(LocalDate.of(2026, 9, 28), fatigue to "14:30"))))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).assertIsDisplayed()
+  }
+
+  @Test
+  fun weekCard_aDayLoggedWithoutAnIntensity_isNotADayWithoutSymptoms() {
+    setContent(filled.copy(days = listOf(day(today, fatigue.copy(intensity = null) to "14:30"))))
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomJournalWeekDay("2026-10-05"), useUnmergedTree = true)
+        .assert(
+            androidx.compose.ui.test.hasContentDescription("Monday, logged without an intensity")
+        )
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun weekCard_isFullyVisibleInLandscape() {
+    setContent(filled)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = "w411dp-h891dp", fontScale = 2f)
+  fun weekCard_isFullyVisibleAt200PercentFont() {
+    setContent(filled)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsFullyVisible()
+  }
 }
