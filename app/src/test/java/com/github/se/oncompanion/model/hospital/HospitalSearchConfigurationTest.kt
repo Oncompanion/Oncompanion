@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Checks the debug resource selects the verified proxy without requesting tokens or HTTP. */
+/** Checks the shared resource selects the deployed proxy without requesting tokens or HTTP. */
 @RunWith(AndroidJUnit4::class)
 class HospitalSearchConfigurationTest {
   private val original = HospitalRepositoryProvider.repository
@@ -24,7 +24,7 @@ class HospitalSearchConfigurationTest {
   }
 
   @Test
-  fun debugEndpointInstallsTheAuthenticatedProxyWithoutSearching() {
+  fun sharedEndpointInstallsTheAuthenticatedProxyWithoutSearching() {
     val endpoint =
         ApplicationProvider.getApplicationContext<Context>()
             .getString(R.string.hospital_proxy_endpoint)

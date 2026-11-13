@@ -1,12 +1,59 @@
 <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 
-# Hospital proxy verification procedure
+# Hospital proxy verification record and procedure
 
-Deployment evidence and completed negative checks are recorded in
-[#435](https://github.com/Oncompanion/Oncompanion/pull/435). Current configuration:
-[DEPLOYMENT.md](DEPLOYMENT.md). This runbook describes verification steps, not proof that they ran.
+This is the single record of completed live checks and outstanding verification. Deployment evidence
+and negative checks are also linked from [#435](https://github.com/Oncompanion/Oncompanion/pull/435).
+Configuration is described in [DEPLOYMENT.md](DEPLOYMENT.md) and the
+[Android setup guide](../docs/hospital-proxy-client.md). A procedure is not proof that it ran.
 
-## Negative endpoint verification
+## Verification status
+
+| Check | Evidence / status |
+| --- | --- |
+| Invalid/missing credentials and malformed requests | Five deployed negative checks recorded in #435; see limitations below. |
+| Authenticated debug search | Completed on the emulator on 12 November 2026, using Google sign-in and privately registered debug App Check. |
+| Successful hospital suggestion and attribution | Completed for the public HUG query below. A different query returned a valid empty result. |
+| Server-cache repeat | Same query after app process restart returned the same suggestion; cache and coordinator timestamps remained unchanged. Consistent with a server-cache hit without another upstream request. |
+| Physical-phone debug search | LimeeFox reports success in the [PR #446 review](https://github.com/Oncompanion/Oncompanion/pull/446#pullrequestreview-5882588343), using a registered debug token. This is not release attestation. |
+| Signed-release Play Integrity and authenticated search | **Outstanding.** Check the next signed weekly APK containing release activation; record the APK version, phone and result. |
+| Valid Auth with missing/invalid App Check | **Outstanding.** Invalid-Auth rejections do not establish this combination. |
+| Successful-request log retention/privacy | **Outstanding.** Scoped negative-test evidence is not proof of universal non-retention. |
+| Live quota exhaustion, proxy alerts and notification delivery | **Outstanding.** Use automated quota/error tests rather than exhausting live capacity. |
+| Temporary debug enrollment/test-session cleanup | **Not verified.** Revoke/remove only under the separately approved cleanup scope. |
+
+## Completed debug-emulator checks: 12 November 2026
+
+The project owner separately authorized the bounded diagnostic attempts and the same-query cache
+repeat. These records do not authorize further searches. No patient information was submitted.
+Token values, enrollment secrets, user identities, profile contents and full Logcat are excluded.
+
+1. **`Hôpital Genève`:** authenticated request returned a valid empty result and the UI displayed
+   "No hospitals found. You can keep your text." with OpenStreetMap attribution. Cache creation
+   was observed at `2026-11-12T14:24:21.033773Z`, with zero projected results. Empty results are
+   successful responses, not evidence of an upstream error.
+2. **`Hôpitaux universitaires de Genève`:** separately approved public-hospital query returned one
+   suggestion with OpenStreetMap attribution. Cache update time was `2026-11-12T14:28:52.242333Z`,
+   expiry `2026-11-19T14:28:51.804Z`; coordinator update time was
+   `2026-11-12T14:28:52.444092Z`. The request completed and released the coordinator.
+3. **Identical HUG repeat:** the app was restarted into a new process to clear Android's memory
+   cache. After checking the server entry was fresh, one identical search returned the same
+   suggestion. Cache and coordinator update times above remained unchanged. This supports the
+   server-cache path; merely seeing the same UI result without those checks would not establish it.
+
+These checks establish the debug Auth/App Check path, suggestions, attribution and the bounded
+server-cache repeat. They do not establish signed-release attestation, live profile saving,
+quota-exhaustion handling or monitoring delivery. Metadata timestamps above are UTC.
+
+### Earlier failed attempt: 11 November 2026
+
+The earlier UI error was "Search is unavailable. Try again later or enter the hospital manually."
+Sanitized logs recorded `hospital_search_upstream_failure` with `upstream_timeout` at
+`2026-11-11T18:49:19.951798Z` on the previous deployed revision. That request passed the handler's
+credential checks and reached the upstream path. The root cause remains unknown; later success
+is not proof of a fix. Diagnostic backend changes are separate from the Android activation diff.
+
+## Negative endpoint procedure
 
 Use non-sensitive synthetic markers and invalid credential strings only. Check GET with no Auth
 (401), invalid Auth/App Check (401), missing App Check with a bearer string (403), missing query
@@ -15,137 +62,83 @@ metadata and inspect retained scoped logs after ingestion. No marker, URL or cre
 be retained. Missing App Check with an invalid bearer does not test App Check validation with valid Auth.
 Never substitute real patient information. An absent entry is bounded evidence, not universal privacy.
 
-## Deferred live-search plan; prerequisites still pending
+## Bounded live-search procedure
 
-Authenticated live-search and server-cache verification remain deferred in
-[deployment #435](https://github.com/Oncompanion/Oncompanion/pull/435).
-The procedure below is retained for a future explicitly resumed test, limited to one public query
-and one identical repeat with at most one upstream request. Do not execute it while deferred.
-No IAM, Auth-provider or security-rule changes are authorized. No authenticated search has been
-executed; test-user/enrollment setup requires its own owner-approved scope.
-The owner requested a debug emulator workflow rather than adding release signing for this PR.
-Use the existing debug App Check provider, with a temporary owner-approved enrollment in the existing
-project; this tests the debug-token path, not release Play Integrity attestation.
+Each new live attempt needs its own approved public query, request budget and credential scope.
+The completed attempts above do not grant an ongoing test budget. Do not retry automatically,
+try additional names, inject faults, exhaust quotas or change Auth/App Check to obtain a result.
+The usual bounded plan is one public query and one identical repeat, with at most one upstream
+request. If cache freshness, tokens or the request budget are uncertain, stop and report.
 
-1. Have an authorized administrator create one dedicated Firebase test UID and a short-lived custom
-   sign-in token using existing trusted administration tooling. No separate Google account is
-   required by Firebase custom authentication. Verify that the existing administration tooling can
-   sign tokens; do not add signing permissions or create keys to make this test possible.
-   Email/password and anonymous providers are disabled and will not be enabled for this test.
-2. The production UI remains Google sign-in only. A trusted local test bootstrap must call the
-   existing Firebase SDK's `signInWithCustomToken` for that dedicated UID; the Auth repository's
-   current-user listener is provider-independent. There is no such bootstrap in the current app.
-   Do not add a production sign-in method, reuse a real patient's account, paste credentials into
-   commands/debugger history, or log a token. If trusted signing/bootstrap tooling is unavailable,
-   record the authenticated live flow as blocked rather than bypassing Auth.
-3. After separate approval, register the debug provider's enrollment secret privately in Firebase
-   App Check for Android app `1:782199763007:android:48269a68de9ec7c134888a`. The SDK's enrollment
-   secret is not an App Check request token. Let the SDK exchange it for the real token; keep
-   Auth/App Check verification enabled. Never collect or upload broad Logcat containing that secret.
-4. With valid tokens, use only the non-sensitive marker for rejection checks: valid Auth + missing
-   App Check => 403; valid Auth + invalid App Check => 403; valid App Check + missing/invalid Auth
-   => 401. These must stop before service/quota/upstream access.
-5. After explicit live-search approval, submit **one** public hospital/location query (proposed:
-   `Hôpital Genève`) once. At most **one real upstream Nominatim request** is allowed. Observe
-   suggestions and attribution, or record an empty response without trying another query.
-6. Submit exactly the same query through a fresh client/process once, so Android's memory cache
-   cannot hide the server behavior. Inspect cache/control metadata before/after: this should be a
-   shared-cache hit with no second upstream call. Stop on an unexpected miss/failure; do not retry.
-7. Test offline cache/manual entry and error states with existing fake-transport/emulator tests;
-   do not manufacture 429/503, exhaust live quotas, run concurrent misses or inject production faults.
-   Live profile saving, if approved, uses only this UID's fictional test profile/hospital text.
-8. Under the same separately approved cleanup scope, revoke the temporary debug enrollment and
-   test sessions, and remove only the dedicated Auth user/test profile. Do not delete backend cache,
-   quota or coordinator documents or rotate the secret; normal expiry/TTL handles cache/quota data.
+### Android Studio debug setup
 
-Approval must cover the dedicated Auth/profile fixtures, temporary enrollment/revocation, the one
-upstream request and same-query repeat. Normal proxy handling writes its cache/quota/control stores.
-Tokens stay private and out of Git, logs, arguments and result artifacts. No new IAM grant is proposed.
-If an existing authorized administrator cannot supply custom authentication, this live path remains
-unverified; a different authentication/test-setup decision requires separate review.
-
-## Android Studio: local procedure with the existing sign-in UI
-
-**Current blocker:** no dedicated signed-in test account or enrolled debug App Check secret is
-available here. The existing UI accepts Google sign-in only. A plain Firebase UID cannot sign in
-through that UI. The procedure below uses a dedicated Google test account (no patient information),
-not a real patient's existing account. If no dedicated Google identity is available, use the custom
-Firebase route described above only with already-authorized signing/bootstrap tooling; that route
-is not available unless those prerequisites are provided. No new Auth provider, IAM grant or login UI is proposed.
-
-1. Open the project in Android Studio, select the **debug** build variant, and start an existing
-   Google APIs emulator in Device Manager (API 34+). Run/debug the normal `app` configuration,
-   not an instrumented test. Keep the main endpoint resource empty during credential setup.
-2. Set a breakpoint in `MainActivity.onCreate` after `super.onCreate`. In **Evaluate Expression**,
-   run this existing debug-only provider call, then resume. It requests attestation only; it does
-   not call the hospital proxy or Nominatim and does not display token contents:
+1. Use the normal debug app on an emulator or phone and a dedicated Google test account with only
+   fictional profile data. The existing sign-in UI is Google-only; creating a Firebase UID alone
+   does not establish a sign-in session. Do not add a provider, login method, signing key or IAM
+   permission to make a test possible. Custom Firebase authentication requires separately approved
+   trusted signing/bootstrap tooling and is not the path used in the completed checks.
+2. Both builds already inherit the deployed URL from main resources. Do not add another endpoint
+   overlay. Typing does not search; only tap Search after credentials and the live budget are ready.
+3. To initialize debug attestation without searching, stop at a breakpoint in `MainActivity.onCreate`
+   after `super.onCreate`, open **Evaluate Expression**, evaluate this single-line expression, then
+   close the dialog and resume. It does not print or return a credential:
 
    ```kotlin
-   com.github.se.oncompanion.model.hospital.HospitalProxyAppCheck.instance.getAppCheckToken(false)
-   kotlin.Unit
+   run { com.github.se.oncompanion.model.hospital.HospitalProxyAppCheck.instance.getAppCheckToken(false); kotlin.Unit }
    ```
 
-3. In this dedicated emulator's local Logcat, filter for `DebugAppCheckProvider`. The SDK emits
-   an enrollment secret. In Firebase Console select **oncompanion-c4144 → App Check → the Android
-   app → Manage debug tokens**, and register that secret privately with a temporary test label.
-   This owner-controlled registration is live App Check configuration, not an Auth-provider change.
-   Do not paste it here, commit it, inspect/copy actual request tokens, or upload Logcat. Clear the
-   local Logcat buffer after enrollment and after the test; the SDK can emit the secret on restart.
-4. Using the same breakpoint, request a fresh token once with the same expression but
-   `getAppCheckToken(true)`, then resume. Let the SDK cache it. Keep attestation verification enabled;
-   if issuance fails, stop. Do not expand/copy token values in the debugger.
-5. Sign in normally with the dedicated Google test account. Use only fictional onboarding details
-   if a test profile is needed. Do not use a personal/patient account. Creating a Firebase test UID
-   alone is insufficient; the app needs a genuine Firebase sign-in session.
-6. Once credentials are ready, create this **temporary local debug resource overlay** at
-   `app/src/debug/res/values/hospital_proxy_verification.xml`. It uses the existing resource setting,
-   enables only the debug build, needs no build/CI dependency change, and must not be committed:
+4. The SDK may emit its debug enrollment secret locally. Under separate owner approval, register it
+   privately in Firebase Console → App Check → the Android app → Manage debug tokens. It is a
+   credential, not an App Check request token. Never paste it into an issue/chat, commit it, upload
+   broad Logcat or expand/copy token values from the debugger. Clear the local Logcat buffer after
+   enrollment/testing; the SDK may emit the secret again on restart.
+5. If issuance needs verification, evaluate a single fresh-token request using `getAppCheckToken(true)`
+   with a completion listener that logs only a fixed success/failure marker, then resume so the
+   asynchronous callback can complete. A returned Task/Unit is not proof of token issuance. Stop
+   if sign-in or attestation fails; do not bypass verification.
+6. Open Profile → Edit profile and submit the exact approved public query once. Record success,
+   empty/error feedback, result count and attribution. Do not save the profile unless the approved
+   test-fixture scope includes it. A valid empty result is not a service failure.
+7. Before an approved identical repeat, inspect only safe server cache/coordinator metadata and
+   confirm the cache entry is still fresh. Restart the app process to clear its in-memory cache;
+   do not clear app data or delete backend cache/quota/control records. Submit the same query once
+   and compare the response and metadata. An unexpected miss/error means stop, not retry.
+8. Use existing fake-transport/emulator tests for offline/manual entry and 429/503/network/error
+   states. Do not manufacture production faults. Under approved cleanup, revoke the temporary
+   enrollment/test sessions and remove only the dedicated test fixtures. Do not rotate the quota
+   secret or reset the coordinator.
 
-   ```xml
-   <!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
-   <resources>
-       <string name="hospital_proxy_endpoint" translatable="false">https://europe-west1-oncompanion-c4144.cloudfunctions.net/hospitalSearch</string>
-   </resources>
-   ```
+The existing instrumentation runner wires Auth/Firestore to emulators; do not run it against the
+live signed-in app. Automated emulator tokens cannot authenticate to the deployed proxy. Use a
+separate test device/emulator for connected tests rather than replacing a live-verification session.
 
-7. Run the normal debug app again. Open **Profile → Edit profile**, enter exactly **`Hôpital Genève`**
-   and tap **Search once**. Check suggestions (or a valid empty response) and OpenStreetMap attribution.
-   Do not try another name or automatically retry an error. If it fails or returns empty, record that
-   outcome; do not claim successful suggestions. Selecting a result is enough; saving is optional
-   and only permitted for the fictional dedicated test profile under the approved fixture scope.
-8. Before the repeat, use the owner's Firestore Console to confirm that
-   `hospitalSearchCache/a04ad894456fad447aef1ea7e9a0928d8e2a41c499dc8a77a53de8425b63db18`
-   exists and has a future `expiresAt`. Record only its update time/expiry and coordinator metadata,
-   not credentials or record contents. If cache freshness is uncertain, **do not repeat**. Never
-   delete cache/quota/control documents or read the quota secret to force a test outcome.
-9. Force-stop/reopen the debug app to clear the Android memory cache, then submit the **identical
-   query once**. Its shared-cache response should match, with unchanged server cache/control metadata.
-   This checks the server path rather than merely the in-memory adapter. Stop after this repeat.
-   Any unexpected error/miss means stop and report; it does not authorize another attempt.
-10. With the result now in Android's memory cache, turn the emulator offline and verify cached
-    display/manual typing without another online request. Use the existing automated fake-transport
-    tests for 429/503/network/error handling; do not create live faults or exhaust quota.
-11. Remove the temporary overlay; keep the main endpoint empty until final activation is reviewed.
-    Revoke the temporary debug registration and clear local Logcat. Clean up/revoke only the
-    dedicated test account/profile if that cleanup was approved. Do not delete shared backend data.
+### Signed weekly APK check
 
-For safe automated tests, start local Auth/Firestore emulators on 9099/8080 and run
-`HospitalProfileTest` from `app/src/androidTest`. The existing runner wires both SDKs to emulators;
-those unsigned emulator tokens cannot authenticate to the deployed proxy. The normal live debug app
-must not be wired to those emulators. No release keystore or production sign-in UI change is needed.
+The [PR #446 reviewer](https://github.com/Oncompanion/Oncompanion/pull/446#pullrequestreview-5882588343)
+volunteered a physical phone for this check. The existing signed release process publishes from
+main; there is no signed branch-build result in this record. Install the next signed weekly APK
+that includes activation over version 0.2.1, retaining the normal signing identity. No debug token
+is required or accepted as evidence of release Play Integrity.
 
-## How to report results
+With an approved bounded public-hospital test and a dedicated sign-in, check suggestions and
+attribution in Profile → Edit profile. Record the release version/commit, phone/OS, attestation/search
+outcome and manual fallback. If it fails, preserve manual entry, report the failure and use the
+Android rollback procedure in [DEPLOYMENT.md](DEPLOYMENT.md) if needed; do not weaken verification.
+The shared endpoint being present, matching signing SHA-256, debug-phone success and an unsigned
+release build are prerequisites/evidence, not proof of a successful release App Check token.
 
-Record status, result count, attribution and safe cache/coordinator metadata in the verification issue.
-Distinguish emulator evidence, deployed negative cases and actual authenticated success. Record
-unverified cases explicitly: authenticated success/server cache, valid-Auth App Check rejection,
-successful-request logging, release Play Integrity and Android activation. Live quota exhaustion is
-not covered by the two-request budget; use automated tests instead. Monitoring delivery is separate.
+No release-key distribution, build-workflow changes, new enrollment or live search is authorized
+merely by following this document. The existing Auth/App Check requirements remain mandatory.
 
-Never include passwords, Firebase/App Check tokens, enrollment secrets, request URLs or full Logcat.
-A debug-provider request does not verify release attestation. The server-cache repeat must bypass
-Android's in-memory cache and must not create a second upstream request. Stop if unsure.
+## Reporting results
+
+Add dated results to this file, distinguishing automated tests, deployed rejection checks, debug
+success and signed-release verification. Record incomplete checks explicitly. Never include passwords,
+Firebase/App Check tokens, enrollment secrets, request URLs or full Logcat. A debug-provider request
+does not verify release attestation. The server-cache repeat must bypass Android's in-memory cache
+and must not create a second upstream request. Monitoring delivery remains a separate check.
 
 Sources: [Firebase custom tokens](https://firebase.google.com/docs/auth/admin/create-custom-tokens),
 [Android custom sign-in](https://firebase.google.com/docs/auth/android/custom-auth),
-[debug App Check](https://firebase.google.com/docs/app-check/android/debug-provider).
+[debug App Check](https://firebase.google.com/docs/app-check/android/debug-provider),
+[Play Integrity](https://firebase.google.com/docs/app-check/android/play-integrity-provider).

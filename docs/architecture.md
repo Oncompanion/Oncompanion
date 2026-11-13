@@ -105,8 +105,11 @@ enforces ten initial shared-cache misses per rolling hour and fifty per rolling 
 server-only Secret Manager key; raw UIDs never enter search storage. Cache expiry also has a
 deployable TTL policy; logical expiry remains enforced.
 The Account, Appointments and overview diagrams identify the deployed backend. The
-repository-to-proxy path is enabled for debug Profile searches through a variant resource. Release
-keeps the empty endpoint pending authenticated live verification and Play Integrity verification.
+repository-to-proxy path is enabled for debug and release Profile searches through one shared URL
+in the main string resources. Release uses Play Integrity; if attestation is unavailable or rejected
+(for example, without Google Play services or on a device that fails integrity), Search reports its
+existing error and manual entry remains usable. Verification evidence and outstanding checks live in
+[LIVE_VERIFICATION.md](../functions/LIVE_VERIFICATION.md).
 
 `hospitalSearchCache/{sha256}` stores only projected hospital results and a seven-day expiry;
 `hospitalSearchControl/nominatim` holds the exclusive owner or server-timestamp cooldown. Both
@@ -136,12 +139,12 @@ the block for that adapter's lifetime instead of shortening the provider wait. C
 once before creating field ViewModels; endpoint changes/disable require recreating existing consumers.
 The prior local HTTP repository remains legacy code for its tests, not an integrated search path.
 
-`MainActivity` passes the variant-specific `hospital_proxy_endpoint` resource to
+`MainActivity` passes the shared `hospital_proxy_endpoint` resource to
 `HospitalRepositoryProvider.configureAtStartup` before creating fields. An installed adapter is
-reused across activity recreation, keeping its cache and retry gate. The debug resource selects the
-verified deployed HTTPS endpoint; release remains manual-only. Debug requires a dedicated signed-in
-test account and separately authorized App Check enrollment before live verification. `FirebaseHospitalProxyTokens` obtains Auth/App Check
-tokens lazily.
+reused across activity recreation, keeping its cache and retry gate. Both builds inherit the deployed
+HTTPS endpoint from main resources; release uses Play Integrity and debug uses private debug enrollment.
+Debug requires a dedicated signed-in test account and separately authorized App Check enrollment
+before live verification. `FirebaseHospitalProxyTokens` obtains Auth/App Check tokens lazily.
 Profile Search is enabled only for an installed proxy adapter. The existing
 HospitalFieldViewModel owns explicit Search actions and stale-result cancellation, while edits,
 selection, saving and leaving Profile clear obsolete feedback. Rate-limited searches show a distinct

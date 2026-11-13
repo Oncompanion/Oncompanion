@@ -1,4 +1,5 @@
 <!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
 
 <p align="center">
   <img src="docs/banner.png" alt="oncompanion" width="100%">
@@ -44,10 +45,11 @@ People in active cancer therapy live with exhaustion, "chemo brain" and complica
 - **Prescriptions without retyping.** Photograph a prescription and on-device text recognition (ML Kit) drafts it. You check every field before anything is saved. The app warns you when a prescription is already saved or looks like a renewal.
 - **Ligue events.** Browse the Ligue genevoise's events and note that you registered with the organizer.
 - **Care circle.** Invite relatives with a code and choose which sections each one can see: planning, symptoms, prescriptions, events. You can also let a relative add entries for you, signed with their name. A prescription a relative adds stays unconfirmed until you have checked it.
+- **Find your hospital.** Search explicitly from Edit profile, select a hospital suggestion, or enter the location manually. New searches need connectivity and valid app attestation; manual entry remains available if search fails.
 - **Works offline.** Everything is saved on the phone first and syncs once you're back online. Prescription scanning works offline too.
 - **Made for tired days.** Light and dark themes, landscape, and text that stays usable at 200% font size.
 
-**Coming next:** reminders for appointments, events and medications; logging a symptom by voice; a summary of how you've been to show your doctor (on screen or as a PDF); a hospital search in your profile; and the Ligue's directory of contacts and support programs.
+**Coming next:** reminders for appointments, events and medications; logging a symptom by voice; a summary of how you've been to show your doctor (on screen or as a PDF); and the Ligue's directory of contacts and support programs.
 
 ## Design
 
