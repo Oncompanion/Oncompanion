@@ -172,6 +172,17 @@
     <string name="symptom_added_by">Added by %1$s</string>
     <!-- Heading of the logged symptoms on the detail -->
     <string name="symptom_detail_symptoms">Symptoms</string>
+    <!-- The "This week" card of the journal: e.g. "4 entries · Most often: Fatigue" -->
+    <string name="symptom_week_title">This week</string>
+    <plurals name="symptom_week_summary">
+        <item quantity="one">%1$d entry · Most often: %2$s</item>
+        <item quantity="other">%1$d entries · Most often: %2$s</item>
+    </plurals>
+    <string name="symptom_week_hint">Bar height = how hard the day felt, in your own words</string>
+    <!-- What TalkBack reads for a day of the chart, e.g. "Monday, Moderate" -->
+    <string name="symptom_week_day_intensity">%1$s, %2$s</string>
+    <string name="symptom_week_day_no_intensity">%1$s, logged without an intensity</string>
+    <string name="symptom_week_day_nothing">%1$s, nothing logged</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to Oncompanion</string>

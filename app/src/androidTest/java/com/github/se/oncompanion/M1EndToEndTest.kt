@@ -13,6 +13,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -286,11 +287,12 @@ class M1EndToEndTest {
 
   /** From the journal: the symptom just logged is deleted after confirming, and is gone. */
   private fun deleteSymptom() {
-    val fatigue = string(R.string.symptom_type_fatigue)
-    ui.open(C.Tag.overview_shortcut_symptoms, hasText(fatigue, substring = true))
-    ui.open(hasText(fatigue, substring = true), hasTestTag(C.Tag.symptom_detail_delete))
-        .reveal()
-        .performClick()
+    // The entry's row: the "This week" card above it also says "Most often: Fatigue", but can't be
+    // tapped
+    val entry =
+        hasText(string(R.string.symptom_type_fatigue), substring = true) and hasClickAction()
+    ui.open(C.Tag.overview_shortcut_symptoms, entry)
+    ui.open(entry, hasTestTag(C.Tag.symptom_detail_delete)).reveal().performClick()
     // Back in the journal, which is empty again
     ui.open(C.Tag.symptom_delete_confirm, hasTestTag(C.Tag.symptom_journal_empty))
     ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.overview_greeting))
