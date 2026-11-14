@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.common
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
@@ -222,6 +223,21 @@ class PaperLakeTest {
             .fetchSemanticsNodes()
             .size,
     )
+  }
+
+  @Test
+  fun scene_givenAHeight_keepsIt_andCutsTheSkyNotTheWater() {
+    // Sign in gives the scene the space left, here 170 dp less than its proportions
+    compose.setContent {
+      OncompanionTheme(darkTheme = false) {
+        PaperLakeScene(LocalTime.parse("21:00"), Modifier.testTag(HEADER).size(390.dp, 300.dp))
+      }
+    }
+
+    compose.onNodeWithTag(HEADER).assertHeightIsEqualTo(300.dp)
+    // The far water, at 360 of 470 dp, moved up with the bottom edge
+    assertSameColor("scene water at dusk", HorizonDuskBottomLight, colorAt(20f, 190f))
+    assertSameColor("scene sky at dusk", HorizonDuskTopLight, skyColor())
   }
 
   @Test

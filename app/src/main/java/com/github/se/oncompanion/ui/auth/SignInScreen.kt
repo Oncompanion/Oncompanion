@@ -5,11 +5,17 @@ package com.github.se.oncompanion.ui.auth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,20 +30,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.PaperLakeScene
 import com.github.se.oncompanion.ui.common.RibbonLogo
+import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
+import java.time.LocalTime
 
 /**
- * Sign-in screen (Figma "US-01 / Login"): the only way in is "Continue with Google". The first
- * sign-in creates the account.
+ * Sign-in screen (Figma "US-1 / Login"): the only way in is "Continue with Google". The first
+ * sign-in creates the account. Under the Paper lake scene in portrait, next to it in landscape.
  *
  * @param onSignedIn called once after a successful sign-in, with where to go next
  * @param credentialProvider shows Google's dialog; replaceable in tests
@@ -98,44 +109,112 @@ fun SignInContent(
     }
   }
 
+  // The light of when the screen opened: the sky doesn't change while the user signs in
+  val openedAt = remember { LocalTime.now() }
   Scaffold(
       modifier = modifier.testTag(C.Tag.sign_in_screen),
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
-    Column(
-        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      RibbonLogo(Modifier.testTag(C.Tag.sign_in_logo), size = 64.dp)
-      Spacer(Modifier.height(24.dp))
-      Text(
-          text = stringResource(R.string.sign_in_welcome),
-          style = MaterialTheme.typography.headlineMedium,
-          textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(8.dp))
-      Text(
-          text = stringResource(R.string.sign_in_subtitle),
-          style = MaterialTheme.typography.bodyLarge,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(32.dp))
-      GoogleSignInButton(
-          onClick = onSignInClick,
-          enabled = !uiState.isLoading,
-          modifier = Modifier.testTag(C.Tag.google_sign_in_button),
-      )
-      Spacer(Modifier.height(24.dp))
-      Box(Modifier.size(32.dp)) {
-        if (uiState.isLoading) {
-          CircularProgressIndicator(Modifier.fillMaxSize().testTag(C.Tag.sign_in_loading))
+    val layoutDirection = LocalLayoutDirection.current
+    // The lake goes under the status bar, as in the Figma; the rest keeps clear of the system bars
+    val clear =
+        Modifier.padding(
+            end = innerPadding.calculateEndPadding(layoutDirection),
+            bottom = innerPadding.calculateBottomPadding(),
+        )
+    if (isCompactHeight()) {
+      // A phone held sideways: the lake on the left half, the welcome and the button on the right
+      Row(Modifier.fillMaxSize()) {
+        PaperLakeScene(openedAt, Modifier.weight(1f).fillMaxHeight().testTag(C.Tag.sign_in_scene))
+        Column(
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxHeight()
+                    .then(clear)
+                    .padding(top = innerPadding.calculateTopPadding())
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.Center,
+        ) {
+          // The welcome scrolls, so the button never leaves the screen
+          // A smaller title than in portrait, so the welcome fits on a phone held sideways
+          Welcome(
+              Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+              titleStyle = MaterialTheme.typography.headlineMedium,
+          )
+          SignInAction(uiState, onSignInClick)
         }
+      }
+    } else {
+      Column(Modifier.fillMaxSize().then(clear)) {
+        // The lake takes the space left: a short phone or a large font shrinks it, not the text
+        PaperLakeScene(openedAt, Modifier.weight(1f).testTag(C.Tag.sign_in_scene))
+        Welcome(
+            Modifier.padding(horizontal = Spacing.lg).padding(top = Spacing.xl),
+            titleStyle = MaterialTheme.typography.headlineLarge,
+        )
+        SignInAction(
+            uiState,
+            onSignInClick,
+            Modifier.padding(horizontal = Spacing.lg)
+                .padding(top = Spacing.lg, bottom = Spacing.xl),
+        )
       }
     }
   }
 }
+
+/**
+ * The ribbon, the welcome and what signing in does (Figma "Welcome").
+ *
+ * @param titleStyle the welcome's: Headline Large as in the Figma, Medium in landscape
+ */
+@Composable
+private fun Welcome(modifier: Modifier, titleStyle: TextStyle) {
+  Column(modifier) {
+    RibbonLogo(Modifier.testTag(C.Tag.sign_in_logo), size = LOGO_SIZE)
+    Spacer(Modifier.height(Spacing.sm))
+    // The text sits a little further in than the ribbon, whose drawing has its own margin
+    Column(
+        modifier = Modifier.padding(horizontal = Spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+      Text(
+          text = stringResource(R.string.sign_in_welcome),
+          style = titleStyle,
+      )
+      Text(
+          text = stringResource(R.string.sign_in_subtitle),
+          style = MaterialTheme.typography.bodyLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+}
+
+/** "Continue with Google", with the spinner above it while signing in. */
+@Composable
+private fun SignInAction(
+    uiState: SignInUiState,
+    onSignInClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(Modifier.padding(bottom = Spacing.lg).size(SPINNER_SIZE)) {
+      if (uiState.isLoading) {
+        CircularProgressIndicator(Modifier.fillMaxSize().testTag(C.Tag.sign_in_loading))
+      }
+    }
+    GoogleSignInButton(
+        onClick = onSignInClick,
+        enabled = !uiState.isLoading,
+        modifier = Modifier.testTag(C.Tag.google_sign_in_button),
+    )
+  }
+}
+
+// The Figma's ribbon on Sign in, and the spinner's room above the button
+private val LOGO_SIZE = 64.dp
+private val SPINNER_SIZE = 32.dp
 
 private fun SignInError.messageRes(): Int =
     when (this) {
