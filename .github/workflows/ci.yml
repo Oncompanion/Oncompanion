@@ -157,6 +157,16 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      # The classes inside those APKs, for the coverage report: JaCoCo matches classes by a CRC of
+      # their bytes, so the report must read these and not another compile's
+      - name: Upload the compiled classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-classes
+          path: app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/
+          if-no-files-found: error
+          retention-days: 3
+
   # The connected tests, split in 4 shards that run at the same time on their own runner, each with
   # its own Android emulator and Firebase emulators. No Gradle here: a shard boots its emulator
   # while the Build APKs job runs, then installs the APKs and runs a quarter of the test methods
@@ -311,7 +321,9 @@ jobs:
         run: |
           chmod +x ./gradlew
 
-      # The same classes as the APKs the shards test: the build is reproducible
+      # The SonarCloud upload needs the app compiled (its sonarResolver task, even with
+      # sonar.gradle.skipCompile): done while the tests run. The coverage report doesn't use these
+      # classes but the Build APKs job's, see "Use the classes the shards ran on"
       - name: Compile
         run: |
           ./gradlew compileDebugKotlin --build-cache
@@ -352,6 +364,18 @@ jobs:
           pattern: connected-coverage-*
           merge-multiple: true
           path: app/build/outputs/code_coverage/debugAndroidTest/connected
+
+      # In place of this job's own compile, which JaCoCo would silently not match if one class
+      # differed (a compiler update, a non-deterministic generator). The upload's compile then
+      # comes back from the build cache
+      - name: Use the classes the shards ran on
+        run: rm -rf app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes
+
+      - name: Download the compiled classes
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-classes
+          path: app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes
 
       - name: Generate Coverage Report
         run: |
