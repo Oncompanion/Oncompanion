@@ -61,6 +61,12 @@ adb shell am instrument -r -w \
   python3 .github/scripts/instrumentation_to_junit.py "test-results/TEST-shard-$shard.xml"
 
 # The debug app can read its own files: copy the coverage out, unchanged
+coverage=shard-coverage/shard-$shard/coverage.ec
 mkdir -p "shard-coverage/shard-$shard"
-adb exec-out run-as "$app_id" cat "$coverage_on_device" > "shard-coverage/shard-$shard/coverage.ec"
-[ -s "shard-coverage/shard-$shard/coverage.ec" ] || { echo "No coverage written"; exit 1; }
+adb exec-out run-as "$app_id" cat "$coverage_on_device" > "$coverage"
+# exec-out mixes run-as's errors ("No such file", "not debuggable") into the file: check it starts
+# with JaCoCo's header (block 0x01, then 0xC0C0), rather than only that it isn't empty
+if [ "$(head -c 3 "$coverage" | od -An -tx1 | tr -d ' \n')" != "01c0c0" ]; then
+  echo "No coverage written: $(head -c 200 "$coverage")"
+  exit 1
+fi

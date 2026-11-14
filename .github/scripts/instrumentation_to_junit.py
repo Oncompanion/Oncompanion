@@ -5,11 +5,13 @@
 Reads the output on stdin as the tests run and echoes it, so the log shows progress. Each test's
 time is measured between its start and end lines, as nothing else gives it without Gradle.
 
-Exits with 1 when a test failed, or when the run didn't finish (e.g. the app crashed): fewer
-results than tests announced, or no "INSTRUMENTATION_CODE: -1" (Activity.RESULT_OK) at the end.
+Exits with 1 when a test failed, when no test ran, or when the run didn't finish (e.g. the app
+crashed): fewer results than tests announced, or no "INSTRUMENTATION_CODE: -1"
+(Activity.RESULT_OK) at the end. A test that started but never ended is reported as an error.
 
 Usage: ... | instrumentation_to_junit.py <report.xml>
 """
+import re
 import sys
 import time
 from xml.etree import ElementTree
@@ -21,6 +23,9 @@ CODE = "INSTRUMENTATION_CODE: "
 
 # AndroidJUnitRunner's status codes (InstrumentationResultPrinter)
 START, OK, ERROR, FAILURE, IGNORED, ASSUMPTION_FAILURE = 1, 0, -1, -2, -3, -4
+
+CRASHED = "The test never ended: the app probably crashed during it (see the logcat)"
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def parse(lines):
@@ -52,7 +57,18 @@ def parse(lines):
         elif key is not None:
             # A value on several lines, e.g. a stack trace
             status[key] += "\n" + line
+    # A test that started but never ended: the app crashed during it. Reported as an error, so the
+    # report names the test to look at
+    end = time.monotonic()
+    for test, start in started.items():
+        results.append((*test, ERROR, end - start, CRASHED))
     return results, announced, final_code
+
+
+def xml_safe(text):
+    """[text] without the control characters XML 1.0 forbids (e.g. ANSI escapes in a stack
+    trace), which would make the report unreadable."""
+    return CONTROL_CHARACTERS.sub("", text)
 
 
 def write_report(results, path):
@@ -74,6 +90,7 @@ def write_report(results, path):
         )
         if code in (FAILURE, ERROR):
             tag = "failure" if code == FAILURE else "error"
+            stack = xml_safe(stack)
             ElementTree.SubElement(case, tag, message=stack.split("\n", 1)[0]).text = stack
         elif code in (IGNORED, ASSUMPTION_FAILURE):
             ElementTree.SubElement(case, "skipped")
@@ -86,6 +103,10 @@ def main():
     failed = write_report(results, sys.argv[1])
     print(f"{len(results)} of {announced} tests ran, {failed} failed")
     if failed:
+        return 1
+    if announced == 0:
+        # A wrong numShards/shardIndex or runner argument would otherwise pass with nothing run
+        print("No test ran in this shard")
         return 1
     if len(results) < announced or final_code != -1:
         print("The run didn't finish: the app may have crashed (see the logcat)")
