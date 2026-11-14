@@ -15,18 +15,33 @@ app_id=com.github.se.oncompanion
 runner=$app_id.test/$app_id.utils.OncompanionTestRunner
 coverage_on_device=/data/data/$app_id/coverage.ec
 
-# The emulator booted while the APKs were being built: wait for them (at most 15 min)
-for _ in $(seq 90); do
-  build=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
-    --jq '.jobs[] | select(.name == "Build APKs") | "\(.status) \(.conclusion)"') || build=""
-  case "$build" in
-    "completed success") break ;;
-    completed*) echo "The Build APKs job ended with \"${build#completed }\"" && exit 1 ;;
-  esac
-  sleep 10
+# The emulator booted while the APKs were being built: wait for them (at most 15 min). Every 30 s:
+# each run's waits share GITHUB_TOKEN's 1,000 API calls per hour with every other run of the repo
+build=""
+for _ in $(seq 30); do
+  if build=$(gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+    --jq '.jobs[] | select(.name == "Build APKs") | "\(.status) \(.conclusion)"'); then
+    case "$build" in
+      "") echo "No job named \"Build APKs\" in this run: rename it here and in ci.yml together"
+        exit 1 ;;
+      "completed success") break ;;
+      completed*) echo "The Build APKs job ended with \"${build#completed }\"" && exit 1 ;;
+    esac
+  else
+    # A GitHub API error (e.g. the rate limit) is said and tried again, not taken for "not done"
+    echo "Couldn't read the Build APKs job, trying again"
+  fi
+  sleep 30
 done
 [ "$build" = "completed success" ] || { echo "The Build APKs job didn't finish in time"; exit 1; }
-gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n debug-apks -D apks
+
+# Three tries, so a passing API error doesn't fail the shard after its emulator booted
+for attempt in 1 2 3; do
+  gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n debug-apks -D apks && break
+  [ "$attempt" = 3 ] && { echo "Couldn't download the APKs"; exit 1; }
+  rm -rf apks
+  sleep $((attempt * 15))
+done
 
 # No "isn't responding" dialogs: on the slow emulator they take the focus from the app under
 # test. The whole device's logcat is recorded, to see what happened when a test fails

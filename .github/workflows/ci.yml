@@ -121,6 +121,8 @@ jobs:
 
   # The app and its connected tests, built once for every shard
   build:
+    # The shards wait for this job by its name (.github/scripts/run-connected-shard.sh): rename
+    # both together
     name: Build APKs
     runs-on: ubuntu-latest
 
@@ -328,14 +330,15 @@ jobs:
         run: |
           ./gradlew compileDebugKotlin --build-cache
 
-      # At most 20 min. A failed job stops here: its reports are missing, and SonarCloud would show a
-      # wrong coverage. "Re-run failed jobs" runs it and this job again (#300)
+      # At most 20 min, every 30 s (GITHUB_TOKEN has 1,000 API calls per hour for the whole repo).
+      # A failed job stops here: its reports are missing, and SonarCloud would show a wrong
+      # coverage. "Re-run failed jobs" runs it and this job again (#300)
       - name: Wait for the tests
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for _ in $(seq 120); do
-            # A read that fails (a GitHub API error) is tried again, rather than failing the job
+          for _ in $(seq 40); do
+            # A read that fails (a GitHub API error) is said and tried again, not failing the job
             if jobs=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
               --jq '.jobs[] | select(.name == "Checks" or (.name | startswith("Connected tests"))) | "\(.status) \(.conclusion) \(.name)"'); then
               if [ "$(echo "$jobs" | wc -l)" -lt 5 ]; then
@@ -347,8 +350,10 @@ jobs:
                 exit 1
               fi
               echo "$jobs" | grep -qv "^completed" || exit 0
+            else
+              echo "Couldn't read the jobs of this run, trying again"
             fi
-            sleep 10
+            sleep 30
           done
           echo "The tests didn't finish in time" && exit 1
 
