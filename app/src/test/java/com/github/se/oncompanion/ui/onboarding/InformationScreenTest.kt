@@ -15,7 +15,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -585,7 +587,7 @@ class InformationScreenTest {
   }
 
   @Test
-  fun useAnotherAccount_isBelowContinue_andAsksTheScreenToSwitch() {
+  fun useAnotherAccount_isAboveContinue_andAsksTheScreenToSwitch() {
     var clicks = 0
     composeTestRule.setContent {
       InformationContent(
@@ -604,6 +606,14 @@ class InformationScreenTest {
         .assertTextEquals(
             context.getString(R.string.onboarding_signed_in_as, "alex.martin@example.com")
         )
+    // Just above Continue, which stays at the bottom of the screen (Figma)
+    val account =
+        composeTestRule
+            .onNodeWithTag(C.Tag.onboarding_use_another_account)
+            .getUnclippedBoundsInRoot()
+    val save =
+        composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).getUnclippedBoundsInRoot()
+    assertTrue(account.bottom <= save.top)
     composeTestRule.onNodeWithTag(C.Tag.onboarding_use_another_account).performClick()
     composeTestRule.runOnIdle { assertEquals(1, clicks) }
   }
@@ -632,5 +642,45 @@ class InformationScreenTest {
       uiState = busy
       button.performScrollTo().assertIsNotEnabled()
     }
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun content_at200Percent_onASmallPhone_everythingCanBeScrolledToWhole() {
+    setContent(OnboardingUiState(firstName = "Alex", email = "alex.martin@example.com"))
+
+    listOf(
+            C.Tag.onboarding_band,
+            C.Tag.onboarding_first_name_field,
+            C.Tag.onboarding_family_name_field,
+            C.Tag.cancer_type_field,
+            C.Tag.onboarding_use_another_account,
+            C.Tag.onboarding_save_button,
+        )
+        .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }
+  }
+
+  @Test
+  fun rotating_keepsTheMissingFirstNameError() {
+    uiState = OnboardingUiState(firstName = "Alex")
+    val restoration = StateRestorationTester(composeTestRule)
+    restoration.setContent {
+      InformationContent(
+          uiState = uiState,
+          onFirstNameChange = { uiState = uiState.copy(firstName = it) },
+          onFamilyNameChange = {},
+          onCancerTypeChange = {},
+          onContinue = {},
+          onErrorShown = {},
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).performTextClearance()
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assert(hasError)
+
+    // The activity is recreated: the error stays, since the user did clear the field
+    restoration.emulateSavedInstanceStateRestore()
+
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_first_name_field).assert(hasError)
+    composeTestRule.onNodeWithTag(C.Tag.onboarding_save_button).assertIsNotEnabled()
   }
 }

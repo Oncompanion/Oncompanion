@@ -2,10 +2,13 @@
 
 package com.github.se.oncompanion.ui.onboarding
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.cancer.CancerTypes
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeTextField
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
  * Text field for the cancer type, with suggestions while typing (see [CancerTypes.suggest]).
@@ -63,17 +67,26 @@ fun CancerTypeField(
         supportingText = { Text(stringResource(R.string.cancer_type_hint)) },
         singleLine = true,
         modifier =
+            // As wide as the box, like the other fields (Figma)
             Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                .fillMaxWidth()
                 .testTag(C.Tag.cancer_type_field),
     )
+    // A white card under the field (Figma "Cancer type suggestions"). Material's own shadow, which
+    // the menu's window draws: the theme's Elevation 1 would be cut at the window's edges
     ExposedDropdownMenu(
         expanded = expanded,
         onDismissRequest = { open = false },
         modifier = Modifier.testTag(C.Tag.cancer_type_suggestions),
+        shape = MaterialTheme.shapes.medium,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
       suggestions.forEach { suggestion ->
         DropdownMenuItem(
-            text = { Text(highlightMatch(suggestion, value)) },
+            text = {
+              Text(highlightMatch(suggestion, value), style = MaterialTheme.typography.bodyLarge)
+            },
+            contentPadding = PaddingValues(horizontal = Spacing.lg),
             onClick = {
               onValueChange(suggestion)
               open = false
