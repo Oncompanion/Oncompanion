@@ -53,10 +53,10 @@ jobs:
 
 
   # Formatting, lint, unit tests and the unsigned release build. They run beside the connected tests
-  # in the CI job, so a formatting, lint or unit test error shows up in a few minutes and they no
-  # longer add to the time of the whole run.
+  # in the connected test shards, so a formatting, lint or unit test error shows up in a few minutes
+  # and they no longer add to the time of the whole run.
   checks:
-    # The CI job waits for this job by its name ("Wait for the Checks job"): rename both together
+    # The connected test shards read this job's result by its name: rename both together
     name: Checks
     runs-on: ubuntu-latest
 
@@ -98,9 +98,9 @@ jobs:
         run: |
           ./gradlew testDebugUnitTest --build-cache
 
-      # SonarCloud imports the lint issues, the unit test results and their coverage: the CI job
-      # downloads them before its analysis. Paths are kept under app/build/. Kept 7 days, so
-      # "Re-run failed jobs" on the CI job alone still finds them a few days later
+      # SonarCloud imports the lint issues, the unit test results and their coverage: the SonarCloud
+      # job downloads them before its analysis. Paths are kept under app/build/. Kept 7 days, so
+      # "Re-run failed jobs" on the SonarCloud job alone still finds them a few days later
       - name: Upload reports for SonarCloud
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,26 +119,16 @@ jobs:
         run: |
           ./gradlew assembleRelease --build-cache
 
-  # Connected tests, the coverage of all tests and the SonarCloud analysis
-  ci:
-    name: CI
-    # Execute the CI on the course's runners
+  # The app and its connected tests, built once for every shard
+  build:
+    name: Build APKs
     runs-on: ubuntu-latest
 
     steps:
-      # First step : Checkout the repository on the runner
       - name: Checkout
         uses: actions/checkout@v7
         with:
           submodules: recursive
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis (if we use Sonar Later)
-
-      # Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux. Enabling it allows the Android emulator to run faster.
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
 
       - name: Setup JDK
         uses: actions/setup-java@v6
@@ -146,12 +136,51 @@ jobs:
           distribution: "temurin"
           java-version: "21"
 
-      # Caching is a very useful part of a CI, as a workflow is executed in a clean environment every time,
-      # this means that one would need to re-download and re-process gradle files for every run. Which is very time consuming.
-      #
-      # To avoid that, we cache the the gradle folder to reuse it later.
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: |
+          chmod +x ./gradlew
+
+      - name: Build the APKs
+        run: |
+          ./gradlew assembleDebug assembleDebugAndroidTest --build-cache
+
+      - name: Upload the APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 3
+
+  # The connected tests, split in 4 shards that run at the same time on their own runner, each with
+  # its own Android emulator and Firebase emulators. No Gradle here: a shard boots its emulator
+  # while the Build APKs job runs, then installs the APKs and runs a quarter of the test methods
+  # (AndroidJUnitRunner's numShards and shardIndex), see .github/scripts/run-connected-shard.sh.
+  # 4 rather than 3: the split is by test name, not by time, so smaller shards even out better
+  connected:
+    name: Connected tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing shard doesn't cancel the others: their failures are worth seeing too
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux. Enabling it allows the Android emulator to run faster.
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       # Cache the Emulator, if the cache does not hit, create the emulator.
       # The emulator has a back camera so the real-camera test (ScanCameraTest) can run; the key changes
@@ -178,10 +207,6 @@ jobs:
           disable-animations: false
           script: echo "Generated AVD snapshot for caching."
 
-      - name: Grant execute permission for gradlew
-        run: |
-          chmod +x ./gradlew
-
       # Firebase emulators (Auth + Firestore) used by the connected tests, see firebase.json.
       # The Android emulator reaches them on the host at 10.0.2.2.
       - name: Setup Node
@@ -196,8 +221,8 @@ jobs:
           timeout 180 bash -c 'until curl -s localhost:8080 > /dev/null && curl -s localhost:9099 > /dev/null; do sleep 2; done'
 
       # Checks often fails early (ktfmt after about a minute): then stop here, rather than after
-      # 10 minutes of connected tests whose run can't reach SonarCloud anyway. Checks still running,
-      # or its result unreadable: go on, "Wait for the Checks job" decides later
+      # several minutes of connected tests whose run can't reach SonarCloud anyway. Checks still
+      # running, or its result unreadable: go on, the SonarCloud job waits for it
       - name: Stop if the Checks job already failed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -212,9 +237,11 @@ jobs:
               exit 1 ;;
           esac
 
-      # Run connected tests on the emulator
+      # This shard's quarter of the connected tests, on the APKs of the Build APKs job
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           api-level: 34
           target: google_apis
@@ -222,24 +249,18 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
-          # No "isn't responding" dialogs: on the slow emulator they take the focus from the app
-          # under test. The whole device's logcat is recorded, to see what happened when a test fails
-          script: |
-            adb shell settings put global hide_error_dialogs 1
-            adb logcat -v time > emulator-logcat.txt &
-            ./gradlew connectedCheck --parallel --build-cache
+          script: bash .github/scripts/run-connected-shard.sh ${{ matrix.shard }} 4
 
       # Only when something failed: the logs to find out why
       - name: Upload test logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: connected-test-logs
+          name: connected-test-logs-${{ matrix.shard }}
           path: |
             emulator-logcat.txt
             firebase-emulators.log
-            app/build/outputs/androidTest-results/
-            app/build/reports/androidTests/
+            test-results/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -248,38 +269,76 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: |
-            app/build/outputs/androidTest-results/connected/
+          name: test-results-${{ matrix.shard }}
+          path: test-results/
           if-no-files-found: ignore
           retention-days: 7
 
-      # The lint report and the unit tests come from the Checks job, which runs at the same time and
-      # is usually done by now. Wait for it (at most 10 min), so SonarCloud still gets them.
-      # If Checks failed, its reports are missing or partial and SonarCloud would show a wrong
-      # coverage: stop here, and "Re-run failed jobs" runs both jobs again (#300)
-      - name: Wait for the Checks job
+      # Each shard's coverage in its own folder, so the SonarCloud job can put them side by side
+      # where jacocoTestReport looks for them (connected/*/coverage.ec)
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: connected-coverage-${{ matrix.shard }}
+          path: shard-coverage/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The coverage of all tests and the SonarCloud analysis. It starts with the other jobs and compiles
+  # while the tests run (the SonarCloud upload needs the compiled app), then waits for the Checks
+  # job (lint and unit tests) and every connected test shard to merge their reports
+  sonar:
+    name: SonarCloud analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis
+
+      - name: Setup JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: |
+          chmod +x ./gradlew
+
+      # The same classes as the APKs the shards test: the build is reproducible
+      - name: Compile
+        run: |
+          ./gradlew compileDebugKotlin --build-cache
+
+      # At most 20 min. A failed job stops here: its reports are missing, and SonarCloud would show a
+      # wrong coverage. "Re-run failed jobs" runs it and this job again (#300)
+      - name: Wait for the tests
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for _ in $(seq 60); do
+          for _ in $(seq 120); do
             # A read that fails (a GitHub API error) is tried again, rather than failing the job
-            # after its connected tests
-            if checks=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
-              --jq '.jobs[] | select(.name == "Checks") | "\(.status) \(.conclusion)"'); then
-              # Renamed job: fail now with the reason rather than after 10 minutes
-              [ -z "$checks" ] && echo "No job named Checks in this run" && exit 1
-              case "$checks" in
-                "completed success") exit 0 ;;
-                completed*)
-                  echo "The Checks job ended with \"${checks#completed }\": SonarCloud isn't run without its reports."
-                  echo "Fix it, or use \"Re-run failed jobs\" to run Checks and this job again."
-                  exit 1 ;;
-              esac
+            if jobs=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
+              --jq '.jobs[] | select(.name == "Checks" or (.name | startswith("Connected tests"))) | "\(.status) \(.conclusion) \(.name)"'); then
+              if [ "$(echo "$jobs" | wc -l)" -lt 5 ]; then
+                echo "Expected the Checks job and 4 shards, found:" && echo "$jobs" && exit 1
+              fi
+              if echo "$jobs" | grep "^completed" | grep -v "^completed success"; then
+                echo "SonarCloud isn't run without these reports."
+                echo "Fix it, or use \"Re-run failed jobs\" to run them and this job again."
+                exit 1
+              fi
+              echo "$jobs" | grep -qv "^completed" || exit 0
             fi
             sleep 10
           done
-          echo "The Checks job didn't finish in time" && exit 1
+          echo "The tests didn't finish in time" && exit 1
 
       - name: Download reports of the Checks job
         uses: actions/download-artifact@v4
@@ -287,7 +346,13 @@ jobs:
           name: checks-reports
           path: app/build
 
-      # This step generates the coverage report which will be uploaded to sonar
+      - name: Download coverage of the connected tests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: connected-coverage-*
+          merge-multiple: true
+          path: app/build/outputs/code_coverage/debugAndroidTest/connected
+
       - name: Generate Coverage Report
         run: |
           ./gradlew jacocoTestReport
