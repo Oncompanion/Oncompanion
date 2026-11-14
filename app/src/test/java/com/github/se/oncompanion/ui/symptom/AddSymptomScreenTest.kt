@@ -791,6 +791,19 @@ class AddSymptomScreenTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun pickingSymptoms_doesntMoveTheChips() {
+    setContent(empty)
+    fun chipBounds() =
+        SymptomType.entries.map { node(C.Tag.symptomAddType(it.name)).getBoundsInRoot() }
+    val unpicked = chipBounds()
+
+    composeTestRule.runOnIdle { uiState = uiState.copy(types = SymptomType.entries.toList()) }
+
+    assertEquals(unpicked, chipBounds())
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
   fun intensityScale_isMildModerateSevere_acrossTheTrack_withoutNumbers() {
     setContent(filled)
     val mild = boundsOf(string(R.string.symptom_severity_mild))

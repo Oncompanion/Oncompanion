@@ -6,6 +6,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -25,7 +28,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.colorAt
@@ -76,37 +78,55 @@ class LakeFilterChipTest {
       chip().colorAt(x, chip().getUnclippedBoundsInRoot().let { (it.bottom - it.top) / 2 })
 
   @Test
-  fun unselected_isA48dpWhiteChip_withA1dpOutline_andNoCheck() {
+  fun unselected_isA48dpWhiteChip_withA1dpOutline() {
     setContent(selected = false)
 
     chip().assertHeightIsEqualTo(48.dp).assertIsNotSelected()
     composeTestRule
         .onNodeWithText("Fatigue", useUnmergedTree = true)
         .assertTextStyle(typography.labelLarge, colors.onSurface)
-    composeTestRule
-        .onNodeWithTag(C.Tag.filter_chip_check, useUnmergedTree = true)
-        .assertDoesNotExist()
     assertSameColor("border", colors.outline, colorAcross(0.5.dp))
     assertSameColor("inside", colors.surfaceContainerLowest, colorAcross(2.dp))
   }
 
   @Test
-  fun selected_isDawn_withACheckBeforeItsLabel_andNoBorder() {
+  fun selected_isDawn_withoutBorder_andItsLabel16dpFromEachSide() {
     setContent(selected = true)
 
     chip().assertHeightIsEqualTo(48.dp).assertIsSelected()
     composeTestRule
         .onNodeWithText("Fatigue", useUnmergedTree = true)
         .assertTextStyle(typography.labelLarge, colors.onSecondaryContainer)
-    val check =
-        composeTestRule
-            .onNodeWithTag(C.Tag.filter_chip_check, useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
+    val chipBounds = chip().getUnclippedBoundsInRoot()
     val label =
         composeTestRule.onNodeWithText("Fatigue", useUnmergedTree = true).getUnclippedBoundsInRoot()
-    assertEquals(20.dp, check.right - check.left)
-    assertEquals(8.dp, label.left - check.right)
+    assertEquals(16.dp, label.left - chipBounds.left)
+    assertEquals(16.dp, chipBounds.right - label.right)
     assertSameColor("edge", colors.secondaryContainer, colorAcross(0.5.dp))
+  }
+
+  // A chip that grew when picked would push the chips after it along, or onto the next row
+  @Test
+  fun pickingAndUnpicking_keepsItsWidth() {
+    var selected by mutableStateOf(false)
+    composeTestRule.setContent {
+      OncompanionTheme {
+        LakeFilterChip(
+            selected = selected,
+            onClick = { selected = !selected },
+            label = "Fatigue",
+            modifier = Modifier.testTag(CHIP),
+        )
+      }
+    }
+    fun width() = chip().getUnclippedBoundsInRoot().let { it.right - it.left }
+    val unpicked = width()
+
+    for (expectedSelected in listOf(true, false)) {
+      chip().performClick()
+      assertEquals(expectedSelected, selected)
+      assertEquals(unpicked.value, width().value, 0.5f)
+    }
   }
 
   @Test
@@ -125,16 +145,13 @@ class LakeFilterChipTest {
     assertEquals(0, clicks)
   }
 
-  // A detail shows what was logged: the same colours, but no check and nothing to tap
+  // A detail shows what was logged: the same colours, but nothing to tap
   @Test
-  fun readOnly_isDawnWithoutACheck_andCantBeTappedNorHeardAsACheckbox() {
+  fun readOnly_isDawn_andCantBeTappedNorHeardAsACheckbox() {
     setContent(selected = true, onClick = null)
 
     chip().assertHeightIsEqualTo(48.dp)
-    composeTestRule
-        .onNodeWithTag(C.Tag.filter_chip_check, useUnmergedTree = true)
-        .assertDoesNotExist()
-    // The label sits 16 dp from each side, as without a check
+    // The label sits 16 dp from each side, as on a chip that can be picked
     val chipBounds = chip().getUnclippedBoundsInRoot()
     val label =
         composeTestRule.onNodeWithText("Fatigue", useUnmergedTree = true).getUnclippedBoundsInRoot()
