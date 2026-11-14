@@ -44,7 +44,7 @@
     <string name="profile_member">Oncompanion member</string>
     <string name="profile_signed_out">Sign in to view your profile.</string>
     <string name="profile_missing">Your profile is not available yet.</string>
-    <string name="profile_error">Couldn\'t load your profile. Check your connection and try again.</string>
+    <string name="profile_error">Couldn\'t load your profile. Please try again.</string>
     <string name="profile_retry">Retry</string>
     <string name="profile_sign_out">Sign out</string>
     <string name="profile_sign_out_title">Sign out?</string>
@@ -113,7 +113,7 @@
     <string name="symptom_intensity_value">%1$d/10</string>
     <string name="symptom_intensity_description">Intensity %1$d out of 10</string>
     <string name="symptom_retry">Retry</string>
-    <string name="symptom_error_hint">Check your connection and try again.</string>
+    <string name="symptom_error_hint">Something went wrong. Please try again.</string>
     <string name="symptom_journal_today">Today</string>
     <string name="symptom_journal_yesterday">Yesterday</string>
     <string name="symptom_journal_empty_title">No symptoms logged yet</string>

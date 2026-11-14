@@ -155,6 +155,11 @@ class SymptomDetailScreenTest {
         context.getString(R.string.symptom_detail_error_title),
         C.Tag.symptom_detail_error,
     )
+    assertTextInside(context.getString(R.string.symptom_error_hint), C.Tag.symptom_detail_error)
+    // A load error isn't a connection problem: offline, Firestore serves its cache (#438)
+    composeTestRule
+        .onNode(hasText("connection", substring = true, ignoreCase = true), useUnmergedTree = true)
+        .assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.symptom_detail_retry).performClick()
     assertEquals(1, retries)
   }
