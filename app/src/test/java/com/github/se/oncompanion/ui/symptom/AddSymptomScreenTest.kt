@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -60,6 +62,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class AddSymptomScreenTest {
@@ -686,6 +689,18 @@ class AddSymptomScreenTest {
     }
   }
 
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun smallLandscape_loadError_retryCanBeScrolledTo_andTapped() {
+    setContent(empty.copy(isEditing = true, hasLoadError = true))
+
+    val retry = scrolledTo(C.Tag.symptom_edit_retry)
+    retry.assertIsDisplayed().assertIsFullyVisible()
+    retry.performClick()
+
+    assertEquals(listOf("retry"), events)
+  }
+
   // ----- Screen with its ViewModel -----
 
   @Test
@@ -765,5 +780,66 @@ class AddSymptomScreenTest {
     }
 
     composeTestRule.onNodeWithText("Log symptoms for Anne").assertIsDisplayed()
+  }
+
+  // ----- Figma: "Log symptoms" -----
+  // Native graphics, so texts have their real width (the default mode measures them almost 0 wide)
+
+  /** The bounds of the first node showing [text], even in the unmerged tree. */
+  private fun boundsOf(text: String) =
+      composeTestRule.onNodeWithText(text, useUnmergedTree = true).getBoundsInRoot()
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun intensityScale_isMildModerateSevere_acrossTheTrack_withoutNumbers() {
+    setContent(filled)
+    val mild = boundsOf(string(R.string.symptom_severity_mild))
+    val moderate = boundsOf(string(R.string.symptom_severity_moderate))
+    val severe = boundsOf(string(R.string.symptom_severity_severe))
+    val track = node(C.Tag.symptom_add_intensity_track).getBoundsInRoot()
+
+    // Start, middle and end of the track, in this order
+    assertEquals(track.left.value, mild.left.value, 0.5f)
+    assertEquals(track.right.value, severe.right.value, 0.5f)
+    val middle = track.left + track.width / 2
+    assertEquals(middle.value, (moderate.left + moderate.width / 2).value, 0.5f)
+    assertTrue(mild.right <= moderate.left && moderate.right <= severe.left)
+    // The value above says what is picked: no number under each stop
+    for (number in 1..10) {
+      composeTestRule
+          .onNode(hasText(number.toString()), useUnmergedTree = true)
+          .assertDoesNotExist()
+    }
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = "w320dp-h640dp", fontScale = 2f)
+  fun intensityScale_wordsDontOverlap_onANarrowPhoneAt200PercentFont() {
+    setContent(filled)
+    val mild = boundsOf(string(R.string.symptom_severity_mild))
+    val moderate = boundsOf(string(R.string.symptom_severity_moderate))
+    val severe = boundsOf(string(R.string.symptom_severity_severe))
+    val track = node(C.Tag.symptom_add_intensity_track).getBoundsInRoot()
+
+    // In this order, and all within the track's width
+    assertTrue(mild.right <= moderate.left && moderate.right <= severe.left)
+    assertTrue(track.left <= mild.left && severe.right <= track.right)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun form_keeps16dpMargins_24dpBetweenGroups_andTheQuestionOverItsControl() {
+    setContent(filled)
+    val feeling = boundsOf(string(R.string.symptom_add_types))
+    val chip = node(C.Tag.symptomAddType("FATIGUE")).getBoundsInRoot()
+    val severe = boundsOf(string(R.string.symptom_severity_severe))
+    val whenQuestion = boundsOf(string(R.string.symptom_add_when))
+
+    assertEquals(16f, feeling.left.value, 0.5f)
+    assertEquals(16f, chip.left.value, 0.5f)
+    // A question is 8 dp over its control, and a group is 24 dp under the one before
+    assertEquals(8f, (chip.top - feeling.bottom).value, 0.5f)
+    assertEquals(24f, (whenQuestion.top - severe.bottom).value, 0.5f)
   }
 }
