@@ -56,7 +56,8 @@ jobs:
   # in the connected test shards, so a formatting, lint or unit test error shows up in a few minutes
   # and they no longer add to the time of the whole run.
   checks:
-    # The connected test shards read this job's result by its name: rename both together
+    # The connected test shards and the SonarCloud job read this job's result by its name: rename
+    # all three together
     name: Checks
     runs-on: ubuntu-latest
 
@@ -125,6 +126,7 @@ jobs:
     # both together
     name: Build APKs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -175,12 +177,17 @@ jobs:
   # (AndroidJUnitRunner's numShards and shardIndex), see .github/scripts/run-connected-shard.sh.
   # 4 rather than 3: the split is by test name, not by time, so smaller shards even out better
   connected:
-    name: Connected tests (${{ matrix.shard }}/4)
+    # The SonarCloud job finds the shards by this name: rename both together
+    name: Connected tests (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
+    # A hung test run doesn't hold a runner for GitHub's 6 hours
+    timeout-minutes: 30
     strategy:
       # One failing shard doesn't cancel the others: their failures are worth seeing too
       fail-fast: false
       matrix:
+        # The only place the number of shards is written: the name, the script and the SonarCloud
+        # job take it from here (strategy.job-total)
         shard: [1, 2, 3, 4]
 
     steps:
@@ -261,7 +268,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated
           disable-animations: true
-          script: bash .github/scripts/run-connected-shard.sh ${{ matrix.shard }} 4
+          script: bash .github/scripts/run-connected-shard.sh ${{ matrix.shard }} ${{ strategy.job-total }}
 
       # Only when something failed: the logs to find out why
       - name: Upload test logs
@@ -302,6 +309,8 @@ jobs:
   sonar:
     name: SonarCloud analysis
     runs-on: ubuntu-latest
+    # Its own wait for the tests stops after 20 min
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -341,8 +350,14 @@ jobs:
             # A read that fails (a GitHub API error) is said and tried again, not failing the job
             if jobs=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
               --jq '.jobs[] | select(.name == "Checks" or (.name | startswith("Connected tests"))) | "\(.status) \(.conclusion) \(.name)"'); then
-              if [ "$(echo "$jobs" | wc -l)" -lt 5 ]; then
-                echo "Expected the Checks job and 4 shards, found:" && echo "$jobs" && exit 1
+              # The number of shards, from their names ("Connected tests (1/4)"): Checks and
+              # every shard must be there
+              total=$(echo "$jobs" | grep -o 'Connected tests ([0-9]*/[0-9]*)' | head -n 1 \
+                | sed 's|.*/\([0-9]*\))|\1|')
+              if [ -z "$total" ] || ! echo "$jobs" | grep -q ' Checks$' \
+                || [ "$(echo "$jobs" | grep -c ' Connected tests (')" -ne "$total" ]; then
+                echo "Expected the Checks job and every connected test shard, found:"
+                echo "$jobs" && exit 1
               fi
               if echo "$jobs" | grep "^completed" | grep -v "^completed success"; then
                 echo "SonarCloud isn't run without these reports."
