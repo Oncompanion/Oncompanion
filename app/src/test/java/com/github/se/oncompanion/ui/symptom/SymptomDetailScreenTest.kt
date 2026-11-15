@@ -28,6 +28,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.navigation.NavHostController
@@ -43,6 +44,8 @@ import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -623,5 +626,52 @@ class SymptomDetailScreenTest {
     )
 
     composeTestRule.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Robert")
+  }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** Anne's symptom, as her caregiver allowed to edit and delete it, with [delete]. */
+  private val allowed = loaded.copy(entry = fatigue, canEdit = true)
+
+  @Test
+  fun allowedCaregiver_seesEditAndDelete_andTheDialogSaysWhoseEntryItIs() {
+    setCaregiverContent(allowed.copy(delete = DeletePhase.CONFIRMING))
+
+    composeTestRule.onNodeWithText("Delete Anne's entry?").assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText("It will be removed from Anne's symptom journal. You can't undo this.")
+        .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertExists()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun allowedCaregiver_actionsFitInLandscape() {
+    setCaregiverContent(allowed)
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptom_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.symptom_detail_delete))
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_edit).assertIsFullyVisible()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun caregiverDeleteDialog_fitsASmallLandscapePhone() {
+    setCaregiverContent(allowed.copy(delete = DeletePhase.CONFIRMING))
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).assertIsFullyVisible()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_cancel).assertIsFullyVisible()
+  }
+
+  @Test
+  fun symptomEditedByACaregiver_saysWho_underWhoAddedIt() {
+    setContent(loaded.copy(entry = fatigue, addedByName = "Sam", editedByName = "Carol"))
+
+    composeTestRule.onNodeWithTag(C.Tag.added_by).performScrollTo().assertTextEquals("Added by Sam")
+    composeTestRule
+        .onNodeWithTag(C.Tag.edited_by)
+        .performScrollTo()
+        .assertTextEquals("Edited by Carol")
   }
 }

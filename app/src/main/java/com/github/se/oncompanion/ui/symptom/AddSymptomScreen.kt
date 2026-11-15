@@ -273,8 +273,10 @@ private fun FormTopBar(
       title = {
         Text(
             when {
+              // A caregiver sees whose journal gets the symptom, or whose entry they edit (US-46)
+              uiState.isEditing && caregiverOf != null ->
+                  stringResource(R.string.symptom_edit_title_for, caregiverOf)
               uiState.isEditing -> stringResource(R.string.symptom_edit_title)
-              // A caregiver sees whose journal gets the symptom
               caregiverOf != null -> stringResource(R.string.symptom_add_title_for, caregiverOf)
               else -> stringResource(R.string.symptom_add_title)
             }

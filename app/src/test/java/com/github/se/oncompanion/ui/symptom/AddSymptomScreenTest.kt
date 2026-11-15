@@ -766,4 +766,26 @@ class AddSymptomScreenTest {
 
     composeTestRule.onNodeWithText("Log symptoms for Anne").assertIsDisplayed()
   }
+
+  /** A caregiver editing the patient's symptom (US-46) sees whose entry it is in the title. */
+  @Test
+  fun caregiverEdit_titleSaysWhoseEntryItIs() {
+    composeTestRule.setContent {
+      AddSymptomContent(
+          uiState = editingForm,
+          onBack = {},
+          onToggleType = {},
+          onIntensityChange = {},
+          onClearIntensity = {},
+          onDateChange = {},
+          onTimeChange = {},
+          onNotesChange = {},
+          onSave = {},
+          onErrorShown = {},
+          caregiverOf = "Anne",
+      )
+    }
+
+    composeTestRule.onNodeWithText("Edit Anne's entry").assertIsDisplayed()
+  }
 }

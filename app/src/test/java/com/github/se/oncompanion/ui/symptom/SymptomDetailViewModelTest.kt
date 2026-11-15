@@ -512,4 +512,87 @@ class SymptomDetailViewModelTest {
 
     assertEquals("Bob", vm.uiState.value.addedByName)
   }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** "caregiver" follows "patient", who lets them add to, edit and delete in Symptoms. */
+  private fun allowedCaregiver() =
+      FollowedPatient(
+          CarePermission.SYMPTOMS,
+          canAdd = setOf(CarePermission.SYMPTOMS),
+          canEditAndDelete = setOf(CarePermission.SYMPTOMS),
+      )
+
+  private fun idle() = shadowOf(Looper.getMainLooper()).idle()
+
+  @Test
+  fun allowedCaregiver_deletesThePatientsSymptom_afterConfirming() {
+    repository.seed("patient", fatigue)
+    val vm = followedViewModel(allowedCaregiver())
+    assertTrue(vm.uiState.value.canDelete)
+
+    vm.requestDelete()
+    assertEquals(listOf(fatigue), repository.symptoms("patient"))
+    vm.confirmDelete()
+    idle()
+
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
+    assertTrue(repository.symptoms("patient").isEmpty())
+  }
+
+  @Test
+  fun caregiverDeletionFails_keepsTheDialog_untilThePatientTurnsTheSwitchOff() {
+    repository.seed("patient", fatigue)
+    val patient = allowedCaregiver()
+    val vm = followedViewModel(patient)
+    repository.writeError = IllegalStateException("rejected")
+
+    vm.requestDelete()
+    vm.confirmDelete()
+    idle()
+    assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
+    assertTrue(vm.uiState.value.isDeleteDialogShown)
+
+    // The switch off: no more Delete, and the dialog closes
+    patient.shares(CarePermission.SYMPTOMS, canAdd = setOf(CarePermission.SYMPTOMS))
+    idle()
+    assertFalse(vm.uiState.value.canDelete)
+    assertFalse(vm.uiState.value.isDeleteDialogShown)
+    repository.writeError = null
+    vm.confirmDelete()
+    idle()
+    assertEquals(listOf(fatigue), repository.symptoms("patient"))
+  }
+
+  @Test
+  fun caregiverWithoutTheSwitch_cantDelete() {
+    repository.seed("patient", fatigue)
+    val vm =
+        followedViewModel(
+            FollowedPatient(CarePermission.SYMPTOMS, canAdd = setOf(CarePermission.SYMPTOMS))
+        )
+
+    vm.requestDelete()
+    vm.confirmDelete()
+    idle()
+
+    assertFalse(vm.uiState.value.canEdit)
+    assertEquals(listOf(fatigue), repository.symptoms("patient"))
+  }
+
+  @Test
+  fun editedByACaregiver_thePatientSeesTheNameTheyGaveThem_theCaregiverTheStoredOne() {
+    val edited = fatigue.copy(editedBy = "bob", editedByName = "Bob")
+    repository.seed("alice", edited)
+    repository.seed("patient", edited)
+    circle.setMembers("alice", listOf(CareCircleMember(uid = "bob", firstName = "Robert")))
+
+    val own = viewModel()
+    val followed = followedViewModel(allowedCaregiver())
+    idle()
+
+    assertEquals("Robert", own.uiState.value.editedByName)
+    assertNull(own.uiState.value.addedByName)
+    assertEquals("Bob", followed.uiState.value.editedByName)
+  }
 }
