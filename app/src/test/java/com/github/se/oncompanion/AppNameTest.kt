@@ -15,15 +15,24 @@ class AppNameTest {
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
+  /** The name in any case: "Oncompanion", "OnCompanion", "ONCOMPANION"... */
+  private val anyCase = Regex(APP_NAME, RegexOption.IGNORE_CASE)
+
   @Test
-  fun noString_writesTheNameWithACapital() {
-    val capitalised =
+  fun noString_writesTheNameOtherThanInLowercase() {
+    val wrongCase =
         R.string::class
             .java
             .fields
-            .filter { context.getString(it.getInt(null)).contains("Oncompanion") }
+            .filter { field ->
+              anyCase.findAll(context.getString(field.getInt(null))).any { it.value != APP_NAME }
+            }
             .map { it.name }
 
-    assertEquals(emptyList<String>(), capitalised)
+    assertEquals(emptyList<String>(), wrongCase)
+  }
+
+  private companion object {
+    const val APP_NAME = "oncompanion"
   }
 }
