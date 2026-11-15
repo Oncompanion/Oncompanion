@@ -169,7 +169,16 @@ service cloud.firestore {
           && data.get('canAdd', []) is list
           && data.permissions.hasAll(data.get('canAdd', []));
     }
-    // What the patient can change on a member; an invite also has its email.
+    // What the patient lets a member edit and delete (US-46), only on a member: invites and
+    // redeeming never carry it. Optional (missing on members saved before it existed, who can't
+    // edit or delete), and only sections the member can also add to.
+    // Keep in sync with CareCircleMemberDetails.canEditAndDelete.
+    function isValidCanEditAndDelete(data) {
+      return data.get('canEditAndDelete', []) is list
+          && data.get('canAdd', []).hasAll(data.get('canEditAndDelete', []));
+    }
+    // What the patient decides on an invite and on a member. An invite also has its email, a member
+    // canEditAndDelete.
     function detailKeys() {
       return ['firstName', 'familyName', 'relationship', 'permissions', 'canAdd'];
     }
@@ -362,8 +371,9 @@ service cloud.firestore {
                              get(invitePath(request.resource.data.inviteCode)).data);
         allow update: if isOwner(uid)
                       && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(detailKeys())
-                      && isValidCareCircleMemberDetails(request.resource.data);
+                             .hasOnly(detailKeys().concat(['canEditAndDelete']))
+                      && isValidCareCircleMemberDetails(request.resource.data)
+                      && isValidCanEditAndDelete(request.resource.data);
         allow delete: if isOwner(uid);
       }
 

@@ -115,8 +115,11 @@ class CareCircleRepositoryFirestore(
       details: CareCircleMemberDetails,
   ): Unit = SessionAccess.operation {
     require(details.isValid()) { "Invalid care circle member details" }
-    // update, never set: a member removed on another device must not come back
-    circle(ownerUid).document(memberUid).update(detailFields(details)).addOnFailureListener { e ->
+    // update, never set: a member removed on another device must not come back. Editing and
+    // deleting is only stored on a member, never on an invite (US-46)
+    val fields =
+        detailFields(details) + (FIELD_CAN_EDIT_AND_DELETE to names(details.canEditAndDelete))
+    circle(ownerUid).document(memberUid).update(fields).addOnFailureListener { e ->
       reportRejected("update of member $memberUid", e)
     }
   }
@@ -155,6 +158,8 @@ class CareCircleRepositoryFirestore(
     }
     val permissions = (doc.get(FIELD_PERMISSIONS) as? List<*>).orEmpty().filterIsInstance<String>()
     val canAdd = (doc.get(FIELD_CAN_ADD) as? List<*>).orEmpty().filterIsInstance<String>()
+    val canEditAndDelete =
+        (doc.get(FIELD_CAN_EDIT_AND_DELETE) as? List<*>).orEmpty().filterIsInstance<String>()
     return CareCircleMember(
         uid = doc.id,
         firstName = firstName,
@@ -162,6 +167,7 @@ class CareCircleRepositoryFirestore(
         relationship = Relationship.fromName(doc.getString(FIELD_RELATIONSHIP)),
         permissions = CarePermission.fromNames(permissions),
         canAdd = CarePermission.fromNames(canAdd),
+        canEditAndDelete = CarePermission.fromNames(canEditAndDelete),
         // Read leniently: a field of the wrong type is treated as missing (and logged)
         email = doc.getLenient<String>(FIELD_EMAIL),
         addedAt = doc.getLenient<Timestamp>(FIELD_ADDED_AT)?.toInstant(),
@@ -190,6 +196,7 @@ class CareCircleRepositoryFirestore(
     const val FIELD_RELATIONSHIP = "relationship"
     const val FIELD_PERMISSIONS = "permissions"
     const val FIELD_CAN_ADD = "canAdd"
+    const val FIELD_CAN_EDIT_AND_DELETE = "canEditAndDelete"
     const val FIELD_EMAIL = "email"
     const val FIELD_ADDED_AT = "addedAt"
     const val FIELD_INVITE_CODE = "inviteCode"
@@ -202,9 +209,12 @@ class CareCircleRepositoryFirestore(
             FIELD_FAMILY_NAME to details.familyName,
             FIELD_RELATIONSHIP to details.relationship.name,
             // In display order, so a member's lists equal its invite's
-            FIELD_PERMISSIONS to
-                CarePermission.entries.filter { it in details.permissions }.map { it.name },
-            FIELD_CAN_ADD to CarePermission.entries.filter { it in details.canAdd }.map { it.name },
+            FIELD_PERMISSIONS to names(details.permissions),
+            FIELD_CAN_ADD to names(details.canAdd),
         )
+
+    /** The names of [sections], in display order. */
+    private fun names(sections: Set<CarePermission>): List<String> =
+        CarePermission.entries.filter { it in sections }.map { it.name }
   }
 }

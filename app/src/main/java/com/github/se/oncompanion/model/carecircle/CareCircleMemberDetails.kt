@@ -13,6 +13,9 @@ package com.github.se.oncompanion.model.carecircle
  * @property permissions what the person can see, read-only
  * @property canAdd the sections the person can also add to, e.g. log a symptom for the patient;
  *   only sections they see, and none for members saved before it existed
+ * @property canEditAndDelete the sections the person can also edit and delete in, the patient's own
+ *   entries included (US-46); only sections they can add to. Only a member has it: the patient
+ *   grants it when editing them, never on an invite, and members saved before it existed have none
  */
 data class CareCircleMemberDetails(
     val firstName: String,
@@ -20,6 +23,7 @@ data class CareCircleMemberDetails(
     val relationship: Relationship = Relationship.OTHER,
     val permissions: Set<CarePermission> = emptySet(),
     val canAdd: Set<CarePermission> = emptySet(),
+    val canEditAndDelete: Set<CarePermission> = emptySet(),
 ) {
   /** First and family name, e.g. "Sophie Dubois". */
   val fullName: String
@@ -35,15 +39,16 @@ data class CareCircleMemberDetails(
 
   /**
    * Whether these details can be saved: a non-blank first name, names of at most [MAX_NAME_LENGTH]
-   * characters, and adding only to sections the person can see. Same constraints as
-   * `isValidCareCircleMemberDetails` in firestore.rules, so the app refuses what the server would
-   * refuse.
+   * characters, adding only to sections the person can see, and editing and deleting only where
+   * they can add. Same constraints as `isValidCareCircleMemberDetails` in firestore.rules, so the
+   * app refuses what the server would refuse.
    */
   fun isValid(): Boolean =
       firstName.isNotBlank() &&
           firstName.length <= MAX_NAME_LENGTH &&
           (familyName == null || familyName.length <= MAX_NAME_LENGTH) &&
-          permissions.containsAll(canAdd)
+          permissions.containsAll(canAdd) &&
+          canAdd.containsAll(canEditAndDelete)
 
   companion object {
     /** Longest first or family name. Keep in sync with firestore.rules. */
