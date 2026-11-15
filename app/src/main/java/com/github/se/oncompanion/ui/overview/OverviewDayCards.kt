@@ -46,6 +46,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
  * The next appointment (Figma: "Next appointment card"), or "No upcoming appointment". Tapping it
  * opens its detail; the empty card opens Planning.
  *
+ * @param modifier e.g. to overlap the header's lower edge
  * @param canAdd whether to suggest adding an appointment; a caregiver can't
  */
 @Composable
@@ -54,6 +55,7 @@ internal fun NextAppointmentCard(
     today: LocalDate,
     onOpenPlanning: () -> Unit,
     onOpenAppointment: (String) -> Unit,
+    modifier: Modifier = Modifier,
     canAdd: Boolean = true,
 ) {
   val colors = MaterialTheme.colorScheme
@@ -64,7 +66,8 @@ internal fun NextAppointmentCard(
         if (appointment == null) onOpenPlanning() else onOpenAppointment(appointment.id)
       },
       modifier =
-          Modifier.fillMaxWidth()
+          modifier
+              .fillMaxWidth()
               .testTag(
                   if (upcoming) C.Tag.overview_next_appointment else C.Tag.overview_no_appointment
               ),

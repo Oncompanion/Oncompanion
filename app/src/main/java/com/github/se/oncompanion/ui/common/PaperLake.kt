@@ -59,7 +59,7 @@ fun PaperLakeHeader(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-  if (isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE) {
+  if (isPaperLakeHeaderBand()) {
     PaperLakeBand(time, modifier, content)
     return
   }
@@ -77,6 +77,14 @@ fun PaperLakeHeader(
     content()
   }
 }
+
+/**
+ * Whether [PaperLakeHeader] is drawn as the 100 dp band: in landscape or at a large font scale. A
+ * screen reads it to lay out what goes on the header, e.g. a card overlapping its lower edge.
+ */
+@Composable
+fun isPaperLakeHeaderBand(): Boolean =
+    isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE
 
 /**
  * The 100 dp Paper lake band behind a top app bar (Figma "Paper lake band"): the sky in the colour

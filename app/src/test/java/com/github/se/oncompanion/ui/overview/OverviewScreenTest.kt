@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.ui.overview
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -20,16 +22,19 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -70,7 +75,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 class OverviewScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  // An activity rule, so the phone can be rotated (the activity recreated)
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -717,5 +723,98 @@ class OverviewScreenTest {
         .onNodeWithTag(C.Tag.overview_prescriptions_badge, useUnmergedTree = true)
         .assertIsDisplayed()
         .assertContentDescriptionEquals("2 prescriptions to confirm")
+  }
+
+  // ----- Look (Figma "US-23 / Overview – Dashboard") -----
+
+  private fun bounds(tag: String) =
+      composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+  @Test
+  fun header_isOnTop_andTheAppointmentCardOverlapsItsLowerEdge_withOrWithoutAnAppointment() {
+    var state by mutableStateOf(loaded.copy(nextAppointment = appointment))
+    composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}) }
+
+    listOf(appointment to C.Tag.overview_next_appointment, null to C.Tag.overview_no_appointment)
+        .forEach { (next, cardTag) ->
+          state = loaded.copy(nextAppointment = next)
+          composeTestRule.waitForIdle()
+          val header = bounds(C.Tag.overview_header)
+          val card = bounds(cardTag)
+          assertEquals(0.dp, header.top)
+          assertTrue("the full header, $cardTag", header.height >= 210.dp)
+          assertTrue(
+              "the card starts on the header, $cardTag",
+              card.top > header.top && card.top < header.bottom,
+          )
+          assertTrue(
+              "the greeting stays above the card",
+              bounds(C.Tag.overview_greeting).bottom <= card.top,
+          )
+        }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_headerIsTheBand_andTheCardIsBelowIt() {
+    setContent(loaded.copy(nextAppointment = appointment))
+
+    val header = bounds(C.Tag.overview_header)
+    assertTrue("the band, not the 210 dp header: ${header.height}", header.height < 210.dp)
+    assertTrue(bounds(C.Tag.overview_next_appointment).top >= header.bottom)
+  }
+
+  @Test
+  fun withoutADay_nothingOverlapsTheHeader() {
+    var state by mutableStateOf(OverviewUiState(now = morning))
+    composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}) }
+
+    listOf(
+            OverviewUiState(now = morning) to C.Tag.overview_loading,
+            loaded.copy(hasError = true) to C.Tag.overview_error,
+        )
+        .forEach { (shown, tag) ->
+          state = shown
+          composeTestRule.waitForIdle()
+          assertTrue(tag, bounds(tag).top >= bounds(C.Tag.overview_header).bottom)
+        }
+  }
+
+  @Test
+  fun phoneRotated_theDayIsStillShown() {
+    val checkUp =
+        PlanningItem(
+            PlanningSource.Appointment("check-up"),
+            PlanningTiming.Timed(appointment.dateTime.toInstant(ZoneOffset.UTC)),
+            appointment.title,
+            subtitle = appointment.place,
+        )
+    val viewModel =
+        OverviewViewModel(
+            authRepository = FakeAuthRepository(),
+            profileRepository = FakeUserProfileRepository(),
+            observePlanning =
+                ownPlanning(FakePlanningRepository().apply { items.value = listOf(checkUp) }),
+            clock = clockAt(morning),
+            zoneId = ZoneOffset.UTC,
+        )
+    val show = {
+      composeTestRule.activity.setContent {
+        OverviewScreen(
+            navigationActions =
+                RecordingNavigationActions(TestNavHostController(LocalContext.current)),
+            viewModel = viewModel,
+        )
+      }
+    }
+    composeTestRule.runOnUiThread(show)
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
+
+    // Rotating recreates the activity; the Overview's ViewModel survives it
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(show)
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_header).assertIsDisplayed()
+    assertTextInside(appointment.title, C.Tag.overview_next_appointment)
   }
 }
