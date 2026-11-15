@@ -750,6 +750,11 @@ class OverviewScreenTest {
           val header = bounds(C.Tag.overview_header)
           val card = bounds(cardTag)
           assertEquals(0.dp, header.top)
+          // The strip behind the status bar, so scrolled cards never pass under its icons (its
+          // look is checked in PaperLakeTest: Robolectric's status bar has no height)
+          composeTestRule
+              .onNodeWithTag(C.Tag.overview_status_bar, useUnmergedTree = true)
+              .assertExists()
           assertTrue("the full header, $cardTag", header.height >= 210.dp)
           assertTrue(
               "the card starts on the header, $cardTag",

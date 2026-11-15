@@ -7,10 +7,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -117,6 +120,27 @@ fun PaperLakeBand(
     )
     content()
   }
+}
+
+/**
+ * An opaque strip behind the status bar, in the sky's colour at [time], for a screen whose Paper
+ * lake header scrolls away: drawn above the content, it keeps the content from passing under the
+ * clock and icons. At rest it blends into the header. Decorative.
+ *
+ * @param insets the bar it covers; the status bar by default
+ */
+@Composable
+fun PaperLakeStatusBar(
+    time: LocalTime,
+    modifier: Modifier = Modifier,
+    insets: WindowInsets = WindowInsets.statusBars,
+) {
+  Box(
+      modifier
+          .fillMaxWidth()
+          .windowInsetsTopHeight(insets)
+          .background(MaterialTheme.lakeColors.horizonAt(time).top)
+  )
 }
 
 /**

@@ -62,6 +62,7 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.common.PaperLakeHeader
+import com.github.se.oncompanion.ui.common.PaperLakeStatusBar
 import com.github.se.oncompanion.ui.common.isPaperLakeHeaderBand
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
@@ -205,61 +206,66 @@ fun OverviewContent(
     ->
     val layoutDirection = LocalLayoutDirection.current
     // The header draws behind the status bar, so the top inset is kept inside it
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .padding(
-                    start = innerPadding.calculateStartPadding(layoutDirection),
-                    end = innerPadding.calculateEndPadding(layoutDirection),
-                    bottom = innerPadding.calculateBottomPadding(),
-                )
-                .verticalScroll(rememberScrollState())
-    ) {
-      val band = isPaperLakeHeaderBand()
-      PaperLakeHeader(uiState.now.toLocalTime(), Modifier.testTag(C.Tag.overview_header)) {
-        OverviewHeader(
-            uiState,
-            caregiverOf,
-            onSwitchPatient,
-            onProfileClick = { onShortcutClick(OverviewShortcut.PROFILE) },
-            band = band,
-        )
-      }
-      val dayShown = !uiState.isLoading && !uiState.hasError && !uiState.isNotShared
-      // Only the full header leaves room for a card on its lower edge
-      val overlaps = dayShown && !band
-      Column(
-          modifier =
-              Modifier.padding(horizontal = Spacing.lg)
-                  .padding(top = if (overlaps) 0.dp else Spacing.lg, bottom = Spacing.lg),
-          verticalArrangement = Arrangement.spacedBy(Spacing.md),
-      ) {
-        when {
-          uiState.isLoading -> LoadingDay()
-          uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
-          // The patient a caregiver follows doesn't share their planning, so there is no day to
-          // show
-          uiState.isNotShared && caregiverOf != null ->
-              NotSharedMessage(caregiverOf, CarePermission.PLANNING)
-          else -> {
-            NextAppointmentCard(
-                uiState.nextAppointment,
-                uiState.now.toLocalDate(),
-                onOpenPlanning,
-                onOpenAppointment,
-                canAdd = caregiverOf == null,
-                modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
+    Box(
+        Modifier.fillMaxSize()
+            .padding(
+                start = innerPadding.calculateStartPadding(layoutDirection),
+                end = innerPadding.calculateEndPadding(layoutDirection),
+                bottom = innerPadding.calculateBottomPadding(),
             )
-            TodaySection(uiState.todayEntries, onOpenPlanning)
-          }
+    ) {
+      Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        val band = isPaperLakeHeaderBand()
+        PaperLakeHeader(uiState.now.toLocalTime(), Modifier.testTag(C.Tag.overview_header)) {
+          OverviewHeader(
+              uiState,
+              caregiverOf,
+              onSwitchPatient,
+              onProfileClick = { onShortcutClick(OverviewShortcut.PROFILE) },
+              band = band,
+          )
         }
-        // The shortcuts stay available whatever happens to the day's data. A caregiver only gets
-        // the sections the patient shares, never the care circle, which only the patient manages
-        val tiles =
-            if (caregiverOf == null) tileShortcuts
-            else tileShortcuts.filter { it.section != null && it.section in uiState.sharedSections }
-        if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
+        val dayShown = !uiState.isLoading && !uiState.hasError && !uiState.isNotShared
+        // Only the full header leaves room for a card on its lower edge
+        val overlaps = dayShown && !band
+        Column(
+            modifier =
+                Modifier.padding(horizontal = Spacing.lg)
+                    .padding(top = if (overlaps) 0.dp else Spacing.lg, bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+          when {
+            uiState.isLoading -> LoadingDay()
+            uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
+            // The patient a caregiver follows doesn't share their planning, so there is no day to
+            // show
+            uiState.isNotShared && caregiverOf != null ->
+                NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+            else -> {
+              NextAppointmentCard(
+                  uiState.nextAppointment,
+                  uiState.now.toLocalDate(),
+                  onOpenPlanning,
+                  onOpenAppointment,
+                  canAdd = caregiverOf == null,
+                  modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
+              )
+              TodaySection(uiState.todayEntries, onOpenPlanning)
+            }
+          }
+          // The shortcuts stay available whatever happens to the day's data. A caregiver only gets
+          // the sections the patient shares, never the care circle, which only the patient manages
+          val tiles =
+              if (caregiverOf == null) tileShortcuts
+              else
+                  tileShortcuts.filter {
+                    it.section != null && it.section in uiState.sharedSections
+                  }
+          if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
+        }
       }
+      // Drawn last, so scrolled content passes under it rather than under the clock and icons
+      PaperLakeStatusBar(uiState.now.toLocalTime(), Modifier.testTag(C.Tag.overview_status_bar))
     }
   }
 }
