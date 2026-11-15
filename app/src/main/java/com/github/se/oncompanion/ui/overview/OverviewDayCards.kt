@@ -34,6 +34,7 @@ import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.EmptyLake
+import com.github.se.oncompanion.ui.common.LARGE_FONT_SCALE
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.theme.Spacing
@@ -247,11 +248,6 @@ private fun NothingToday() {
 /** The column of times, so titles line up (DESIGN.md: at least 52 dp, growing with the text). */
 private val TIME_COLUMN_WIDTH = 52.dp
 
-/**
- * From this font scale on, a row's time goes above its title (the header's band starts there too).
- */
-private const val STACKED_FONT_SCALE = 1.3f
-
 /** The Figma's filled circle of a done entry, inside its 48 dp target. */
 private val CHECK_SIZE = 28.dp
 private val CHECK_ICON_SIZE = 18.dp
@@ -265,8 +261,9 @@ private val CHECK_ICON_SIZE = 18.dp
 private fun TodayRow(entry: TodayEntry) {
   val colors = MaterialTheme.colorScheme
   val done = entry.status == TodayItemStatus.DONE
-  // At a large font, the time goes above the title, so a long name isn't cut in the middle
-  val stacked = LocalDensity.current.fontScale >= STACKED_FONT_SCALE
+  // At a large font (as for the header's band), the time goes above the title, so a long name
+  // isn't cut in the middle
+  val stacked = LocalDensity.current.fontScale >= LARGE_FONT_SCALE
   Row(
       modifier =
           Modifier.fillMaxWidth()

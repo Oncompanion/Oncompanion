@@ -204,8 +204,11 @@ private val HEADER_HEIGHT = 210.dp
 private val BAND_HEIGHT = 100.dp
 private val WATERLINE_HEIGHT = 4.dp
 
-// From this font scale on, the header shrinks to the band (DESIGN.md: "a large font scale")
-private const val LARGE_FONT_SCALE = 1.3f
+/**
+ * DESIGN.md's "large font scale": from it on, the header shrinks to the band. Screens that change
+ * their layout at a large font use it too, so everything switches at the same scale.
+ */
+const val LARGE_FONT_SCALE = 1.3f
 
 // The Sign in scene's frame
 private const val SCENE_RATIO = 390f / 470f
