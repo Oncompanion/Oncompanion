@@ -27,6 +27,9 @@ enum class AppointmentType {
  * @property addedBy the uid of the caregiver who added it for the patient (US-41), or `null` when
  *   the patient did
  * @property addedByName that caregiver's first name, shown as "Added by Sam"
+ * @property editedBy the uid of the caregiver who last edited it for the patient (US-46), or `null`
+ *   when nobody did or the patient edited it last
+ * @property editedByName that caregiver's first name, shown as "Edited by Sam"
  */
 data class Appointment(
     val id: String = "",
@@ -38,6 +41,8 @@ data class Appointment(
     val createdAt: Instant? = null,
     val addedBy: String? = null,
     val addedByName: String? = null,
+    val editedBy: String? = null,
+    val editedByName: String? = null,
 ) {
   /**
    * Whether the patient-entered fields fit the storage schema. The repository assigns [id] and
@@ -52,7 +57,10 @@ data class Appointment(
           (notes == null || notes.length <= MAX_NOTES_LENGTH) &&
           // A caregiver's appointment says who added it
           (addedBy == null ||
-              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
+              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH)) &&
+          // So does one a caregiver edited
+          (editedBy == null ||
+              (!editedByName.isNullOrBlank() && editedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
 
   companion object {
     /** Maximum title length; keep in sync with the appointment security rules. */
@@ -64,7 +72,10 @@ data class Appointment(
     /** Maximum notes length; keep in sync with the appointment security rules. */
     const val MAX_NOTES_LENGTH = 1000
 
-    /** Longest name of the caregiver who added it; keep in sync with `isValidAttribution`. */
+    /**
+     * Longest name of the caregiver who added or edited it; keep in sync with `isValidAttribution`
+     * and `isValidEditor`.
+     */
     const val MAX_ADDED_BY_NAME_LENGTH = 50
 
     /** Earliest instant supported by a Firestore timestamp. */

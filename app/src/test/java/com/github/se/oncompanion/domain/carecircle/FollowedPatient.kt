@@ -14,12 +14,13 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * For tests of caregiver mode: "caregiver" is signed in and follows "patient", who shares the
- * [shared] sections with them and lets them add to [canAdd]. The test can change that while a
- * screen shows the patient's data.
+ * [shared] sections with them, lets them add to [canAdd], and edit and delete in [canEditAndDelete]
+ * (US-46). The test can change that while a screen shows the patient's data.
  */
 class FollowedPatient(
     vararg shared: CarePermission,
     canAdd: Set<CarePermission> = emptySet(),
+    canEditAndDelete: Set<CarePermission> = emptySet(),
 ) {
   val auth = FakeAuthRepository {
     AuthUser(it)
@@ -39,13 +40,18 @@ class FollowedPatient(
   val sectionAccess = ResolveSectionAccess(careAccess, auth)
 
   init {
-    shares(*shared, canAdd = canAdd)
+    shares(*shared, canAdd = canAdd, canEditAndDelete = canEditAndDelete)
   }
 
   /**
-   * The patient now shares exactly [sections] with the caregiver, and lets them add to [canAdd].
+   * The patient now shares exactly [sections] with the caregiver, lets them add to [canAdd], and
+   * edit and delete in [canEditAndDelete].
    */
-  fun shares(vararg sections: CarePermission, canAdd: Set<CarePermission> = emptySet()) =
+  fun shares(
+      vararg sections: CarePermission,
+      canAdd: Set<CarePermission> = emptySet(),
+      canEditAndDelete: Set<CarePermission> = emptySet(),
+  ) =
       circle.setMembers(
           "patient",
           listOf(
@@ -54,6 +60,7 @@ class FollowedPatient(
                   firstName = "Sam",
                   permissions = sections.toSet(),
                   canAdd = canAdd,
+                  canEditAndDelete = canEditAndDelete,
               )
           ),
       )
@@ -68,10 +75,12 @@ class FollowedPatient(
 }
 
 /**
- * A [ResolveSectionAccess] where "caregiver" follows "patient", who shares [shared] and lets them
- * add to [canAdd].
+ * A [ResolveSectionAccess] where "caregiver" follows "patient", who shares [shared], lets them add
+ * to [canAdd], and edit and delete in [canEditAndDelete].
  */
 fun followedPatientAccess(
     vararg shared: CarePermission,
     canAdd: Set<CarePermission> = emptySet(),
-): ResolveSectionAccess = FollowedPatient(*shared, canAdd = canAdd).sectionAccess
+    canEditAndDelete: Set<CarePermission> = emptySet(),
+): ResolveSectionAccess =
+    FollowedPatient(*shared, canAdd = canAdd, canEditAndDelete = canEditAndDelete).sectionAccess

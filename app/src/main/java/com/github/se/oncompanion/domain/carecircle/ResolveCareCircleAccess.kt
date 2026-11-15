@@ -95,6 +95,10 @@ class ResolveCareCircleAccess(
                   membership.member.permissions,
                   isOwn = false,
                   addable = membership.member.canAdd intersect membership.member.permissions,
+                  editable =
+                      membership.member.canEditAndDelete intersect
+                          membership.member.canAdd intersect
+                          membership.member.permissions,
               )
           CareCircleMembership.NotMember -> CareAccess.Denied
           CareCircleMembership.Unconfirmed -> CareAccess.Unconfirmed

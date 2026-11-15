@@ -102,7 +102,7 @@ class AppointmentRepositoryFirestore(
         // Update only editable fields so missing documents and creation metadata stay protected.
         collection(uid)
             .document(appointment.id)
-            .update(fieldsOf(appointment))
+            .update(fieldsOf(appointment) + editorOf(appointment))
             .addOnFailureListener { error ->
               Log.e(
                   TAG,
@@ -144,6 +144,18 @@ class AppointmentRepositoryFirestore(
               FIELD_ADDED_BY_NAME to appointment.addedByName,
           )
 
+  /**
+   * Who edited [appointment]: the caregiver who signed it (US-46), or nobody when the patient did,
+   * which removes an earlier caregiver's name since the patient's edit is now the last one.
+   */
+  private fun editorOf(appointment: Appointment): Map<String, Any?> =
+      mapOf(
+          FIELD_EDITED_BY to (appointment.editedBy ?: FieldValue.delete()),
+          FIELD_EDITED_BY_NAME to
+              (appointment.editedByName.takeIf { appointment.editedBy != null }
+                  ?: FieldValue.delete()),
+      )
+
   private fun collection(uid: String) =
       db.collection(USERS_COLLECTION).document(uid).collection(COLLECTION)
 
@@ -168,6 +180,8 @@ class AppointmentRepositoryFirestore(
               createdAt = createdAt,
               addedBy = document.getString(FIELD_ADDED_BY),
               addedByName = document.getString(FIELD_ADDED_BY_NAME),
+              editedBy = document.getString(FIELD_EDITED_BY),
+              editedByName = document.getString(FIELD_EDITED_BY_NAME),
           )
           .also { require(it.isValid()) }
     } catch (_: RuntimeException) {
@@ -198,6 +212,10 @@ class AppointmentRepositoryFirestore(
     const val FIELD_ADDED_BY = "addedBy"
     /** That caregiver's first name, as shown in "Added by". */
     const val FIELD_ADDED_BY_NAME = "addedByName"
+    /** The uid of the caregiver who last edited it (US-46); absent when the patient did. */
+    const val FIELD_EDITED_BY = "editedBy"
+    /** That caregiver's first name, as shown in "Edited by". */
+    const val FIELD_EDITED_BY_NAME = "editedByName"
     private const val TAG = "AppointmentRepository"
   }
 }

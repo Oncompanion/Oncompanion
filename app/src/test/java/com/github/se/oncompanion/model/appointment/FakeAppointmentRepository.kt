@@ -144,7 +144,15 @@ class FakeAppointmentRepository(
           current +
               (uid to
                   (current.getValue(uid) +
-                      (appointment.id to appointment.copy(createdAt = existing.createdAt))))
+                      (appointment.id to
+                          // Like Firestore: who added it stays, the editor is the new one's
+                          appointment.copy(
+                              createdAt = existing.createdAt,
+                              addedBy = existing.addedBy,
+                              addedByName = existing.addedByName,
+                              editedByName =
+                                  appointment.editedByName.takeIf { appointment.editedBy != null },
+                          ))))
     }
   }
 

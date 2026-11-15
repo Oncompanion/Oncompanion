@@ -35,8 +35,15 @@ sealed interface CareSection<out T> {
    *
    * @property canEdit whether edit and delete may be offered: only for the user's own data
    * @property canAdd whether adding may be offered (US-22)
+   * @property canEditEntries whether its entries may be edited and deleted, also by a caregiver the
+   *   patient allows (US-46)
    */
-  data class Shown<T>(val data: T, val canEdit: Boolean, val canAdd: Boolean) : CareSection<T>
+  data class Shown<T>(
+      val data: T,
+      val canEdit: Boolean,
+      val canAdd: Boolean,
+      val canEditEntries: Boolean = canEdit,
+  ) : CareSection<T>
 
   /** The patient a caregiver follows doesn't share this section with them. */
   data object NotShared : CareSection<Nothing>
@@ -109,7 +116,9 @@ class ObserveCareSection(
   flow {
     emitAll(read(access.ownerUid))
   }
-      .map<T, CareSection<T>> { CareSection.Shown(it, access.canEdit, access.canAdd) }
+      .map<T, CareSection<T>> {
+        CareSection.Shown(it, access.canEdit, access.canAdd, access.canEditEntries)
+      }
       .onStart { emit(CareSection.Loading(accessKnown = true, canAdd = access.canAdd)) }
       .catch { e ->
         if (e is CancellationException) throw e

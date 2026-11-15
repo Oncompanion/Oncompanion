@@ -101,7 +101,10 @@ class AppointmentTest {
     )
   }
 
-  /** A caregiver's appointment says who added it (US-41); the patient's own says nothing. */
+  /**
+   * A caregiver's appointment says who added it (US-41), and one a caregiver edited who edited it
+   * (US-46); the patient's own says nothing.
+   */
   @Test
   fun caregiversAppointmentNeedsTheirName() {
     val cases =
@@ -112,9 +115,14 @@ class AppointmentTest {
             appointment.copy(addedBy = "carol", addedByName = "a".repeat(51)) to false,
             appointment.copy(addedBy = "carol", addedByName = null) to false,
             appointment.copy(addedBy = "carol", addedByName = "  ") to false,
+            appointment.copy(editedBy = "carol", editedByName = "Carol") to true,
+            appointment.copy(editedBy = "carol", editedByName = "a".repeat(50)) to true,
+            appointment.copy(editedBy = "carol", editedByName = "a".repeat(51)) to false,
+            appointment.copy(editedBy = "carol", editedByName = null) to false,
+            appointment.copy(editedBy = "carol", editedByName = "  ") to false,
         )
     for ((input, expected) in cases) {
-      assertEquals(input.addedByName, expected, input.isValid())
+      assertEquals(input.toString(), expected, input.isValid())
     }
   }
 
