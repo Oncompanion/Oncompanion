@@ -4,10 +4,13 @@ package com.github.se.oncompanion.ui.common
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -20,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.theme.DarkLakeColors
 import com.github.se.oncompanion.ui.theme.Horizon
 import com.github.se.oncompanion.ui.theme.HorizonDawnBottomDark
 import com.github.se.oncompanion.ui.theme.HorizonDawnBottomLight
@@ -33,6 +37,7 @@ import com.github.se.oncompanion.ui.theme.HorizonDuskBottomDark
 import com.github.se.oncompanion.ui.theme.HorizonDuskBottomLight
 import com.github.se.oncompanion.ui.theme.HorizonDuskTopDark
 import com.github.se.oncompanion.ui.theme.HorizonDuskTopLight
+import com.github.se.oncompanion.ui.theme.LightLakeColors
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.LocalTime
 import kotlin.math.abs
@@ -107,6 +112,32 @@ class PaperLakeTest {
             abs(expected.green - actual.green) < 0.02f &&
             abs(expected.blue - actual.blue) < 0.02f
     assertTrue("$message: expected $expected, was $actual", close)
+  }
+
+  @Test
+  fun statusBarStrip_coversTheBar_inTheSkyOfItsTime_inBothThemes() {
+    var time by mutableStateOf("08:00")
+    var dark by mutableStateOf(false)
+    compose.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        PaperLakeStatusBar(
+            LocalTime.parse(time),
+            Modifier.testTag(STRIP),
+            insets = WindowInsets(top = 24.dp),
+        )
+      }
+    }
+
+    compose.onNodeWithTag(STRIP).assertHeightIsEqualTo(24.dp)
+    listOf(false to LightLakeColors, true to DarkLakeColors).forEach { (isDark, lake) ->
+      dark = isDark
+      listOf("08:00" to lake.dawn.top, "14:00" to lake.day.top, "20:00" to lake.dusk.top).forEach {
+          (at, sky) ->
+        time = at
+        compose.waitForIdle()
+        assertSameColor("$at, dark=$isDark", sky, pixel(STRIP, 4f, 4f))
+      }
+    }
   }
 
   @Test
@@ -307,6 +338,7 @@ class PaperLakeTest {
 
   private companion object {
     const val HEADER = "paper_lake"
+    const val STRIP = "status_bar_strip"
     // In the header's far water band: under the foothills, above the middle band
     const val FAR_WATER_Y = 165f
     const val TITLE = "Good morning, Anne"

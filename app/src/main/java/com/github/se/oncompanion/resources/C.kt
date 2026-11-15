@@ -95,6 +95,8 @@ object C {
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
     const val overview_shortcut_care_circle = "overview_shortcut_care_circle"
     const val overview_shortcut_profile = "overview_shortcut_profile"
+    const val overview_header = "overview_header"
+    const val overview_status_bar = "overview_status_bar"
     const val overview_greeting = "overview_greeting"
     const val overview_date = "overview_date"
     const val overview_loading = "overview_loading"
