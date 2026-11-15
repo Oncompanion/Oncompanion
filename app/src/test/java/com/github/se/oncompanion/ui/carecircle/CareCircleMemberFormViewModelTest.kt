@@ -1045,4 +1045,96 @@ class CareCircleMemberFormViewModelTest {
         assertTrue(CarePermission.SYMPTOMS in state.permissions)
         assertTrue(state.canSave)
       }
+
+  // ----- Editing and deleting (US-46) -----
+
+  @Test
+  fun editingAndDeleting_isOnlyOfferedToAMember_whoCanAddToTheSection() =
+      runTest(dispatcher) {
+        // Adding someone: never, even where they can add, so an invite can't carry it
+        val adding = viewModel()
+        adding.onPermissionChange(CarePermission.SYMPTOMS, true)
+        adding.onCanAddChange(CarePermission.SYMPTOMS, true)
+        adding.onCanEditAndDeleteChange(CarePermission.SYMPTOMS, true)
+        assertTrue(adding.uiState.value.canEditAndDelete.isEmpty())
+
+        // Editing a member: only where they can add, off by default
+        val editing = editViewModel()
+        advanceUntilIdle()
+        assertTrue(editing.uiState.value.canEditAndDelete.isEmpty())
+        editing.onPermissionChange(CarePermission.SYMPTOMS, true)
+        editing.onCanEditAndDeleteChange(CarePermission.SYMPTOMS, true)
+        assertTrue(editing.uiState.value.canEditAndDelete.isEmpty())
+
+        editing.onCanAddChange(CarePermission.SYMPTOMS, true)
+        editing.onCanEditAndDeleteChange(CarePermission.SYMPTOMS, true)
+        assertEquals(setOf(CarePermission.SYMPTOMS), editing.uiState.value.canEditAndDelete)
+        editing.onCanEditAndDeleteChange(CarePermission.SYMPTOMS, false)
+        assertTrue(editing.uiState.value.canEditAndDelete.isEmpty())
+      }
+
+  @Test
+  fun stoppingAddingOrSharing_alsoStopsEditingAndDeleting_inThatSectionOnly() =
+      runTest(dispatcher) {
+        val all = CareCircleMemberDetails.ADDABLE_SECTIONS
+        circle.setMembers(
+            ownerUid,
+            listOf(marc.copy(permissions = all, canAdd = all, canEditAndDelete = all)),
+        )
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        assertEquals(all, viewModel.uiState.value.canEditAndDelete)
+
+        viewModel.onCanAddChange(CarePermission.SYMPTOMS, false)
+        viewModel.onPermissionChange(CarePermission.PLANNING, false)
+
+        val state = viewModel.uiState.value
+        assertEquals(
+            setOf(CarePermission.EVENTS, CarePermission.PRESCRIPTIONS),
+            state.canEditAndDelete,
+        )
+        // Allowing adding again doesn't bring editing and deleting back
+        viewModel.onCanAddChange(CarePermission.SYMPTOMS, true)
+        assertFalse(CarePermission.SYMPTOMS in viewModel.uiState.value.canEditAndDelete)
+      }
+
+  @Test
+  fun edit_savesEditingAndDeleting_andKeepsItWhenSavingOtherChanges() =
+      runTest(dispatcher) {
+        val symptoms = setOf(CarePermission.SYMPTOMS)
+        circle.setMembers(
+            ownerUid,
+            listOf(
+                marc.copy(permissions = symptoms, canAdd = symptoms, canEditAndDelete = symptoms)
+            ),
+        )
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.unchanged)
+
+        viewModel.onFirstNameChange("Marco")
+        saved(viewModel)
+        assertEquals(symptoms, circle.updated.last().second.canEditAndDelete)
+      }
+
+  @Test
+  fun edit_turningEditingAndDeletingOff_isAChangeToSave() =
+      runTest(dispatcher) {
+        val planning = setOf(CarePermission.PLANNING)
+        circle.setMembers(
+            ownerUid,
+            listOf(
+                marc.copy(permissions = planning, canAdd = planning, canEditAndDelete = planning)
+            ),
+        )
+        val viewModel = editViewModel()
+        advanceUntilIdle()
+
+        viewModel.onCanEditAndDeleteChange(CarePermission.PLANNING, false)
+        assertTrue(viewModel.uiState.value.canSave)
+        saved(viewModel)
+
+        assertTrue(circle.updated.single().second.canEditAndDelete.isEmpty())
+        assertEquals(planning, circle.updated.single().second.canAdd)
+      }
 }

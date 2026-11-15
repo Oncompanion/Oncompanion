@@ -407,6 +407,31 @@ internal val CarePermission.addDescription: Int?
         CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions_add_description
       }
 
+/**
+ * The switch letting a member edit and delete in the section, e.g. "Allow editing and deleting
+ * symptoms" (US-46). For events, removing a confirmation: there is nothing to edit.
+ */
+@get:StringRes
+internal val CarePermission.editDeleteLabel: Int
+  get() =
+      when (this) {
+        CarePermission.PLANNING -> R.string.permission_planning_edit_delete
+        CarePermission.EVENTS -> R.string.permission_events_edit_delete
+        CarePermission.SYMPTOMS -> R.string.permission_symptoms_edit_delete
+        CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions_edit_delete
+      }
+
+/** What [editDeleteLabel] lets the member do, e.g. "They can change or delete any appointment". */
+@get:StringRes
+internal val CarePermission.editDeleteDescription: Int
+  get() =
+      when (this) {
+        CarePermission.PLANNING -> R.string.permission_planning_edit_delete_description
+        CarePermission.EVENTS -> R.string.permission_events_edit_delete_description
+        CarePermission.SYMPTOMS -> R.string.permission_symptoms_edit_delete_description
+        CarePermission.PRESCRIPTIONS -> R.string.permission_prescriptions_edit_delete_description
+      }
+
 /** The relationship as shown to the user, e.g. "Home nurse". */
 @get:StringRes
 internal val Relationship.label: Int

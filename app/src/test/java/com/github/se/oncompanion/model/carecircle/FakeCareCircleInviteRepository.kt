@@ -245,6 +245,8 @@ class FakeCareCircleInviteRepository(
 
   private fun requireValid(details: CareCircleMemberDetails, email: String?) {
     require(details.isValid()) { "Invalid care circle member details" }
+    // Editing and deleting is only given to a member, never through an invite (US-46)
+    require(details.canEditAndDelete.isEmpty()) { "An invite can't let edit and delete" }
     require(email == null || CareCircleInvite.isValidEmail(email)) { "Invalid email" }
   }
 

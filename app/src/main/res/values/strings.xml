@@ -319,6 +319,17 @@
     <string name="permission_events_add_description">They can confirm that you registered for an event. It shows right away, with their name.</string>
     <string name="permission_prescriptions_add">Allow adding prescriptions</string>
     <string name="permission_prescriptions_add_description">They can add a prescription. It waits for you to confirm it.</string>
+    <!-- Letting a member edit and delete in a section they add to (US-46), only when editing them -->
+    <string name="permission_planning_edit_delete">Allow editing and deleting appointments</string>
+    <string name="permission_planning_edit_delete_description">They can change or delete any appointment, yours included.</string>
+    <string name="permission_events_edit_delete">Allow removing confirmations</string>
+    <string name="permission_events_edit_delete_description">They can remove the confirmation that you registered for an event.</string>
+    <string name="permission_symptoms_edit_delete">Allow editing and deleting symptoms</string>
+    <string name="permission_symptoms_edit_delete_description">They can change or delete any entry in your symptom journal, yours included.</string>
+    <string name="permission_prescriptions_edit_delete">Allow editing and deleting prescriptions</string>
+    <string name="permission_prescriptions_edit_delete_description">They can change or delete any prescription, yours included.</string>
+    <!-- Under an edit-and-delete switch that is greyed out because adding is off -->
+    <string name="permission_edit_delete_needs_adding">Allow adding first</string>
 
     <!-- Add a care circle member (#79) -->
     <string name="care_circle_form_add_title">Add a member</string>

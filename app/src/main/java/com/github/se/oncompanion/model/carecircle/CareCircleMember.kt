@@ -57,6 +57,7 @@ enum class CarePermission {
  * @property inviteCode the invite code the member joined with, or null if unknown. Not shown; it
  *   tells a used invite (deleted when redeemed) from a cancelled one.
  * @property canAdd the sections the member can also add to, among [permissions]
+ * @property canEditAndDelete the sections the member can also edit and delete in, among [canAdd]
  */
 data class CareCircleMember(
     val uid: String,
@@ -68,10 +69,19 @@ data class CareCircleMember(
     val addedAt: Instant? = null,
     val inviteCode: String? = null,
     val canAdd: Set<CarePermission> = emptySet(),
+    val canEditAndDelete: Set<CarePermission> = emptySet(),
 ) {
   /** What the patient decided about this member: name, relationship and permissions. */
   val details: CareCircleMemberDetails
-    get() = CareCircleMemberDetails(firstName, familyName, relationship, permissions, canAdd)
+    get() =
+        CareCircleMemberDetails(
+            firstName,
+            familyName,
+            relationship,
+            permissions,
+            canAdd,
+            canEditAndDelete,
+        )
 
   /** First and family name, e.g. "Sophie Dubois". */
   val fullName: String

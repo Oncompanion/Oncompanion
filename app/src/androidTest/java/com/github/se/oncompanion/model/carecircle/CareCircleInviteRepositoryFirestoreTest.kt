@@ -287,6 +287,15 @@ class CareCircleInviteRepositoryFirestoreTest {
     assertRefused { create(CareCircleMemberDetails(tooLong)) }
     assertRefused { create(email = "julie") }
     assertRefused { repository.updateInvite("ABCDEFGHJK", julie, "not an email") }
+    // An invite never lets edit and delete (US-46), even where it lets add
+    val editing =
+        julie.copy(
+            permissions = setOf(CarePermission.PLANNING),
+            canAdd = setOf(CarePermission.PLANNING),
+            canEditAndDelete = setOf(CarePermission.PLANNING),
+        )
+    assertRefused { create(editing) }
+    assertRefused { repository.updateInvite("ABCDEFGHJK", editing, null) }
   }
 
   @Test

@@ -108,6 +108,7 @@ fun CareCircleMemberFormScreen(
       onSave = viewModel::save,
       onBack = onBack,
       onCanAddChange = viewModel::onCanAddChange,
+      onCanEditAndDeleteChange = viewModel::onCanEditAndDeleteChange,
       onOpenInvite = onOpenInvite,
   )
 }
@@ -126,6 +127,7 @@ fun CareCircleMemberFormContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onCanAddChange: (CarePermission, Boolean) -> Unit = { _, _ -> },
+    onCanEditAndDeleteChange: (CarePermission, Boolean) -> Unit = { _, _ -> },
     onOpenInvite: (inviteCode: String) -> Unit = {},
 ) {
   // A short screen (a phone held sideways) lets the top bar scroll with the form: with the
@@ -155,7 +157,7 @@ fun CareCircleMemberFormContent(
         RelationshipField(uiState.relationship, uiState.canEdit, onRelationshipChange)
         EmailField(uiState, onEmailChange, onOpenInvite)
       }
-      PermissionSwitches(uiState, onPermissionChange, onCanAddChange)
+      PermissionSwitches(uiState, onPermissionChange, onCanAddChange, onCanEditAndDeleteChange)
       SaveSection(uiState, onSave)
     }
   }
@@ -371,6 +373,7 @@ private fun PermissionSwitches(
     uiState: CareCircleMemberFormUiState,
     onPermissionChange: (CarePermission, Boolean) -> Unit,
     onCanAddChange: (CarePermission, Boolean) -> Unit,
+    onCanEditAndDeleteChange: (CarePermission, Boolean) -> Unit,
 ) {
   val firstName = uiState.firstName.trim()
   Text(
@@ -402,6 +405,8 @@ private fun PermissionSwitches(
     )
     if (permission in CareCircleMemberDetails.ADDABLE_SECTIONS) {
       CanAddSwitch(permission, uiState, granted, onCanAddChange)
+      // Only for a member: nobody starts out able to edit or delete (US-46)
+      if (uiState.isEditing) CanEditAndDeleteSwitch(permission, uiState, onCanEditAndDeleteChange)
     }
   }
 }
@@ -436,6 +441,43 @@ private fun CanAddSwitch(
                   onValueChange = { onCanAddChange(section, it) },
               )
               .testTag(C.Tag.careCircleFormCanAdd(section.name)),
+  )
+}
+
+/**
+ * Lets the member edit and delete in [section] (US-46), indented like [CanAddSwitch]: only for
+ * someone who can add to it, so it is greyed out, saying so, while adding is off.
+ */
+@Composable
+private fun CanEditAndDeleteSwitch(
+    section: CarePermission,
+    uiState: CareCircleMemberFormUiState,
+    onChange: (CarePermission, Boolean) -> Unit,
+) {
+  val allowed = section in uiState.canEditAndDelete
+  val canAdd = section in uiState.canAdd
+  val enabled = uiState.canEdit && canAdd
+  ListItem(
+      headlineContent = { Text(stringResource(section.editDeleteLabel)) },
+      supportingContent = {
+        Text(
+            stringResource(
+                if (canAdd) section.editDeleteDescription
+                else R.string.permission_edit_delete_needs_adding
+            )
+        )
+      },
+      trailingContent = { Switch(checked = allowed, onCheckedChange = null, enabled = enabled) },
+      modifier =
+          Modifier.padding(start = 24.dp)
+              .heightIn(min = 56.dp)
+              .toggleable(
+                  value = allowed,
+                  enabled = enabled,
+                  role = Role.Switch,
+                  onValueChange = { onChange(section, it) },
+              )
+              .testTag(C.Tag.careCircleFormCanEditAndDelete(section.name)),
   )
 }
 

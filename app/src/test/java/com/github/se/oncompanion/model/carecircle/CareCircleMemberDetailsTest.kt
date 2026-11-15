@@ -135,4 +135,36 @@ class CareCircleMemberDetailsTest {
         )
     assertEquals(setOf(CarePermission.SYMPTOMS), member.details.canAdd)
   }
+
+  @Test
+  fun isValid_editingAndDeletingNeedsAdding_andMemberDetailsCopyIt() {
+    val symptoms = setOf(CarePermission.SYMPTOMS)
+    val cases =
+        listOf(
+            // can add, can edit and delete, valid
+            symptoms to symptoms to true,
+            emptySet<CarePermission>() to symptoms to false,
+            symptoms to emptySet<CarePermission>() to true,
+        )
+    for ((sections, valid) in cases) {
+      val (canAdd, canEditAndDelete) = sections
+      val details =
+          CareCircleMemberDetails(
+              "Julie",
+              permissions = symptoms,
+              canAdd = canAdd,
+              canEditAndDelete = canEditAndDelete,
+          )
+      assertEquals("$canAdd / $canEditAndDelete", valid, details.isValid())
+    }
+    val member =
+        CareCircleMember(
+            uid = "u1",
+            firstName = "Julie",
+            permissions = symptoms,
+            canAdd = symptoms,
+            canEditAndDelete = symptoms,
+        )
+    assertEquals(symptoms, member.details.canEditAndDelete)
+  }
 }

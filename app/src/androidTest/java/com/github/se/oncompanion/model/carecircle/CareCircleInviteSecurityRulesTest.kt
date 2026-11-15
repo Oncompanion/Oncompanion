@@ -177,6 +177,18 @@ class CareCircleInviteSecurityRulesTest {
   @Test
   fun cannotCreateWithExtraFields(): Unit = runBlocking {
     denied(newInvite().set(inviteFields(aliceUid, "role" to "PATIENT")))
+    // Editing and deleting is only granted to a member, never on an invite (US-46)
+    denied(
+        newInvite()
+            .set(
+                inviteFields(
+                    aliceUid,
+                    "permissions" to listOf("SYMPTOMS"),
+                    "canAdd" to listOf("SYMPTOMS"),
+                    "canEditAndDelete" to listOf("SYMPTOMS"),
+                )
+            )
+    )
   }
 
   // ---- denied: other users ----
@@ -241,5 +253,6 @@ class CareCircleInviteSecurityRulesTest {
     denied(invite.update("firstName", ""))
     denied(invite.update("permissions", listOf("EDIT")))
     denied(invite.update("email", "a".repeat(255)))
+    denied(invite.update("canEditAndDelete", emptyList<String>()))
   }
 }
