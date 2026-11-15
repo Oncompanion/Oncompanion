@@ -292,6 +292,10 @@ object C {
     fun careCircleMemberCanAdd(permissionName: String) =
         "care_circle_member_can_add_$permissionName"
 
+    /** Whether the member can edit and delete in [permissionName], read-only (US-46). */
+    fun careCircleMemberCanEditAndDelete(permissionName: String) =
+        "care_circle_member_can_edit_and_delete_$permissionName"
+
     // Add a care circle member
     const val care_circle_form_screen = "care_circle_form_screen"
     const val care_circle_form_back_button = "care_circle_form_back_button"
@@ -318,6 +322,10 @@ object C {
 
     /** The switch letting the member add to [permissionName], e.g. "SYMPTOMS". */
     fun careCircleFormCanAdd(permissionName: String) = "care_circle_form_can_add_$permissionName"
+
+    /** The switch letting the member edit and delete in [permissionName] (US-46). */
+    fun careCircleFormCanEditAndDelete(permissionName: String) =
+        "care_circle_form_can_edit_and_delete_$permissionName"
 
     /** Under the email warning: opens the invitation that already has this email (#257). */
     const val care_circle_form_open_invite = "care_circle_form_open_invite"

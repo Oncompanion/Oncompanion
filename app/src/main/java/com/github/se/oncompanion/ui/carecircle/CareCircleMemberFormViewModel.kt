@@ -50,6 +50,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @property permissions what the person will see; none until the patient turns them on
  * @property canAdd the sections the person can also add to; only sections they see, none until the
  *   patient turns them on
+ * @property canEditAndDelete editing: the sections the member can also edit and delete in; only
+ *   sections they can add to. Never offered when adding someone (US-46)
  * @property duplicate adding: who in the circle already has this email, if anyone (#257). Kept up
  *   to date as the email, the circle and the time change; never set when editing
  * @property accountEmail adding: the signed-in patient's own email, null when editing or if their
@@ -73,6 +75,7 @@ data class CareCircleMemberFormUiState(
     val email: String = "",
     val permissions: Set<CarePermission> = emptySet(),
     val canAdd: Set<CarePermission> = emptySet(),
+    val canEditAndDelete: Set<CarePermission> = emptySet(),
     val duplicate: EmailAlreadyInCircle? = null,
     val accountEmail: String? = null,
     val firstNameTouched: Boolean = false,
@@ -130,6 +133,7 @@ data class CareCircleMemberFormUiState(
           relationship = it,
           permissions = permissions,
           canAdd = canAdd,
+          canEditAndDelete = canEditAndDelete,
       )
     }
 
@@ -299,6 +303,7 @@ class CareCircleMemberFormViewModel(
                             email = member.email.orEmpty(),
                             permissions = member.permissions,
                             canAdd = member.canAdd,
+                            canEditAndDelete = member.canEditAndDelete,
                             isLoading = false,
                         )
                         // Trimmed like a save, so an untouched form counts as unchanged
@@ -347,18 +352,38 @@ class CareCircleMemberFormViewModel(
   }
 
   /**
-   * Gives or takes away access to [permission]. Hiding a section also stops the person from adding
-   * to it.
+   * Gives or takes away access to [permission]. Hiding a section also stops the person from adding,
+   * editing and deleting in it.
    */
   fun onPermissionChange(permission: CarePermission, granted: Boolean) = edit {
     if (granted) it.copy(permissions = it.permissions + permission)
-    else it.copy(permissions = it.permissions - permission, canAdd = it.canAdd - permission)
+    else
+        it.copy(
+            permissions = it.permissions - permission,
+            canAdd = it.canAdd - permission,
+            canEditAndDelete = it.canEditAndDelete - permission,
+        )
   }
 
-  /** Lets the person add to [section] for the patient, or not. Only for a section they see. */
+  /**
+   * Lets the person add to [section] for the patient, or not. Only for a section they see; no
+   * longer adding also stops them from editing and deleting in it.
+   */
   fun onCanAddChange(section: CarePermission, allowed: Boolean) = edit {
-    if (!allowed) it.copy(canAdd = it.canAdd - section)
+    if (!allowed)
+        it.copy(canAdd = it.canAdd - section, canEditAndDelete = it.canEditAndDelete - section)
     else if (section in it.permissions) it.copy(canAdd = it.canAdd + section) else it
+  }
+
+  /**
+   * Lets the member edit and delete every entry in [section], the patient's own included, or not
+   * (US-46). Only when editing a member, and only for a section they can add to.
+   */
+  fun onCanEditAndDeleteChange(section: CarePermission, allowed: Boolean) = edit {
+    if (!allowed) it.copy(canEditAndDelete = it.canEditAndDelete - section)
+    else if (it.isEditing && section in it.canAdd)
+        it.copy(canEditAndDelete = it.canEditAndDelete + section)
+    else it
   }
 
   private fun edit(change: (CareCircleMemberFormUiState) -> CareCircleMemberFormUiState) {

@@ -33,6 +33,8 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.carecircle.FakeCareCircleRepository
 import com.github.se.oncompanion.model.carecircle.Relationship
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Screen
@@ -43,6 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 class CareCircleMemberScreenTest {
@@ -415,6 +418,30 @@ class CareCircleMemberScreenTest {
       val addable = section in CareCircleMemberDetails.ADDABLE_SECTIONS
       assertEquals(section.name, addable, section.addLabel != null)
       assertEquals(section.name, addable, section.addDescription != null)
+    }
+  }
+
+  // ---- editing and deleting (US-46) ----
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun member_showsWhereTheyCanEditAndDelete_readOnly_evenInLandscape() {
+    val all = CareCircleMemberDetails.ADDABLE_SECTIONS
+    val allowed = setOf(CarePermission.PLANNING, CarePermission.PRESCRIPTIONS)
+    setContent(
+        CareCircleMemberUiState.Member(
+            marc.copy(permissions = all, canAdd = all, canEditAndDelete = allowed)
+        )
+    )
+
+    for (section in all) {
+      val row =
+          composeTestRule
+              .onNodeWithTag(C.Tag.careCircleMemberCanEditAndDelete(section.name))
+              .performScrollTo()
+              .assertHasNoClickAction()
+      row.assertIsFullyVisible()
+      if (section in allowed) row.assertIsOn() else row.assertIsOff()
     }
   }
 }
