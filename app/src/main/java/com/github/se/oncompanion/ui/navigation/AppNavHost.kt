@@ -312,7 +312,9 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
-        // In caregiver mode, the chosen patient's appointment, read-only
+        // In caregiver mode, the chosen patient's appointment, which they may let the caregiver
+        // edit
+        // and delete (US-46)
         val detail: AppointmentDetailViewModel = viewModel {
           AppointmentDetailViewModel(id, patientUid = chosenPatient?.uid)
         }
@@ -332,8 +334,13 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        // In caregiver mode, the chosen patient's appointment (US-46)
         val form: AppointmentFormViewModel = viewModel {
-          AppointmentFormViewModel(LocalDate.now(), appointmentId = id)
+          AppointmentFormViewModel(
+              LocalDate.now(),
+              appointmentId = id,
+              patientUid = chosenPatient?.uid,
+          )
         }
         AppointmentFormScreen(
             form,
@@ -342,6 +349,7 @@ private fun SessionNavHost(
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
             onSignedOut = signOut,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
