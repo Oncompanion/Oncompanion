@@ -480,6 +480,21 @@ class SymptomJournalScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun longJournal_lastEntryEndsAboveTheAddButton() {
+    val entries =
+        (0 until 12).map { i -> JournalEntry(fatigue.copy(id = "e$i"), LocalTime.of(20 - i, 0)) }
+    setContent(loaded.copy(days = listOf(JournalDay(today, entries))))
+
+    // The week card and the day's header come before the entries
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).performScrollToIndex(entries.size + 1)
+
+    val last = composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).getBoundsInRoot()
+    val add = composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).getBoundsInRoot()
+    assertTrue("last ends at ${last.bottom}, button starts at ${add.top}", last.bottom <= add.top)
+  }
+
+  @Test
   fun caregiver_allowedToAdd_seesTheAddButton_andWhoAddedEachEntry() {
     val signed = fatigue.copy(addedBy = "caregiver", addedByName = "Sam")
     setCaregiverContent(
