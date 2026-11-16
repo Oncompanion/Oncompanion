@@ -21,13 +21,14 @@ data class WeekDay(val date: LocalDate, val intensity: Int?, val hasEntries: Boo
  *
  * @property days Monday to Sunday; the days after today are empty
  * @property entryCount how many symptoms were logged this week
- * @property mostOften the symptom logged most often this week, ties going to the one listed first
- *   in [SymptomType]
+ * @property mostOften the symptom logged more often than every other one this week, `null` on a
+ *   tie: the card then only gives the count, so it never names a symptom the entries don't single
+ *   out
  */
 data class WeekSummary(
     val days: List<WeekDay>,
     val entryCount: Int,
-    val mostOften: SymptomType,
+    val mostOften: SymptomType?,
 )
 
 /**
@@ -52,7 +53,8 @@ fun weekSummaryOf(days: List<JournalDay>, today: LocalDate): WeekSummary? {
         )
       }
   val counts = entries.flatMap { it.entry.types }.groupingBy { it }.eachCount()
-  val mostOften =
-      counts.entries.sortedWith(compareBy({ -it.value }, { it.key.ordinal })).first().key
+  // Only a symptom logged more often than every other one is named
+  val highest = counts.values.max()
+  val mostOften = counts.filterValues { it == highest }.keys.singleOrNull()
   return WeekSummary(weekDays, entries.size, mostOften)
 }

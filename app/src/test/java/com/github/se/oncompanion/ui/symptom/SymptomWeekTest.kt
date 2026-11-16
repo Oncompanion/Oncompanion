@@ -81,12 +81,13 @@ class SymptomWeekTest {
   }
 
   @Test
-  fun mostOften_isTheSymptomLoggedTheMost_tiesGoingToTheFirstListed() {
+  fun mostOften_isTheSymptomLoggedTheMost_orNoneOnATie() {
     val cases =
         listOf(
             listOf(entry(SymptomType.PAIN), entry(SymptomType.FATIGUE, SymptomType.PAIN)) to
                 SymptomType.PAIN,
-            listOf(entry(SymptomType.NAUSEA), entry(SymptomType.FATIGUE)) to SymptomType.FATIGUE,
+            listOf(entry(SymptomType.NAUSEA), entry(SymptomType.FATIGUE)) to null,
+            listOf(entry(SymptomType.HEADACHE, SymptomType.FATIGUE)) to null,
             listOf(entry(SymptomType.OTHER)) to SymptomType.OTHER,
         )
     for ((entries, expected) in cases) {

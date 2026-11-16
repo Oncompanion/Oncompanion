@@ -41,9 +41,9 @@ import java.util.Locale
 
 /**
  * The "This week" card at the top of the journal (Figma: "Symptoms – History"): how many symptoms
- * were logged this calendar week and which one most often, then a bar per day whose height is the
- * highest intensity the user entered that day. Nothing is judged: the bars share one colour and the
- * app draws no conclusion from them.
+ * were logged this calendar week and, unless several tie, which one most often, then a bar per day
+ * whose height is the highest intensity the user entered that day. Nothing is judged: the bars
+ * share one colour and the app draws no conclusion from them.
  */
 @Composable
 fun WeekCard(summary: WeekSummary, modifier: Modifier = Modifier) {
@@ -61,12 +61,19 @@ fun WeekCard(summary: WeekSummary, modifier: Modifier = Modifier) {
       )
       Text(
           text =
-              pluralStringResource(
-                  R.plurals.symptom_week_summary,
-                  summary.entryCount,
-                  summary.entryCount,
-                  stringResource(summary.mostOften.label),
-              ),
+              summary.mostOften?.let {
+                pluralStringResource(
+                    R.plurals.symptom_week_summary,
+                    summary.entryCount,
+                    summary.entryCount,
+                    stringResource(it.label),
+                )
+              }
+                  ?: pluralStringResource(
+                      R.plurals.symptom_week_count,
+                      summary.entryCount,
+                      summary.entryCount,
+                  ),
           style = MaterialTheme.typography.bodyMedium,
       )
       Text(

@@ -178,6 +178,11 @@
         <item quantity="one">%1$d entry · Most often: %2$s</item>
         <item quantity="other">%1$d entries · Most often: %2$s</item>
     </plurals>
+    <!-- The count alone, when several symptoms were logged equally often -->
+    <plurals name="symptom_week_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
     <string name="symptom_week_hint">Bar height = how hard the day felt, in your own words</string>
     <!-- What TalkBack reads for a day of the chart, e.g. "Monday, Moderate" -->
     <string name="symptom_week_day_intensity">%1$s, %2$s</string>

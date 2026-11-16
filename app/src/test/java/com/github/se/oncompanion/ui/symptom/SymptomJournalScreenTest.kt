@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -527,8 +528,34 @@ class SymptomJournalScreenTest {
     for ((date, description) in descriptions) {
       composeTestRule
           .onNodeWithTag(C.Tag.symptomJournalWeekDay(date), useUnmergedTree = true)
-          .assert(androidx.compose.ui.test.hasContentDescription(description))
+          .assert(hasContentDescription(description))
     }
+  }
+
+  @Test
+  fun weekCard_symptomsLoggedEquallyOften_givesOnlyTheCount() {
+    // Fatigue and pain, once each this week: neither is singled out
+    setContent(
+        loaded.copy(
+            days =
+                listOf(
+                    day(
+                        today,
+                        fatigue to "14:30",
+                        fatigue.copy(id = "pain", types = listOf(SymptomType.PAIN)) to "09:00",
+                    )
+                )
+        )
+    )
+
+    assertTextInside("2 entries", C.Tag.symptom_journal_week)
+    composeTestRule
+        .onNode(
+            hasText("Most often", substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.symptom_journal_week)),
+            useUnmergedTree = true,
+        )
+        .assertDoesNotExist()
   }
 
   @Test
@@ -545,9 +572,7 @@ class SymptomJournalScreenTest {
 
     composeTestRule
         .onNodeWithTag(C.Tag.symptomJournalWeekDay("2026-10-05"), useUnmergedTree = true)
-        .assert(
-            androidx.compose.ui.test.hasContentDescription("Monday, logged without an intensity")
-        )
+        .assert(hasContentDescription("Monday, logged without an intensity"))
   }
 
   @Test
