@@ -7,13 +7,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -111,19 +114,39 @@ fun SignInContent(
 
   // The light of when the screen opened: the sky doesn't change while the user signs in
   val openedAt = remember { LocalTime.now() }
+  val landscape = isCompactHeight()
   Scaffold(
       modifier = modifier.testTag(C.Tag.sign_in_screen),
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
+      // The button is the bottom bar, so the error snackbar shows above it and never covers it
+      bottomBar = {
+        val bar = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+        if (landscape) {
+          // Under the welcome, on the right half: the lake shows through the left half
+          Row(bar) {
+            Spacer(Modifier.weight(1f))
+            SignInAction(uiState, onSignInClick, Modifier.weight(1f).padding(Spacing.lg))
+          }
+        } else {
+          SignInAction(
+              uiState,
+              onSignInClick,
+              bar.padding(horizontal = Spacing.lg).padding(top = Spacing.lg, bottom = Spacing.xl),
+          )
+        }
+      },
   ) { innerPadding ->
     val layoutDirection = LocalLayoutDirection.current
     // The lake goes under the status bar, as in the Figma; the rest keeps clear of the system bars
+    // and of the button
     val clear =
         Modifier.padding(
             end = innerPadding.calculateEndPadding(layoutDirection),
             bottom = innerPadding.calculateBottomPadding(),
         )
-    if (isCompactHeight()) {
-      // A phone held sideways: the lake on the left half, the welcome and the button on the right
+    if (landscape) {
+      // A phone held sideways: the lake on the left half, the welcome on the right, above the
+      // button
       Row(Modifier.fillMaxSize()) {
         PaperLakeScene(openedAt, Modifier.weight(1f).fillMaxHeight().testTag(C.Tag.sign_in_scene))
         Column(
@@ -132,16 +155,16 @@ fun SignInContent(
                     .fillMaxHeight()
                     .then(clear)
                     .padding(top = innerPadding.calculateTopPadding())
-                    .padding(Spacing.lg),
+                    .padding(horizontal = Spacing.lg)
+                    .padding(top = Spacing.lg),
             verticalArrangement = Arrangement.Center,
         ) {
-          // The welcome scrolls, so the button never leaves the screen
+          // The welcome scrolls, so it never pushes the button off the screen
           // A smaller title than in portrait, so the welcome fits on a phone held sideways
           Welcome(
-              Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+              Modifier.verticalScroll(rememberScrollState()),
               titleStyle = MaterialTheme.typography.headlineMedium,
           )
-          SignInAction(uiState, onSignInClick)
         }
       }
     } else {
@@ -151,12 +174,6 @@ fun SignInContent(
         Welcome(
             Modifier.padding(horizontal = Spacing.lg).padding(top = Spacing.xl),
             titleStyle = MaterialTheme.typography.headlineLarge,
-        )
-        SignInAction(
-            uiState,
-            onSignInClick,
-            Modifier.padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.lg, bottom = Spacing.xl),
         )
       }
     }

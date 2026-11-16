@@ -246,6 +246,30 @@ class SignInContentTest {
     assertSameColor("dark ribbon", TertiaryDark, ribbonColor())
   }
 
+  // ----- A snackbar never covers an action (AGENTS.md) -----
+
+  /** After an error, the snackbar's message and Retry stay above "Continue with Google". */
+  private fun assertTheSnackbarIsAboveTheButton() {
+    setContent(SignInUiState(error = SignInError.FAILED))
+    waitForText(string(R.string.sign_in_retry))
+
+    val button = bounds(C.Tag.google_sign_in_button)
+    listOf(R.string.sign_in_error_failed, R.string.sign_in_retry).forEach { text ->
+      val bottom = composeTestRule.onNodeWithText(string(text)).getUnclippedBoundsInRoot().bottom
+      assertTrue(
+          "${string(text)} ends at $bottom, the button starts at ${button.top}",
+          bottom <= button.top,
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+  }
+
+  @Test fun errorSnackbar_staysAboveTheButton_inPortrait() = assertTheSnackbarIsAboveTheButton()
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun errorSnackbar_staysAboveTheButton_inLandscape() = assertTheSnackbarIsAboveTheButton()
+
   // ----- Layout (Figma "US-1 / Login") -----
 
   private fun bounds(tag: String) =
