@@ -525,8 +525,5 @@ object C {
 
     // Shared message state: its round info tile
     const val message_state_icon = "message_state_icon"
-
-    // Shared filter chip: the check of a selected chip
-    const val filter_chip_check = "filter_chip_check"
   }
 }
