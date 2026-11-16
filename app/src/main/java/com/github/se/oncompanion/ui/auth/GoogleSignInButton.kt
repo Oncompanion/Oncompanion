@@ -42,8 +42,7 @@ fun GoogleSignInButton(
       onClick = onClick,
       enabled = enabled,
       // The 56 dp of the app's buttons (Google's guidelines ask at least 40), taller with large
-      // font
-      // sizes so the label is never clipped
+      // font sizes so the label is never clipped
       modifier = modifier.fillMaxWidth().heightIn(min = HEIGHT),
       shape = MaterialTheme.shapes.full,
       border = BorderStroke(1.dp, colors.border.copy(alpha = if (enabled) 1f else 0.12f)),
