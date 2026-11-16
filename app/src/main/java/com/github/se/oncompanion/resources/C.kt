@@ -247,6 +247,9 @@ object C {
     /** The bar of a day in the journal's "This week" chart; [date] is ISO. */
     fun symptomJournalWeekDay(date: String) = "symptom_journal_week_day_$date"
 
+    /** The drawn bar (or dot, or baseline) of a day in the "This week" chart; [date] is ISO. */
+    fun symptomJournalWeekBar(date: String) = "symptom_journal_week_bar_$date"
+
     /** The chip of a symptom type on the add screen; [type] is its enum name, e.g. `FATIGUE`. */
     fun symptomAddType(type: String) = "symptom_add_type_$type"
 

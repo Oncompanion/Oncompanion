@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -556,6 +557,33 @@ class SymptomJournalScreenTest {
             useUnmergedTree = true,
         )
         .assertDoesNotExist()
+  }
+
+  @Test
+  fun weekCard_barsGrowWithTheIntensity_andADayWithoutOneIsMarkedApart() {
+    // Sunday 11: Mon 1/10, Tue 4/10, Wed 10/10, Thu without an intensity, Fri nothing
+    val days =
+        listOf(1, 4, 10, null)
+            .mapIndexed { i, intensity ->
+              day(
+                  today.plusDays(i.toLong()),
+                  fatigue.copy(id = "e$i", intensity = intensity) to "12:00",
+              )
+            }
+            .reversed()
+    setContent(loaded.copy(today = today.plusDays(6), days = days))
+
+    fun bar(day: Long) =
+        composeTestRule
+            .onNodeWithTag(
+                C.Tag.symptomJournalWeekBar(today.plusDays(day).toString()),
+                useUnmergedTree = true,
+            )
+            .getBoundsInRoot()
+    val (mild, moderate, severe) = (0L..2L).map { bar(it).height }
+    assertTrue("$mild < $moderate < $severe", mild < moderate && moderate < severe)
+    // A day logged without an intensity doesn't look like a day with nothing logged
+    assertTrue("${bar(3)} vs ${bar(4)}", bar(3).height > bar(4).height)
   }
 
   @Test

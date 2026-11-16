@@ -123,19 +123,22 @@ private fun DayBar(day: WeekDay, modifier: Modifier = Modifier) {
     // The bars all start on the same line, so their heights compare
     Box(Modifier.height(BAR_AREA_HEIGHT), contentAlignment = Alignment.BottomCenter) {
       val color = MaterialTheme.colorScheme.primary
+      val barTag = Modifier.testTag(C.Tag.symptomJournalWeekBar(day.date.toString()))
       when {
         day.intensity != null ->
             Box(
-                Modifier.width(BAR_WIDTH)
+                barTag
+                    .width(BAR_WIDTH)
                     .height(barHeight(day.intensity))
                     .clip(MaterialTheme.shapes.small)
                     .background(color)
             )
         day.hasEntries ->
-            Box(Modifier.size(DOT_SIZE).border(DOT_BORDER, color, MaterialTheme.shapes.full))
+            Box(barTag.size(DOT_SIZE).border(DOT_BORDER, color, MaterialTheme.shapes.full))
         else ->
             Box(
-                Modifier.width(BAR_WIDTH)
+                barTag
+                    .width(BAR_WIDTH)
                     .height(BASELINE_HEIGHT)
                     .clip(MaterialTheme.shapes.full)
                     .background(color.copy(alpha = BASELINE_ALPHA))
