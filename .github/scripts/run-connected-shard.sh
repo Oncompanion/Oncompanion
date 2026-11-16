@@ -3,7 +3,7 @@
 #
 # Runs one shard of the connected tests on the running emulator, without Gradle: waits for the
 # "Build APKs" job of this run, installs its two APKs, runs this shard's test methods with
-# AndroidJUnitRunner's numShards/shardIndex, then saves the JUnit report and the coverage.
+# AndroidJUnitRunner's testFile (shared out by connected_shards.py), then saves the JUnit report and the coverage.
 #
 # Usage: run-connected-shard.sh <shard, from 1> <number of shards>
 # Needs GH_TOKEN, GITHUB_RUN_ID and GITHUB_REPOSITORY (set by GitHub Actions).
@@ -14,6 +14,7 @@ shards=$2
 app_id=com.github.se.oncompanion
 runner=$app_id.test/$app_id.utils.OncompanionTestRunner
 coverage_on_device=/data/data/$app_id/coverage.ec
+tests_on_device=/data/local/tmp/shard-tests.txt
 
 # The emulator booted while the APKs were being built: wait for them (at most 15 min). Every 30 s:
 # each run's waits share GITHUB_TOKEN's 1,000 API calls per hour with every other run of the repo
@@ -53,9 +54,16 @@ adb logcat -v time > emulator-logcat.txt &
 adb install -r -t apks/debug/app-debug.apk
 adb install -r -t apks/androidTest/debug/app-debug-androidTest.apk
 
+# This shard's tests, shared out by their recorded time (connected_shards.py): the runner lists
+# every test without running it, and each shard picks its share of the same list
+adb shell am instrument -r -w -e log true "$runner" > test-list.txt
+python3 .github/scripts/connected_shards.py plan "$shard" "$shards" .github/connected-test-times.txt \
+  < test-list.txt > shard-tests.txt
+adb push shard-tests.txt "$tests_on_device"
+adb shell chmod 644 "$tests_on_device"
+
 mkdir -p test-results
-adb shell am instrument -r -w \
-  -e numShards "$shards" -e shardIndex "$((shard - 1))" \
+adb shell am instrument -r -w -e testFile "$tests_on_device" \
   -e coverage true -e coverageFile "$coverage_on_device" \
   "$runner" |
   python3 .github/scripts/instrumentation_to_junit.py "test-results/TEST-shard-$shard.xml"

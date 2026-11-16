@@ -231,11 +231,11 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  # The connected tests, split in 4 shards that run at the same time on their own runner, each with
+  # The connected tests, split in 6 shards that run at the same time on their own runner, each with
   # its own Android emulator and Firebase emulators. No Gradle here: a shard boots its emulator
-  # while the Build APKs job runs, then installs the APKs and runs a quarter of the test methods
-  # (AndroidJUnitRunner's numShards and shardIndex), see .github/scripts/run-connected-shard.sh.
-  # 4 rather than 3: the split is by test name, not by time, so smaller shards even out better
+  # while the Build APKs job runs, then installs the APKs and runs its share of the test methods,
+  # shared out by their recorded time (.github/connected-test-times.txt) so the shards end together,
+  # see .github/scripts/run-connected-shard.sh and connected_shards.py
   connected:
     # The SonarCloud job finds the shards by this name: rename both together
     name: Connected tests (${{ matrix.shard }}/${{ strategy.job-total }})
@@ -248,7 +248,7 @@ jobs:
       matrix:
         # The only place the number of shards is written: the name, the script and the SonarCloud
         # job take it from here (strategy.job-total)
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
 
     steps:
       - name: Checkout
