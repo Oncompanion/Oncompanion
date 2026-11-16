@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -17,13 +20,14 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.navigation.NavHostController
@@ -55,7 +59,8 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 class SymptomJournalScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  // An activity, so the rotation test can recreate it
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -392,6 +397,43 @@ class SymptomJournalScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_retry).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).assertIsDisplayed()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun screen_keepsTheEntriesAndTheScrollPosition_acrossARotation() {
+    // Enough entries to scroll in landscape, the newest (e0) first
+    val entries =
+        (0 until 12).map { i ->
+          fatigue.copy(id = "e$i", occurredAt = fatigue.occurredAt.minusSeconds(3600L * i))
+        }
+    val repository = FakeSymptomRepository().apply { seed("alice", *entries.toTypedArray()) }
+    val auth =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    val viewModel = SymptomJournalViewModel(auth, repository)
+    val showScreen = {
+      composeTestRule.activity.setContent {
+        SymptomJournalScreen(
+            navigationActions = NavigationActions(TestNavHostController(LocalContext.current)),
+            viewModel = viewModel,
+        )
+      }
+    }
+    composeTestRule.runOnUiThread(showScreen)
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptom_journal_list)
+        .performScrollToNode(hasTestTag(C.Tag.symptomJournalItem("e11")))
+
+    // Rotating recreates the activity, but the screen's ViewModel survives it
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(showScreen)
+    composeTestRule.waitForIdle()
+
+    // Still scrolled to the oldest entry, not back at the top
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e0")).assertIsNotDisplayed()
   }
 
   // ----- Caregiver mode (US-20) -----
