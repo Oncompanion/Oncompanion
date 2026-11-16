@@ -3,12 +3,14 @@
 package com.github.se.oncompanion.ui.auth
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,7 +35,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SignInScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
   private val user = AuthUser(uid = "uid-42", email = "alex@example.com", givenName = "Alex")
@@ -241,5 +243,31 @@ class SignInScreenTest {
       assertEquals(listOf("google-id-token", "google-id-token"), repository.signInTokens)
       assertEquals(listOf(AfterSignIn.ONBOARDING), destinations)
     }
+  }
+
+  @Test
+  fun rotatingWhileSigningIn_keepsWaiting_withoutAskingGoogleAgain() {
+    val token = CompletableDeferred<String>()
+    provider.onGetToken = { token.await() }
+    val viewModel = SignInViewModel(repository, profiles)
+    val show = {
+      composeTestRule.activity.setContent {
+        SignInScreen(
+            onSignedIn = { destinations += it },
+            viewModel = viewModel,
+            credentialProvider = provider,
+        )
+      }
+    }
+    composeTestRule.runOnUiThread(show)
+    clickSignIn()
+    composeTestRule.onNodeWithTag(C.Tag.sign_in_loading).assertIsDisplayed()
+
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(show)
+
+    composeTestRule.onNodeWithTag(C.Tag.sign_in_loading).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsNotEnabled()
+    composeTestRule.runOnIdle { assertEquals(1, provider.tokenRequests.size) }
   }
 }

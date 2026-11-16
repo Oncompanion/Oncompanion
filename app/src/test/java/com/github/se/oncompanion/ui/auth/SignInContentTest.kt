@@ -12,21 +12,32 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.textLayout
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.TertiaryDark
 import com.github.se.oncompanion.ui.theme.TertiaryLight
+import com.github.se.oncompanion.ui.theme.Typography
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -233,5 +244,108 @@ class SignInContentTest {
     setContent(SignInUiState())
 
     assertSameColor("dark ribbon", TertiaryDark, ribbonColor())
+  }
+
+  // ----- A snackbar never covers an action (AGENTS.md) -----
+
+  /** After an error, the snackbar's message and Retry stay above "Continue with Google". */
+  private fun assertTheSnackbarIsAboveTheButton() {
+    setContent(SignInUiState(error = SignInError.FAILED))
+    waitForText(string(R.string.sign_in_retry))
+
+    val button = bounds(C.Tag.google_sign_in_button)
+    listOf(R.string.sign_in_error_failed, R.string.sign_in_retry).forEach { text ->
+      val bottom = composeTestRule.onNodeWithText(string(text)).getUnclippedBoundsInRoot().bottom
+      assertTrue(
+          "${string(text)} ends at $bottom, the button starts at ${button.top}",
+          bottom <= button.top,
+      )
+    }
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+  }
+
+  @Test fun errorSnackbar_staysAboveTheButton_inPortrait() = assertTheSnackbarIsAboveTheButton()
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun errorSnackbar_staysAboveTheButton_inLandscape() = assertTheSnackbarIsAboveTheButton()
+
+  // ----- Layout (Figma "US-1 / Login") -----
+
+  private fun bounds(tag: String) =
+      composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+  @Test
+  fun portrait_putsTheLakeAcrossTheTop_andTheButtonAtTheBottom() {
+    setContent(SignInUiState())
+
+    val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val scene = bounds(C.Tag.sign_in_scene)
+    assertEquals(0.dp, scene.top)
+    assertEquals(root.width, scene.width)
+    assertTrue("The ribbon is under the lake", bounds(C.Tag.sign_in_logo).top >= scene.bottom)
+    val button = bounds(C.Tag.google_sign_in_button)
+    assertTrue("The button is below the welcome", button.top > bounds(C.Tag.sign_in_logo).bottom)
+    assertTrue("The button is in the lower part", button.top > root.height / 2)
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_putsTheLakeOnTheLeftHalf_andTheWelcomeNextToIt() {
+    setContent(SignInUiState())
+
+    val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val scene = bounds(C.Tag.sign_in_scene)
+    assertEquals(0.dp, scene.left)
+    assertEquals(root.height, scene.height)
+    assertEquals(root.width.value / 2, scene.width.value, 1f)
+    assertTrue("The ribbon is right of the lake", bounds(C.Tag.sign_in_logo).left >= scene.right)
+    assertTrue(
+        "The button is right of the lake",
+        bounds(C.Tag.google_sign_in_button).left >= scene.right,
+    )
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun smallPhoneAt200Percent_shrinksTheLake_andShowsTheWholeWelcome() {
+    setContent(SignInUiState())
+
+    composeTestRule.onNodeWithText(string(R.string.sign_in_subtitle)).assertIsFullyVisible()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+    // The lake shrinks, but stays
+    val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    assertTrue(bounds(C.Tag.sign_in_scene).height > root.height / 4)
+  }
+
+  @Test
+  @Config(qualifiers = "w800dp-h360dp")
+  // Real text measurement: without it, Robolectric lays the text out far smaller
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun landscape_showsTheWholeWelcome_withASmallerTitle() {
+    // In the app's theme: Figtree's line heights decide whether the welcome fits
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = false) { SignInContent(SignInUiState(), {}, {}) }
+    }
+
+    composeTestRule.onNodeWithText(string(R.string.sign_in_subtitle)).assertIsFullyVisible()
+    val title = composeTestRule.onNodeWithText(string(R.string.sign_in_welcome)).textLayout()
+    assertEquals(Typography.headlineMedium.fontSize, title.layoutInput.style.fontSize)
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun smallLandscapeAt200Percent_keepsTheButtonOnScreen_andScrollsTheWelcome() {
+    setContent(SignInUiState())
+
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
+    composeTestRule
+        .onNodeWithText(string(R.string.sign_in_subtitle))
+        .performScrollTo()
+        .assertIsFullyVisible()
+    composeTestRule.onNodeWithTag(C.Tag.google_sign_in_button).assertIsFullyVisible()
   }
 }

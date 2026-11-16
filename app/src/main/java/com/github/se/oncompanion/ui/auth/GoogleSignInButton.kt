@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,11 +22,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.theme.full
 
 /**
  * "Continue with Google" button following Google's Sign in with Google branding guidelines (pill
- * shape, multicolor "G", light or dark theme). The Figma "Google sign-in button" component
- * describes the same values.
+ * shape, multicolor "G", light or dark theme), 56 dp tall like the app's other buttons. Its colours
+ * are Google's, not the theme's: the Figma's Login frame draws a teal button instead, but the
+ * guidelines ask for this one.
  */
 @Composable
 fun GoogleSignInButton(
@@ -40,9 +41,10 @@ fun GoogleSignInButton(
   OutlinedButton(
       onClick = onClick,
       enabled = enabled,
-      // At least 40 dp (branding), taller with large font sizes so the label is never clipped
-      modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
-      shape = RoundedCornerShape(20.dp),
+      // The 56 dp of the app's buttons (Google's guidelines ask at least 40), taller with large
+      // font sizes so the label is never clipped
+      modifier = modifier.fillMaxWidth().heightIn(min = HEIGHT),
+      shape = MaterialTheme.shapes.full,
       border = BorderStroke(1.dp, colors.border.copy(alpha = if (enabled) 1f else 0.12f)),
       colors =
           ButtonDefaults.outlinedButtonColors(
@@ -65,6 +67,8 @@ fun GoogleSignInButton(
     Text(stringResource(R.string.sign_in_with_google), style = MaterialTheme.typography.labelLarge)
   }
 }
+
+private val HEIGHT = 56.dp
 
 /** Colors from Google's branding guidelines. */
 private enum class GoogleButtonColors(val container: Color, val border: Color, val content: Color) {

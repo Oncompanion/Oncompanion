@@ -75,6 +75,7 @@ object C {
     const val google_sign_in_button = "google_sign_in_button"
     const val sign_in_loading = "sign_in_loading"
     const val sign_in_logo = "sign_in_logo"
+    const val sign_in_scene = "sign_in_scene"
     const val account_check_screen = "account_check_screen"
     const val account_check_retry = "account_check_retry"
     const val account_check_loading = "account_check_loading"
