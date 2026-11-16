@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -84,11 +85,12 @@ class AppointmentEditTest {
         day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) !=
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     )
-        compose.onNodeWithTag(C.Tag.planning_next).performClick()
-    compose.onNodeWithTag(C.Tag.planningDay(day.toString())).performClick()
-    compose.onNodeWithText("Oncology follow-up").performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
-    compose.onNodeWithTag(C.Tag.appointment_title).assertTextContains("Oncology follow-up")
+        await(hasTestTag(C.Tag.planning_next)).performClick()
+    await(hasTestTag(C.Tag.planningDay(day.toString()))).performClick()
+    await(hasText("Oncology follow-up")).performClick()
+    await(hasTestTag(C.Tag.appointment_detail_edit_button)).performClick()
+    // The form fills in once the appointment has been read
+    await(hasTestTag(C.Tag.appointment_title) and hasText("Oncology follow-up"))
     compose
         .onNodeWithTag(C.Tag.appointment_notes)
         .performScrollTo()
@@ -98,15 +100,18 @@ class AppointmentEditTest {
     compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
     compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Updated oncology follow-up")
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
-    compose.onNodeWithText("Updated oncology follow-up").assertIsDisplayed()
+    await(hasTestTag(C.Tag.appointment_detail_screen)).assertIsDisplayed()
+    await(hasText("Updated oncology follow-up")).assertIsDisplayed()
     capture("appointment-edit-saved.png")
     compose.onNodeWithTag(C.Tag.appointment_back).performClick()
-    compose.onNodeWithText("Updated oncology follow-up").assertIsDisplayed()
+    await(hasTestTag(C.Tag.planning_screen))
+    await(hasText("Updated oncology follow-up")).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.bottom_navigation_tab_overview).performClick()
-    compose
-        .onNodeWithTag(C.Tag.overview_next_appointment)
-        .assertTextContains("Updated oncology follow-up")
+    // The Overview shows its card once the day's planning has been read
+    await(
+        hasTestTag(C.Tag.overview_next_appointment) and
+            hasText("Updated oncology follow-up", substring = true)
+    )
     runBlocking {
       withTimeout(10_000) {
         val collection = db.collection("users").document(original.first).collection("appointments")
@@ -124,6 +129,24 @@ class AppointmentEditTest {
     }
   }
 
+  /**
+   * The node matching [matcher], once it is on screen. The screens read Firestore's cache on its
+   * own threads, which Compose's idling doesn't wait for: on a freshly started emulator a screen
+   * can still be loading when the previous action returns. Before the first screen is drawn there
+   * is no Compose hierarchy yet, which counts as "not there yet" (as in EndToEndTestDriver.exists).
+   */
+  private fun await(matcher: SemanticsMatcher): SemanticsNodeInteraction {
+    compose.waitUntil(TIMEOUT_MS) {
+      try {
+        compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+      } catch (error: IllegalStateException) {
+        if (error.message?.startsWith("No compose hierarchies found") != true) throw error
+        false
+      }
+    }
+    return compose.onNode(matcher)
+  }
+
   private fun capture(name: String) {
     val context = ApplicationProvider.getApplicationContext<Context>()
     File(context.cacheDir, name).outputStream().use {
@@ -133,5 +156,10 @@ class AppointmentEditTest {
           .asAndroidBitmap()
           .compress(Bitmap.CompressFormat.PNG, 100, it)
     }
+  }
+
+  private companion object {
+    /** As long as the end-to-end tests wait for a screen (EndToEndTestDriver). */
+    const val TIMEOUT_MS = 15_000L
   }
 }
