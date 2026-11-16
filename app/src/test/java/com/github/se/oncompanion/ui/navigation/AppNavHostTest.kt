@@ -72,6 +72,8 @@ import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.model.planning.*
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.session.RejectedWritesProvider
+import com.github.se.oncompanion.model.speech.FakeSpeechRecognizer
+import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
@@ -141,6 +143,7 @@ class AppNavHostTest {
     MedicationRepositoryProvider.repository = appMedicationRepository
     SymptomRepositoryProvider.repository = appSymptomRepository
     UserProfileRepositoryProvider.repository = appUserProfileRepository
+    SpeechRecognizerProvider.reset()
   }
 
   /** Shows the NavHost with these repositories in the providers its ViewModels read. */
@@ -168,6 +171,8 @@ class AppNavHostTest {
     AuthRepositoryProvider.repository = authRepository
     MedicationRepositoryProvider.repository = medicationRepository
     SymptomRepositoryProvider.repository = symptomRepository
+    // MainActivity installs the phone's recognizer, which this test doesn't start
+    SpeechRecognizerProvider.recognizer = FakeSpeechRecognizer()
     // Restoring the state needs the app's own NavController, which saves where the user was
     if (restoration != null) {
       restoration.setContent {
