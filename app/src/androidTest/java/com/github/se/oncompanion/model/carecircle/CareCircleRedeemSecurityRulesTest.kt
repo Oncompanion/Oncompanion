@@ -283,6 +283,13 @@ class CareCircleRedeemSecurityRulesTest {
     denied(
         redeemBatch(inviteCode, member = memberFields(inviteCode, "canAdd" to listOf("SYMPTOMS")))
     )
+    // Nobody joins able to edit or delete (US-46)
+    denied(
+        redeemBatch(
+            inviteCode,
+            member = memberFields(inviteCode, "canEditAndDelete" to emptyList<String>()),
+        )
+    )
   }
 
   @Test

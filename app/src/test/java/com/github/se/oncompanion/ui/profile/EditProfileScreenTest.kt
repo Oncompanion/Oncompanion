@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
@@ -118,7 +119,11 @@ class EditProfileScreenTest {
   @Test
   fun loadErrorOffersRetry() {
     content(EditProfileUiState(EditProfileStatus.ERROR))
-    node(C.Tag.edit_profile_load_error).assertIsDisplayed()
+    node(C.Tag.edit_profile_load_error)
+        .assertIsDisplayed()
+        .assertTextEquals(compose.activity.getString(R.string.profile_error))
+    // A load error isn't a connection problem: offline, Firestore serves its cache (#438)
+    compose.onNode(hasText("connection", substring = true, ignoreCase = true)).assertDoesNotExist()
     node(C.Tag.edit_profile_retry).performClick()
     compose.runOnIdle { assertEquals(1, retries) }
   }

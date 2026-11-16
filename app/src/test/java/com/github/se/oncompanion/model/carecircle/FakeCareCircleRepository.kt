@@ -150,6 +150,7 @@ class FakeCareCircleRepository(rejectedWrites: RejectedWrites = RejectedWrites()
                   relationship = details.relationship,
                   permissions = details.permissions,
                   canAdd = details.canAdd,
+                  canEditAndDelete = details.canEditAndDelete,
               )
         },
     )
