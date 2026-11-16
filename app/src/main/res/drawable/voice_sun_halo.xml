@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- One halo of the voice sun: a flat white disc, scaled and faded with the voice (VoiceLake.kt) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="132dp"
+    android:height="132dp"
+    android:viewportWidth="132"
+    android:viewportHeight="132">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,0A66,66 0,1 1,66 132A66,66 0,1 1,66 0Z" />
+</vector>

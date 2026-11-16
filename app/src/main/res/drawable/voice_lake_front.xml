@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The nearer water and the light on it, in front of the voice lake's far water (VoiceLake.kt) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="195dp"
+    android:height="135dp"
+    android:viewportWidth="390"
+    android:viewportHeight="270">
+    <path
+        android:fillColor="#7FB3C0"
+        android:pathData="M0,240H390V270H0Z" />
+    <path
+        android:fillColor="#2F6F7E"
+        android:pathData="M0,260H390V270H0Z" />
+    <path
+        android:fillColor="#FBF8F4"
+        android:pathData="M245.5,216H278.5A1.5,1.5 0,0 1,278.5 219H245.5A1.5,1.5 0,0 1,245.5 216Z" />
+</vector>
