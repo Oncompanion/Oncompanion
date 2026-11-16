@@ -199,6 +199,43 @@ class CareCircleSecurityRulesTest {
     denied(member.update(detailFields()))
     denied(member.update("permissions", listOf("PLANNING", "EVENTS", "SYMPTOMS", "PRESCRIPTIONS")))
     denied(member.update("canAdd", listOf("SYMPTOMS")))
+    denied(member.update("canEditAndDelete", listOf("PLANNING")))
+  }
+
+  // ---- editing and deleting (US-46) ----
+
+  @Test
+  fun ownerLetsTheMemberEditAndDelete_onlyWhereTheyAdd(): Unit = runBlocking {
+    val symptoms = listOf("SYMPTOMS")
+    allowed(member.update(detailFields("canAdd" to symptoms, "canEditAndDelete" to symptoms)))
+    assertEquals(symptoms, allowed(member.get(Source.SERVER)).get("canEditAndDelete"))
+    allowed(
+        member.update(detailFields("canAdd" to symptoms, "canEditAndDelete" to emptyList<String>()))
+    )
+
+    denied(
+        member.update(detailFields("canAdd" to symptoms, "canEditAndDelete" to listOf("PLANNING")))
+    )
+    denied(member.update(detailFields("canAdd" to symptoms, "canEditAndDelete" to "SYMPTOMS")))
+    // Carol's doc has no canAdd, as for a member saved before it existed
+    denied(member.update("canEditAndDelete", listOf("PLANNING")))
+  }
+
+  @Test
+  fun ownerCannotStopAddingButLeaveEditingAndDeleting(): Unit = runBlocking {
+    val symptoms = listOf("SYMPTOMS")
+    allowed(member.update(detailFields("canAdd" to symptoms, "canEditAndDelete" to symptoms)))
+    denied(member.update("canAdd", emptyList<String>()))
+    denied(
+        member.update(
+            detailFields("permissions" to listOf("PLANNING"), "canAdd" to emptyList<String>())
+        )
+    )
+    allowed(
+        member.update(
+            detailFields("canAdd" to emptyList<String>(), "canEditAndDelete" to emptyList<String>())
+        )
+    )
   }
 
   private companion object {

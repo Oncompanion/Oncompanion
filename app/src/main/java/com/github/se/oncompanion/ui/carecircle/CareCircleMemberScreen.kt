@@ -266,6 +266,7 @@ private fun MemberDetails(
         PermissionItem(permission = permission, granted = permission in member.permissions)
         if (permission in CareCircleMemberDetails.ADDABLE_SECTIONS) {
           CanAddItem(section = permission, allowed = permission in member.canAdd)
+          CanEditAndDeleteItem(permission, allowed = permission in member.canEditAndDelete)
         }
       }
     }
@@ -373,6 +374,22 @@ internal fun CanAddItem(section: CarePermission, allowed: Boolean) {
           Modifier.padding(start = 24.dp)
               .semantics(mergeDescendants = true) { toggleableState = ToggleableState(allowed) }
               .testTag(C.Tag.careCircleMemberCanAdd(section.name)),
+  )
+}
+
+/**
+ * Whether the member can also edit and delete in [section] (US-46), read-only, like [CanAddItem].
+ */
+@Composable
+private fun CanEditAndDeleteItem(section: CarePermission, allowed: Boolean) {
+  ListItem(
+      headlineContent = { Text(stringResource(section.editDeleteLabel)) },
+      supportingContent = { Text(stringResource(section.editDeleteDescription)) },
+      trailingContent = { Switch(checked = allowed, onCheckedChange = null) },
+      modifier =
+          Modifier.padding(start = 24.dp)
+              .semantics(mergeDescendants = true) { toggleableState = ToggleableState(allowed) }
+              .testTag(C.Tag.careCircleMemberCanEditAndDelete(section.name)),
   )
 }
 

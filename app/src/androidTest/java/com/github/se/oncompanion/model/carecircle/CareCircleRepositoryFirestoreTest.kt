@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.COLLECTION
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_ADDED_AT
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_CAN_ADD
+import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_CAN_EDIT_AND_DELETE
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_EMAIL
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FAMILY_NAME
 import com.github.se.oncompanion.model.carecircle.CareCircleRepositoryFirestore.Companion.FIELD_FIRST_NAME
@@ -157,6 +158,7 @@ class CareCircleRepositoryFirestoreTest {
     assertEquals("relationship", FIELD_RELATIONSHIP)
     assertEquals("permissions", FIELD_PERMISSIONS)
     assertEquals("canAdd", FIELD_CAN_ADD)
+    assertEquals("canEditAndDelete", FIELD_CAN_EDIT_AND_DELETE)
     assertEquals("email", FIELD_EMAIL)
     assertEquals("addedAt", FIELD_ADDED_AT)
   }
@@ -540,6 +542,25 @@ class CareCircleRepositoryFirestoreTest {
     synced()
     val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
     assertEquals(listOf("SYMPTOMS"), saved.get(FIELD_CAN_ADD))
+  }
+
+  @Test
+  fun updateMember_savesWhereTheyCanEditAndDelete_whichAMemberWithoutItCant(): Unit = runBlocking {
+    addMember("marc", "Marc", permissions = listOf("SYMPTOMS"))
+    // Saved before US-46: no canEditAndDelete field
+    assertTrue(firstMember("marc")!!.canEditAndDelete.isEmpty())
+
+    val symptoms = setOf(CarePermission.SYMPTOMS)
+    repository.updateMember(
+        aliceUid,
+        "marc",
+        UPDATED.copy(canAdd = symptoms, canEditAndDelete = symptoms),
+    )
+
+    assertEquals(symptoms, firstMember("marc")?.canEditAndDelete)
+    synced()
+    val saved = withTimeout(10_000) { memberDoc("marc").get(Source.SERVER).await() }
+    assertEquals(listOf("SYMPTOMS"), saved.get(FIELD_CAN_EDIT_AND_DELETE))
   }
 
   @Test

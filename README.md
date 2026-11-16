@@ -103,10 +103,12 @@ The hospital search proxy in [functions/](functions/) has its own checks and tes
 
 ### CI and releases
 
-Every pull request runs three jobs ([ci.yml](.github/workflows/ci.yml)):
+Every pull request runs these jobs ([ci.yml](.github/workflows/ci.yml)), all at the same time:
 - **Hospital proxy** checks and tests `functions/`.
 - **Checks** runs ktfmt, lint, the unit and Robolectric tests and the release build.
-- **CI** runs the connected tests on an emulator with the Firebase emulators, then the coverage report and SonarCloud.
+- **Build APKs** builds the app and its connected tests once.
+- **Connected tests (1/4 to 4/4)** each run a quarter of the connected tests on their own emulator with the Firebase emulators, on those APKs.
+- **SonarCloud analysis** merges the coverage of all tests and uploads it, with the lint report, to SonarCloud.
 
 Every Thursday, [release.yml](.github/workflows/release.yml) publishes the signed APK built from the latest green commit on `main`. Its version is `<milestone>.<release number>`.
 

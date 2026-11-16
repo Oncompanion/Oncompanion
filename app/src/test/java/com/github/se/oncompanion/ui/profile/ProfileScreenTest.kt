@@ -3,6 +3,7 @@
 
 package com.github.se.oncompanion.ui.profile
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,7 +15,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
@@ -50,6 +53,9 @@ private class ProfileScreenAuthRepository(private val user: AuthUser) : AuthRepo
 class ProfileScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
+
+  private fun string(id: Int, vararg args: Any): String =
+      ApplicationProvider.getApplicationContext<Context>().getString(id, *args)
 
   private fun setContent(
       state: ProfileUiState,
@@ -141,7 +147,7 @@ class ProfileScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.profile_name).assertTextEquals("Alex Moreau")
     composeTestRule
         .onNodeWithTag(C.Tag.profile_member_since)
-        .assertTextEquals("Oncompanion member since Sep 2026")
+        .assertTextEquals(string(R.string.profile_member_since, "Sep 2026"))
     composeTestRule.onNodeWithTag(C.Tag.profile_information).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_first_name).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_family_name).assertIsDisplayed()
@@ -172,7 +178,9 @@ class ProfileScreenTest {
     )
 
     composeTestRule.onNodeWithTag(C.Tag.profile_name).assertTextEquals("Alex")
-    composeTestRule.onNodeWithTag(C.Tag.profile_member_since).assertTextEquals("Oncompanion member")
+    composeTestRule
+        .onNodeWithTag(C.Tag.profile_member_since)
+        .assertTextEquals(string(R.string.profile_member))
     composeTestRule.onNodeWithTag(C.Tag.profile_first_name).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.profile_family_name).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.profile_email).assertDoesNotExist()
@@ -231,7 +239,7 @@ class ProfileScreenTest {
 
       composeTestRule
           .onNodeWithTag(C.Tag.profile_member_since)
-          .assertTextEquals("Oncompanion member since Aug 2026")
+          .assertTextEquals(string(R.string.profile_member_since, "Aug 2026"))
     } finally {
       TimeZone.setDefault(previousTimezone)
     }

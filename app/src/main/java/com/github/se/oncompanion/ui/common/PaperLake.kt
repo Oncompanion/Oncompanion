@@ -7,9 +7,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -62,7 +65,7 @@ fun PaperLakeHeader(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-  if (isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE) {
+  if (isPaperLakeHeaderBand()) {
     PaperLakeBand(time, modifier, content)
     return
   }
@@ -80,6 +83,14 @@ fun PaperLakeHeader(
     content()
   }
 }
+
+/**
+ * Whether [PaperLakeHeader] is drawn as the 100 dp band: in landscape or at a large font scale. A
+ * screen reads it to lay out what goes on the header, e.g. a card overlapping its lower edge.
+ */
+@Composable
+fun isPaperLakeHeaderBand(): Boolean =
+    isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE
 
 /**
  * The 100 dp Paper lake band behind a top app bar (Figma "Paper lake band"): the sky in the colour
@@ -112,6 +123,27 @@ fun PaperLakeBand(
     )
     content()
   }
+}
+
+/**
+ * An opaque strip behind the status bar, in the sky's colour at [time], for a screen whose Paper
+ * lake header scrolls away: drawn above the content, it keeps the content from passing under the
+ * clock and icons. At rest it blends into the header. Decorative.
+ *
+ * @param insets the bar it covers; the status bar by default
+ */
+@Composable
+fun PaperLakeStatusBar(
+    time: LocalTime,
+    modifier: Modifier = Modifier,
+    insets: WindowInsets = WindowInsets.statusBars,
+) {
+  Box(
+      modifier
+          .fillMaxWidth()
+          .windowInsetsTopHeight(insets)
+          .background(MaterialTheme.lakeColors.horizonAt(time).top)
+  )
 }
 
 /**
@@ -192,8 +224,11 @@ private val HEADER_HEIGHT = 210.dp
 private val BAND_HEIGHT = 100.dp
 private val WATERLINE_HEIGHT = 4.dp
 
-// From this font scale on, the header shrinks to the band (DESIGN.md: "a large font scale")
-private const val LARGE_FONT_SCALE = 1.3f
+/**
+ * DESIGN.md's "large font scale": from it on, the header shrinks to the band. Screens that change
+ * their layout at a large font use it too, so everything switches at the same scale.
+ */
+const val LARGE_FONT_SCALE = 1.3f
 
 // The Sign in scene's frame
 private const val SCENE_RATIO = 390f / 470f

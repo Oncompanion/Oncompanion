@@ -106,6 +106,14 @@ class CareCircleMemberFormScreenTest {
                 state.copy(canAdd = if (allowed) state.canAdd + section else state.canAdd - section)
           },
           onOpenInvite = { openedInvites += it },
+          onCanEditAndDeleteChange = { section, allowed ->
+            state =
+                state.copy(
+                    canEditAndDelete =
+                        if (allowed) state.canEditAndDelete + section
+                        else state.canEditAndDelete - section
+                )
+          },
       )
     }
   }
@@ -755,5 +763,107 @@ class CareCircleMemberFormScreenTest {
           .performScrollTo()
           .assertTextContains(label, substring = true)
     }
+  }
+
+  // ---- editing and deleting (US-46) ----
+
+  @Test
+  fun editingAndDeleting_isOnlyOfferedWhenEditing_greyedOutUntilAdding() {
+    content(complete.copy(permissions = CareCircleMemberDetails.ADDABLE_SECTIONS))
+    for (section in CareCircleMemberDetails.ADDABLE_SECTIONS) {
+      node(C.Tag.careCircleFormCanEditAndDelete(section.name)).assertDoesNotExist()
+    }
+
+    // The same form editing a member
+    state = editing.copy(permissions = CareCircleMemberDetails.ADDABLE_SECTIONS)
+    val allowed = mutableSetOf<CarePermission>()
+    for ((section, label) in
+        listOf(
+            CarePermission.PLANNING to "Allow editing and deleting appointments",
+            CarePermission.EVENTS to "Allow removing confirmations",
+            CarePermission.SYMPTOMS to "Allow editing and deleting symptoms",
+            CarePermission.PRESCRIPTIONS to "Allow editing and deleting prescriptions",
+        )) {
+      val editDelete = node(C.Tag.careCircleFormCanEditAndDelete(section.name))
+      editDelete
+          .performScrollTo()
+          .assertIsNotEnabled()
+          .assertIsOff()
+          .assertTextContains(label, substring = true)
+          .assertTextContains(
+              string(R.string.permission_edit_delete_needs_adding),
+              substring = true,
+          )
+
+      node(C.Tag.careCircleFormCanAdd(section.name)).performScrollTo().performClick()
+      editDelete.performScrollTo().assertIsEnabled().performClick()
+
+      editDelete.assertIsOn()
+      allowed += section
+      assertEquals(allowed, state.canEditAndDelete)
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun editingAndDeleting_landscape_everySwitchAndSaveCanBeReachedInFull() {
+    val all = CareCircleMemberDetails.ADDABLE_SECTIONS
+    content(editing.copy(permissions = all, canAdd = all, canEditAndDelete = all))
+    for (section in all) {
+      val editDelete = node(C.Tag.careCircleFormCanEditAndDelete(section.name))
+      editDelete.performScrollTo().assertIsOn()
+      editDelete.assertIsFullyVisible()
+    }
+    node(C.Tag.care_circle_form_save_button).performScrollTo().assertIsFullyVisible()
+  }
+
+  @Test
+  fun screen_editingAndDeletingChoice_survivesRotation_andIsSaved() {
+    val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "owner") })
+    runBlocking { auth.signInWithGoogle("token") }
+    val symptoms = setOf(CarePermission.SYMPTOMS)
+    val circle =
+        FakeCareCircleRepository().apply {
+          setMembers(
+              "owner",
+              listOf(
+                  CareCircleMember(
+                      uid = "marc",
+                      firstName = "Marc",
+                      relationship = Relationship.SON,
+                      permissions = symptoms,
+                      canAdd = symptoms,
+                  )
+              ),
+          )
+        }
+    val viewModel =
+        CareCircleMemberFormViewModel(
+            FakeCareCircleInviteRepository(),
+            FakeUserProfileRepository(),
+            auth,
+            circle,
+            memberUid = "marc",
+        )
+    val show = {
+      compose.activity.setContent {
+        CareCircleMemberFormScreen(
+            onBack = {},
+            onSaved = {},
+            onOpenInvite = {},
+            viewModel = viewModel,
+        )
+      }
+    }
+    compose.runOnUiThread(show)
+    val editDelete = node(C.Tag.careCircleFormCanEditAndDelete(CarePermission.SYMPTOMS.name))
+    editDelete.performScrollTo().assertIsOff().performClick()
+
+    compose.activityRule.scenario.recreate()
+    compose.runOnUiThread(show)
+
+    editDelete.performScrollTo().assertIsOn()
+    node(C.Tag.care_circle_form_save_button).performScrollTo().performClick()
+    compose.runOnIdle { assertEquals(symptoms, circle.updated.single().second.canEditAndDelete) }
   }
 }
