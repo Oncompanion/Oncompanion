@@ -53,6 +53,19 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun howLoudTheUserIs_comesBackAsALevelFromZeroToOne() = runTest {
+    val session = startListening(SpeechLanguage.ENGLISH)
+
+    // Android's dB, from below silence to above speaking up close
+    val cases = listOf(-5f to 0f, -2f to 0f, 4f to 0.5f, 10f to 1f, 14f to 1f)
+    for ((rmsdB, _) in cases) android.triggerOnRmsChanged(rmsdB)
+    runCurrent()
+
+    assertEquals(cases.map { SpeechEvent.Level(it.second) }, session.events)
+    session.job.cancel()
+  }
+
+  @Test
   fun whatTheUserSaysComesBackAsTheySpeakThenInFull() = runTest {
     val session = startListening(SpeechLanguage.FRENCH)
 

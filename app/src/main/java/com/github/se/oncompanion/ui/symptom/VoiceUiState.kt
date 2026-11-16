@@ -22,11 +22,14 @@ sealed interface VoiceUiState {
    *
    * @property isFinishing the patient tapped Done: the form is filled once the phone has the whole
    *   text
+   * @property level how loud the patient is right now, from 0 to 1, so the screen shows it hears
+   *   them
    */
   data class Listening(
       val text: String = "",
       val draft: SymptomDraft = SymptomDraft(),
       val isFinishing: Boolean = false,
+      val level: Float = 0f,
   ) : VoiceUiState
 
   /**

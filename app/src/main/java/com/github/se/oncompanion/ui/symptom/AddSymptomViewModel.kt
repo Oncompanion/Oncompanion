@@ -401,7 +401,8 @@ class AddSymptomViewModel(
     val language = SpeechLanguage.of(locale)
     listening = viewModelScope.launch {
       speechRecognizer.listen(language).collect { event ->
-        voiceAfter(event, language)?.let(::show)
+        if (event is SpeechEvent.Level) hearLevel(event.level)
+        else voiceAfter(event, language)?.let(::show)
       }
     }
   }
@@ -411,19 +412,31 @@ class AddSymptomViewModel(
    * the form, and text still coming keeps Done tapped.
    */
   private fun show(next: VoiceUiState) {
-    val finishing = (_uiState.value.voice as? VoiceUiState.Listening)?.isFinishing == true
+    val current = _uiState.value.voice as? VoiceUiState.Listening
     when {
-      finishing && next is VoiceUiState.Heard -> useDraft(next.draft)
-      finishing && next is VoiceUiState.Listening ->
-          _uiState.update { it.copy(voice = next.copy(isFinishing = true)) }
+      current?.isFinishing == true && next is VoiceUiState.Heard -> useDraft(next.draft)
+      // New words keep how loud the patient is and whether Done was tapped
+      current != null && next is VoiceUiState.Listening ->
+          _uiState.update {
+            it.copy(voice = next.copy(isFinishing = current.isFinishing, level = current.level))
+          }
       else -> _uiState.update { it.copy(voice = next) }
+    }
+  }
+
+  /** How loud the patient is, shown while listening. */
+  private fun hearLevel(level: Float) {
+    _uiState.update { state ->
+      val listening = state.voice as? VoiceUiState.Listening ?: return@update state
+      state.copy(voice = listening.copy(level = level))
     }
   }
 
   /** What dictating shows after [event], or `null` if it doesn't change. */
   private fun voiceAfter(event: SpeechEvent, language: SpeechLanguage): VoiceUiState? =
       when (event) {
-        SpeechEvent.Listening -> null
+        SpeechEvent.Listening,
+        is SpeechEvent.Level -> null
         is SpeechEvent.PartialText ->
             VoiceUiState.Listening(event.text, draftOf(event.text, language))
         is SpeechEvent.FinalText -> VoiceUiState.Heard(event.text, draftOf(event.text, language))

@@ -1039,6 +1039,25 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun listening_showsHowLoudThePatientIs_acrossNewWords() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+
+        hear(SpeechEvent.Level(0.7f))
+        assertEquals(0.7f, (viewModel.state.voice as VoiceUiState.Listening).level)
+        // New words don't reset it
+        hear(SpeechEvent.PartialText("I feel sick"))
+        assertEquals(0.7f, (viewModel.state.voice as VoiceUiState.Listening).level)
+        hear(SpeechEvent.Level(0.2f))
+        assertEquals(0.2f, (viewModel.state.voice as VoiceUiState.Listening).level)
+
+        // Once heard, the level no longer changes anything
+        hear(SpeechEvent.FinalText("I feel sick"))
+        hear(SpeechEvent.Level(0.9f))
+        assertTrue(viewModel.state.voice is VoiceUiState.Heard)
+      }
+
+  @Test
   fun done_whileListening_stopsThenFillsTheFormWithTheWholeText() =
       runTest(dispatcher) {
         val viewModel = listening()
