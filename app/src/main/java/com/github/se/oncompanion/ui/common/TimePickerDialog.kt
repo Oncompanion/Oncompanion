@@ -24,7 +24,8 @@ import java.time.LocalTime
  * closes the dialog in both cases.
  *
  * On a short window (a phone held sideways) the time is typed instead of set on a clock, which has
- * a fixed size and would be cut off, and the title leaves room for it.
+ * a fixed size and would be cut off, and the title leaves room for it. Either way the time is in
+ * Display Small, as in DESIGN.md.
  *
  * @param is24Hour whether the time is picked in 24-hour format; by default the phone's setting, as
  *   the appointment and planning screens show times. A screen that always shows `HH:mm` passes
@@ -65,10 +66,21 @@ fun TimePickerDialog(
             }
           },
       text = {
-        if (compact) {
-          TimeInput(state = pickerState, modifier = Modifier.testTag(testTags.picker))
-        } else {
-          TimePicker(state = pickerState, modifier = Modifier.testTag(testTags.picker))
+        // The time in Display Small (DESIGN.md), where Material draws it in Display Large on the
+        // clock and Display Medium when typed
+        val typography = MaterialTheme.typography
+        MaterialTheme(
+            typography =
+                typography.copy(
+                    displayLarge = typography.displaySmall,
+                    displayMedium = typography.displaySmall,
+                )
+        ) {
+          if (compact) {
+            TimeInput(state = pickerState, modifier = Modifier.testTag(testTags.picker))
+          } else {
+            TimePicker(state = pickerState, modifier = Modifier.testTag(testTags.picker))
+          }
         }
       },
       confirmButton = {

@@ -7,11 +7,15 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -28,6 +32,7 @@ import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.assertTextStyle
 import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.textLayout
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.buttonLabel
 import com.github.se.oncompanion.ui.theme.lakeColors
@@ -191,6 +196,38 @@ class TimePickerDialogTest {
 
     assertStyle(title, typography.labelMedium, colors.onSurfaceVariant)
   }
+
+  /** Fails unless the [hour] and [minutes] of 08:05 are laid out in Display Small. */
+  private fun assertTimeIsDisplaySmall(hour: SemanticsMatcher, minutes: SemanticsMatcher) {
+    setContent()
+
+    for (part in listOf(hour, minutes)) {
+      val style =
+          composeTestRule
+              .onNode(part and hasAnyAncestor(hasTestTag(tags.picker)), useUnmergedTree = true)
+              .textLayout()
+              .layoutInput
+              .style
+      assertEquals("${part.description} size", typography.displaySmall.fontSize, style.fontSize)
+      assertEquals(
+          "${part.description} weight",
+          typography.displaySmall.fontWeight,
+          style.fontWeight,
+      )
+    }
+  }
+
+  @Test
+  fun onTheClock_theTimeIsDisplaySmall() =
+      assertTimeIsDisplaySmall(hour = hasText("08"), minutes = hasText("05"))
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun typed_theTimeIsDisplaySmall() =
+      assertTimeIsDisplaySmall(
+          hour = hasSetTextAction() and hasContentDescription("for hour"),
+          minutes = hasSetTextAction() and hasContentDescription("for minutes"),
+      )
 
   @Test
   fun buttons_are56dpTall_withTheButtonLabelStyle() {
