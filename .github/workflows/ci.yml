@@ -52,9 +52,9 @@ jobs:
           'node --test --experimental-test-coverage --test-coverage-include="functions/lib/*.js" --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 functions/test/unit.test.mjs functions/test/firestore.test.mjs'
 
 
-  # Formatting, lint, unit tests and the unsigned release build. They run beside the connected tests
-  # in the connected test shards, so a formatting, lint or unit test error shows up in a few minutes
-  # and they no longer add to the time of the whole run.
+  # Formatting and unit tests. They run beside the connected test shards, lint and the release
+  # build, so a formatting or unit test error shows up in a few minutes and they no longer add to
+  # the time of the whole run.
   checks:
     # The connected test shards and the SonarCloud job read this job's result by its name: rename
     # all three together
@@ -91,31 +91,91 @@ jobs:
         run: |
           ./gradlew ktfmtCheck
 
-      - name: Lint
-        run: |
-          ./gradlew lintDebug --build-cache
-
       - name: Unit tests
         run: |
           ./gradlew testDebugUnitTest --build-cache
 
-      # SonarCloud imports the lint issues, the unit test results and their coverage: the SonarCloud
-      # job downloads them before its analysis. Paths are kept under app/build/. Kept 7 days, so
-      # "Re-run failed jobs" on the SonarCloud job alone still finds them a few days later
+      # SonarCloud imports the unit test results and their coverage: the SonarCloud job downloads
+      # them before its analysis. Paths are kept under app/build/. Kept 7 days, so "Re-run failed
+      # jobs" on the SonarCloud job alone still finds them a few days later
       - name: Upload reports for SonarCloud
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: checks-reports
           path: |
-            app/build/reports/lint-results-debug.xml
             app/build/test-results/testDebugUnitTest/
             app/build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec
           if-no-files-found: warn
           retention-days: 7
 
-      # Build the release variant (unsigned) on every run, so a PR that breaks R8 (a missing keep
-      # rule) fails here. The signed APK is built and published by release.yml.
+  # Android lint, in its own job so it runs beside the unit tests rather than after them
+  lint:
+    # The SonarCloud job reads this job's result by its name: rename both together
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: |
+          chmod +x ./gradlew
+
+      - name: Lint
+        run: |
+          ./gradlew lintDebug --build-cache
+
+      # SonarCloud imports the lint issues: the SonarCloud job downloads them into app/build/reports
+      - name: Upload the lint report for SonarCloud
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  # Build the release variant (unsigned) on every run, so a PR that breaks R8 (a missing keep rule)
+  # fails here. The signed APK is built and published by release.yml. Nothing waits for this job:
+  # SonarCloud doesn't use the release build
+  release-build:
+    name: Release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: |
+          chmod +x ./gradlew
+
       - name: Assemble release
         run: |
           ./gradlew assembleRelease --build-cache
@@ -305,7 +365,7 @@ jobs:
 
   # The coverage of all tests and the SonarCloud analysis. It starts with the other jobs and compiles
   # while the tests run (the SonarCloud upload needs the compiled app), then waits for the Checks
-  # job (lint and unit tests) and every connected test shard to merge their reports
+  # and Lint jobs and every connected test shard to merge their reports
   sonar:
     name: SonarCloud analysis
     runs-on: ubuntu-latest
@@ -349,14 +409,15 @@ jobs:
           for _ in $(seq 40); do
             # A read that fails (a GitHub API error) is said and tried again, not failing the job
             if jobs=$(gh run view ${{ github.run_id }} -R ${{ github.repository }} --json jobs \
-              --jq '.jobs[] | select(.name == "Checks" or (.name | startswith("Connected tests"))) | "\(.status) \(.conclusion) \(.name)"'); then
-              # The number of shards, from their names ("Connected tests (1/4)"): Checks and
-              # every shard must be there
+              --jq '.jobs[] | select(.name == "Checks" or .name == "Lint" or (.name | startswith("Connected tests"))) | "\(.status) \(.conclusion) \(.name)"'); then
+              # The number of shards, from their names ("Connected tests (1/4)"): Checks, Lint
+              # and every shard must be there
               total=$(echo "$jobs" | grep -o 'Connected tests ([0-9]*/[0-9]*)' | head -n 1 \
                 | sed 's|.*/\([0-9]*\))|\1|')
               if [ -z "$total" ] || ! echo "$jobs" | grep -q ' Checks$' \
+                || ! echo "$jobs" | grep -q ' Lint$' \
                 || [ "$(echo "$jobs" | grep -c ' Connected tests (')" -ne "$total" ]; then
-                echo "Expected the Checks job and every connected test shard, found:"
+                echo "Expected the Checks and Lint jobs and every connected test shard, found:"
                 echo "$jobs" && exit 1
               fi
               if echo "$jobs" | grep "^completed" | grep -v "^completed success"; then
@@ -377,6 +438,12 @@ jobs:
         with:
           name: checks-reports
           path: app/build
+
+      - name: Download the lint report
+        uses: actions/download-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports
 
       - name: Download coverage of the connected tests
         uses: actions/download-artifact@v4

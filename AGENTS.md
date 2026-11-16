@@ -128,10 +128,12 @@ Run these before every push and make sure they pass:
 - If you change `functions/`, also run what CI runs on it: `npm --prefix functions ci`, `npm --prefix functions run format:check`, `npm --prefix functions run lint`, `npm --prefix functions run build`, and its tests on the Firestore emulator (the last step of the `hospital-proxy` job in `ci.yml`).
 - CI runs these jobs in parallel on every PR (`.github/workflows/ci.yml`):
   - **Hospital proxy**: the `functions/` checks above.
-  - **Checks**: ktfmt, lint, unit + Robolectric tests, and the release build. A formatting, lint or unit test error shows up here in a few minutes.
+  - **Checks**: ktfmt, then the unit + Robolectric tests. A formatting or unit test error shows up here in a few minutes.
+  - **Lint**: Android lint, beside Checks rather than after it.
+  - **Release build**: the unsigned release APK, so a change that breaks R8 (a missing keep rule) fails. Nothing waits for it.
   - **Build APKs**: the app and its connected tests, built once.
   - **Connected tests (1/4 to 4/4)**: each boots its emulator and the Firebase emulators while the APKs are built, then runs a quarter of the connected test methods (`numShards`/`shardIndex`, `.github/scripts/run-connected-shard.sh`), without Gradle. A shard stops before its tests if Checks already failed.
-  - **SonarCloud analysis**: compiles while the tests run, waits for Checks and the 4 shards, then merges their coverage and uploads it with the lint report and the unit test results. When one of them fails, it stops, so SonarCloud never computes a coverage with reports missing.
+  - **SonarCloud analysis**: compiles while the tests run, waits for Checks, Lint and the 4 shards, then merges their coverage and uploads it with the lint report and the unit test results. When one of them fails, it stops, so SonarCloud never computes a coverage with reports missing.
   - Every run keeps its connected test results (with each test's time) for 7 days, one file per shard.
 - **Releases**: `release.yml` publishes the signed APK as a GitHub Release every Thursday, from the latest commit on `main` whose CI passed (or by hand: Actions → Weekly release → Run workflow). Its version is `<baseVersion>.<release number>` (`app/build.gradle.kts`): bump `baseVersion` once each milestone is released. Never rename or recreate `release.yml`: its run number is the APK's `versionCode`, and a restart at 1 would block updates on phones.
 - **When a job fails on a flake, use "Re-run failed jobs"**, not "Re-run job" on one job alone: SonarCloud analysis must run again to get the reports. It reruns with the failed jobs and reuses the reports of the jobs that passed, which are kept 7 days (the APKs 3 days): after that, use "Re-run all jobs".
