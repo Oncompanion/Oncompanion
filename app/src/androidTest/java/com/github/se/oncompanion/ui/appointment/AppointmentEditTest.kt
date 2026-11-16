@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -6,15 +7,17 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.AppHostActivity
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorTestData
+import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.Source
 import java.io.File
@@ -30,12 +33,19 @@ import org.junit.runner.RunWith
 /** Exercises the production edit flow against cached Firebase data and later synchronization. */
 @RunWith(AndroidJUnit4::class)
 class AppointmentEditTest {
-  @get:Rule val compose = createComposeRule()
+  // AppHostActivity sets its content again when Android relaunches it (e.g. on a freshly started
+  // emulator), so the screen comes back instead of staying blank, as in the end-to-end tests
+  @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
+
+  // The screens read Firestore's cache on its own threads, which Compose's idling doesn't wait for:
+  // the driver waits for each screen before acting on it, as in the end-to-end tests
+  private val ui = EndToEndTestDriver(compose)
 
   /** Restores the shared emulator connection and session for later tests. */
   @After
   fun teardown(): Unit = runBlocking {
     FirebaseEmulator.firestore.enableNetwork().await()
+    AppHostActivity.content.value = {}
     EmulatorTestData.signOut()
   }
 
@@ -79,16 +89,24 @@ class AppointmentEditTest {
         uid to snapshot
       }
     }
-    compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
+    compose.runOnUiThread {
+      AppHostActivity.content.value = {
+        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) }
+      }
+    }
+    val planningDay = C.Tag.planningDay(day.toString())
     if (
         day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) !=
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     )
-        compose.onNodeWithTag(C.Tag.planning_next).performClick()
-    compose.onNodeWithTag(C.Tag.planningDay(day.toString())).performClick()
-    compose.onNodeWithText("Oncology follow-up").performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
-    compose.onNodeWithTag(C.Tag.appointment_title).assertTextContains("Oncology follow-up")
+        ui.open(C.Tag.planning_next, hasTestTag(planningDay))
+    ui.open(planningDay, hasText("Oncology follow-up"))
+    ui.open(hasText("Oncology follow-up"), hasTestTag(C.Tag.appointment_detail_edit_button))
+    // The form fills in once the appointment has been read
+    ui.open(
+        C.Tag.appointment_detail_edit_button,
+        hasTestTag(C.Tag.appointment_title) and hasText("Oncology follow-up"),
+    )
     compose
         .onNodeWithTag(C.Tag.appointment_notes)
         .performScrollTo()
@@ -96,17 +114,18 @@ class AppointmentEditTest {
     compose.onNodeWithTag(C.Tag.appointment_title).performScrollTo()
     capture("appointment-edit-form.png")
     compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
-    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Updated oncology follow-up")
-    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
-    compose.onNodeWithText("Updated oncology follow-up").assertIsDisplayed()
+    ui.typeText(compose.onNodeWithTag(C.Tag.appointment_title), "Updated oncology follow-up")
+    ui.open(C.Tag.appointment_save, hasTestTag(C.Tag.appointment_detail_screen)).assertIsDisplayed()
+    ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
     capture("appointment-edit-saved.png")
-    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
-    compose.onNodeWithText("Updated oncology follow-up").assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.bottom_navigation_tab_overview).performClick()
-    compose
-        .onNodeWithTag(C.Tag.overview_next_appointment)
-        .assertTextContains("Updated oncology follow-up")
+    ui.open(C.Tag.appointment_back, hasTestTag(C.Tag.planning_screen))
+    ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
+    // The Overview shows its card once the day's planning has been read
+    ui.open(
+        C.Tag.bottom_navigation_tab_overview,
+        hasTestTag(C.Tag.overview_next_appointment) and
+            hasText("Updated oncology follow-up", substring = true),
+    )
     runBlocking {
       withTimeout(10_000) {
         val collection = db.collection("users").document(original.first).collection("appointments")
