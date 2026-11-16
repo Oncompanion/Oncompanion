@@ -53,7 +53,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
@@ -86,10 +85,7 @@ fun CareCircleMemberFormScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   // An invitation with the typed email may have expired while the phone slept
-  LifecycleResumeEffect(viewModel) {
-    viewModel.refreshExpiry()
-    onPauseOrDispose {}
-  }
+  CheckExpiryOnResume(viewModel::refreshExpiry)
   // Leaves once per save, even if the screen recomposes before it is gone
   LaunchedEffect(uiState.save) {
     if (uiState.save == SavePhase.SAVED) {

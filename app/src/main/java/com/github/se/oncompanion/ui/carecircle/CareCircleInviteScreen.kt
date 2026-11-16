@@ -51,7 +51,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -105,10 +104,7 @@ fun CareCircleInviteScreen(
   val scope = rememberCoroutineScope()
   val snackbarHostState = remember { SnackbarHostState() }
   // Back from another app (e.g. the email app): the invite code may have expired in the meantime
-  LifecycleResumeEffect(viewModel) {
-    viewModel.refreshExpiry()
-    onPauseOrDispose {}
-  }
+  CheckExpiryOnResume(viewModel::refreshExpiry)
   // Leaves once the invitation is cancelled or replaced
   LaunchedEffect(uiState) {
     when (val state = uiState) {
