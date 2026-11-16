@@ -367,11 +367,6 @@ class AddSymptomViewModel(
     startListening()
   }
 
-  /** The patient is done speaking: what was understood so far is kept and drafted. */
-  fun stopListening() {
-    if (_uiState.value.voice is VoiceUiState.Listening) speechRecognizer.stop()
-  }
-
   /** Back to the form without using what was said; it is dropped. */
   fun cancelVoice() {
     listening?.cancel()
@@ -380,12 +375,25 @@ class AddSymptomViewModel(
   }
 
   /**
-   * Fills the form with what was heard, for the patient to check before saving. Only fields still
-   * empty are filled: nothing they already entered is replaced.
+   * The patient is done: fills the form with what was heard, for them to check before saving. While
+   * listening, it stops first and fills the form once the phone has the whole text. Only fields
+   * still empty are filled: nothing they already entered is replaced.
    */
-  fun useDraft() {
-    val heard = _uiState.value.voice as? VoiceUiState.Heard ?: return
-    edit { it.filledFrom(heard.draft).copy(voice = null, isDrafted = true).withFutureCheck() }
+  fun onDone() {
+    when (val voice = _uiState.value.voice) {
+      is VoiceUiState.Heard -> useDraft(voice.draft)
+      is VoiceUiState.Listening ->
+          if (!voice.isFinishing) {
+            _uiState.update { it.copy(voice = voice.copy(isFinishing = true)) }
+            speechRecognizer.stop()
+          }
+      else -> Unit
+    }
+  }
+
+  /** Fills the form with [draft] and goes back to it. */
+  private fun useDraft(draft: SymptomDraft) {
+    edit { it.filledFrom(draft).copy(voice = null, isDrafted = true).withFutureCheck() }
   }
 
   /** Listens to the patient in the phone's language, replacing any session already running. */
@@ -395,8 +403,22 @@ class AddSymptomViewModel(
     val language = SpeechLanguage.of(locale)
     listening = viewModelScope.launch {
       speechRecognizer.listen(language).collect { event ->
-        _uiState.update { it.copy(voice = voiceAfter(event, language) ?: it.voice) }
+        voiceAfter(event, language)?.let(::show)
       }
+    }
+  }
+
+  /**
+   * Shows [next], unless the patient already tapped Done: then the whole text goes straight into
+   * the form, and text still coming keeps Done tapped.
+   */
+  private fun show(next: VoiceUiState) {
+    val finishing = (_uiState.value.voice as? VoiceUiState.Listening)?.isFinishing == true
+    when {
+      finishing && next is VoiceUiState.Heard -> useDraft(next.draft)
+      finishing && next is VoiceUiState.Listening ->
+          _uiState.update { it.copy(voice = next.copy(isFinishing = true)) }
+      else -> _uiState.update { it.copy(voice = next) }
     }
   }
 
@@ -404,21 +426,17 @@ class AddSymptomViewModel(
   private fun voiceAfter(event: SpeechEvent, language: SpeechLanguage): VoiceUiState? =
       when (event) {
         SpeechEvent.Listening -> null
-        is SpeechEvent.PartialText -> VoiceUiState.Listening(event.text)
-        // Parsed in the language it was heard in, which may not be the phone's
-        is SpeechEvent.FinalText ->
-            VoiceUiState.Heard(
-                event.text,
-                parseSpokenSymptom(
-                    event.text,
-                    Locale.forLanguageTag(language.tag),
-                    ZonedDateTime.now(clock),
-                ),
-            )
+        is SpeechEvent.PartialText ->
+            VoiceUiState.Listening(event.text, draftOf(event.text, language))
+        is SpeechEvent.FinalText -> VoiceUiState.Heard(event.text, draftOf(event.text, language))
         is SpeechEvent.Failed ->
             if (event.error == SpeechError.NO_PERMISSION) VoiceUiState.MicrophoneRefused
             else VoiceUiState.Failed(event.error)
       }
+
+  /** The form drafted from [text], parsed in the language it was heard in, not the phone's. */
+  private fun draftOf(text: String, language: SpeechLanguage): SymptomDraft =
+      parseSpokenSymptom(text, Locale.forLanguageTag(language.tag), ZonedDateTime.now(clock))
 
   /**
    * The form with [draft] in the fields still empty: its symptoms after those picked, its intensity

@@ -995,8 +995,11 @@ class AddSymptomViewModelTest {
         val viewModel = listening()
         assertEquals(listOf(SpeechLanguage.ENGLISH), speech.languages)
 
-        hear(SpeechEvent.Listening, SpeechEvent.PartialText("I feel"))
-        assertEquals(VoiceUiState.Listening("I feel"), viewModel.state.voice)
+        // What is picked up shows while the patient speaks
+        hear(SpeechEvent.Listening, SpeechEvent.PartialText("I feel sick"))
+        val listening = viewModel.state.voice as VoiceUiState.Listening
+        assertEquals("I feel sick", listening.text)
+        assertEquals(listOf(SymptomType.NAUSEA), listening.draft.types)
 
         hear(SpeechEvent.FinalText("I feel sick 7/10"))
         val heard = viewModel.state.voice as VoiceUiState.Heard
@@ -1008,18 +1011,45 @@ class AddSymptomViewModelTest {
       }
 
   @Test
-  fun stop_cancel_andStartOver_controlTheSession() =
+  fun done_whileListening_stopsThenFillsTheFormWithTheWholeText() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        hear(SpeechEvent.PartialText("I feel"))
+
+        viewModel.onDone()
+        assertEquals(1, speech.stops)
+        assertTrue((viewModel.state.voice as VoiceUiState.Listening).isFinishing)
+        // A second tap doesn't stop again, and text still coming keeps Done tapped
+        viewModel.onDone()
+        hear(SpeechEvent.PartialText("I feel sick"))
+        assertEquals(1, speech.stops)
+        assertTrue((viewModel.state.voice as VoiceUiState.Listening).isFinishing)
+
+        hear(SpeechEvent.FinalText("I feel sick 7/10"))
+        assertNull(viewModel.state.voice)
+        assertTrue(viewModel.state.isDrafted)
+        assertEquals(listOf(SymptomType.NAUSEA), viewModel.state.types)
+        assertEquals(7, viewModel.state.intensity)
+      }
+
+  @Test
+  fun done_withNothingUnderstood_saysSo() =
       runTest(dispatcher) {
         val viewModel = listening()
 
-        // Stop asks the phone to finish; what it understood still comes
-        viewModel.stopListening()
-        assertEquals(1, speech.stops)
+        viewModel.onDone()
+        hear(SpeechEvent.Failed(SpeechError.NO_SPEECH))
+
+        assertEquals(VoiceUiState.Failed(SpeechError.NO_SPEECH), viewModel.state.voice)
+        assertFalse(viewModel.state.isDrafted)
+      }
+
+  @Test
+  fun cancel_andStartOver_controlTheSession() =
+      runTest(dispatcher) {
+        val viewModel = listening()
         hear(SpeechEvent.FinalText("I feel sick"))
         assertTrue(viewModel.state.voice is VoiceUiState.Heard)
-        // Nothing to stop once heard
-        viewModel.stopListening()
-        assertEquals(1, speech.stops)
 
         // Start over drops what was heard and listens again
         viewModel.restartListening()
@@ -1043,11 +1073,15 @@ class AddSymptomViewModelTest {
         val viewModel = listening()
         hear(SpeechEvent.PartialText("my head"))
 
+        // Even after Done: starting over listens afresh
+        viewModel.onDone()
         viewModel.restartListening()
         advanceUntilIdle()
         hear(SpeechEvent.PartialText("I feel"))
 
-        assertEquals(VoiceUiState.Listening("I feel"), viewModel.state.voice)
+        val listening = viewModel.state.voice as VoiceUiState.Listening
+        assertEquals("I feel", listening.text)
+        assertFalse(listening.isFinishing)
         assertEquals(2, speech.languages.size)
       }
 
@@ -1122,7 +1156,7 @@ class AddSymptomViewModelTest {
           val viewModel = viewModel().also(case.before)
           heard(case.transcript, viewModel)
 
-          viewModel.useDraft()
+          viewModel.onDone()
           val state = viewModel.state
           assertNull(case.transcript, state.voice)
           assertTrue(case.transcript, state.isDrafted)
@@ -1138,7 +1172,7 @@ class AddSymptomViewModelTest {
   fun aDictatedSymptom_isSavedOnlyWhenThePatientSaves() =
       runTest(dispatcher) {
         val viewModel = heard("headache 7 out of 10 yesterday at 9 am")
-        viewModel.useDraft()
+        viewModel.onDone()
         advanceUntilIdle()
         assertEquals(emptyList<SymptomEntry>(), repository.symptoms(uid))
 
@@ -1158,7 +1192,7 @@ class AddSymptomViewModelTest {
         val viewModel = heard("j'ai mal dormi cette nuit", viewModel(Locale.FRANCE))
 
         assertEquals(listOf(SpeechLanguage.FRENCH), speech.languages)
-        viewModel.useDraft()
+        viewModel.onDone()
         assertEquals(listOf(SymptomType.SLEEP_PROBLEMS), viewModel.state.types)
       }
 
@@ -1170,7 +1204,7 @@ class AddSymptomViewModelTest {
         viewModel.save()
 
         // Saving: the form no longer changes
-        viewModel.useDraft()
+        viewModel.onDone()
         viewModel.onSpeak(hasMicrophone = true)
         assertEquals(listOf(SymptomType.PAIN), viewModel.state.types)
         assertNull(viewModel.state.intensity)
