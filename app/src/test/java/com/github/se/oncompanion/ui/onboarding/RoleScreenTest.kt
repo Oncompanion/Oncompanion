@@ -419,6 +419,10 @@ class RoleScreenTest {
     val band = bounds(C.Tag.onboarding_band)
     assertEquals(0.dp, band.top)
     assertEquals(root.width, band.width)
+    // The strip behind the status bar, so the scrolled step never passes under its icons
+    composeTestRule
+        .onNodeWithTag(C.Tag.onboarding_status_bar, useUnmergedTree = true)
+        .assertExists()
     val title =
         composeTestRule
             .onNodeWithText(context.getString(R.string.onboarding_role_title))
