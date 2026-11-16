@@ -6,11 +6,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.ImageDecoder
-import android.net.Uri
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,7 +31,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,7 +71,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -95,6 +89,8 @@ import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeDialog
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
+import com.github.se.oncompanion.ui.common.appSettingsIntent
+import com.github.se.oncompanion.ui.common.hasPermission
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.Spacing
 import java.io.File
@@ -145,7 +141,10 @@ fun ScanScreen(
   // upright so the two don't show at once
   LaunchedEffect(uiState.showUprightTip) {
     if (uiState.showUprightTip) return@LaunchedEffect
-    if (!context.hasCameraPermission() && !viewModel.uiState.value.permissionRequested) {
+    if (
+        !context.hasPermission(Manifest.permission.CAMERA) &&
+            !viewModel.uiState.value.permissionRequested
+    ) {
       viewModel.onPermissionRequested()
       permissionLauncher.launch(Manifest.permission.CAMERA)
     }
@@ -154,7 +153,7 @@ fun ScanScreen(
   // Each time the screen comes back (at start, or from the phone's settings): the camera may be
   // allowed by now
   LifecycleResumeEffect(Unit) {
-    if (context.hasCameraPermission()) viewModel.onPermissionGranted()
+    if (context.hasPermission(Manifest.permission.CAMERA)) viewModel.onPermissionGranted()
     onPauseOrDispose {}
   }
 
@@ -818,14 +817,3 @@ private fun Context.findActivity(): Activity? =
       is ContextWrapper -> baseContext.findActivity()
       else -> null
     }
-
-private fun Context.hasCameraPermission(): Boolean =
-    ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
-        PackageManager.PERMISSION_GRANTED
-
-/** This app's page in the phone's settings, where the camera can be allowed again. */
-private fun appSettingsIntent(context: Context): Intent =
-    Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", context.packageName, null),
-    )
