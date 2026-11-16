@@ -56,11 +56,6 @@ import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-/** "29 Sep 2026", as in the prescription form. The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
  * The prescriptions list (US-11 "See my saved prescriptions", Figma: "US-11 / Prescription list"):
@@ -328,7 +323,7 @@ private fun PrescriptionItem(
     state: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-  val date = prescription.prescribedOn.format(dateFormatter)
+  val date = prescription.prescribedOn.format(prescriptionDateFormatter)
   val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
   ListItem(
       headlineContent = {

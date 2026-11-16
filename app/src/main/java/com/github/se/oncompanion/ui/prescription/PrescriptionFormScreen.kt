@@ -81,9 +81,6 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** "29 Sep 2026". The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
-
 // The start date in a medication's row, short like the rest of the row: "29 Sep"
 private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 
@@ -653,7 +650,7 @@ private fun DateField(
   var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
   ClickableReadOnlyField(
-      value = date.format(dateFormatter),
+      value = date.format(prescriptionDateFormatter),
       label = label,
       onClick = { pickerOpen = true },
       onClickLabel = stringResource(R.string.prescription_form_pick_date),

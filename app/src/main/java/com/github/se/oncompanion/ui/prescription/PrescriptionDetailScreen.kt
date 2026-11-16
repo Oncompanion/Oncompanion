@@ -50,8 +50,6 @@ import com.github.se.oncompanion.ui.common.DetailWithActions
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private val actionTags =
     DetailActionTags(
@@ -66,9 +64,6 @@ private val deleteDialogTags =
         cancel = C.Tag.prescription_delete_cancel,
         error = C.Tag.prescription_delete_error,
     )
-
-/** "29 Sep 2026", as in the list and the form. The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
  * The detail of one saved prescription (US-11, Figma: "US-11 / Prescription detail"), opened from
@@ -247,7 +242,7 @@ private fun PrescriptionDetail(prescription: Prescription) {
       )
     }
     LabelledRow(
-        value = prescription.prescribedOn.format(dateFormatter),
+        value = prescription.prescribedOn.format(prescriptionDateFormatter),
         label = stringResource(R.string.prescription_detail_date),
         icon = painterResource(R.drawable.ic_schedule),
         testTag = C.Tag.prescription_detail_date,
@@ -295,7 +290,7 @@ private fun MedicationItem(medication: Medication) {
   val starts =
       stringResource(
           R.string.prescription_detail_starts,
-          medication.startDate.format(dateFormatter),
+          medication.startDate.format(prescriptionDateFormatter),
       )
   ListItem(
       headlineContent = { Text(medication.name) },
