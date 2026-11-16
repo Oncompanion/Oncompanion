@@ -57,6 +57,9 @@ adb install -r -t apks/androidTest/debug/app-debug-androidTest.apk
 # This shard's tests, shared out by their recorded time (connected_shards.py): the runner lists
 # every test without running it, and each shard picks its share of the same list
 adb shell am instrument -r -w -e log true "$runner" > test-list.txt
+# adb exits with 0 even when the listing crashed: without the runner's final OK code, this shard
+# would plan from a partial list, and the tests it misses would run in no shard
+grep -q '^INSTRUMENTATION_CODE: -1' test-list.txt || { echo "Couldn't list the tests:"; cat test-list.txt; exit 1; }
 python3 .github/scripts/connected_shards.py plan "$shard" "$shards" .github/connected-test-times.txt \
   < test-list.txt > shard-tests.txt
 adb push shard-tests.txt "$tests_on_device"

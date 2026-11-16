@@ -67,6 +67,9 @@ def main(args):
         if not tests:
             sys.exit("No test listed: the test APK couldn't be read")
         shares, loads = plan(tests, read_times(args[3]), shards)
+        if not shares[shard - 1]:
+            # An empty testFile makes AndroidJUnitRunner run every test of the APK
+            sys.exit(f"No test for shard {shard}: fewer tests than shards")
         print(
             f"Shard {shard}/{shards}: {len(shares[shard - 1])} of {len(set(tests))} tests, "
             f"about {loads[shard - 1]:.0f} s (shards: {', '.join(f'{load:.0f}' for load in loads)})",
