@@ -7,15 +7,17 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.AppHostActivity
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.utils.EmulatorTestData
+import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.firestore.Source
 import java.io.File
@@ -31,12 +33,19 @@ import org.junit.runner.RunWith
 /** Exercises the production edit flow against cached Firebase data and later synchronization. */
 @RunWith(AndroidJUnit4::class)
 class AppointmentEditTest {
-  @get:Rule val compose = createComposeRule()
+  // AppHostActivity sets its content again when Android relaunches it (e.g. on a freshly started
+  // emulator), so the screen comes back instead of staying blank, as in the end-to-end tests
+  @get:Rule val compose = createAndroidComposeRule<AppHostActivity>()
+
+  // The screens read Firestore's cache on its own threads, which Compose's idling doesn't wait for:
+  // the driver waits for each screen before acting on it, as in the end-to-end tests
+  private val ui = EndToEndTestDriver(compose)
 
   /** Restores the shared emulator connection and session for later tests. */
   @After
   fun teardown(): Unit = runBlocking {
     FirebaseEmulator.firestore.enableNetwork().await()
+    AppHostActivity.content.value = {}
     EmulatorTestData.signOut()
   }
 
@@ -80,17 +89,24 @@ class AppointmentEditTest {
         uid to snapshot
       }
     }
-    compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
+    compose.runOnUiThread {
+      AppHostActivity.content.value = {
+        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) }
+      }
+    }
+    val planningDay = C.Tag.planningDay(day.toString())
     if (
         day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) !=
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     )
-        await(hasTestTag(C.Tag.planning_next)).performClick()
-    await(hasTestTag(C.Tag.planningDay(day.toString()))).performClick()
-    await(hasText("Oncology follow-up")).performClick()
-    await(hasTestTag(C.Tag.appointment_detail_edit_button)).performClick()
+        ui.open(C.Tag.planning_next, hasTestTag(planningDay))
+    ui.open(planningDay, hasText("Oncology follow-up"))
+    ui.open(hasText("Oncology follow-up"), hasTestTag(C.Tag.appointment_detail_edit_button))
     // The form fills in once the appointment has been read
-    await(hasTestTag(C.Tag.appointment_title) and hasText("Oncology follow-up"))
+    ui.open(
+        C.Tag.appointment_detail_edit_button,
+        hasTestTag(C.Tag.appointment_title) and hasText("Oncology follow-up"),
+    )
     compose
         .onNodeWithTag(C.Tag.appointment_notes)
         .performScrollTo()
@@ -98,19 +114,17 @@ class AppointmentEditTest {
     compose.onNodeWithTag(C.Tag.appointment_title).performScrollTo()
     capture("appointment-edit-form.png")
     compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
-    compose.onNodeWithTag(C.Tag.appointment_title).performTextInput("Updated oncology follow-up")
-    compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().performClick()
-    await(hasTestTag(C.Tag.appointment_detail_screen)).assertIsDisplayed()
-    await(hasText("Updated oncology follow-up")).assertIsDisplayed()
+    ui.typeText(compose.onNodeWithTag(C.Tag.appointment_title), "Updated oncology follow-up")
+    ui.open(C.Tag.appointment_save, hasTestTag(C.Tag.appointment_detail_screen)).assertIsDisplayed()
+    ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
     capture("appointment-edit-saved.png")
-    compose.onNodeWithTag(C.Tag.appointment_back).performClick()
-    await(hasTestTag(C.Tag.planning_screen))
-    await(hasText("Updated oncology follow-up")).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.bottom_navigation_tab_overview).performClick()
+    ui.open(C.Tag.appointment_back, hasTestTag(C.Tag.planning_screen))
+    ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
     // The Overview shows its card once the day's planning has been read
-    await(
+    ui.open(
+        C.Tag.bottom_navigation_tab_overview,
         hasTestTag(C.Tag.overview_next_appointment) and
-            hasText("Updated oncology follow-up", substring = true)
+            hasText("Updated oncology follow-up", substring = true),
     )
     runBlocking {
       withTimeout(10_000) {
@@ -129,24 +143,6 @@ class AppointmentEditTest {
     }
   }
 
-  /**
-   * The node matching [matcher], once it is on screen. The screens read Firestore's cache on its
-   * own threads, which Compose's idling doesn't wait for: on a freshly started emulator a screen
-   * can still be loading when the previous action returns. Before the first screen is drawn there
-   * is no Compose hierarchy yet, which counts as "not there yet" (as in EndToEndTestDriver.exists).
-   */
-  private fun await(matcher: SemanticsMatcher): SemanticsNodeInteraction {
-    compose.waitUntil(TIMEOUT_MS) {
-      try {
-        compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
-      } catch (error: IllegalStateException) {
-        if (error.message?.startsWith("No compose hierarchies found") != true) throw error
-        false
-      }
-    }
-    return compose.onNode(matcher)
-  }
-
   private fun capture(name: String) {
     val context = ApplicationProvider.getApplicationContext<Context>()
     File(context.cacheDir, name).outputStream().use {
@@ -156,10 +152,5 @@ class AppointmentEditTest {
           .asAndroidBitmap()
           .compress(Bitmap.CompressFormat.PNG, 100, it)
     }
-  }
-
-  private companion object {
-    /** As long as the end-to-end tests wait for a screen (EndToEndTestDriver). */
-    const val TIMEOUT_MS = 15_000L
   }
 }
