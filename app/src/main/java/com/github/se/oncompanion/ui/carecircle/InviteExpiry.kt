@@ -6,6 +6,27 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+/**
+ * Lets a ViewModel check expiry again without new data from the repositories: it combines
+ * [requests] with its data before calling [repeatAtEachExpiry], and calls [checkAgain] when its
+ * screen resumes (see [CheckExpiryOnResume]).
+ */
+class ExpiryChecks {
+  private val checks = MutableStateFlow(0)
+
+  /** Changes each time [checkAgain] is called; collectors only need the latest. */
+  val requests: StateFlow<Int> = checks.asStateFlow()
+
+  /** Asks for the invitations shown to be checked again against the current time. */
+  fun checkAgain() {
+    checks.update { it + 1 }
+  }
+}
 
 /**
  * Calls [show] with the current time, then again each time one of [expiries] passes, so an

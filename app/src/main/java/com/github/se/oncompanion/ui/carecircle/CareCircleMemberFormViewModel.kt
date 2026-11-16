@@ -186,8 +186,7 @@ class CareCircleMemberFormViewModel(
       )
   val uiState: StateFlow<CareCircleMemberFormUiState> = _uiState.asStateFlow()
 
-  /** Bumped to check expiry again without new data from the repositories. */
-  private val expiryChecks = MutableStateFlow(0)
+  private val expiryChecks = ExpiryChecks()
 
   private var duplicateCheck: Job? = null
 
@@ -209,7 +208,7 @@ class CareCircleMemberFormViewModel(
    * resumes: the timer below doesn't run while the phone sleeps, and the user may change the clock.
    */
   fun refreshExpiry() {
-    expiryChecks.update { it + 1 }
+    expiryChecks.checkAgain()
   }
 
   /**
@@ -236,7 +235,7 @@ class CareCircleMemberFormViewModel(
               circle.filterNotNull(),
               // Checked again when a failed save gives the form back
               _uiState.map { it.email to it.save }.distinctUntilChanged(),
-              expiryChecks,
+              expiryChecks.requests,
           ) { circle, (email, save), _ ->
             (email to circle).takeIf { save == SavePhase.EDITING }
           }

@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** What the care circle screen shows. */
@@ -67,8 +66,7 @@ class CareCircleViewModel(
 
   private var observeJob: Job? = null
 
-  /** Bumped to check expiry again without new data from the repositories. */
-  private val expiryChecks = MutableStateFlow(0)
+  private val expiryChecks = ExpiryChecks()
 
   init {
     observeCircle()
@@ -80,7 +78,7 @@ class CareCircleViewModel(
    * clock.
    */
   fun refreshExpiry() {
-    expiryChecks.update { it + 1 }
+    expiryChecks.checkAgain()
   }
 
   /** Reads the circle again after an [CareCircleUiState.Error]. */
@@ -103,7 +101,7 @@ class CareCircleViewModel(
         combine(
                 careCircleRepository.observeMembers(uid),
                 inviteRepository.observePendingInvites(uid),
-                expiryChecks,
+                expiryChecks.requests,
             ) { members, invites, _ ->
               members to invites
             }
