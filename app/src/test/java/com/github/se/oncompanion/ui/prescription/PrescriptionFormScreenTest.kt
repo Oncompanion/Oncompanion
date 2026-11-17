@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
@@ -619,6 +620,31 @@ class PrescriptionFormScreenTest {
     setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
 
     node(C.Tag.prescription_form_retry_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun error_retryCanBeReached_onASmallPhoneSidewaysWithTheLargestFont() {
+    // Taller than the screen there: the message scrolls so Retry can still be tapped (#490)
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_retry_button)
+        .performScrollTo()
+        .assertIsFullyVisible()
+  }
+
+  @Test
+  fun error_spansTheWholeWidth_soItWrapsLikeOnTheOtherPrescriptionScreens() {
+    // The message state brings its own side padding: nothing is added around it (#490)
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+    val screen = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+    val message =
+        composeTestRule
+            .onNodeWithTag(C.Tag.prescription_form_load_error)
+            .fetchSemanticsNode()
+            .boundsInRoot
+    assertEquals(screen.left, message.left)
+    assertEquals(screen.right, message.right)
   }
 
   @Test

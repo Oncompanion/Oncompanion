@@ -166,20 +166,16 @@ fun PrescriptionsContent(
             )
         PrescriptionsLoad.FAILED -> ErrorState(caregiverOf, buttonRoom, onRetry)
         PrescriptionsLoad.NO_ACCESS ->
-            NoAccessMessage(
-                uiState.isCaregiver,
-                caregiverOf,
-                Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_no_access),
-            )
+            MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
+              NoAccessMessage(uiState.isCaregiver, caregiverOf)
+            }
         // The patient a caregiver follows doesn't share their prescriptions
         PrescriptionsLoad.NOT_SHARED ->
             // Without the name, the caregiver was just removed and leaves for Whose care?
             if (caregiverOf == null)
-                NoAccessMessage(
-                    isCaregiver = true,
-                    caregiverOf = null,
-                    Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_no_access),
-                )
+                MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
+                  NoAccessMessage(isCaregiver = true, caregiverOf = null)
+                }
             else
                 NotSharedMessage(
                     caregiverOf,
@@ -427,33 +423,39 @@ private fun AddedByYouItem(
  */
 @Composable
 private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
-  CenteredMessage(testTag = C.Tag.prescriptions_empty, bottom = buttonRoom) {
-    Icon(
-        painter = painterResource(R.drawable.ic_prescriptions),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(48.dp),
-    )
-    Text(
-        text = stringResource(R.string.prescriptions_empty_title),
-        style = MaterialTheme.typography.titleMedium,
-        textAlign = TextAlign.Center,
-    )
-    Text(
-        text =
-            caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
-                ?: stringResource(R.string.prescriptions_empty_hint),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-    )
+  MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_empty)) {
+    Column(
+        Modifier.padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Icon(
+          painter = painterResource(R.drawable.ic_prescriptions),
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(48.dp),
+      )
+      Text(
+          text = stringResource(R.string.prescriptions_empty_title),
+          style = MaterialTheme.typography.titleMedium,
+          textAlign = TextAlign.Center,
+      )
+      Text(
+          text =
+              caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
+                  ?: stringResource(R.string.prescriptions_empty_hint),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+      )
+    }
   }
 }
 
 /** The list couldn't be loaded: whose it is, and a way to retry. */
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
-  CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
+  MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_error)) {
     PrescriptionMessage(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
@@ -463,21 +465,6 @@ private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit
         onAction = onRetry,
         actionTestTag = C.Tag.prescriptions_retry_button,
     )
-  }
-}
-
-/** Centers [content] in the space above the buttons, [bottom] high. */
-@Composable
-private fun CenteredMessage(testTag: String, bottom: Dp, content: @Composable () -> Unit) {
-  Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .padding(start = 32.dp, end = 32.dp, bottom = bottom)
-              .testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    content()
   }
 }
 

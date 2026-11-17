@@ -150,30 +150,26 @@ fun PrescriptionDetailContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_loading)
             )
         PrescriptionsLoad.FAILED ->
-            PrescriptionMessage(
-                title = stringResource(R.string.prescription_detail_error_title),
-                modifier =
-                    Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_error),
-                hint = stringResource(R.string.prescription_detail_error_hint),
-                actionLabel = stringResource(R.string.prescription_detail_retry),
-                onAction = onRetry,
-                actionTestTag = C.Tag.prescription_detail_retry_button,
-            )
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_error)) {
+              PrescriptionMessage(
+                  title = stringResource(R.string.prescription_detail_error_title),
+                  hint = stringResource(R.string.prescription_detail_error_hint),
+                  actionLabel = stringResource(R.string.prescription_detail_retry),
+                  onAction = onRetry,
+                  actionTestTag = C.Tag.prescription_detail_retry_button,
+              )
+            }
         PrescriptionsLoad.NO_ACCESS ->
-            NoAccessMessage(
-                uiState.isCaregiver,
-                caregiverOf,
-                Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_no_access),
-            )
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+              NoAccessMessage(uiState.isCaregiver, caregiverOf)
+            }
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         PrescriptionsLoad.NOT_SHARED ->
             // Without the name, the caregiver was just removed and leaves for Whose care?
             if (caregiverOf == null)
-                NoAccessMessage(
-                    isCaregiver = true,
-                    caregiverOf = null,
-                    Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_no_access),
-                )
+                MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+                  NoAccessMessage(isCaregiver = true, caregiverOf = null)
+                }
             else
                 NotSharedMessage(
                     caregiverOf,
@@ -183,13 +179,12 @@ fun PrescriptionDetailContent(
         PrescriptionsLoad.SHOWN ->
             // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
             if (prescription == null)
-                PrescriptionMessage(
-                    title = stringResource(R.string.prescription_detail_not_found_title),
-                    modifier =
-                        Modifier.align(Alignment.Center)
-                            .testTag(C.Tag.prescription_detail_not_found),
-                    hint = stringResource(R.string.prescription_detail_not_found_hint),
-                )
+                MessageArea(Modifier.testTag(C.Tag.prescription_detail_not_found)) {
+                  PrescriptionMessage(
+                      title = stringResource(R.string.prescription_detail_not_found_title),
+                      hint = stringResource(R.string.prescription_detail_not_found_hint),
+                  )
+                }
             // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
             else
                 DetailWithActions(

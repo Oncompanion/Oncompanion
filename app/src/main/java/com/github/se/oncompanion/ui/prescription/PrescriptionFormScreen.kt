@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.prescription
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -388,39 +389,38 @@ private fun FormTopAppBar(
  */
 @Composable
 private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier: Modifier) {
-  Column(
-      modifier = modifier.fillMaxSize().padding(horizontal = 32.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    when (load) {
-      PrescriptionFormLoad.LOADING ->
+  when (load) {
+    PrescriptionFormLoad.LOADING ->
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_form_loading))
-      // No retry: the form keeps listening and fills in if the prescription arrives later
-      PrescriptionFormLoad.NOT_FOUND ->
+        }
+    // No retry: the form keeps listening and fills in if the prescription arrives later
+    PrescriptionFormLoad.NOT_FOUND ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_found)) {
           PrescriptionMessage(
               title = stringResource(R.string.prescription_form_not_found_title),
-              modifier = Modifier.testTag(C.Tag.prescription_form_not_found),
               hint = stringResource(R.string.prescription_form_not_found_hint),
           )
-      PrescriptionFormLoad.NOT_SIGNED_IN ->
+        }
+    PrescriptionFormLoad.NOT_SIGNED_IN ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_signed_in)) {
           PrescriptionMessage(
               title = stringResource(R.string.prescription_form_not_signed_in_title),
-              modifier = Modifier.testTag(C.Tag.prescription_form_not_signed_in),
               hint = stringResource(R.string.prescription_form_not_signed_in_hint),
           )
-      PrescriptionFormLoad.FAILED ->
+        }
+    PrescriptionFormLoad.FAILED ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_load_error)) {
           PrescriptionMessage(
               title = stringResource(R.string.prescription_form_load_error_title),
-              modifier = Modifier.testTag(C.Tag.prescription_form_load_error),
               hint = stringResource(R.string.prescription_form_load_error_hint),
               actionLabel = stringResource(R.string.prescription_form_retry),
               onAction = onRetry,
               actionTestTag = C.Tag.prescription_form_retry_button,
           )
-      // The fields are shown instead
-      PrescriptionFormLoad.READY -> Unit
-    }
+        }
+    // The fields are shown instead
+    PrescriptionFormLoad.READY -> Unit
   }
 }
 
