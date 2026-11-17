@@ -106,7 +106,6 @@ class PrescriptionDetailViewModelTest {
     val state = viewModel().uiState.value
 
     assertEquals(PrescriptionsLoad.LOADING, state.load)
-    assertFalse(state.isNotFound)
   }
 
   @Test
@@ -119,7 +118,6 @@ class PrescriptionDetailViewModelTest {
     val state = vm.uiState.value
     assertEquals(chemo, state.prescription)
     assertEquals(PrescriptionsLoad.SHOWN, state.load)
-    assertFalse(state.isNotFound)
   }
 
   @Test
@@ -129,7 +127,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertNull(vm.uiState.value.prescription)
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -146,7 +145,8 @@ class PrescriptionDetailViewModelTest {
 
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -156,7 +156,8 @@ class PrescriptionDetailViewModelTest {
 
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -182,7 +183,8 @@ class PrescriptionDetailViewModelTest {
     repository.deletePrescription("alice", "chemo")
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -192,7 +194,6 @@ class PrescriptionDetailViewModelTest {
     val vm = viewModel()
     advanceUntilIdle()
     assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
-    assertFalse(vm.uiState.value.isNotFound)
 
     repository.readError = null
     vm.load()
@@ -213,7 +214,6 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
-    assertFalse(vm.uiState.value.isNotFound)
   }
 
   @Test
@@ -239,7 +239,6 @@ class PrescriptionDetailViewModelTest {
     // Retrying can't sign the patient back in: no access, not an error to retry
     assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
     assertFalse(vm.uiState.value.isCaregiver)
-    assertFalse(vm.uiState.value.isNotFound)
   }
 
   @Test
@@ -263,6 +262,27 @@ class PrescriptionDetailViewModelTest {
     val viewModel = PrescriptionDetailViewModel("chemo")
     dispatcher.scheduler.advanceUntilIdle()
     assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
+  }
+
+  @Test
+  fun whileReadingAgain_neverShowsAPrescriptionToSomeoneWhoLostAccess() {
+    // Only a shown or loading prescription may stay while it is read again: losing the access
+    // never turns back into the prescription, even if one were still held (#490)
+    val cases =
+        listOf(
+            PrescriptionsLoad.SHOWN to chemo to PrescriptionsLoad.SHOWN,
+            PrescriptionsLoad.SHOWN to null to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.LOADING to chemo to PrescriptionsLoad.SHOWN,
+            PrescriptionsLoad.LOADING to null to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.FAILED to chemo to PrescriptionsLoad.FAILED,
+            PrescriptionsLoad.NOT_SHARED to chemo to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.NO_ACCESS to chemo to PrescriptionsLoad.LOADING,
+        )
+    for ((before, expected) in cases) {
+      val (load, prescription) = before
+      val state = PrescriptionDetailUiState(prescription = prescription, load = load)
+      assertEquals("$load with ${prescription?.id}", expected, state.loadWhileReading())
+    }
   }
 
   // ----- Delete (US-12) -----
@@ -315,8 +335,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
-    // Not shown as "no longer exists" while the screen closes
-    assertFalse(vm.uiState.value.isNotFound)
+    // Still shown, not "no longer exists", while the screen closes
+    assertEquals(chemo, vm.uiState.value.prescription)
     assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
   }
 
@@ -467,7 +487,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertFalse(vm.uiState.value.isDeleteDialogShown)
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -512,7 +533,6 @@ class PrescriptionDetailViewModelTest {
     dispatcher.scheduler.advanceUntilIdle()
 
     assertEquals(PrescriptionsLoad.NOT_SHARED, viewModel.uiState.value.load)
-    assertFalse(viewModel.uiState.value.isNotFound)
   }
 
   /** A caregiver's view of "patient"'s prescription, while [patient] changes the access. */
@@ -554,7 +574,6 @@ class PrescriptionDetailViewModelTest {
     assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
     // Known from the start, so the text stays right once leave() clears the patient's name
     assertTrue(viewModel.uiState.value.isCaregiver)
-    assertFalse(viewModel.uiState.value.isNotFound)
     assertNull(viewModel.uiState.value.prescription)
   }
 

@@ -50,10 +50,6 @@ data class PrescriptionDetailUiState(
     val isOwn: Boolean = true,
     val isCaregiver: Boolean = false,
 ) : HasDeletePhase {
-  /** The prescription doesn't exist (e.g. deleted on another device). */
-  val isNotFound: Boolean
-    get() = load == PrescriptionsLoad.SHOWN && prescription == null
-
   /**
    * The prescription is shown and can be corrected: not after a read error, when what is on screen
    * may be out of date.
@@ -65,6 +61,23 @@ data class PrescriptionDetailUiState(
   override val canDelete: Boolean
     get() = canEdit
 }
+
+/**
+ * What the detail shows while the prescription is read again, with the access known: the
+ * prescription kept from before, a read error over it, or nothing yet. Only a shown or loading
+ * prescription may stay: after the access was lost, the read has to show it again first, even if
+ * one were still held (#490).
+ */
+internal fun PrescriptionDetailUiState.loadWhileReading(): PrescriptionsLoad =
+    when (load) {
+      PrescriptionsLoad.SHOWN,
+      PrescriptionsLoad.LOADING ->
+          if (prescription == null) PrescriptionsLoad.LOADING else PrescriptionsLoad.SHOWN
+      // A read error stays shown over the prescription kept from before it
+      PrescriptionsLoad.FAILED -> PrescriptionsLoad.FAILED
+      PrescriptionsLoad.NOT_SHARED,
+      PrescriptionsLoad.NO_ACCESS -> PrescriptionsLoad.LOADING
+    }
 
 /**
  * Loads one prescription of the signed-in user and keeps it up to date, so a correction saved in
@@ -152,16 +165,7 @@ class PrescriptionDetailViewModel(
         // What is shown stays until the prescription arrives (e.g. after a failed deletion), but
         // not while the access itself isn't known: then nothing of it may show
         is CareSection.Loading ->
-            if (section.accessKnown)
-                copy(
-                    load =
-                        when {
-                          prescription == null -> PrescriptionsLoad.LOADING
-                          // A read error stays shown over the prescription kept from before it
-                          load == PrescriptionsLoad.FAILED -> PrescriptionsLoad.FAILED
-                          else -> PrescriptionsLoad.SHOWN
-                        }
-                )
+            if (section.accessKnown) copy(load = loadWhileReading())
             else
                 copy(
                     prescription = null,
