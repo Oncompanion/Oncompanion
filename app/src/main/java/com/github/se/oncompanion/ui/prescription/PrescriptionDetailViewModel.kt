@@ -36,30 +36,26 @@ import kotlinx.coroutines.launch
  *
  * @property prescription the prescription, or `null` while loading, after an error, or if it
  *   doesn't exist
- * @property isLoading true until the prescription arrives
- * @property hasError true if it couldn't be loaded (or nobody is signed in)
+ * @property load where reading it is at: shown with no [prescription] means it doesn't exist
  * @property delete where the deletion of the prescription is at
  * @property isOwn whether it is the user's own prescription: a caregiver only reads the patient's
- * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
  */
 data class PrescriptionDetailUiState(
     val prescription: Prescription? = null,
-    val isLoading: Boolean = true,
-    val hasError: Boolean = false,
+    val load: PrescriptionsLoad = PrescriptionsLoad.LOADING,
     override val delete: DeletePhase = DeletePhase.IDLE,
     val isOwn: Boolean = true,
-    val isNotShared: Boolean = false,
 ) : HasDeletePhase {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
-    get() = !isLoading && !hasError && !isNotShared && prescription == null
+    get() = load == PrescriptionsLoad.SHOWN && prescription == null
 
   /**
    * The prescription is shown and can be corrected: not after a read error, when what is on screen
    * may be out of date.
    */
   val canEdit: Boolean
-    get() = isOwn && prescription != null && !isLoading && !hasError && !delete.isUnderWay
+    get() = isOwn && prescription != null && load == PrescriptionsLoad.SHOWN && !delete.isUnderWay
 
   /** The prescription is shown and can be deleted. */
   override val canDelete: Boolean
@@ -112,7 +108,7 @@ class PrescriptionDetailViewModel(
 
   /** Starts (or, after an error, restarts) observing the prescription. */
   fun load() {
-    _uiState.update { it.copy(isLoading = true, hasError = false) }
+    _uiState.update { it.copy(load = PrescriptionsLoad.LOADING) }
     observe()
   }
 
@@ -151,13 +147,20 @@ class PrescriptionDetailViewModel(
         // What is shown stays until the prescription arrives (e.g. after a failed deletion), but
         // not while the access itself isn't known: then nothing of it may show
         is CareSection.Loading ->
-            if (section.accessKnown) copy(isLoading = prescription == null, isNotShared = false)
+            if (section.accessKnown)
+                copy(
+                    load =
+                        when {
+                          prescription == null -> PrescriptionsLoad.LOADING
+                          // A read error stays shown over the prescription kept from before it
+                          load == PrescriptionsLoad.FAILED -> PrescriptionsLoad.FAILED
+                          else -> PrescriptionsLoad.SHOWN
+                        }
+                )
             else
                 copy(
                     prescription = null,
-                    isLoading = true,
-                    hasError = false,
-                    isNotShared = false,
+                    load = PrescriptionsLoad.LOADING,
                     isOwn = false,
                     delete = delete.afterRead(false),
                 )
@@ -166,26 +169,22 @@ class PrescriptionDetailViewModel(
         CareSection.NotShared ->
             copy(
                 prescription = null,
-                isLoading = false,
-                hasError = section == CareSection.NoAccess,
-                isNotShared = section == CareSection.NotShared,
+                load =
+                    if (section == CareSection.NotShared) PrescriptionsLoad.NOT_SHARED
+                    else PrescriptionsLoad.FAILED,
                 isOwn = false,
                 delete = delete.afterRead(false),
             )
         is CareSection.Failed ->
             copy(
-                isLoading = false,
-                hasError = true,
-                isNotShared = false,
+                load = PrescriptionsLoad.FAILED,
                 delete = delete.afterRead(false),
             )
         // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
         is CareSection.Shown ->
             copy(
                 prescription = section.data,
-                isLoading = false,
-                hasError = false,
-                isNotShared = false,
+                load = PrescriptionsLoad.SHOWN,
                 isOwn = section.canEdit,
                 delete = delete.afterRead(exists = section.data != null),
             )

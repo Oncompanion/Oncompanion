@@ -116,13 +116,12 @@ class PrescriptionsViewModelTest {
         repository.seed(uid, prescription("p1", "2026-09-29", "Ondansetron 8 mg"))
         val viewModel = viewModel()
 
-        assertTrue(viewModel.uiState.value.isLoading)
-        assertFalse(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.LOADING, viewModel.uiState.value.load)
         assertEquals(emptyList<Prescription>(), viewModel.uiState.value.prescriptions)
 
         advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals(PrescriptionsLoad.SHOWN, viewModel.uiState.value.load)
         assertEquals(listOf("p1"), viewModel.ids)
       }
 
@@ -135,7 +134,7 @@ class PrescriptionsViewModelTest {
         assertEquals(
             PrescriptionsUiState(
                 today = LocalDate.of(2026, 10, 12),
-                isLoading = false,
+                load = PrescriptionsLoad.SHOWN,
                 canAdd = true,
             ),
             viewModel.uiState.value,
@@ -168,8 +167,7 @@ class PrescriptionsViewModelTest {
         val viewModel = viewModel()
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.hasError)
-        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
       }
 
   @Test
@@ -180,8 +178,7 @@ class PrescriptionsViewModelTest {
         val viewModel = viewModel(FakeAuthRepository())
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.hasError)
-        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 
@@ -197,13 +194,11 @@ class PrescriptionsViewModelTest {
         viewModel.load()
 
         // Loading again, without the old error
-        assertTrue(viewModel.uiState.value.isLoading)
-        assertFalse(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.LOADING, viewModel.uiState.value.load)
 
         advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.isLoading)
-        assertFalse(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.SHOWN, viewModel.uiState.value.load)
         assertEquals(listOf("p1"), viewModel.ids)
       }
 
@@ -231,7 +226,7 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), viewModel.ids)
-        assertFalse(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.SHOWN, viewModel.uiState.value.load)
       }
 
   @Test
@@ -246,7 +241,7 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("p1"), viewModel.ids)
-        assertFalse(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.SHOWN, viewModel.uiState.value.load)
       }
 
   // ----- This month / Earlier -----
@@ -363,7 +358,7 @@ class PrescriptionsViewModelTest {
         // Like the app's NavHost does: without Firebase nobody is signed in
         val viewModel = PrescriptionsViewModel()
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
       }
 
   // ----- Caregiver mode (US-20) -----
@@ -388,7 +383,7 @@ class PrescriptionsViewModelTest {
 
         assertEquals(listOf("p1"), viewModel.ids)
         assertFalse(viewModel.uiState.value.canAdd)
-        assertFalse(viewModel.uiState.value.isNotShared)
+        assertEquals(PrescriptionsLoad.SHOWN, viewModel.uiState.value.load)
       }
 
   @Test
@@ -399,9 +394,8 @@ class PrescriptionsViewModelTest {
         val viewModel = caregiverViewModel(CarePermission.SYMPTOMS)
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.isNotShared)
+        assertEquals(PrescriptionsLoad.NOT_SHARED, viewModel.uiState.value.load)
         assertEquals(emptyList<String>(), viewModel.ids)
-        assertFalse(viewModel.uiState.value.hasError)
         assertFalse(viewModel.uiState.value.canAdd)
       }
 
@@ -443,14 +437,13 @@ class PrescriptionsViewModelTest {
         val patient = FollowedPatient().apply { removesTheCaregiver() }
         val viewModel = caregiverViewModel(patient)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
 
         // The patient adds the caregiver back, without their prescriptions
         patient.shares(CarePermission.SYMPTOMS)
         advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.hasError)
-        assertTrue(viewModel.uiState.value.isNotShared)
+        assertEquals(PrescriptionsLoad.NOT_SHARED, viewModel.uiState.value.load)
       }
 
   @Test
@@ -461,7 +454,7 @@ class PrescriptionsViewModelTest {
         val viewModel = viewModel()
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
         assertTrue(viewModel.uiState.value.canAdd)
       }
 
@@ -674,7 +667,7 @@ class PrescriptionsViewModelTest {
         val reopened = caregiverList(seen, unreadable)
         advanceUntilIdle()
 
-        assertFalse(reopened.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.SHOWN, reopened.uiState.value.load)
         assertTrue(reopened.uiState.value.waiting.isEmpty())
         assertEquals(listOf("accepted"), reopened.thisMonthIds)
       }
@@ -702,7 +695,7 @@ class PrescriptionsViewModelTest {
         assertEquals(listOf("own"), patient.ids)
         assertEquals(listOf("rejected"), repository.rejectedOf("patient").map { it.id })
         assertEquals(listOf("rejected"), caregiver.uiState.value.waiting.map { it.id })
-        assertFalse(caregiver.uiState.value.hasError)
+        assertEquals(PrescriptionsLoad.SHOWN, caregiver.uiState.value.load)
       }
 
   @Test

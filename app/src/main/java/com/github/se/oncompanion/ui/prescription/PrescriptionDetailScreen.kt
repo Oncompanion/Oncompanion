@@ -146,12 +146,12 @@ fun PrescriptionDetailContent(
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val prescription = uiState.prescription
-      when {
-        uiState.isLoading ->
+      when (uiState.load) {
+        PrescriptionsLoad.LOADING ->
             CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_loading)
             )
-        uiState.hasError ->
+        PrescriptionsLoad.FAILED ->
             Message(
                 testTag = C.Tag.prescription_detail_error,
                 title = stringResource(R.string.prescription_detail_error_title),
@@ -164,36 +164,37 @@ fun PrescriptionDetailContent(
               )
             }
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
-        uiState.isNotShared && caregiverOf != null ->
+        PrescriptionsLoad.NOT_SHARED ->
             NotSharedMessage(
-                caregiverOf,
+                caregiverOf.orEmpty(),
                 CarePermission.PRESCRIPTIONS,
                 Modifier.align(Alignment.Center),
             )
-        // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
-        prescription == null ->
-            Message(
-                testTag = C.Tag.prescription_detail_not_found,
-                title = stringResource(R.string.prescription_detail_not_found_title),
-                hint = stringResource(R.string.prescription_detail_not_found_hint),
-            )
-        // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
-        else ->
-            DetailWithActions(
-                showActions = uiState.canEdit,
-                contentTestTag = C.Tag.prescription_detail_content,
-                actions = {
-                  DetailActions(
-                      editLabel = stringResource(R.string.prescription_detail_edit),
-                      deleteLabel = stringResource(R.string.prescription_detail_delete),
-                      onEdit = onEdit,
-                      onDelete = onDelete,
-                      tags = actionTags,
-                  )
-                },
-            ) {
-              PrescriptionDetail(prescription)
-            }
+        PrescriptionsLoad.SHOWN ->
+            // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
+            if (prescription == null)
+                Message(
+                    testTag = C.Tag.prescription_detail_not_found,
+                    title = stringResource(R.string.prescription_detail_not_found_title),
+                    hint = stringResource(R.string.prescription_detail_not_found_hint),
+                )
+            // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
+            else
+                DetailWithActions(
+                    showActions = uiState.canEdit,
+                    contentTestTag = C.Tag.prescription_detail_content,
+                    actions = {
+                      DetailActions(
+                          editLabel = stringResource(R.string.prescription_detail_edit),
+                          deleteLabel = stringResource(R.string.prescription_detail_delete),
+                          onEdit = onEdit,
+                          onDelete = onDelete,
+                          tags = actionTags,
+                      )
+                    },
+                ) {
+                  PrescriptionDetail(prescription)
+                }
       }
     }
   }

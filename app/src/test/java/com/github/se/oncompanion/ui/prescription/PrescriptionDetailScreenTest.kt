@@ -76,7 +76,8 @@ class PrescriptionDetailScreenTest {
       )
 
   private val loading = PrescriptionDetailUiState()
-  private val shown = PrescriptionDetailUiState(prescription = chemo, isLoading = false)
+  private val shown =
+      PrescriptionDetailUiState(prescription = chemo, load = PrescriptionsLoad.SHOWN)
 
   private fun setContent(
       state: PrescriptionDetailUiState,
@@ -141,7 +142,7 @@ class PrescriptionDetailScreenTest {
   fun error_showsRetry_whichCallsBack() {
     var retries = 0
     setContent(
-        PrescriptionDetailUiState(isLoading = false, hasError = true),
+        PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED),
         onRetry = { retries++ },
     )
 
@@ -157,14 +158,14 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun error_neverBlamesTheConnection() {
-    setContent(PrescriptionDetailUiState(isLoading = false, hasError = true))
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
 
     composeTestRule.onNodeWithText("connection", substring = true).assertDoesNotExist()
   }
 
   @Test
   fun notFound_saysItNoLongerExists_withoutRetry() {
-    setContent(PrescriptionDetailUiState(isLoading = false))
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN))
 
     assertTextInside(
         context.getString(R.string.prescription_detail_not_found_title),
@@ -298,10 +299,10 @@ class PrescriptionDetailScreenTest {
   fun editButton_onlyWhileThePrescriptionIsShown() {
     listOf(
             loading,
-            PrescriptionDetailUiState(isLoading = false, hasError = true),
-            PrescriptionDetailUiState(isLoading = false),
+            PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED),
+            PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN),
             // A read error after it was shown: what is on screen may be out of date
-            shown.copy(hasError = true),
+            shown.copy(load = PrescriptionsLoad.FAILED),
         )
         .forEach { state -> assertEquals("Edit for $state", false, state.canEdit) }
     setContent(loading)
@@ -514,7 +515,7 @@ class PrescriptionDetailScreenTest {
   @Test
   fun caregiver_prescriptionsNotShared_saysSo_insteadOfNotFound() {
     setCaregiverContent(
-        PrescriptionDetailUiState(isLoading = false, isNotShared = true, isOwn = false)
+        PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SHARED, isOwn = false)
     )
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()

@@ -17,6 +17,24 @@ internal val prescriptionDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
+ * Where reading the prescriptions of the list or the detail is at, as one value, so two states can
+ * never be true at once. What was read is kept apart: an empty list, or a prescription that no
+ * longer exists, is still [SHOWN].
+ */
+enum class PrescriptionsLoad {
+  /** The access or the prescriptions are still being read. */
+  LOADING,
+  /** Read: the list, maybe empty, or the prescription, null if it no longer exists. */
+  SHOWN,
+  /**
+   * Reading failed, and retrying may help. Not a connection problem: offline, the cache answers.
+   */
+  FAILED,
+  /** In caregiver mode, the patient doesn't share their prescriptions. */
+  NOT_SHARED,
+}
+
+/**
  * A centered title and a hint under it, for the messages the prescription screens show instead of
  * their content (e.g. an empty list, a prescription that can't be loaded), so they all look alike.
  */

@@ -159,29 +159,30 @@ fun PrescriptionsContent(
     // Room is kept at the bottom only for buttons that are shown
     val buttonRoom = if (uiState.canAdd) BUTTON_ROOM else 0.dp
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
-      when {
-        uiState.isLoading ->
+      when (uiState.load) {
+        PrescriptionsLoad.LOADING ->
             CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
-        uiState.hasError -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        PrescriptionsLoad.FAILED -> ErrorState(caregiverOf, buttonRoom, onRetry)
         // The patient a caregiver follows doesn't share their prescriptions
-        uiState.isNotShared && caregiverOf != null ->
+        PrescriptionsLoad.NOT_SHARED ->
             NotSharedMessage(
-                caregiverOf,
+                caregiverOf.orEmpty(),
                 CarePermission.PRESCRIPTIONS,
                 Modifier.align(Alignment.Center),
             )
-        uiState.prescriptions.isEmpty() -> EmptyState(caregiverOf, buttonRoom)
-        else ->
-            PrescriptionList(
-                uiState,
-                caregiverOf = caregiverOf,
-                buttonRoom = buttonRoom,
-                onOpen = onOpen,
-                onReview = onReview,
-                onDismiss = onDismiss,
-            )
+        PrescriptionsLoad.SHOWN ->
+            if (uiState.prescriptions.isEmpty()) EmptyState(caregiverOf, buttonRoom)
+            else
+                PrescriptionList(
+                    uiState,
+                    caregiverOf = caregiverOf,
+                    buttonRoom = buttonRoom,
+                    onOpen = onOpen,
+                    onReview = onReview,
+                    onDismiss = onDismiss,
+                )
       }
     }
   }
