@@ -114,11 +114,27 @@ data class NextUp(
 )
 
 /**
+ * One of the medications to take today, on the patient's "Today's medications" card.
+ *
+ * @property key identifies it, the same as in Planning
+ * @property name its name and dosage (e.g. "Ondansetron 8 mg")
+ * @property frequency the frequency recorded on the prescription, if any
+ * @property notConfirmedAddedBy who added it, while its prescription isn't confirmed yet (US-43)
+ */
+data class TodayMedication(
+    val key: String,
+    val name: String,
+    val frequency: String? = null,
+    val notConfirmedAddedBy: String? = null,
+)
+
+/**
  * What the Overview shows.
  *
  * @property now the current time, for the greeting, today's date and the entries' status
  * @property firstName the user's first name, or `null` for a greeting without a name
  * @property nextUp the patient's next event or appointment, see [NextUp]
+ * @property todayMedications the medications to take today, in Planning's order
  * @property todayEntries today's entries: those without a time first, then by time
  * @property isLoading true until the planning data arrives
  * @property hasError true if it couldn't be loaded
@@ -132,6 +148,7 @@ data class OverviewUiState(
     val firstName: String? = null,
     val nextAppointment: NextAppointment? = null,
     val nextUp: NextUp? = null,
+    val todayMedications: List<TodayMedication> = emptyList(),
     val todayEntries: List<TodayEntry> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
@@ -291,6 +308,7 @@ class OverviewViewModel(
       copy(
           nextAppointment = nextAppointmentOf(planned, now),
           nextUp = nextUpOf(planned, now),
+          todayMedications = medicationsOf(planned, now),
           todayEntries = entriesOf(planned, now),
       )
 
@@ -326,6 +344,23 @@ class OverviewViewModel(
       }
     }
   }
+
+  /** Today's medications, with their dosage after their name. */
+  private fun medicationsOf(planned: List<PlanningItem>, now: LocalDateTime) =
+      planned
+          .filter {
+            it.source is PlanningSource.Medication && it.timing.dateIn(zoneId) == now.toLocalDate()
+          }
+          .map { item ->
+            TodayMedication(
+                key = item.key,
+                name =
+                    listOfNotNull(item.title, item.dosage?.takeIf { it.isNotBlank() })
+                        .joinToString(" "),
+                frequency = item.frequency?.takeIf { it.isNotBlank() },
+                notConfirmedAddedBy = item.addedByName.takeIf { !item.isConfirmed },
+            )
+          }
 
   /** The first appointment that hasn't started yet. */
   private fun nextAppointmentOf(planned: List<PlanningItem>, now: LocalDateTime): NextAppointment? =

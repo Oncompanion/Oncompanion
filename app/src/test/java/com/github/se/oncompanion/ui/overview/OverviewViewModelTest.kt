@@ -132,6 +132,7 @@ class OverviewViewModelTest {
                           "active",
                           "p",
                           "Active medication",
+                          dosage = "8 mg",
                           frequency = "As recorded",
                           startDate = today,
                           durationDays = 2,
@@ -160,6 +161,11 @@ class OverviewViewModelTest {
       assertNull(entry.time)
       assertNull(entry.status)
       assertNull(vm.uiState.value.nextAppointment)
+      // The patient's card names it with its dosage
+      assertEquals(
+          listOf(TodayMedication(entry.key, "Active medication 8 mg", "As recorded")),
+          vm.uiState.value.todayMedications,
+      )
     } finally {
       Dispatchers.resetMain()
     }
@@ -435,6 +441,33 @@ class OverviewViewModelTest {
             "HUG",
         ),
         vm.uiState.value.nextUp,
+    )
+  }
+
+  @Test
+  fun todayMedications_areTodaysOnly_withTheirDosage_frequency_andWhoAddedThem() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    medication("a", frequency = "Twice a day").copy(dosage = "8 mg"),
+                    // Blank fields show nothing rather than an empty chip or a trailing space
+                    medication("b", frequency = " ").copy(dosage = " "),
+                    medication("c").copy(addedByName = "Sam", isConfirmed = false),
+                    medication("tomorrow", date = now.toLocalDate().plusDays(1)),
+                    event("yoga", now.withHour(10)),
+                )
+        )
+
+    assertEquals(
+        listOf(
+            Triple("Medication a 8 mg", "Twice a day", null),
+            Triple("Medication b", null, null),
+            Triple("Medication c", null, "Sam"),
+        ),
+        vm.uiState.value.todayMedications.map {
+          Triple(it.name, it.frequency, it.notConfirmedAddedBy)
+        },
     )
   }
 
