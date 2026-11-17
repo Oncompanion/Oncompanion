@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion
 
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isOff
+import androidx.compose.ui.test.isOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -50,9 +52,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * M2's two-account journey through real screens and Firebase emulators. Only Google's account
- * picker is replaced. Revocation reuses the same accounts, sign-in helpers and cleanup rather than
- * relying on another test running first.
+ * M2's two-account journeys through real screens and Firebase emulators. Only Google's account
+ * picker is replaced. Each journey creates its own accounts and reuses the same sign-in helpers and
+ * cleanup rather than relying on another test running first.
  */
 @RunWith(AndroidJUnit4::class)
 class M2EndToEndTest {
@@ -68,6 +70,7 @@ class M2EndToEndTest {
   private val credentials = AccountPicker()
   private val patientNotes = "Patient entry $run"
   private val caregiverNotes = "Caregiver entry $run"
+  private val editedNotes = "Edited by the caregiver $run"
   private lateinit var inviteCode: String
 
   // Record identities as soon as Auth creates them, even if onboarding or the next UI wait fails.
@@ -235,6 +238,79 @@ class M2EndToEndTest {
     compose.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
   }
 
+  /**
+   * US-46: the patient lets the caregiver edit and delete symptoms, the caregiver edits one entry
+   * and deletes another, then the patient takes back editing and deleting but keeps sharing and
+   * adding.
+   */
+  @Test
+  fun patientLetsTheCaregiverEditAndDeleteSymptoms_thenTakesItBack() {
+    ui.startApp(credentials)
+    signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
+    openSymptoms()
+    logSymptom("FATIGUE", patientNotes)
+    ui.open(C.Tag.symptom_back_button, patientGreeting())
+    inviteCaregiver()
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    signOutThroughProfile()
+
+    // The caregiver joins and logs an entry, which they can't change yet
+    credentials.select(caregiver)
+    signInAndOnboard(
+        caregiver,
+        C.Tag.onboarding_role_caregiver,
+        hasTestTag(C.Tag.join_circle_screen),
+    )
+    joinCareCircle()
+    openSymptoms()
+    logSymptom("NAUSEA", caregiverNotes)
+    assertReadOnly(caregiverNotes)
+    ui.open(C.Tag.symptom_back_button, caregiverTitle())
+    signOutThroughProfile()
+
+    // An invitation can't let edit and delete: the patient turns it on for the member
+    signIn(patient, patientGreeting())
+    assertAcceptedMember()
+    setSymptomEditing(on = true)
+    leaveMember()
+    signOutThroughProfile()
+
+    signIn(caregiver, caregiverTitle())
+    openSymptoms()
+    editNotes(caregiverNotes, editedNotes)
+    deleteAfterCancellingOnce(patientNotes)
+    ui.open(C.Tag.symptom_back_button, caregiverTitle())
+    signOutThroughProfile()
+
+    // The patient sees the edit, signed with the name they gave the member, and who added it
+    signIn(patient, patientGreeting())
+    openSymptoms()
+    // Once the journal has loaded, the deleted entry is gone for the patient too
+    assertSymptom("NAUSEA", editedNotes)
+    ui.waitFor(symptomRow(patientNotes), gone = true)
+    ui.open(symptomRow(editedNotes), hasTestTag(C.Tag.symptom_detail_content))
+    ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(editedNotes))
+        .reveal()
+        .assertIsDisplayed()
+    for (attribution in listOf(R.string.symptom_added_by, R.string.edited_by)) {
+      val expected = compose.activity.getString(attribution, circleName)
+      ui.waitFor(hasText(expected), unmerged = true).reveal().assertIsDisplayed()
+    }
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+    ui.open(C.Tag.symptom_back_button, patientGreeting())
+    assertAcceptedMember()
+    setSymptomEditing(on = false)
+    leaveMember()
+    signOutThroughProfile()
+
+    // A fresh session still sees and adds symptoms, but can no longer edit or delete them
+    signIn(caregiver, caregiverTitle())
+    openSymptoms()
+    assertSymptom("NAUSEA", editedNotes)
+    ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
+    assertReadOnly(editedNotes)
+  }
+
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
     ui.signInAndOnboard(account.firstName, roleTag, destination)
     checkNotNull(account.uid) { "The new account wasn't recorded" }
@@ -372,6 +448,69 @@ class M2EndToEndTest {
     ui.waitFor(hasTestTag(C.Tag.careCircleMemberCanAdd("SYMPTOMS")) and isOff())
         .reveal()
         .assertIsOff()
+  }
+
+  /** Signs [account] in again from the sign-in screen, up to [destination]. */
+  private fun signIn(account: Account, destination: SemanticsMatcher) {
+    credentials.select(account)
+    ui.open(C.Tag.google_sign_in_button, destination)
+    assertEquals(account.uid, FirebaseEmulator.auth.currentUser?.uid)
+  }
+
+  /**
+   * Turns "Allow editing and deleting" in Symptoms [on] or off for the caregiver, through the form
+   * the patient uses, keeping sharing and adding.
+   */
+  private fun setSymptomEditing(on: Boolean) {
+    ui.open(
+        C.Tag.careCircleMember(checkNotNull(caregiver.uid)),
+        hasTestTag(C.Tag.care_circle_member_details),
+    )
+    val editing = C.Tag.careCircleFormCanEditAndDelete("SYMPTOMS")
+    ui.open(C.Tag.care_circle_member_edit_button, hasTestTag(editing))
+    ui.tag(C.Tag.careCircleFormPermission("SYMPTOMS")).reveal().assertIsOn()
+    ui.tag(C.Tag.careCircleFormCanAdd("SYMPTOMS")).reveal().assertIsOn()
+    val switch = ui.tag(editing).reveal().assertIsEnabled()
+    if (on) switch.assertIsOff() else switch.assertIsOn()
+    switch.performClick()
+    if (on) ui.tag(editing).assertIsOn() else ui.tag(editing).assertIsOff()
+    ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_member_details))
+    // The member's saved rights, read back from the circle
+    val saved = hasTestTag(C.Tag.careCircleMemberCanEditAndDelete("SYMPTOMS"))
+    ui.waitFor(saved and if (on) isOn() else isOff()).reveal().assertIsDisplayed()
+    ui.waitFor(hasTestTag(C.Tag.careCircleMemberPermission("SYMPTOMS")) and isOn())
+    ui.waitFor(hasTestTag(C.Tag.careCircleMemberCanAdd("SYMPTOMS")) and isOn())
+  }
+
+  private fun leaveMember() {
+    ui.open(C.Tag.care_circle_member_back_button, hasTestTag(C.Tag.care_circle_member_list))
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+  }
+
+  /** Edits the notes of the entry showing [from] through its detail, and saves. */
+  private fun editNotes(from: String, to: String) {
+    ui.open(symptomRow(from), hasTestTag(C.Tag.symptom_detail_content))
+    ui.open(C.Tag.symptom_detail_edit, hasTestTag(C.Tag.symptom_add_notes))
+    ui.tag(C.Tag.symptom_add_notes).reveal().replaceText(to)
+    // Back on the detail once saved, with the new notes
+    ui.open(
+        C.Tag.symptom_add_save,
+        hasTestTag(C.Tag.symptom_detail_notes) and text(to),
+    )
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
+    assertSymptom("NAUSEA", to)
+  }
+
+  /** Cancels the deletion of the entry showing [notes] once, then deletes it. */
+  private fun deleteAfterCancellingOnce(notes: String) {
+    ui.open(symptomRow(notes), hasTestTag(C.Tag.symptom_detail_content))
+    ui.open(C.Tag.symptom_detail_delete, hasTestTag(C.Tag.symptom_delete_dialog))
+    ui.open(C.Tag.symptom_delete_cancel, hasTestTag(C.Tag.symptom_detail_content))
+    ui.waitFor(hasTestTag(C.Tag.symptom_delete_dialog), gone = true)
+    ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(notes)).assertIsDisplayed()
+    ui.open(C.Tag.symptom_detail_delete, hasTestTag(C.Tag.symptom_delete_dialog))
+    ui.open(C.Tag.symptom_delete_confirm, hasTestTag(C.Tag.symptom_journal_list))
+    ui.waitFor(symptomRow(notes), gone = true)
   }
 
   private fun signOutThroughProfile() {
