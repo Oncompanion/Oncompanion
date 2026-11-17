@@ -285,14 +285,16 @@ class CaregiverAppointmentSecurityRulesTest {
   }
 
   @Test
-  fun patientEdit_removesTheCaregiversName_andCantSignAsEditor(): Unit = runBlocking {
+  fun patientEdit_removesTheCaregiversName_orKeepsIt_butCantChangeIt(): Unit = runBlocking {
     shareWithCarol(see = listOf("PLANNING"), add = listOf("PLANNING"), edit = listOf("PLANNING"))
     val alices = alicesAppointment()
     allowed(alices.update(carolsEdit()))
     EmulatorTestData.signIn("appointment-alice")
 
-    denied(alices.update(mapOf("notes" to "Mine")))
     denied(alices.update(mapOf("editedBy" to aliceUid, "editedByName" to "Alice")))
+    denied(alices.update(mapOf("editedByName" to "Bob")))
+    // An older version of the app leaves the editor as it was
+    allowed(alices.update(mapOf("notes" to "Mine")))
     allowed(
         alices.update(
             mapOf(

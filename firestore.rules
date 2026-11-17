@@ -45,11 +45,14 @@ service cloud.firestore {
               && data.addedByName.size() <= 50;
     }
     // Who last edited an entry: nothing when the patient did, or the signed-in caregiver's uid and
-    // first name when a caregiver did (US-46), so nobody can edit in someone else's name. Keep in
-    // sync with Appointment (MAX_ADDED_BY_NAME_LENGTH).
-    function isValidEditor(ownerUid, data) {
+    // first name when a caregiver did (US-46), so nobody can edit in someone else's name. The
+    // patient may also leave the editor as it was: older versions of the app don't remove it.
+    // Keep in sync with Appointment (MAX_ADDED_BY_NAME_LENGTH).
+    function isValidEditor(ownerUid, data, previous) {
       return isOwner(ownerUid)
           ? !data.keys().hasAny(['editedBy', 'editedByName'])
+              || (data.get('editedBy', null) == previous.get('editedBy', null)
+                  && data.get('editedByName', null) == previous.get('editedByName', null))
           : data.get('editedBy', null) == request.auth.uid
               && data.get('editedByName', null) is string
               && data.editedByName.trim().size() > 0
@@ -348,7 +351,7 @@ service cloud.firestore {
         allow update: if canEditIn(uid, 'PLANNING')
                       && isValidAppointment(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
-                      && isValidEditor(uid, request.resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
