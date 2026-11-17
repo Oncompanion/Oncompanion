@@ -1,9 +1,11 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
+import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import kotlinx.coroutines.flow.first
 
@@ -65,7 +67,9 @@ class ManageMedicationSchedule(
    * wrong prescription can be corrected. A medication of the draft that has an ID stays the same
    * saved medication, one without an ID is added, and a saved one that the draft leaves out is
    * removed. Returns once it is saved on the device, also offline. Who added it stays the same, and
-   * saving a prescription a caregiver added confirms it (US-43): the patient checked each field.
+   * a patient saving a prescription a caregiver added confirms it (US-43). A caregiver editing with
+   * [editedBy] and [editedByName] keeps the saved confirmation state, signing the last edit. The
+   * patient's edit clears an earlier caregiver editor.
    *
    * The prescription is read again first, because it can have been deleted since the form was
    * opened (e.g. from another device) and the repository would then silently save nothing. The read
@@ -75,9 +79,24 @@ class ManageMedicationSchedule(
    *
    * @return `true` if the prescription was replaced; `false` if it no longer exists, in which case
    *   nothing is written and the caller should tell the user
-   * @throws IllegalArgumentException if the draft is not [PrescriptionDraft.isValid]
+   * @throws IllegalArgumentException if the draft or the editor signature is invalid
    */
-  suspend fun update(uid: String, prescriptionId: String, draft: PrescriptionDraft): Boolean {
+  suspend fun update(
+      uid: String,
+      prescriptionId: String,
+      draft: PrescriptionDraft,
+      editedBy: String? = null,
+      editedByName: String? = null,
+  ): Boolean {
+    require((editedBy == null) == (editedByName == null)) { "An editor signs with both" }
+    require(
+        editedBy == null ||
+            (editedBy.isNotBlank() &&
+                !editedByName.isNullOrBlank() &&
+                editedByName.length <= Prescription.MAX_ADDED_BY_NAME_LENGTH)
+    ) {
+      "Invalid editor signature"
+    }
     require(draft.isValid()) { "Invalid prescription draft" }
     // Without this read, the caller couldn't tell a saved correction from one that was dropped
     val saved =
@@ -88,10 +107,13 @@ class ManageMedicationSchedule(
         draft
             .toPrescription(prescriptionId, medicationRepository::newId)
             .copy(
+                createdAt = saved.createdAt,
+                editedBy = editedBy,
+                editedByName = editedByName,
                 addedBy = saved.addedBy,
                 addedByName = saved.addedByName,
                 confirmation =
-                    if (saved.confirmation == PrescriptionConfirmation.PENDING)
+                    if (editedBy == null && saved.confirmation == PrescriptionConfirmation.PENDING)
                         PrescriptionConfirmation.CONFIRMED
                     else saved.confirmation,
             )

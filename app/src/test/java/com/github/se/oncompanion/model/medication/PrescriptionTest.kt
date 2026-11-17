@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.medication
@@ -62,6 +63,24 @@ class PrescriptionTest {
   }
 
   @Test
+  fun editorRequiresBothIdentityAndABoundedNonBlankName() {
+    val cases =
+        listOf(
+            valid to true,
+            valid.copy(editedByName = "Sam") to false,
+            valid.copy(editedBy = "sam") to false,
+            valid.copy(editedBy = "", editedByName = "Sam") to false,
+            valid.copy(editedBy = " ", editedByName = "Sam") to false,
+            valid.copy(editedBy = "sam", editedByName = " ") to false,
+            valid.copy(editedBy = "sam", editedByName = "a".repeat(50)) to true,
+            valid.copy(editedBy = "sam", editedByName = "a".repeat(51)) to false,
+        )
+    for ((prescription, expected) in cases) {
+      assertEquals(expected, prescription.isValid())
+    }
+  }
+
+  @Test
   fun isConfirmed_onlyOnceThePatientConfirmed() {
     assertTrue(valid.isConfirmed)
     assertFalse(valid.copy(confirmation = PrescriptionConfirmation.PENDING).isConfirmed)
@@ -72,6 +91,8 @@ class PrescriptionTest {
   fun optionalFieldsDefaultToNull() {
     assertNull(valid.prescribedBy)
     assertNull(valid.createdAt)
+    assertNull(valid.editedBy)
+    assertNull(valid.editedByName)
   }
 
   @Test

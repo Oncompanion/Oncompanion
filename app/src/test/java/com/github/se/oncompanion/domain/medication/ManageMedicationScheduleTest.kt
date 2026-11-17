@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.domain.medication
@@ -6,7 +7,9 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import java.io.IOException
+import java.time.Instant
 import java.time.LocalDate
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -268,6 +271,113 @@ class ManageMedicationScheduleTest {
       assertEquals(listOf("sam", "Sam"), listOf(updated.addedBy, updated.addedByName))
       assertEquals(after, updated.confirmation)
     }
+  }
+
+  @Test
+  fun caregiverEditPreservesConfirmationOriginalAuthorCreationAndMedicationIds() = runTest {
+    for (confirmation in
+        listOf(PrescriptionConfirmation.PENDING, PrescriptionConfirmation.CONFIRMED)) {
+      val saved =
+          draft
+              .toPrescription(repository.newId(), repository::newId)
+              .copy(
+                  addedBy = "original",
+                  addedByName = "Original",
+                  confirmation = confirmation,
+                  createdAt = Instant.parse("2026-09-29T10:00:00Z"),
+                  editedBy = "previous",
+                  editedByName = "Previous",
+              )
+      repository.seed(uid, saved)
+      val changed = saved.toDraft().copy(prescribedBy = "Dr. Rossi")
+
+      assertTrue(manageMedicationSchedule.update(uid, saved.id, changed, "sam", "Sam"))
+
+      val updated = repository.prescriptionsOf(uid).single { it.id == saved.id }
+      assertEquals(confirmation, updated.confirmation)
+      assertEquals(saved.createdAt, updated.createdAt)
+      assertEquals(saved.addedBy, updated.addedBy)
+      assertEquals(saved.addedByName, updated.addedByName)
+      assertEquals(saved.medications, updated.medications)
+      assertEquals("sam", updated.editedBy)
+      assertEquals("Sam", updated.editedByName)
+      assertEquals("Dr. Rossi", updated.prescribedBy)
+    }
+    // Editing the pending entry never exposes its medications to reminders.
+    val reminded = repository.observeMedications(uid).first()
+    assertEquals(draft.medications.size, reminded.size)
+  }
+
+  @Test
+  fun patientEditClearsEarlierEditorAndStillConfirmsPending() = runTest {
+    val saved =
+        draft
+            .toPrescription(repository.newId(), repository::newId)
+            .copy(
+                addedBy = "author",
+                addedByName = "Author",
+                confirmation = PrescriptionConfirmation.PENDING,
+                editedBy = "sam",
+                editedByName = "Sam",
+            )
+    repository.seed(uid, saved)
+
+    manageMedicationSchedule.update(uid, saved.id, saved.toDraft())
+
+    val updated = repository.prescriptionsOf(uid).single()
+    assertNull(updated.editedBy)
+    assertNull(updated.editedByName)
+    assertEquals(PrescriptionConfirmation.CONFIRMED, updated.confirmation)
+    assertEquals("author", updated.addedBy)
+  }
+
+  @Test
+  fun invalidEditorIsRejectedBeforeReadingOrWriting() = runTest {
+    val saved = savedPrescription()
+    val cases =
+        listOf(
+            "sam" to null,
+            null to "Sam",
+            "" to "Sam",
+            " " to "Sam",
+            "sam" to "",
+            "sam" to " ",
+            "sam" to "a".repeat(51),
+        )
+    for ((editor, name) in cases) {
+      val result = runCatching {
+        manageMedicationSchedule.update(uid, saved.id, draft, editor, name)
+      }
+      assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+      assertEquals(listOf(saved), repository.prescriptionsOf(uid))
+    }
+  }
+
+  @Test
+  fun caregiverEditOfMissingPrescriptionWritesNothing() = runTest {
+    assertFalse(manageMedicationSchedule.update(uid, "missing", draft, "sam", "Sam"))
+    assertTrue(repository.prescriptionsOf(uid).isEmpty())
+  }
+
+  @Test
+  fun rejectKeepsHistoricalEditorWhenMovingPendingPrescription() = runTest {
+    val saved =
+        draft
+            .toPrescription(repository.newId(), repository::newId)
+            .copy(
+                addedBy = "author",
+                addedByName = "Author",
+                confirmation = PrescriptionConfirmation.PENDING,
+                editedBy = "sam",
+                editedByName = "Sam",
+            )
+    repository.seed(uid, saved)
+
+    assertTrue(manageMedicationSchedule.reject(uid, saved.id))
+
+    val rejected = repository.rejectedOf(uid).single()
+    assertEquals("sam", rejected.editedBy)
+    assertEquals("Sam", rejected.editedByName)
   }
 
   @Test
