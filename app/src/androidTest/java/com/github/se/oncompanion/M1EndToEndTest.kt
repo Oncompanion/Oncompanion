@@ -231,7 +231,7 @@ class M1EndToEndTest {
   private fun seeNextAppointmentOnOverview(title: String) {
     ui.open(
         C.Tag.bottom_navigation_tab_overview,
-        hasTestTag(C.Tag.overview_next_appointment) and
+        hasTestTag(C.Tag.overview_next_up) and
             (hasText(title, substring = true) or hasAnyDescendant(hasText(title))),
     )
   }
@@ -364,7 +364,7 @@ class M1EndToEndTest {
         hasTestTag(C.Tag.overview_greeting) and hasText(firstName, substring = true),
     )
     ui.waitFor(
-        hasTestTag(C.Tag.overview_next_appointment) and
+        hasTestTag(C.Tag.overview_next_up) and
             (hasText(nextAppointment, substring = true) or
                 hasAnyDescendant(hasText(nextAppointment)))
     )
