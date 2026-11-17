@@ -3,6 +3,8 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,20 +12,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -53,7 +59,8 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 class SymptomJournalScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  // An activity, so the rotation test can recreate it
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -397,6 +404,43 @@ class SymptomJournalScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("fatigue")).assertIsDisplayed()
   }
 
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun screen_keepsTheEntriesAndTheScrollPosition_acrossARotation() {
+    // Enough entries to scroll in landscape, the newest (e0) first
+    val entries =
+        (0 until 12).map { i ->
+          fatigue.copy(id = "e$i", occurredAt = fatigue.occurredAt.minusSeconds(3600L * i))
+        }
+    val repository = FakeSymptomRepository().apply { seed("alice", *entries.toTypedArray()) }
+    val auth =
+        FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
+          runBlocking { it.signInWithGoogle("token") }
+        }
+    val viewModel = SymptomJournalViewModel(auth, repository)
+    val showScreen = {
+      composeTestRule.activity.setContent {
+        SymptomJournalScreen(
+            navigationActions = NavigationActions(TestNavHostController(LocalContext.current)),
+            viewModel = viewModel,
+        )
+      }
+    }
+    composeTestRule.runOnUiThread(showScreen)
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptom_journal_list)
+        .performScrollToNode(hasTestTag(C.Tag.symptomJournalItem("e11")))
+
+    // Rotating recreates the activity, but the screen's ViewModel survives it
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(showScreen)
+    composeTestRule.waitForIdle()
+
+    // Still scrolled to the oldest entry, not back at the top
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e0")).assertIsNotDisplayed()
+  }
+
   // ----- Caregiver mode (US-20) -----
 
   private fun setCaregiverContent(state: SymptomJournalUiState) {
@@ -483,6 +527,21 @@ class SymptomJournalScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun longJournal_lastEntryEndsAboveTheAddButton() {
+    val entries =
+        (0 until 12).map { i -> JournalEntry(fatigue.copy(id = "e$i"), LocalTime.of(20 - i, 0)) }
+    setContent(loaded.copy(days = listOf(JournalDay(today, entries))))
+
+    // The week card and the day's header come before the entries
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).performScrollToIndex(entries.size + 1)
+
+    val last = composeTestRule.onNodeWithTag(C.Tag.symptomJournalItem("e11")).getBoundsInRoot()
+    val add = composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).getBoundsInRoot()
+    assertTrue("last ends at ${last.bottom}, button starts at ${add.top}", last.bottom <= add.top)
+  }
+
+  @Test
   fun caregiver_allowedToAdd_seesTheAddButton_andWhoAddedEachEntry() {
     val signed = fatigue.copy(addedBy = "caregiver", addedByName = "Sam")
     setCaregiverContent(
@@ -501,5 +560,124 @@ class SymptomJournalScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).assertIsDisplayed()
     composeTestRule.onNodeWithText("Added by Robert", useUnmergedTree = true).assertExists()
+  }
+
+  @Test
+  fun weekCard_summarisesTheWeek_withABarPerDay() {
+    // Monday 5 October: fatigue 7/10 today; the fever on Saturday 3 is last week's
+    val state =
+        filled.copy(
+            days =
+                listOf(
+                    day(
+                        today,
+                        fatigue to "14:30",
+                        fatigue.copy(id = "f2", intensity = null) to "09:00",
+                    ),
+                    day(LocalDate.of(2026, 10, 3), fever to "08:05"),
+                )
+        )
+    setContent(state)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsDisplayed()
+    assertTextInside("This week", C.Tag.symptom_journal_week)
+    assertTextInside("2 entries · Most often: Fatigue", C.Tag.symptom_journal_week)
+    val descriptions =
+        listOf(
+            "2026-10-05" to "Monday, Severe",
+            "2026-10-06" to "Tuesday, nothing logged",
+            "2026-10-11" to "Sunday, nothing logged",
+        )
+    for ((date, description) in descriptions) {
+      composeTestRule
+          .onNodeWithTag(C.Tag.symptomJournalWeekDay(date), useUnmergedTree = true)
+          .assert(hasContentDescription(description))
+    }
+  }
+
+  @Test
+  fun weekCard_symptomsLoggedEquallyOften_givesOnlyTheCount() {
+    // Fatigue and pain, once each this week: neither is singled out
+    setContent(
+        loaded.copy(
+            days =
+                listOf(
+                    day(
+                        today,
+                        fatigue to "14:30",
+                        fatigue.copy(id = "pain", types = listOf(SymptomType.PAIN)) to "09:00",
+                    )
+                )
+        )
+    )
+
+    assertTextInside("2 entries", C.Tag.symptom_journal_week)
+    composeTestRule
+        .onNode(
+            hasText("Most often", substring = true) and
+                hasAnyAncestor(hasTestTag(C.Tag.symptom_journal_week)),
+            useUnmergedTree = true,
+        )
+        .assertDoesNotExist()
+  }
+
+  @Test
+  fun weekCard_barsGrowWithTheIntensity_andADayWithoutOneIsMarkedApart() {
+    // Sunday 11: Mon 1/10, Tue 4/10, Wed 10/10, Thu without an intensity, Fri nothing
+    val days =
+        listOf(1, 4, 10, null)
+            .mapIndexed { i, intensity ->
+              day(
+                  today.plusDays(i.toLong()),
+                  fatigue.copy(id = "e$i", intensity = intensity) to "12:00",
+              )
+            }
+            .reversed()
+    setContent(loaded.copy(today = today.plusDays(6), days = days))
+
+    fun bar(day: Long) =
+        composeTestRule
+            .onNodeWithTag(
+                C.Tag.symptomJournalWeekBar(today.plusDays(day).toString()),
+                useUnmergedTree = true,
+            )
+            .getBoundsInRoot()
+    val (mild, moderate, severe) = (0L..2L).map { bar(it).height }
+    assertTrue("$mild < $moderate < $severe", mild < moderate && moderate < severe)
+    // A day logged without an intensity doesn't look like a day with nothing logged
+    assertTrue("${bar(3)} vs ${bar(4)}", bar(3).height > bar(4).height)
+  }
+
+  @Test
+  fun weekCard_isHiddenWhenNothingWasLoggedThisWeek() {
+    setContent(filled.copy(days = listOf(day(LocalDate.of(2026, 9, 28), fatigue to "14:30"))))
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_list).assertIsDisplayed()
+  }
+
+  @Test
+  fun weekCard_aDayLoggedWithoutAnIntensity_isNotADayWithoutSymptoms() {
+    setContent(filled.copy(days = listOf(day(today, fatigue.copy(intensity = null) to "14:30"))))
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomJournalWeekDay("2026-10-05"), useUnmergedTree = true)
+        .assert(hasContentDescription("Monday, logged without an intensity"))
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun weekCard_isFullyVisibleInLandscape() {
+    setContent(filled)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = "w411dp-h891dp", fontScale = 2f)
+  fun weekCard_isFullyVisibleAt200PercentFont() {
+    setContent(filled)
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_journal_week).assertIsFullyVisible()
   }
 }

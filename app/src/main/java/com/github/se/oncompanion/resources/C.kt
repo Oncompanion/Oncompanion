@@ -75,11 +75,14 @@ object C {
     const val google_sign_in_button = "google_sign_in_button"
     const val sign_in_loading = "sign_in_loading"
     const val sign_in_logo = "sign_in_logo"
+    const val sign_in_scene = "sign_in_scene"
     const val account_check_screen = "account_check_screen"
     const val account_check_retry = "account_check_retry"
     const val account_check_loading = "account_check_loading"
     const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
+    const val onboarding_band = "onboarding_band"
+    const val onboarding_status_bar = "onboarding_status_bar"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
     const val onboarding_continue_button = "onboarding_continue_button"
@@ -95,6 +98,8 @@ object C {
     const val overview_shortcut_prescriptions = "overview_shortcut_prescriptions"
     const val overview_shortcut_care_circle = "overview_shortcut_care_circle"
     const val overview_shortcut_profile = "overview_shortcut_profile"
+    const val overview_header = "overview_header"
+    const val overview_status_bar = "overview_status_bar"
     const val overview_greeting = "overview_greeting"
     const val overview_date = "overview_date"
     const val overview_loading = "overview_loading"
@@ -157,6 +162,7 @@ object C {
     const val symptom_journal_retry = "symptom_journal_retry"
     const val symptom_journal_empty = "symptom_journal_empty"
     const val symptom_journal_list = "symptom_journal_list"
+    const val symptom_journal_week = "symptom_journal_week"
     const val symptom_detail_screen = "symptom_detail_screen"
     const val symptom_detail_loading = "symptom_detail_loading"
     const val symptom_detail_error = "symptom_detail_error"
@@ -242,6 +248,12 @@ object C {
 
     /** The header of a day of the journal; [date] is ISO, e.g. `2026-10-05`. */
     fun symptomJournalDay(date: String) = "symptom_journal_day_$date"
+
+    /** The bar of a day in the journal's "This week" chart; [date] is ISO. */
+    fun symptomJournalWeekDay(date: String) = "symptom_journal_week_day_$date"
+
+    /** The drawn bar (or dot, or baseline) of a day in the "This week" chart; [date] is ISO. */
+    fun symptomJournalWeekBar(date: String) = "symptom_journal_week_bar_$date"
 
     /** The chip of a symptom type on the add screen; [type] is its enum name, e.g. `FATIGUE`. */
     fun symptomAddType(type: String) = "symptom_add_type_$type"
@@ -517,8 +529,5 @@ object C {
 
     // Shared message state: its round info tile
     const val message_state_icon = "message_state_icon"
-
-    // Shared filter chip: the check of a selected chip
-    const val filter_chip_check = "filter_chip_check"
   }
 }

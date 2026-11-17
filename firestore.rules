@@ -22,7 +22,8 @@ service cloud.firestore {
     // Each user has one profile document: /users/{uid}. Only they can read or write it.
     // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH, MAX_HOSPITAL_LENGTH).
     function isValidProfile(data) {
-      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt'])
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt',
+                                  'dateOfBirth'])
           && data.keys().hasAll(['role', 'firstName', 'createdAt'])
           && data.role in ['PATIENT', 'CAREGIVER']
           && data.firstName is string
@@ -31,6 +32,14 @@ service cloud.firestore {
           && optionalString(data, 'familyName', 50)
           && optionalString(data, 'cancerType', 100)
           && optionalString(data, 'hospital', 100)
+          // The optional date of birth is a day already started somewhere on Earth. It is stored as
+          // its midnight in Zurich, and a day starts at most 13 hours earlier (UTC+14, Kiribati):
+          // the 14 hours let users ahead of Zurich (Australia...) enter their own today, with a
+          // margin for the phone's clock. The app refuses days after the phone's today
+          // (UserProfile.isValid).
+          && (data.get('dateOfBirth', null) == null
+              || (data.dateOfBirth is timestamp
+                  && data.dateOfBirth <= request.time + duration.value(14, 'h')))
           && data.createdAt is timestamp;
     }
     // Who added an entry: nothing when the patient did, or the signed-in caregiver's uid and first

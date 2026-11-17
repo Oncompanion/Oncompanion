@@ -103,8 +103,7 @@ class CareCircleInviteViewModel(
 
   private var observeJob: Job? = null
 
-  /** Bumped to check expiry again without new data from the repositories. */
-  private val expiryChecks = MutableStateFlow(0)
+  private val expiryChecks = ExpiryChecks()
 
   init {
     observeInvite()
@@ -115,7 +114,7 @@ class CareCircleInviteViewModel(
    * doesn't run while the phone sleeps, and the user may change the clock.
    */
   fun refreshExpiry() {
-    expiryChecks.update { it + 1 }
+    expiryChecks.checkAgain()
   }
 
   /** Reads the invitation again after an [CareCircleInviteUiState.Error]. */
@@ -200,7 +199,7 @@ class CareCircleInviteViewModel(
         combine(
                 inviteRepository.observeInvite(ownerUid, inviteCode),
                 careCircleRepository.observeMembers(ownerUid),
-                expiryChecks,
+                expiryChecks.requests,
             ) { invite, members, _ ->
               invite to members.firstOrNull { it.inviteCode == inviteCode }
             }

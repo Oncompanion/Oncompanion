@@ -3,8 +3,10 @@
 package com.github.se.oncompanion.ui.auth
 
 import android.content.Context
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -28,11 +30,15 @@ import androidx.compose.ui.unit.height
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.assertSameColor
+import com.github.se.oncompanion.ui.colorAt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class GoogleSignInButtonTest {
@@ -125,9 +131,9 @@ class GoogleSignInButtonTest {
   }
 
   @Test
-  fun normalFontScale_buttonIs40dpTall() {
+  fun normalFontScale_buttonIs56dpTall() {
     setButton(fontScale = 1f)
-    composeTestRule.onNodeWithTag(TAG).assertHeightIsEqualTo(40.dp)
+    composeTestRule.onNodeWithTag(TAG).assertHeightIsEqualTo(56.dp)
   }
 
   @Test
@@ -137,43 +143,59 @@ class GoogleSignInButtonTest {
   }
 
   // Android applies non-linear font scaling: at the 200% system maximum (fontScale = 2f) the
-  // label's line is ~37.5dp, which still fits in 40dp. A larger scale is needed to force the label
-  // past 40dp and check that the height is a minimum, not a fixed value.
+  // label's line is ~37.5dp, which still fits in 56dp. A larger scale is needed to force the label
+  // past 56dp and check that the height is a minimum, not a fixed value.
 
   @Test
   fun maxSystemFontScale_labelIsFullyDisplayedInsideTheButton() {
     setButton(fontScale = 2f)
-    composeTestRule.onNodeWithTag(TAG).assertHeightIsAtLeast(40.dp)
+    composeTestRule.onNodeWithTag(TAG).assertHeightIsAtLeast(56.dp)
     composeTestRule.onNodeWithText(label, useUnmergedTree = true).assertIsDisplayed()
     assertLabelFitsInButton()
   }
 
   @Test
-  fun labelTallerThan40dp_buttonGrowsTallerThan40dp() {
-    setButton(fontScale = 3f)
+  fun labelTallerThan56dp_buttonGrowsTallerThan56dp() {
+    setButton(fontScale = 4f)
     val textHeight =
         composeTestRule
             .onNodeWithText(label, useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
             .height
-    assertTrue("Precondition: label should exceed 40dp but was $textHeight", textHeight > 40.dp)
+    assertTrue("Precondition: label should exceed 56dp but was $textHeight", textHeight > 56.dp)
 
     val height = composeTestRule.onNodeWithTag(TAG).getUnclippedBoundsInRoot().height
-    assertTrue("Expected button taller than 40dp but was $height", height > 40.dp)
+    assertTrue("Expected button taller than 56dp but was $height", height > 56.dp)
   }
 
   @Test
-  fun labelTallerThan40dp_labelIsFullyDisplayedInsideTheButton() {
-    setButton(fontScale = 3f)
+  fun labelTallerThan56dp_labelIsFullyDisplayedInsideTheButton() {
+    setButton(fontScale = 4f)
     composeTestRule.onNodeWithText(label, useUnmergedTree = true).assertIsDisplayed()
     assertLabelFitsInButton()
   }
 
   @Test
-  fun labelTallerThan40dp_darkButton_labelIsFullyDisplayedInsideTheButton() {
-    setButton(darkTheme = true, fontScale = 3f)
-    composeTestRule.onNodeWithTag(TAG).assertHeightIsAtLeast(40.dp)
+  fun labelTallerThan56dp_darkButton_labelIsFullyDisplayedInsideTheButton() {
+    setButton(darkTheme = true, fontScale = 4f)
+    composeTestRule.onNodeWithTag(TAG).assertHeightIsAtLeast(56.dp)
     assertLabelFitsInButton()
+  }
+
+  @Test
+  @Config(qualifiers = "night")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun withoutATheme_followsTheSystemDarkTheme() {
+    composeTestRule.setContent {
+      GoogleSignInButton(onClick = {}, modifier = Modifier.testTag(TAG).width(300.dp))
+    }
+
+    // Google's dark container, next to the label's end
+    assertSameColor(
+        "dark container",
+        Color(0xFF131314),
+        composeTestRule.onNodeWithTag(TAG).colorAt(280.dp, 28.dp),
+    )
   }
 
   private companion object {

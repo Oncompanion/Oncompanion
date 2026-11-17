@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.auth.SignOut
 import com.github.se.oncompanion.model.session.FakeCleanupJournal
 import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
@@ -60,7 +61,7 @@ class ProfileSignOutScreenTest {
     node(C.Tag.profile_sign_out_dialog).assertIsDisplayed()
     compose.onNodeWithText("Sign out?").assertIsDisplayed()
     compose
-        .onNodeWithText("You will need to sign in again to access your Oncompanion data.")
+        .onNodeWithText(compose.activity.getString(R.string.profile_sign_out_message))
         .assertIsDisplayed()
     node(C.Tag.profile_sign_out_cancel).performClick()
     node(C.Tag.profile_sign_out_dialog).assertDoesNotExist()

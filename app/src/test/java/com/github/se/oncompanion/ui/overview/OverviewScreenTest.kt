@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.ui.overview
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -20,16 +22,19 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -45,14 +50,22 @@ import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
+import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.colorAt
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
+import com.github.se.oncompanion.ui.theme.DarkLakeColors
+import com.github.se.oncompanion.ui.theme.LightLakeColors
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
+import com.github.se.oncompanion.ui.theme.PrimaryContainerLight
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestLight
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -70,7 +83,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 class OverviewScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  // An activity rule, so the phone can be rotated (the activity recreated)
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -717,5 +731,218 @@ class OverviewScreenTest {
         .onNodeWithTag(C.Tag.overview_prescriptions_badge, useUnmergedTree = true)
         .assertIsDisplayed()
         .assertContentDescriptionEquals("2 prescriptions to confirm")
+  }
+
+  // ----- Look (Figma "US-23 / Overview – Dashboard") -----
+
+  private fun bounds(tag: String) =
+      composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+  @Test
+  fun header_isOnTop_andTheAppointmentCardOverlapsItsLowerEdge_withOrWithoutAnAppointment() {
+    var state by mutableStateOf(loaded.copy(nextAppointment = appointment))
+    composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}) }
+
+    listOf(appointment to C.Tag.overview_next_appointment, null to C.Tag.overview_no_appointment)
+        .forEach { (next, cardTag) ->
+          state = loaded.copy(nextAppointment = next)
+          composeTestRule.waitForIdle()
+          val header = bounds(C.Tag.overview_header)
+          val card = bounds(cardTag)
+          assertEquals(0.dp, header.top)
+          // The strip behind the status bar, so scrolled cards never pass under its icons (its
+          // look is checked in PaperLakeTest: Robolectric's status bar has no height)
+          composeTestRule
+              .onNodeWithTag(C.Tag.overview_status_bar, useUnmergedTree = true)
+              .assertExists()
+          assertTrue("the full header, $cardTag", header.height >= 210.dp)
+          assertTrue(
+              "the card starts on the header, $cardTag",
+              card.top > header.top && card.top < header.bottom,
+          )
+          assertTrue(
+              "the greeting stays above the card",
+              bounds(C.Tag.overview_greeting).bottom <= card.top,
+          )
+        }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun landscape_headerIsTheBand_andTheCardIsBelowIt() {
+    setContent(loaded.copy(nextAppointment = appointment))
+
+    val header = bounds(C.Tag.overview_header)
+    assertTrue("the band, not the 210 dp header: ${header.height}", header.height < 210.dp)
+    assertTrue(bounds(C.Tag.overview_next_appointment).top >= header.bottom)
+  }
+
+  @Test
+  fun withoutADay_nothingOverlapsTheHeader() {
+    var state by mutableStateOf(OverviewUiState(now = morning))
+    composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}) }
+
+    listOf(
+            OverviewUiState(now = morning) to C.Tag.overview_loading,
+            loaded.copy(hasError = true) to C.Tag.overview_error,
+        )
+        .forEach { (shown, tag) ->
+          state = shown
+          composeTestRule.waitForIdle()
+          assertTrue(tag, bounds(tag).top >= bounds(C.Tag.overview_header).bottom)
+        }
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun at200Percent_aRowsTimeGoesAboveItsTitle_andEverythingCanBeScrolledToWhole() {
+    val med = entry("med", 8, TodayItemStatus.DONE, TodayItemKind.MEDICATION)
+    setContent(loaded.copy(nextAppointment = appointment, todayEntries = listOf(med)))
+
+    val row = C.Tag.overviewTodayItem("med")
+    composeTestRule.onNodeWithTag(row).performScrollTo()
+    fun textIn(text: String) =
+        composeTestRule
+            .onNode(hasText(text) and hasAnyAncestor(hasTestTag(row)), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+    assertTrue("08:00 above its title", textIn("08:00").bottom <= textIn(med.title).top)
+    listOf(
+            C.Tag.overview_greeting,
+            C.Tag.overview_next_appointment,
+            row,
+            C.Tag.overview_see_planning,
+            C.Tag.overview_shortcut_care_circle,
+        )
+        .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }
+  }
+
+  @Test
+  fun defaultFont_aRowsTimeIsBesideItsTitle() {
+    setContent(loaded.copy(todayEntries = listOf(entry("med", 8, null, TodayItemKind.MEDICATION))))
+
+    val row = C.Tag.overviewTodayItem("med")
+    fun textIn(text: String) =
+        composeTestRule
+            .onNode(hasText(text) and hasAnyAncestor(hasTestTag(row)), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+    val time = textIn("08:00")
+    val title = textIn("Title med")
+    assertTrue("same line", time.top < title.bottom && title.top < time.bottom)
+    assertTrue("the time first", time.right <= title.left)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun cardsAreWhite_withATonalDatePill_tilesTonal_andTheSkyFollowsTheTime_inBothThemes() {
+    var dark by mutableStateOf(false)
+    var now by mutableStateOf(morning)
+    var empty by mutableStateOf(false)
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        OverviewContent(
+            loaded.copy(
+                now = now,
+                nextAppointment = appointment.takeIf { !empty },
+                todayEntries =
+                    if (empty) emptyList()
+                    else listOf(entry("med", 8, null, TodayItemKind.MEDICATION)),
+            ),
+            {},
+            {},
+            {},
+            {},
+        )
+      }
+    }
+
+    listOf(
+            Triple(false, SurfaceContainerLowestLight, PrimaryContainerLight) to LightLakeColors,
+            Triple(true, SurfaceContainerLowestDark, PrimaryContainerDark) to DarkLakeColors,
+        )
+        .forEach { (colors, lake) ->
+          val (isDark, card, tile) = colors
+          dark = isDark
+          listOf(morning to lake.dawn.top, morning.withHour(20) to lake.dusk.top).forEach {
+              (time, sky) ->
+            now = time
+            composeTestRule.waitForIdle()
+            val header = composeTestRule.onNodeWithTag(C.Tag.overview_header)
+            assertSameColor("sky at ${time.hour}h, dark=$isDark", sky, header.colorAt(4.dp, 4.dp))
+          }
+          // In the cards' side padding, away from the text and the rounded corners
+          val next = composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment)
+          assertSameColor("appointment card, dark=$isDark", card, next.colorAt(8.dp, 60.dp))
+          // In the pill, in the gap between its clock and "Tomorrow, ..."
+          val cardBounds = bounds(C.Tag.overview_next_appointment)
+          val date =
+              composeTestRule
+                  .onNode(
+                      hasText("Tomorrow, Sun 4 Oct · 09:30") and
+                          hasAnyAncestor(hasTestTag(C.Tag.overview_next_appointment)),
+                      useUnmergedTree = true,
+                  )
+                  .getUnclippedBoundsInRoot()
+          assertSameColor(
+              "date pill, dark=$isDark",
+              tile,
+              next.colorAt(
+                  date.left - cardBounds.left - 2.dp,
+                  (date.top + date.bottom) / 2 - cardBounds.top,
+              ),
+          )
+          val list = composeTestRule.onNodeWithTag(C.Tag.overview_today_list)
+          assertSameColor("today list, dark=$isDark", card, list.colorAt(8.dp, 30.dp))
+          val symptoms =
+              composeTestRule.onNodeWithTag(C.Tag.overview_shortcut_symptoms).performScrollTo()
+          assertSameColor("tile, dark=$isDark", tile, symptoms.colorAt(8.dp, 36.dp))
+
+          // The empty cards are the same white cards
+          empty = true
+          composeTestRule.waitForIdle()
+          val noAppointment = composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment)
+          assertSameColor("empty card, dark=$isDark", card, noAppointment.colorAt(8.dp, 60.dp))
+          val nothingToday =
+              composeTestRule.onNodeWithTag(C.Tag.overview_today_empty).performScrollTo()
+          assertSameColor("nothing today, dark=$isDark", card, nothingToday.colorAt(4.dp, 4.dp))
+          empty = false
+        }
+  }
+
+  @Test
+  fun phoneRotated_theDayIsStillShown() {
+    val checkUp =
+        PlanningItem(
+            PlanningSource.Appointment("check-up"),
+            PlanningTiming.Timed(appointment.dateTime.toInstant(ZoneOffset.UTC)),
+            appointment.title,
+            subtitle = appointment.place,
+        )
+    val viewModel =
+        OverviewViewModel(
+            authRepository = FakeAuthRepository(),
+            profileRepository = FakeUserProfileRepository(),
+            observePlanning =
+                ownPlanning(FakePlanningRepository().apply { items.value = listOf(checkUp) }),
+            clock = clockAt(morning),
+            zoneId = ZoneOffset.UTC,
+        )
+    val show = {
+      composeTestRule.activity.setContent {
+        OverviewScreen(
+            navigationActions =
+                RecordingNavigationActions(TestNavHostController(LocalContext.current)),
+            viewModel = viewModel,
+        )
+      }
+    }
+    composeTestRule.runOnUiThread(show)
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
+
+    // Rotating recreates the activity; the Overview's ViewModel survives it
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.runOnUiThread(show)
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_header).assertIsDisplayed()
+    assertTextInside(appointment.title, C.Tag.overview_next_appointment)
   }
 }

@@ -7,10 +7,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,14 +20,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.ui.theme.Horizon
 import com.github.se.oncompanion.ui.theme.LakeColors
 import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalTime
+import kotlin.math.roundToInt
 
 /** The three lights of the Paper lake: its sky follows the time of day (DESIGN.md, Horizon). */
 enum class TimeOfDay {
@@ -59,7 +65,7 @@ fun PaperLakeHeader(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-  if (isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE) {
+  if (isPaperLakeHeaderBand()) {
     PaperLakeBand(time, modifier, content)
     return
   }
@@ -77,6 +83,14 @@ fun PaperLakeHeader(
     content()
   }
 }
+
+/**
+ * Whether [PaperLakeHeader] is drawn as the 100 dp band: in landscape or at a large font scale. A
+ * screen reads it to lay out what goes on the header, e.g. a card overlapping its lower edge.
+ */
+@Composable
+fun isPaperLakeHeaderBand(): Boolean =
+    isCompactHeight() || LocalDensity.current.fontScale >= LARGE_FONT_SCALE
 
 /**
  * The 100 dp Paper lake band behind a top app bar (Figma "Paper lake band"): the sky in the colour
@@ -112,8 +126,33 @@ fun PaperLakeBand(
 }
 
 /**
+ * An opaque strip behind the status bar, in the sky's colour at [time], for a screen whose Paper
+ * lake header scrolls away: drawn above the content, it keeps the content from passing under the
+ * clock and icons. At rest it blends into the header. Decorative.
+ *
+ * @param insets the bar it covers; the status bar by default
+ */
+@Composable
+fun PaperLakeStatusBar(
+    time: LocalTime,
+    modifier: Modifier = Modifier,
+    insets: WindowInsets = WindowInsets.statusBars,
+) {
+  Box(
+      modifier
+          .fillMaxWidth()
+          .windowInsetsTopHeight(insets)
+          .background(MaterialTheme.lakeColors.horizonAt(time).top)
+  )
+}
+
+/**
  * The tall Paper lake of Sign in (Figma "Paper lake scene"): the same lake as [PaperLakeHeader],
  * with a boat, its sky and far water in the colours of [time]. Decorative.
+ *
+ * At the Figma's proportions by default. Given another size (Sign in's free space, or half of the
+ * screen in landscape), it covers it with the water kept on the bottom edge: a flatter space cuts
+ * the top of the sky, a narrower one the sides.
  *
  * @param time the time whose light the sky shows, e.g. `remember { LocalTime.now() }` on a screen
  */
@@ -123,14 +162,14 @@ fun PaperLakeScene(
     modifier: Modifier = Modifier,
 ) {
   val horizon = MaterialTheme.lakeColors.horizonAt(time)
-  Box(modifier.fillMaxWidth().aspectRatio(SCENE_RATIO).background(horizon.top)) {
+  Box(modifier.fillMaxWidth().sceneHeight().background(horizon.top)) {
     LakeLayers(
         R.drawable.paper_lake_scene,
         R.drawable.paper_lake_scene_water,
         R.drawable.paper_lake_scene_front,
         horizon.bottom,
-        ContentScale.FillBounds,
-        Alignment.Center,
+        ContentScale.Crop,
+        Alignment.BottomCenter,
     )
   }
 }
@@ -155,6 +194,19 @@ private fun BoxScope.LakeLayers(
   Image(painterResource(front), null, layer, alignment, scale)
 }
 
+/**
+ * The scene's height: the one the caller sets (e.g. a weight or `fillMaxHeight`), otherwise the
+ * Figma's proportions for the width. Unlike `aspectRatio`, a set height is kept rather than
+ * overflowed.
+ */
+private fun Modifier.sceneHeight(): Modifier = layout { measurable, constraints ->
+  val height =
+      if (constraints.hasFixedHeight) constraints.maxHeight
+      else constraints.constrainHeight((constraints.maxWidth / SCENE_RATIO).roundToInt())
+  val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
+  layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}
+
 /** The theme's sky and lake colours at [time]. */
 private fun LakeColors.horizonAt(time: LocalTime): Horizon =
     when (timeOfDayAt(time)) {
@@ -172,8 +224,11 @@ private val HEADER_HEIGHT = 210.dp
 private val BAND_HEIGHT = 100.dp
 private val WATERLINE_HEIGHT = 4.dp
 
-// From this font scale on, the header shrinks to the band (DESIGN.md: "a large font scale")
-private const val LARGE_FONT_SCALE = 1.3f
+/**
+ * DESIGN.md's "large font scale": from it on, the header shrinks to the band. Screens that change
+ * their layout at a large font use it too, so everything switches at the same scale.
+ */
+const val LARGE_FONT_SCALE = 1.3f
 
 // The Sign in scene's frame
 private const val SCENE_RATIO = 390f / 470f

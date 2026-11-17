@@ -40,8 +40,8 @@
     <string name="profile_first_name">First name</string>
     <string name="profile_family_name">Family name</string>
     <string name="profile_email">Email</string>
-    <string name="profile_member_since">Oncompanion member since %1$s</string>
-    <string name="profile_member">Oncompanion member</string>
+    <string name="profile_member_since">oncompanion member since %1$s</string>
+    <string name="profile_member">oncompanion member</string>
     <string name="profile_signed_out">Sign in to view your profile.</string>
     <string name="profile_missing">Your profile is not available yet.</string>
     <string name="profile_error">Couldn\'t load your profile. Please try again.</string>
@@ -53,7 +53,7 @@
     <string name="profile_sign_out_stay">Stay signed in</string>
     <string name="auth_cleanup_loading">Clearing local account data…</string>
     <string name="auth_cleanup_failed">Sign-out cleanup could not be completed. Your account data is locked on this device. Retry cleanup before signing in again.</string>
-    <string name="profile_sign_out_message">You will need to sign in again to access your Oncompanion data.</string>
+    <string name="profile_sign_out_message">You will need to sign in again to access your oncompanion data.</string>
     <string name="profile_sign_out_cancel">Cancel</string>
     <string name="profile_sign_out_failed">Couldn\'t sign out. Please try again.</string>
     <string name="edit_profile_title">Edit profile</string>
@@ -172,9 +172,25 @@
     <string name="symptom_added_by">Added by %1$s</string>
     <!-- Heading of the logged symptoms on the detail -->
     <string name="symptom_detail_symptoms">Symptoms</string>
+    <!-- The "This week" card of the journal: e.g. "4 entries · Most often: Fatigue" -->
+    <string name="symptom_week_title">This week</string>
+    <plurals name="symptom_week_summary">
+        <item quantity="one">%1$d entry · Most often: %2$s</item>
+        <item quantity="other">%1$d entries · Most often: %2$s</item>
+    </plurals>
+    <!-- The count alone, when several symptoms were logged equally often -->
+    <plurals name="symptom_week_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <string name="symptom_week_hint">Bar height = how hard the day felt, in your own words</string>
+    <!-- What TalkBack reads for a day of the chart, e.g. "Monday, Moderate" -->
+    <string name="symptom_week_day_intensity">%1$s, %2$s</string>
+    <string name="symptom_week_day_no_intensity">%1$s, logged without an intensity</string>
+    <string name="symptom_week_day_nothing">%1$s, nothing logged</string>
 
     <!-- Sign-in -->
-    <string name="sign_in_welcome">Welcome to Oncompanion</string>
+    <string name="sign_in_welcome">Welcome to oncompanion</string>
     <string name="sign_in_subtitle">Sign in with your Google account to continue. New here? Your account is created automatically.</string>
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="sign_in_retry">Retry</string>
@@ -187,7 +203,7 @@
     <!-- Onboarding -->
     <string name="cancer_type_label">Cancer type</string>
     <string name="cancer_type_hint">Start typing to see suggestions</string>
-    <string name="onboarding_role_subtitle">Choose what fits you best, so Oncompanion shows you the right features.</string>
+    <string name="onboarding_role_subtitle">Choose what fits you best, so oncompanion shows you the right features.</string>
     <string name="onboarding_role_patient">I\'m a patient</string>
     <string name="onboarding_role_patient_description">I\'m receiving cancer treatment and want to keep track of my care.</string>
     <string name="onboarding_role_caregiver">I\'m a caregiver</string>
@@ -195,7 +211,7 @@
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_signed_in_as">Signed in as %1$s</string>
     <string name="onboarding_use_another_account">Use another account</string>
-    <string name="onboarding_information_subtitle">This helps us personalize Oncompanion for you. You can change it later.</string>
+    <string name="onboarding_information_subtitle">This helps us personalize oncompanion for you. You can change it later.</string>
     <string name="onboarding_first_name">First name*</string>
     <string name="onboarding_required">*Required</string>
     <string name="onboarding_first_name_missing">Please enter your first name</string>
@@ -226,7 +242,7 @@
     <string name="event_detail_go_back">Go back</string>
     <string name="event_detail_visit_website">Visit event website</string>
     <string name="event_detail_registered">I\'m registered</string>
-    <string name="event_detail_registration_note">This only saves it in Oncompanion. It doesn\'t register you with the organizer.</string>
+    <string name="event_detail_registration_note">This only saves it in oncompanion. It doesn\'t register you with the organizer.</string>
     <string name="event_detail_registration_closed">This event has already started, so it can\'t be confirmed anymore.</string>
     <string name="event_detail_registration_confirmed">Registration confirmed</string>
     <string name="event_detail_registration_confirmed_supporting">You told us you signed up for this event.</string>
@@ -370,7 +386,7 @@
     <string name="join_circle_code">Invite code</string>
     <string name="join_circle_code_hint">For example ABCDE-FGHJK</string>
     <string name="join_circle_join">Join</string>
-    <string name="join_circle_no_code_hint">No code yet? Ask the person you support to add you to their care circle in Oncompanion. This screen opens each time you start the app until you join.</string>
+    <string name="join_circle_no_code_hint">No code yet? Ask the person you support to add you to their care circle in oncompanion. This screen opens each time you start the app until you join.</string>
     <string name="join_circle_error_invalid">This code doesn\'t work. Check it, or ask for a new one.</string>
     <string name="join_circle_error_offline">You need a connection to join a care circle. Please try again online.</string>
     <string name="join_circle_error_not_signed_in">You\'re no longer signed in. Please sign in again.</string>
@@ -431,8 +447,8 @@
     <string name="care_circle_invite_back_to_circle">Back to circle</string>
     <string name="care_circle_invite_not_found">This invitation is no longer pending.</string>
     <string name="care_circle_invite_error">Couldn\'t load this invitation.</string>
-    <string name="care_circle_invite_email_subject">Join my care circle on Oncompanion</string>
-    <string name="care_circle_invite_message">Hi %1$s,\n\nI\'d like you to join my care circle on Oncompanion, so you can follow my care.\n\n1. Install Oncompanion and sign in with Google.\n2. Choose \"I\'m a caregiver\".\n3. Tap \"Join a care circle\" and enter this invite code: %2$s\n\n%4$s\n\n%3$s</string>
+    <string name="care_circle_invite_email_subject">Join my care circle on oncompanion</string>
+    <string name="care_circle_invite_message">Hi %1$s,\n\nI\'d like you to join my care circle on oncompanion, so you can follow my care.\n\n1. Install oncompanion and sign in with Google.\n2. Choose \"I\'m a caregiver\".\n3. Tap \"Join a care circle\" and enter this invite code: %2$s\n\n%4$s\n\n%3$s</string>
     <!-- The message's validity line, e.g. "The code works until 19 Oct 2026." -->
     <string name="care_circle_invite_message_valid_until">The code works until %1$s.</string>
     <!-- While the invitation isn\'t on the server yet, its 7 days haven\'t started -->
@@ -698,6 +714,8 @@
 
     <!-- Shared day picker, above the selected day -->
     <string name="day_picker_title">Select date</string>
+    <!-- Shared time picker, above the clock -->
+    <string name="time_picker_title">Select time</string>
 
     <!-- Shared snackbar: closes the message before it goes away on its own -->
     <string name="snackbar_dismiss">Dismiss</string>

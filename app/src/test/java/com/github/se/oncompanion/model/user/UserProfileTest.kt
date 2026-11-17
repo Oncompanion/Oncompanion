@@ -4,6 +4,9 @@
 package com.github.se.oncompanion.model.user
 
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -93,5 +96,43 @@ class UserProfileTest {
       assertTrue(valid.copy(hospital = it).isValid())
     }
     assertFalse(valid.copy(hospital = "h".repeat(101)).isValid())
+  }
+
+  /** The date of birth is optional and refused once it is after today, like in the rules. */
+  @Test
+  fun dateOfBirthIsOptionalAndNeverInTheFuture() {
+    assertNull(valid.dateOfBirth)
+    val today = LocalDate.of(2026, 11, 15)
+    val cases =
+        listOf(
+            null to true,
+            LocalDate.of(1970, 1, 1) to true,
+            today.minusDays(1) to true,
+            today to true,
+            today.plusDays(1) to false,
+            today.plusYears(1) to false,
+        )
+    for ((dateOfBirth, expected) in cases) {
+      assertEquals("$dateOfBirth", expected, valid.copy(dateOfBirth = dateOfBirth).isValid(today))
+    }
+  }
+
+  /**
+   * Without an explicit day, isValid compares with the phone's today, so a phone ahead of Zurich
+   * (Australia, Kiribati) can enter its own today and a phone behind it can't enter tomorrow.
+   */
+  @Test
+  fun dateOfBirthIsComparedWithThePhonesToday() {
+    val phoneZone = TimeZone.getDefault()
+    try {
+      for (zone in listOf("Pacific/Kiritimati", "Australia/Sydney", "America/Los_Angeles")) {
+        TimeZone.setDefault(TimeZone.getTimeZone(zone))
+        val phoneToday = LocalDate.now(ZoneId.of(zone))
+        assertTrue(zone, valid.copy(dateOfBirth = phoneToday).isValid())
+        assertFalse(zone, valid.copy(dateOfBirth = phoneToday.plusDays(1)).isValid())
+      }
+    } finally {
+      TimeZone.setDefault(phoneZone)
+    }
   }
 }

@@ -324,7 +324,7 @@ The team's logo is a lavender awareness ribbon, drawn as the *Logo/Ribbon* compo
 Pills 56 dp tall, 24 dp side padding, with an optional 24 dp leading icon 8 dp before the label. Filled for the one main action, Tonal for a strong secondary, Outlined (a 1.5 dp Outline border) or Text for the rest. Disabled at 38% opacity. Round icon buttons are 48 dp (e.g. call, microphone).
 
 ### Chips
-Filter chips 48 dp tall (full touch target), 16 dp side padding. Selected: dawn container with a check icon, 8 dp before the label.
+Filter chips 48 dp tall (full touch target), 16 dp side padding. Selected: dawn container without the Outline border, and no check icon, so a chip keeps its width when picked and the chips after it don't move.
 
 ### Cards / Containers
 White on the warm ground, Large radius, no border. Lists live in one card with 1 dp Outline Variant dividers inset 16 dp. A row shows its value above its label (Body Large, then Body Small).

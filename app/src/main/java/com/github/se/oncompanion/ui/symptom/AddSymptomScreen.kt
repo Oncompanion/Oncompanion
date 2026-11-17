@@ -3,14 +3,18 @@
 package com.github.se.oncompanion.ui.symptom
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,11 +22,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,11 +35,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -62,7 +59,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -76,26 +73,38 @@ import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeFilterChip
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
+import com.github.se.oncompanion.ui.common.LakeTopAppBar
 import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
+import com.github.se.oncompanion.ui.common.TimePickerDialog
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// The smallest touch target, for the row of the intensity value and Clear
+private val TOUCH_TARGET = 48.dp
+
 private const val MIN_INTENSITY = SymptomEntry.MIN_INTENSITY
 private const val MAX_INTENSITY = SymptomEntry.MAX_INTENSITY
 
 /**
  * How far the Material slider draws its first and last stops from its edges (half its track
- * height), to line the labels and taps up with the stops. Checked against the rendered slider.
+ * height), to line the taps up with the stops. Checked against the rendered slider.
  */
 private val SliderStopInset = 8.dp
+
+/**
+ * The gap around the handle, Material's "active handle leading space" (private in SliderDefaults).
+ */
+private val THUMB_TRACK_GAP = 6.dp
 
 /** Which picker of the "When" field is open. */
 private enum class WhenPicker {
@@ -221,21 +230,22 @@ fun AddSymptomContent(
             )
           }
       uiState.hasLoadError ->
-          Box(Modifier.padding(innerPadding)) {
-            SymptomMessage(
+          CenteredMessage(Modifier.padding(innerPadding)) {
+            LakeMessageState(
                 title = stringResource(R.string.symptom_edit_error_title),
-                hint = stringResource(R.string.symptom_edit_error_hint),
-                testTag = C.Tag.symptom_edit_error,
-                onRetry = onRetry,
-                retryTestTag = C.Tag.symptom_edit_retry,
+                message = stringResource(R.string.symptom_edit_error_hint),
+                actionLabel = stringResource(R.string.symptom_retry),
+                onAction = onRetry,
+                actionTestTag = C.Tag.symptom_edit_retry,
+                modifier = Modifier.testTag(C.Tag.symptom_edit_error),
             )
           }
       uiState.isNotFound ->
-          Box(Modifier.padding(innerPadding)) {
-            SymptomMessage(
+          CenteredMessage(Modifier.padding(innerPadding)) {
+            LakeMessageState(
                 title = stringResource(R.string.symptom_detail_not_found_title),
-                hint = stringResource(R.string.symptom_detail_not_found_hint),
-                testTag = C.Tag.symptom_edit_not_found,
+                message = stringResource(R.string.symptom_detail_not_found_hint),
+                modifier = Modifier.testTag(C.Tag.symptom_edit_not_found),
             )
           }
       else ->
@@ -258,8 +268,24 @@ fun AddSymptomContent(
 }
 
 /**
- * The title and the button that leaves the form without saving. [caregiverOf] is the patient a
- * caregiver logs the symptom for, `null` for the user's own journal.
+ * Centers a message in the space under the top bar, and lets it scroll when it is taller than that
+ * space (a phone held sideways under the lake band), so its button can still be reached.
+ */
+@Composable
+private fun CenteredMessage(modifier: Modifier, content: @Composable () -> Unit) {
+  BoxWithConstraints(modifier.fillMaxSize()) {
+    Box(
+        Modifier.verticalScroll(rememberScrollState()).fillMaxWidth().heightIn(min = maxHeight),
+        contentAlignment = Alignment.Center,
+    ) {
+      content()
+    }
+  }
+}
+
+/**
+ * The title on the Paper lake band, with the button that leaves the form without saving.
+ * [caregiverOf] is the patient a caregiver logs the symptom for, `null` for the user's own journal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -269,19 +295,16 @@ private fun FormTopBar(
     onBack: () -> Unit,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
-  TopAppBar(
-      title = {
-        Text(
-            when {
-              // A caregiver sees whose journal gets the symptom, or whose entry they edit (US-46)
-              uiState.isEditing && caregiverOf != null ->
-                  stringResource(R.string.symptom_edit_title_for, caregiverOf)
-              uiState.isEditing -> stringResource(R.string.symptom_edit_title)
-              caregiverOf != null -> stringResource(R.string.symptom_add_title_for, caregiverOf)
-              else -> stringResource(R.string.symptom_add_title)
-            }
-        )
-      },
+  LakeTopAppBar(
+      title =
+          when {
+            // A caregiver sees whose journal gets the symptom, or whose entry they edit (US-46)
+            uiState.isEditing && caregiverOf != null ->
+                stringResource(R.string.symptom_edit_title_for, caregiverOf)
+            uiState.isEditing -> stringResource(R.string.symptom_edit_title)
+            caregiverOf != null -> stringResource(R.string.symptom_add_title_for, caregiverOf)
+            else -> stringResource(R.string.symptom_add_title)
+          },
       navigationIcon = {
         // Not while saving or once saved: the screen then leaves by itself, and a second way out
         // would go back twice
@@ -290,7 +313,7 @@ private fun FormTopBar(
             enabled = uiState.save == SavePhase.EDITING,
             modifier = Modifier.testTag(C.Tag.symptom_add_close),
         ) {
-          Icon(Icons.Default.Close, stringResource(R.string.symptom_add_close))
+          Icon(painterResource(R.drawable.ic_close), stringResource(R.string.symptom_add_close))
         }
       },
       windowInsets = windowInsets,
@@ -335,40 +358,43 @@ private fun SymptomFields(
   Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
     // The Scaffold already keeps the content clear of the status bar
     if (scrollsEverything) FormTopBar(uiState, caregiverOf, onBack, WindowInsets(0))
+    // The form groups, 24 dp apart; each is its question over its control
     Column(
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
-      SectionTitle(stringResource(R.string.symptom_add_types))
-      TypeChips(uiState.types, onToggleType)
-
-      SectionTitle(stringResource(R.string.symptom_add_intensity))
-      IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
-
-      SectionTitle(stringResource(R.string.symptom_add_when))
-      WhenField(uiState, onDateChange, onTimeChange)
-
-      SectionTitle(stringResource(R.string.symptom_add_notes_title))
-      NotesField(uiState, onNotesChange)
+      FormGroup(R.string.symptom_add_types) { TypeChips(uiState.types, onToggleType) }
+      FormGroup(R.string.symptom_add_intensity) {
+        IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
+      }
+      FormGroup(R.string.symptom_add_when) { WhenField(uiState, onDateChange, onTimeChange) }
+      FormGroup(R.string.symptom_add_notes_title) { NotesField(uiState, onNotesChange) }
     }
     if (scrollsEverything) FormSaveButton(uiState, onSave)
   }
 }
 
+/** A question as a heading, with its control right under it. */
 @Composable
-private fun SectionTitle(text: String) {
-  Text(
-      text = text,
-      style = MaterialTheme.typography.titleMedium,
-      modifier = Modifier.padding(top = 4.dp).semantics { heading() },
-  )
+private fun FormGroup(@StringRes title: Int, content: @Composable ColumnScope.() -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    Text(
+        text = stringResource(title),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.semantics { heading() },
+    )
+    content()
+  }
 }
 
 /** One chip per symptom type, checked when picked; several can be picked. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TypeChips(picked: List<SymptomType>, onToggleType: (SymptomType) -> Unit) {
-  FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+  FlowRow(
+      horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+      verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+  ) {
     SymptomType.entries.forEach { type ->
       val selected = type in picked
       LakeFilterChip(
@@ -403,13 +429,12 @@ private fun IntensitySlider(
 
   // The value in words, and Clear once there is one
   Row(
-      modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+      modifier = Modifier.fillMaxWidth().heightIn(min = TOUCH_TARGET),
       verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
         text = valueText,
         style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Medium,
         color =
             if (intensity == null) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.onSurface,
@@ -425,15 +450,17 @@ private fun IntensitySlider(
     }
   }
 
-  // "Not set" shows the whole track as inactive, without a handle or the gap around it
+  // The track is light teal where it isn't picked; "Not set" shows all of it so, without a handle
+  // or the gap around it
+  val inactive = MaterialTheme.colorScheme.primaryContainer
   val colors =
       if (intensity == null)
           SliderDefaults.colors(
               thumbColor = Color.Transparent,
-              activeTrackColor = MaterialTheme.colorScheme.secondaryContainer,
-              activeTickColor = MaterialTheme.colorScheme.onSecondaryContainer,
+              activeTrackColor = inactive,
+              inactiveTrackColor = inactive,
           )
-      else SliderDefaults.colors()
+      else SliderDefaults.colors(inactiveTrackColor = inactive)
   // While "Not set" the slider sits on 1 and ignores a touch there, as nothing changes for it: a
   // touch closest to 1 sets it here. The touch isn't taken away, so the slider still follows a
   // drag,
@@ -458,12 +485,15 @@ private fun IntensitySlider(
         valueRange = MIN_INTENSITY.toFloat()..MAX_INTENSITY.toFloat(),
         steps = MAX_INTENSITY - MIN_INTENSITY - 1,
         colors = colors,
+        // No dots on the track: the value above says what is picked
         track = { state ->
-          if (intensity == null) {
-            SliderDefaults.Track(sliderState = state, colors = colors, thumbTrackGapSize = 0.dp)
-          } else {
-            SliderDefaults.Track(sliderState = state, colors = colors)
-          }
+          SliderDefaults.Track(
+              sliderState = state,
+              colors = colors,
+              drawStopIndicator = null,
+              drawTick = { _, _ -> },
+              thumbTrackGapSize = if (intensity == null) 0.dp else THUMB_TRACK_GAP,
+          )
         },
         modifier =
             Modifier.fillMaxWidth()
@@ -481,56 +511,35 @@ private fun IntensitySlider(
     )
   }
 
-  // The numbers under each stop and the severity bands; the slider already says the value
-  Column(Modifier.clearAndSetSemantics {}) {
-    ScaleLabels((MIN_INTENSITY..MAX_INTENSITY).map { it.toFloat() to it.toString() })
-    ScaleLabels(
-        listOf(
-            midpoint(MIN_INTENSITY, Severity.MAX_MILD) to stringResource(Severity.MILD.label),
-            midpoint(Severity.MAX_MILD + 1, Severity.MAX_MODERATE) to
-                stringResource(Severity.MODERATE.label),
-            midpoint(Severity.MAX_MODERATE + 1, MAX_INTENSITY) to
-                stringResource(Severity.SEVERE.label),
-        )
-    )
+  // The words at the start, middle and end of the track, each in its own third so they never
+  // overlap (a word too long for it wraps); the slider already says the value
+  Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
+    ScaleLabel(Severity.MILD, Alignment.Start, TextAlign.Start)
+    ScaleLabel(Severity.MODERATE, Alignment.CenterHorizontally, TextAlign.Center)
+    ScaleLabel(Severity.SEVERE, Alignment.End, TextAlign.End)
   }
 }
 
-private fun midpoint(from: Int, to: Int) = (from + to) / 2f
+/** A word of the scale under the slider, put at [alignment] in its third of the width. */
+@Composable
+private fun RowScope.ScaleLabel(
+    severity: Severity,
+    alignment: Alignment.Horizontal,
+    textAlign: TextAlign,
+) {
+  Text(
+      text = stringResource(severity.label),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      textAlign = textAlign,
+      modifier = Modifier.weight(1f).wrapContentWidth(alignment),
+  )
+}
 
 /** The intensity of the stop closest to [x] on a slider [width] wide. */
 private fun intensityAt(x: Float, width: Int, inset: Float): Int {
   val fraction = ((x - inset) / (width - 2 * inset)).coerceIn(0f, 1f)
   return (MIN_INTENSITY + fraction * (MAX_INTENSITY - MIN_INTENSITY)).roundToInt()
-}
-
-/** Texts centered under the slider at the given intensities, e.g. `2f to "Mild"`. */
-@Composable
-private fun ScaleLabels(labels: List<Pair<Float, String>>) {
-  Layout(
-      content = {
-        labels.forEach { (_, text) ->
-          Text(
-              text = text,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-      },
-      modifier = Modifier.fillMaxWidth(),
-  ) { measurables, constraints ->
-    val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0)) }
-    val width = constraints.maxWidth
-    val inset = SliderStopInset.roundToPx()
-    layout(width, placeables.maxOfOrNull { it.height } ?: 0) {
-      placeables.forEachIndexed { index, placeable ->
-        val fraction = (labels[index].first - MIN_INTENSITY) / (MAX_INTENSITY - MIN_INTENSITY)
-        val center = inset + fraction * (width - 2 * inset)
-        val x = (center - placeable.width / 2f).roundToInt()
-        placeable.placeRelative(x.coerceIn(0, (width - placeable.width).coerceAtLeast(0)), 0)
-      }
-    }
-  }
 }
 
 /**
@@ -596,60 +605,26 @@ private fun WhenField(
             latestDate = today,
         )
     WhenPicker.TIME ->
-        TimePickerDialogFor(
+        TimePickerDialog(
             time = time,
             onConfirm = {
               onTimeChange(it)
               picker = WhenPicker.NONE
             },
             onDismiss = { picker = WhenPicker.NONE },
+            confirmLabel = stringResource(R.string.symptom_add_picker_confirm),
+            cancelLabel = stringResource(R.string.symptom_add_picker_cancel),
+            // As the symptom screens show times (HH:mm), whatever the phone's setting
+            is24Hour = true,
+            testTags =
+                PickerTestTags(
+                    picker = C.Tag.symptom_add_time_picker,
+                    confirm = C.Tag.symptom_add_picker_confirm,
+                    cancel = C.Tag.symptom_add_picker_cancel,
+                ),
         )
     WhenPicker.NONE -> {}
   }
-}
-
-/** Picks a time of day, in 24-hour format as shown everywhere in the app. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerDialogFor(
-    time: LocalTime,
-    onConfirm: (LocalTime) -> Unit,
-    onDismiss: () -> Unit,
-) {
-  val pickerState =
-      rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = true)
-  val compact = isCompactHeight()
-  AlertDialog(
-      onDismissRequest = onDismiss,
-      confirmButton = {
-        LakeButton(
-            text = stringResource(R.string.symptom_add_picker_confirm),
-            onClick = { onConfirm(LocalTime.of(pickerState.hour, pickerState.minute)) },
-            style = LakeButtonStyle.Text,
-            modifier = Modifier.testTag(C.Tag.symptom_add_picker_confirm),
-        )
-      },
-      dismissButton = {
-        LakeButton(
-            text = stringResource(R.string.symptom_add_picker_cancel),
-            onClick = onDismiss,
-            style = LakeButtonStyle.Text,
-            modifier = Modifier.testTag(C.Tag.symptom_add_picker_cancel),
-        )
-      },
-      text = {
-        // A short window (a phone held sideways) types the time: the clock has a fixed size and
-        // would be cut off
-        if (compact) {
-          TimeInput(state = pickerState, modifier = Modifier.testTag(C.Tag.symptom_add_time_picker))
-        } else {
-          TimePicker(
-              state = pickerState,
-              modifier = Modifier.testTag(C.Tag.symptom_add_time_picker),
-          )
-        }
-      },
-  )
 }
 
 /** Free text; with "Other" it asks which symptom it was, and is required. */

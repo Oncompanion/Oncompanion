@@ -5,16 +5,10 @@ package com.github.se.oncompanion.ui.onboarding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -30,7 +24,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.user.Role
@@ -41,9 +34,10 @@ import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
- * Second onboarding step (Figma "US-01 / Onboarding – Information"): first name (required), family
+ * Second onboarding step (Figma "US-1 / Onboarding – Information"): first name (required), family
  * name and, for a patient, cancer type (optional, with suggestions). Continue saves the profile.
  *
  * @param onSaved called with the chosen role once the profile is saved: onboarding is done, and
@@ -109,28 +103,26 @@ fun InformationContent(
       modifier = modifier.testTag(C.Tag.onboarding_information_screen).imePadding(),
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                // The margins scroll with the content: fixed ones would take half of the height
-                // left above the keyboard on a small phone held sideways
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+    OnboardingStep(
+        title = stringResource(R.string.onboarding_information_title),
+        subtitle = stringResource(R.string.onboarding_information_subtitle),
+        innerPadding = innerPadding,
+        actions = {
+          SignedInAs(uiState.email, uiState.canSwitchAccount, onUseAnotherAccount)
+          Spacer(Modifier.height(Spacing.xs))
+          // Continue saves the profile; enabled when a first name is filled in and nothing is
+          // saving
+          LakeButton(
+              text = stringResource(R.string.onboarding_continue),
+              onClick = onContinue,
+              enabled = uiState.canSave,
+              isWorking = uiState.save == SavePhase.SAVING,
+              workingTestTag = C.Tag.onboarding_saving,
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_save_button),
+          )
+        },
     ) {
-      // Title and subtitle
-      Text(
-          text = stringResource(R.string.onboarding_information_title),
-          style = MaterialTheme.typography.headlineMedium,
-      )
-      Spacer(Modifier.height(8.dp))
-      Text(
-          text = stringResource(R.string.onboarding_information_subtitle),
-          style = MaterialTheme.typography.bodyLarge,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Spacer(Modifier.height(32.dp))
-      Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         // First name (required): "*Required" below it, or an error once it's been cleared
         LakeTextField(
             value = uiState.firstName,
@@ -178,19 +170,6 @@ fun InformationContent(
           )
         }
       }
-      // Pushes Continue to the bottom of the screen when there's room
-      Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
-      // Continue saves the profile; enabled when a first name is filled in and nothing is saving
-      LakeButton(
-          text = stringResource(R.string.onboarding_continue),
-          onClick = onContinue,
-          enabled = uiState.canSave,
-          isWorking = uiState.save == SavePhase.SAVING,
-          workingTestTag = C.Tag.onboarding_saving,
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_save_button),
-      )
-      Spacer(Modifier.height(8.dp))
-      SignedInAs(uiState.email, uiState.canSwitchAccount, onUseAnotherAccount)
     }
   }
 }

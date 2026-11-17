@@ -11,31 +11,37 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -43,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,11 +61,18 @@ import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
+import com.github.se.oncompanion.ui.common.PaperLakeHeader
+import com.github.se.oncompanion.ui.common.PaperLakeStatusBar
+import com.github.se.oncompanion.ui.common.isPaperLakeHeaderBand
 import com.github.se.oncompanion.ui.navigation.BottomNavigationBar
 import com.github.se.oncompanion.ui.navigation.NavigationActions
 import com.github.se.oncompanion.ui.navigation.Route
 import com.github.se.oncompanion.ui.navigation.Screen
 import com.github.se.oncompanion.ui.navigation.Tab
+import com.github.se.oncompanion.ui.theme.Shapes
+import com.github.se.oncompanion.ui.theme.Spacing
+import com.github.se.oncompanion.ui.theme.elevation1
+import com.github.se.oncompanion.ui.theme.lakeColors
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -165,6 +179,10 @@ fun OverviewScreen(
 /**
  * Stateless content of the Overview, so each state can be tested without a ViewModel.
  *
+ * The greeting sits on the Paper lake header, in the light of [OverviewUiState.now], and the
+ * appointment card overlaps the header's lower edge (DESIGN.md, main screens). Everything scrolls
+ * together, so a large font or a phone held sideways never hides the day under a fixed header.
+ *
  * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
  * @param onOpenAppointment opens the recorded appointment directly
  * @param onRetry reloads the day after an error
@@ -172,7 +190,6 @@ fun OverviewScreen(
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
  * @param bottomBar the bottom navigation bar, empty by default
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewContent(
     uiState: OverviewUiState,
@@ -185,91 +202,159 @@ fun OverviewContent(
     onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
 ) {
-  Scaffold(
-      modifier = modifier.testTag(C.Tag.overview_screen),
-      topBar = {
-        MediumTopAppBar(
-            title = {
-              if (caregiverOf == null) Greeting(uiState.firstName, uiState.now)
-              else CareTitle(caregiverOf, uiState.now, onSwitchPatient)
-            },
-            actions = {
-              val profile = OverviewShortcut.PROFILE
-              IconButton(
-                  onClick = { onShortcutClick(profile) },
-                  modifier = Modifier.testTag(profile.testTag),
-              ) {
-                Icon(
-                    painter = painterResource(profile.icon),
-                    contentDescription = stringResource(profile.label),
-                )
-              }
-            },
-        )
-      },
-      bottomBar = bottomBar,
-  ) { innerPadding ->
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+  Scaffold(modifier = modifier.testTag(C.Tag.overview_screen), bottomBar = bottomBar) { innerPadding
+    ->
+    val layoutDirection = LocalLayoutDirection.current
+    // The header draws behind the status bar, so the top inset is kept inside it
+    Box(
+        Modifier.fillMaxSize()
+            .padding(
+                start = innerPadding.calculateStartPadding(layoutDirection),
+                end = innerPadding.calculateEndPadding(layoutDirection),
+                bottom = innerPadding.calculateBottomPadding(),
+            )
     ) {
-      when {
-        uiState.isLoading -> LoadingDay()
-        uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
-        // The patient a caregiver follows doesn't share their planning, so there is no day to show
-        uiState.isNotShared && caregiverOf != null ->
-            NotSharedMessage(caregiverOf, CarePermission.PLANNING)
-        else -> {
-          NextAppointmentCard(
-              uiState.nextAppointment,
-              uiState.now.toLocalDate(),
-              onOpenPlanning,
-              onOpenAppointment,
-              canAdd = caregiverOf == null,
+      Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        val band = isPaperLakeHeaderBand()
+        PaperLakeHeader(uiState.now.toLocalTime(), Modifier.testTag(C.Tag.overview_header)) {
+          OverviewHeader(
+              uiState,
+              caregiverOf,
+              onSwitchPatient,
+              onProfileClick = { onShortcutClick(OverviewShortcut.PROFILE) },
+              band = band,
           )
-          TodaySection(uiState.todayEntries, onOpenPlanning)
+        }
+        val dayShown = !uiState.isLoading && !uiState.hasError && !uiState.isNotShared
+        // Only the full header leaves room for a card on its lower edge
+        val overlaps = dayShown && !band
+        Column(
+            modifier =
+                Modifier.padding(horizontal = Spacing.lg)
+                    .padding(top = if (overlaps) 0.dp else Spacing.lg, bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+          when {
+            uiState.isLoading -> LoadingDay()
+            uiState.hasError -> DayError(onRetry, withShortcuts = caregiverOf == null)
+            // The patient a caregiver follows doesn't share their planning, so there is no day to
+            // show
+            uiState.isNotShared && caregiverOf != null ->
+                NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+            else -> {
+              NextAppointmentCard(
+                  uiState.nextAppointment,
+                  uiState.now.toLocalDate(),
+                  onOpenPlanning,
+                  onOpenAppointment,
+                  canAdd = caregiverOf == null,
+                  modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
+              )
+              TodaySection(uiState.todayEntries, onOpenPlanning)
+            }
+          }
+          // The shortcuts stay available whatever happens to the day's data. A caregiver only gets
+          // the sections the patient shares, never the care circle, which only the patient manages
+          val tiles =
+              if (caregiverOf == null) tileShortcuts
+              else
+                  tileShortcuts.filter {
+                    it.section != null && it.section in uiState.sharedSections
+                  }
+          if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
         }
       }
-      // The shortcuts stay available whatever happens to the day's data. A caregiver only gets the
-      // sections the patient shares, never the care circle, which only the patient manages
-      val tiles =
-          if (caregiverOf == null) tileShortcuts
-          else tileShortcuts.filter { it.section != null && it.section in uiState.sharedSections }
-      if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
+      // Drawn last, so scrolled content passes under it rather than under the clock and icons
+      PaperLakeStatusBar(uiState.now.toLocalTime(), Modifier.testTag(C.Tag.overview_status_bar))
+    }
+  }
+}
+
+/** How far the first card reaches up over the header, as in the Figma (header 210, card at 168). */
+private val HEADER_OVERLAP = 42.dp
+
+/**
+ * Moves the card up over the header's lower edge without leaving a gap under it, and raises it with
+ * Elevation 1, the shadow DESIGN.md keeps for this card.
+ */
+private fun Modifier.overlapHeader(): Modifier = layout { measurable, constraints ->
+  val placeable = measurable.measure(constraints)
+  val overlap = HEADER_OVERLAP.roundToPx()
+  layout(placeable.width, placeable.height - overlap) { placeable.place(0, -overlap) }
+}
+    .elevation1(Shapes.large)
+
+/**
+ * The greeting (or "Anne's care ▾" for a caregiver), today's date and the profile button, on the
+ * sky of the header. On the full header, room is left under them for the overlapping card.
+ *
+ * @param band whether the header is the small band, where the title is one size smaller
+ */
+@Composable
+private fun OverviewHeader(
+    uiState: OverviewUiState,
+    caregiverOf: String?,
+    onSwitchPatient: () -> Unit,
+    onProfileClick: () -> Unit,
+    band: Boolean,
+) {
+  val titleStyle =
+      if (band) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge
+  CompositionLocalProvider(LocalContentColor provides MaterialTheme.lakeColors.onHorizon) {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(
+                    start = Spacing.lgPlus,
+                    top = Spacing.lg,
+                    end = Spacing.sm,
+                    bottom = if (band) Spacing.lg else HEADER_OVERLAP + Spacing.lg,
+                ),
+    ) {
+      Box(Modifier.weight(1f)) {
+        if (caregiverOf == null) Greeting(uiState.firstName, uiState.now, titleStyle)
+        else CareTitle(caregiverOf, uiState.now, onSwitchPatient, titleStyle)
+      }
+      val profile = OverviewShortcut.PROFILE
+      IconButton(onClick = onProfileClick, modifier = Modifier.testTag(profile.testTag)) {
+        Icon(
+            painter = painterResource(profile.icon),
+            contentDescription = stringResource(profile.label),
+        )
+      }
     }
   }
 }
 
 /** "Anne's care ▾" and today's date, for a caregiver: tapping it opens "Whose care?". */
 @Composable
-private fun CareTitle(patientName: String, now: LocalDateTime, onClick: () -> Unit) {
+private fun CareTitle(
+    patientName: String,
+    now: LocalDateTime,
+    onClick: () -> Unit,
+    titleStyle: TextStyle,
+) {
   Column(
       Modifier.clickable(
               onClickLabel = stringResource(R.string.overview_switch_patient),
               onClick = onClick,
           )
-          .testTag(C.Tag.overview_whose_care)
+          .testTag(C.Tag.overview_whose_care),
+      verticalArrangement = Arrangement.spacedBy(Spacing.xs),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(stringResource(R.string.overview_care_of, patientName))
+      Text(stringResource(R.string.overview_care_of, patientName), style = titleStyle)
       // The click label already says what it does
-      Text(" ▾", modifier = Modifier.clearAndSetSemantics {})
+      Text(" ▾", style = titleStyle, modifier = Modifier.clearAndSetSemantics {})
     }
-    Text(
-        text = now.format(todayFormatter),
-        style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.testTag(C.Tag.overview_date),
-    )
+    TodayDate(now)
   }
 }
 
-/** "Good morning, Alex" and today's date, in the top bar. */
+/** "Good morning, Alex" and today's date, on the header. */
 @Composable
-private fun Greeting(firstName: String?, now: LocalDateTime) {
+private fun Greeting(firstName: String?, now: LocalDateTime, titleStyle: TextStyle) {
   val name = firstName?.takeIf { it.isNotBlank() }
   val greeting =
       when (now.hour) {
@@ -283,14 +368,20 @@ private fun Greeting(firstName: String?, now: LocalDateTime) {
             if (name == null) stringResource(R.string.overview_greeting_evening)
             else stringResource(R.string.overview_greeting_evening_name, name)
       }
-  Column {
-    Text(text = greeting, modifier = Modifier.testTag(C.Tag.overview_greeting))
-    Text(
-        text = now.format(todayFormatter),
-        style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.testTag(C.Tag.overview_date),
-    )
+  Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+    Text(text = greeting, style = titleStyle, modifier = Modifier.testTag(C.Tag.overview_greeting))
+    TodayDate(now)
   }
+}
+
+/** "Saturday 3 October", under the title. */
+@Composable
+private fun TodayDate(now: LocalDateTime) {
+  Text(
+      text = now.format(todayFormatter),
+      style = MaterialTheme.typography.bodyLarge,
+      modifier = Modifier.testTag(C.Tag.overview_date),
+  )
 }
 
 @Composable
@@ -427,8 +518,8 @@ private fun ShortcutSurface(shortcut: OverviewShortcut, onClick: () -> Unit, sta
   Surface(
       onClick = onClick,
       modifier = modifier.heightIn(min = if (stacked) 72.dp else 104.dp).testTag(shortcut.testTag),
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.secondaryContainer,
+      shape = MaterialTheme.shapes.large,
+      color = MaterialTheme.colorScheme.primaryContainer,
   ) {
     // The label already describes the tile, so the icon is decorative
     val icon =
