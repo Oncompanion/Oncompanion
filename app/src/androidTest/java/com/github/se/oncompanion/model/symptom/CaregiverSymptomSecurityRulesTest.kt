@@ -257,14 +257,17 @@ class CaregiverSymptomSecurityRulesTest {
   }
 
   @Test
-  fun patientEdit_removesTheCaregiversName_andCantSignAsEditor(): Unit = runBlocking {
+  fun patientEdit_removesTheCaregiversName_orKeepsIt_butCantChangeIt(): Unit = runBlocking {
     letCarolEditSymptoms()
     val alices = alicesSymptom()
     allowed(alices.update(carolsEdit()))
     EmulatorTestData.signIn("symptom-alice")
 
-    denied(alices.update(mapOf("intensity" to 3)))
     denied(alices.update(mapOf("editedBy" to aliceUid, "editedByName" to "Alice")))
+    denied(alices.update(mapOf("editedByName" to "Bob")))
+    denied(alices.update(mapOf("editedByName" to FieldValue.delete())))
+    // An older version of the app leaves the editor as it was
+    allowed(alices.update(mapOf("intensity" to 3)))
     allowed(
         alices.update(
             mapOf(
