@@ -372,6 +372,8 @@ object C {
     const val not_shared = "not_shared"
     // Caregiver mode: who added an entry for the patient
     const val added_by = "added_by"
+    // Who last edited an entry for the patient (US-46)
+    const val edited_by = "edited_by"
 
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"

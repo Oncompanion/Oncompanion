@@ -614,4 +614,41 @@ class AppointmentRepositoryFirestoreTest {
     assertFalse(withTimeout(10_000) { document.get(Source.SERVER).await() }.exists())
     assertFalse(document.get(Source.CACHE).await().exists())
   }
+
+  /**
+   * A caregiver the patient lets edit and delete in Planning (US-46) signs their edit; the
+   * patient's next edit removes their name, and who added it never changes.
+   */
+  @Test
+  fun caregiverEdit_isSigned_andThePatientsNextEditRemovesTheName(): Unit = runBlocking {
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val carolUid = EmulatorTestData.createUser("appointment-editor")
+    EmulatorTestData.replaceRawDocument(
+        "users/$uid/circle",
+        carolUid,
+        """{"firstName": {"stringValue": "Carol"},
+            "relationship": {"stringValue": "SISTER"},
+            "permissions": {"arrayValue": {"values": [{"stringValue": "PLANNING"}]}},
+            "canAdd": {"arrayValue": {"values": [{"stringValue": "PLANNING"}]}},
+            "canEditAndDelete": {"arrayValue": {"values": [{"stringValue": "PLANNING"}]}},
+            "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
+    )
+    EmulatorTestData.signIn("appointment-editor")
+    val edited =
+        appointment().copy(id = id, notes = "Fasting", editedBy = carolUid, editedByName = "Carol")
+    repository.updateAppointment(uid, edited)
+    acknowledgeWrites()
+    assertEquals(0, rejectedWrites.unseen.value)
+    assertContent(edited, storedAppointment(id))
+
+    EmulatorTestData.signIn("appointment-owner")
+    repository.updateAppointment(uid, appointment().copy(id = id, notes = "Mine"))
+    acknowledgeWrites()
+    assertEquals(0, rejectedWrites.unseen.value)
+    val document = serverDocument(id)
+    assertFalse(document.contains(AppointmentRepositoryFirestore.FIELD_EDITED_BY))
+    assertFalse(document.contains(AppointmentRepositoryFirestore.FIELD_EDITED_BY_NAME))
+    assertEquals("Mine", document.getString(AppointmentRepositoryFirestore.FIELD_NOTES))
+  }
 }

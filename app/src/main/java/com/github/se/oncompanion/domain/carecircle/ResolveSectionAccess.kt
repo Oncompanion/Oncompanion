@@ -21,11 +21,14 @@ sealed interface SectionAccess {
    * @property canEdit whether edit and delete may be offered: only for the user's own data
    * @property canAdd whether adding may be offered: for the user's own data, or when the patient
    *   lets the caregiver add to this section (US-22)
+   * @property canEditEntries whether its entries may be edited and deleted: the user's own, or when
+   *   the patient lets the caregiver edit and delete in this section (US-46)
    */
   data class Readable(
       val ownerUid: String,
       val canEdit: Boolean,
       val canAdd: Boolean = canEdit,
+      val canEditEntries: Boolean = canEdit,
   ) : SectionAccess
 
   /** The patient a caregiver follows doesn't share this section with them. */
@@ -92,6 +95,7 @@ class ResolveSectionAccess(
                         access.ownerUid,
                         access.canEdit,
                         canAdd = access.canEdit || section in access.addable,
+                        canEditEntries = access.canEditEntriesOf(section),
                     )
                 else SectionAccess.NotShared,
                 access.sections,

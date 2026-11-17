@@ -102,10 +102,11 @@ data class AppointmentFormUiState(
  *
  * In caregiver mode (US-41), it adds the appointment to the planning of [patientUid], signed with
  * the caregiver's uid and first name; the rules only accept it if the patient lets them add
- * appointments. Only the patient edits an appointment.
+ * appointments. It edits one of the patient's the same way, signed as its last editor, if the
+ * patient lets them edit and delete in Planning (US-46).
  *
- * @param patientUid in caregiver mode, the patient whose planning gets the new appointment; null
- *   for the user's own
+ * @param patientUid in caregiver mode, the patient whose planning gets the new or edited
+ *   appointment; null for the user's own
  * @param profileRepository the caregiver's profile, for the first name the appointment is signed
  *   with
  */
@@ -187,7 +188,9 @@ class AppointmentFormViewModel(
     }
     val attempt = session
     observation = viewModelScope.launch {
-      flow { emitAll(repository.observeAppointment(uid, requireNotNull(appointmentId))) }
+      // A caregiver edits the patient's appointment
+      val owner = patientUid ?: uid
+      flow { emitAll(repository.observeAppointment(owner, requireNotNull(appointmentId))) }
           .catch {
             if (isCurrentAttempt(uid, attempt))
                 state.update { it.copy(load = AppointmentFormLoad.FAILED) }
@@ -311,17 +314,7 @@ class AppointmentFormViewModel(
   // Only the session that submitted the write may receive its completion.
   private suspend fun writeAppointment(uid: String, appointment: Appointment, attempt: Int) {
     try {
-      if (!isCurrentAttempt(uid, attempt)) return
-      if (appointmentId != null) repository.updateAppointment(uid, appointment)
-      else if (patientUid == null) repository.addAppointment(uid, appointment)
-      // A caregiver's appointment goes in the patient's planning, signed with who added it
-      else {
-        val signed = appointment.copy(addedBy = uid, addedByName = caregiverName(uid))
-        // Reading the name can take a while: the account may have changed meanwhile
-        currentCoroutineContext().ensureActive()
-        if (!isCurrentAttempt(uid, attempt)) return
-        repository.addAppointment(patientUid, signed)
-      }
+      if (!isCurrentAttempt(uid, attempt) || !store(uid, appointment, attempt)) return
       if (isCurrentAttempt(uid, attempt))
           state.update {
             // Done only if the form still shows its appointment (e.g. it wasn't deleted meanwhile)
@@ -339,6 +332,28 @@ class AppointmentFormViewModel(
             it.copy(save = SavePhase.EDITING, error = AppointmentFormError.SAVE_FAILED)
           }
     }
+  }
+
+  /**
+   * Adds or updates [appointment] in the planning it belongs to. A caregiver's goes in the
+   * patient's planning, signed with who added or edited it. Returns false, writing nothing, if the
+   * account changed while the caregiver's name was read.
+   */
+  private suspend fun store(uid: String, appointment: Appointment, attempt: Int): Boolean {
+    val owner = patientUid ?: uid
+    val signed =
+        if (patientUid == null) appointment
+        else {
+          val name = caregiverName(uid)
+          // Reading the name can take a while: the account may have changed meanwhile
+          currentCoroutineContext().ensureActive()
+          if (!isCurrentAttempt(uid, attempt)) return false
+          if (appointmentId != null) appointment.copy(editedBy = uid, editedByName = name)
+          else appointment.copy(addedBy = uid, addedByName = name)
+        }
+    if (appointmentId != null) repository.updateAppointment(owner, signed)
+    else repository.addAppointment(owner, signed)
+    return true
   }
 
   private fun edit(change: (AppointmentFormUiState) -> AppointmentFormUiState) {
