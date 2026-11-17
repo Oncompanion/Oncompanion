@@ -565,6 +565,35 @@ class SymptomDetailViewModelTest {
   }
 
   @Test
+  fun switchTurnedOffThenOnAgain_whileTheDialogIsOpen_doesntReopenIt() {
+    // Asking to confirm, or after a failed deletion
+    for (fails in listOf(false, true)) {
+      repository.seed("patient", fatigue)
+      val patient = allowedCaregiver()
+      val vm = followedViewModel(patient)
+      repository.writeError = if (fails) IllegalStateException("rejected") else null
+      vm.requestDelete()
+      if (fails) vm.confirmDelete()
+      idle()
+      assertTrue("fails=$fails", vm.uiState.value.isDeleteDialogShown)
+
+      patient.shares(CarePermission.SYMPTOMS, canAdd = setOf(CarePermission.SYMPTOMS))
+      idle()
+      assertEquals("fails=$fails", DeletePhase.IDLE, vm.uiState.value.delete)
+      patient.shares(
+          CarePermission.SYMPTOMS,
+          canAdd = setOf(CarePermission.SYMPTOMS),
+          canEditAndDelete = setOf(CarePermission.SYMPTOMS),
+      )
+      idle()
+
+      assertTrue("fails=$fails", vm.uiState.value.canDelete)
+      assertFalse("fails=$fails", vm.uiState.value.isDeleteDialogShown)
+      repository.writeError = null
+    }
+  }
+
+  @Test
   fun caregiverWithoutTheSwitch_cantDelete() {
     repository.seed("patient", fatigue)
     val vm =

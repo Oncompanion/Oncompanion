@@ -223,8 +223,8 @@ class DeleteConfirmationTest {
             Triple(DeletePhase.DELETING, false, DeletePhase.DELETING),
             Triple(DeletePhase.DELETED, false, DeletePhase.DELETED),
         ) + DeletePhase.entries.map { Triple(it, true, it) }
-    for ((phase, exists, expected) in cases) {
-      assertEquals("$phase, exists=$exists", expected, phase.afterRead(exists))
+    for ((phase, deletable, expected) in cases) {
+      assertEquals("$phase, deletable=$deletable", expected, phase.afterRead(deletable))
     }
   }
 

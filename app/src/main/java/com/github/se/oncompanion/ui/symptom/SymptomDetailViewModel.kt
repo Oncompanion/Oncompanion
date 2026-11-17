@@ -176,7 +176,8 @@ class SymptomDetailViewModel(
                 isNotShared = false,
                 delete = delete.afterRead(false),
             )
-        // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
+        // A symptom deleted elsewhere, or that the patient no longer lets the caregiver delete,
+        // can't be deleted here: the confirmation is dropped
         is CareSection.Shown -> {
           val (shown, names) = section.data
           copy(
@@ -187,7 +188,7 @@ class SymptomDetailViewModel(
               hasError = false,
               isNotShared = false,
               canEdit = section.canEditEntries,
-              delete = delete.afterRead(exists = shown != null),
+              delete = delete.afterRead(deletable = shown != null && section.canEditEntries),
           )
         }
       }
