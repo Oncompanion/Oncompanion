@@ -54,16 +54,6 @@ adb logcat -v time > emulator-logcat.txt &
 adb install -r -t apks/debug/app-debug.apk
 adb install -r -t apks/androidTest/debug/app-debug-androidTest.apk
 
-# For about half a minute after booting, the emulator is still settling (Play services updating,
-# the camera starting): it relaunched a test's activity, and a real-camera capture never came.
-# Whichever test a shard runs first would be the one hit, so no test starts before 60 s after
-# boot. This script starts once the emulator has booted, and the wait for the APKs counts too
-settle=$((60 - SECONDS))
-if [ "$settle" -gt 0 ]; then
-  echo "Letting the emulator settle for $settle s"
-  sleep "$settle"
-fi
-
 # This shard's tests, shared out by their recorded time (connected_shards.py): the runner lists
 # every test without running it, and each shard picks its share of the same list
 adb shell am instrument -r -w -e log true "$runner" > test-list.txt
