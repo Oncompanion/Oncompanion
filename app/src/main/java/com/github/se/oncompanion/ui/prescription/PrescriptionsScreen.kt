@@ -42,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,7 +54,6 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
-import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
 
@@ -425,11 +425,18 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(48.dp),
     )
-    MessageTexts(
-        title = stringResource(R.string.prescriptions_empty_title),
-        hint =
+    Text(
+        text = stringResource(R.string.prescriptions_empty_title),
+        style = MaterialTheme.typography.titleMedium,
+        textAlign = TextAlign.Center,
+    )
+    Text(
+        text =
             caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
                 ?: stringResource(R.string.prescriptions_empty_hint),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
     )
   }
 }
@@ -438,11 +445,11 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
   CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
-    LakeMessageState(
+    PrescriptionMessage(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
                 ?: stringResource(R.string.prescriptions_error_title),
-        message = stringResource(R.string.prescriptions_error_hint),
+        hint = stringResource(R.string.prescriptions_error_hint),
         actionLabel = stringResource(R.string.prescriptions_retry),
         onAction = onRetry,
         actionTestTag = C.Tag.prescriptions_retry_button,

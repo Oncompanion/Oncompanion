@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -399,44 +398,29 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
           CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_form_loading))
       // No retry: the form keeps listening and fills in if the prescription arrives later
       PrescriptionFormLoad.NOT_FOUND ->
-          LoadMessage(
-              C.Tag.prescription_form_not_found,
-              R.string.prescription_form_not_found_title,
-              R.string.prescription_form_not_found_hint,
+          PrescriptionMessage(
+              title = stringResource(R.string.prescription_form_not_found_title),
+              modifier = Modifier.testTag(C.Tag.prescription_form_not_found),
+              hint = stringResource(R.string.prescription_form_not_found_hint),
           )
       PrescriptionFormLoad.NOT_SIGNED_IN ->
-          LoadMessage(
-              C.Tag.prescription_form_not_signed_in,
-              R.string.prescription_form_not_signed_in_title,
-              R.string.prescription_form_not_signed_in_hint,
+          PrescriptionMessage(
+              title = stringResource(R.string.prescription_form_not_signed_in_title),
+              modifier = Modifier.testTag(C.Tag.prescription_form_not_signed_in),
+              hint = stringResource(R.string.prescription_form_not_signed_in_hint),
           )
-      PrescriptionFormLoad.FAILED -> {
-        LoadMessage(
-            C.Tag.prescription_form_load_error,
-            R.string.prescription_form_load_error_title,
-            R.string.prescription_form_load_error_hint,
-        )
-        LakeButton(
-            text = stringResource(R.string.prescription_form_retry),
-            onClick = onRetry,
-            modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
-        )
-      }
+      PrescriptionFormLoad.FAILED ->
+          PrescriptionMessage(
+              title = stringResource(R.string.prescription_form_load_error_title),
+              modifier = Modifier.testTag(C.Tag.prescription_form_load_error),
+              hint = stringResource(R.string.prescription_form_load_error_hint),
+              actionLabel = stringResource(R.string.prescription_form_retry),
+              onAction = onRetry,
+              actionTestTag = C.Tag.prescription_form_retry_button,
+          )
       // The fields are shown instead
       PrescriptionFormLoad.READY -> Unit
     }
-  }
-}
-
-/** The title and hint of a [LoadState] message, found by tests through [testTag]. */
-@Composable
-private fun LoadMessage(testTag: String, @StringRes title: Int, @StringRes hint: Int) {
-  Column(
-      modifier = Modifier.testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-  ) {
-    MessageTexts(title = stringResource(title), hint = stringResource(hint))
   }
 }
 

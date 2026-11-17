@@ -18,7 +18,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -588,6 +590,35 @@ class PrescriptionFormScreenTest {
     node(C.Tag.prescription_form_close_button).assertIsEnabled().performClick()
 
     assertEquals(listOf("close"), events)
+  }
+
+  @Test
+  fun everyLoadMessage_isTheSharedPrescriptionMessage() {
+    // The same message as the list and the detail (#277): its tile shows inside each one
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_FOUND))
+    val cases =
+        listOf(
+            PrescriptionFormLoad.NOT_FOUND to C.Tag.prescription_form_not_found,
+            PrescriptionFormLoad.NOT_SIGNED_IN to C.Tag.prescription_form_not_signed_in,
+            PrescriptionFormLoad.FAILED to C.Tag.prescription_form_load_error,
+        )
+    for ((load, tag) in cases) {
+      composeTestRule.runOnIdle { uiState = uiState.copy(load = load) }
+      composeTestRule
+          .onNode(
+              hasTestTag(C.Tag.message_state_icon) and hasAnyAncestor(hasTestTag(tag)),
+              useUnmergedTree = true,
+          )
+          .assertExists()
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun loadFailure_retryIsFullyVisibleInLandscape() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+
+    node(C.Tag.prescription_form_retry_button).assertIsFullyVisible()
   }
 
   @Test

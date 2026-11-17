@@ -2,12 +2,9 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import java.time.format.DateTimeFormatter
@@ -44,34 +41,46 @@ enum class PrescriptionsLoad {
 }
 
 /**
+ * The one message the prescription screens show in place of their content (#277): a load error, a
+ * prescription that no longer exists, no access. A [title], an optional [hint] and an optional
+ * [actionLabel] such as "Retry". It draws the app's message state today; when the M3 State card
+ * replaces it, only this function changes.
+ *
+ * @param actionTestTag the test tag of the button, shown when [actionLabel] isn't null
+ */
+@Composable
+internal fun PrescriptionMessage(
+    title: String,
+    modifier: Modifier = Modifier,
+    hint: String? = null,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    actionTestTag: String = "",
+) {
+  LakeMessageState(
+      title = title,
+      modifier = modifier,
+      message = hint,
+      actionLabel = actionLabel,
+      onAction = onAction,
+      actionTestTag = actionTestTag,
+  )
+}
+
+/**
  * Why the list or the detail can't show any prescription when there is
  * [PrescriptionsLoad.NO_ACCESS]: the patient ([caregiverOf] null) is signed out, or the caregiver
  * is no longer in the patient's circle. No Retry, since retrying can't change either.
  */
 @Composable
 internal fun NoAccessMessage(caregiverOf: String?, modifier: Modifier = Modifier) {
-  LakeMessageState(
+  PrescriptionMessage(
       title =
           caregiverOf?.let { stringResource(R.string.prescriptions_no_access_title_for, it) }
               ?: stringResource(R.string.prescriptions_signed_out_title),
-      message =
+      hint =
           caregiverOf?.let { stringResource(R.string.prescriptions_no_access_hint_for, it) }
               ?: stringResource(R.string.prescriptions_signed_out_hint),
       modifier = modifier,
-  )
-}
-
-/**
- * A centered title and a hint under it, for the messages the prescription screens show instead of
- * their content (e.g. an empty list, a prescription that can't be loaded), so they all look alike.
- */
-@Composable
-internal fun MessageTexts(title: String, hint: String) {
-  Text(text = title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-  Text(
-      text = hint,
-      style = MaterialTheme.typography.bodyMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      textAlign = TextAlign.Center,
   )
 }

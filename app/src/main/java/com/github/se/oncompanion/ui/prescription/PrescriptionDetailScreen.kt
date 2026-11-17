@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +46,6 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
-import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
 
@@ -152,17 +150,15 @@ fun PrescriptionDetailContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_loading)
             )
         PrescriptionsLoad.FAILED ->
-            Message(
-                testTag = C.Tag.prescription_detail_error,
+            PrescriptionMessage(
                 title = stringResource(R.string.prescription_detail_error_title),
+                modifier =
+                    Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_error),
                 hint = stringResource(R.string.prescription_detail_error_hint),
-            ) {
-              LakeButton(
-                  text = stringResource(R.string.prescription_detail_retry),
-                  onClick = onRetry,
-                  modifier = Modifier.testTag(C.Tag.prescription_detail_retry_button),
-              )
-            }
+                actionLabel = stringResource(R.string.prescription_detail_retry),
+                onAction = onRetry,
+                actionTestTag = C.Tag.prescription_detail_retry_button,
+            )
         PrescriptionsLoad.NO_ACCESS ->
             NoAccessMessage(
                 caregiverOf,
@@ -178,9 +174,11 @@ fun PrescriptionDetailContent(
         PrescriptionsLoad.SHOWN ->
             // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
             if (prescription == null)
-                Message(
-                    testTag = C.Tag.prescription_detail_not_found,
+                PrescriptionMessage(
                     title = stringResource(R.string.prescription_detail_not_found_title),
+                    modifier =
+                        Modifier.align(Alignment.Center)
+                            .testTag(C.Tag.prescription_detail_not_found),
                     hint = stringResource(R.string.prescription_detail_not_found_hint),
                 )
             // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
@@ -308,22 +306,4 @@ private fun MedicationItem(medication: Medication) {
       },
       modifier = Modifier.testTag(C.Tag.prescriptionDetailMedication(medication.id)),
   )
-}
-
-/** A centered message instead of the prescription, with an optional [action] under it. */
-@Composable
-private fun Message(
-    testTag: String,
-    title: String,
-    hint: String,
-    action: @Composable () -> Unit = {},
-) {
-  Column(
-      modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    MessageTexts(title = title, hint = hint)
-    action()
-  }
 }

@@ -30,6 +30,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.LocalDate
@@ -157,10 +158,58 @@ class PrescriptionDetailScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun error_retryIsFullyVisibleInLandscape() {
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertIsFullyVisible()
+  }
+
+  @Test
   fun error_neverBlamesTheConnection() {
     setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
 
     composeTestRule.onNodeWithText("connection", substring = true).assertDoesNotExist()
+  }
+
+  @Test
+  fun everyMessage_isTheSharedPrescriptionMessage() {
+    // The same message as the list and the form (#277): its tile shows inside each one
+    var state by mutableStateOf(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+    setContentOf { state }
+    val cases =
+        listOf(
+            PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED) to
+                C.Tag.prescription_detail_error,
+            PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN) to
+                C.Tag.prescription_detail_not_found,
+            PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS) to
+                C.Tag.prescription_detail_no_access,
+        )
+    for ((shown, tag) in cases) {
+      composeTestRule.runOnIdle { state = shown }
+      composeTestRule
+          .onNode(
+              hasTestTag(C.Tag.message_state_icon) and hasAnyAncestor(hasTestTag(tag)),
+              useUnmergedTree = true,
+          )
+          .assertExists()
+    }
+  }
+
+  /** Like [setContent], with a state the test can change. */
+  private fun setContentOf(state: () -> PrescriptionDetailUiState) {
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState = state(),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+      )
+    }
   }
 
   @Test
