@@ -3,7 +3,10 @@
 package com.github.se.oncompanion.ui.symptom
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,13 +27,14 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -67,7 +71,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 class SymptomDetailScreenTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -579,6 +583,34 @@ class SymptomDetailScreenTest {
       assertEquals(listOf(fatigue), repository.symptoms("alice"))
       assertEquals(0, navigationActions.backCount)
     }
+  }
+
+  @Test
+  fun screen_leavingTheAppWhileTheDialogIsOpen_keepsItOpenOnReturn() {
+    val repository = FakeSymptomRepository().apply { seed("alice", fatigue) }
+    val viewModel = SymptomDetailViewModel("s1", signedInAsAlice(), repository)
+    val screen: @Composable () -> Unit = {
+      SymptomDetailScreen(
+          navigationActions =
+              RecordingNavigationActions(TestNavHostController(LocalContext.current)),
+          viewModel = viewModel,
+      )
+    }
+    composeTestRule.setContent(screen)
+    composeTestRule.onNodeWithTag(C.Tag.symptom_detail_delete).performClick()
+
+    // Another app comes to the front, then the user switches back
+    composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+    composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    // Android recreated the activity meanwhile: the screen is shown again with the same ViewModel
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.activity.setContent(content = screen)
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_dialog).assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_delete_confirm).performClick()
+    composeTestRule.runOnIdle { assertTrue(repository.symptoms("alice").isEmpty()) }
   }
 
   // ----- Caregiver mode (US-20) -----
