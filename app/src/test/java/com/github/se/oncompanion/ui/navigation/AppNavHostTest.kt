@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -359,6 +360,7 @@ class AppNavHostTest {
       vararg patients: Pair<String, String>,
       shared: Set<CarePermission> = emptySet(),
       canAdd: Set<CarePermission> = emptySet(),
+      canEditAndDelete: Set<CarePermission> = emptySet(),
   ): Triple<FakeAuthRepository, FakeCareCircleInviteRepository, FakeCareCircleRepository> {
     val auth = FakeAuthRepository(onSignIn = { AuthUser(uid = "caregiver") })
     runBlocking { auth.signInWithGoogle("token") }
@@ -373,6 +375,7 @@ class AppNavHostTest {
                   firstName = "Sam",
                   permissions = shared,
                   canAdd = canAdd,
+                  canEditAndDelete = canEditAndDelete,
               )
           ),
       )
@@ -775,6 +778,64 @@ class AppNavHostTest {
       assertEquals(PrescriptionConfirmation.PENDING, added.confirmation)
       assertTrue(medications.prescriptionsOf("caregiver").isEmpty())
     }
+  }
+
+  @Test
+  fun caregiverPrescriptionEditAndDelete_useTheChosenPatientAndExistingNavigation() {
+    val section = setOf(CarePermission.PRESCRIPTIONS)
+    val (auth, invites, circles) =
+        followingCaregiver(
+            "p-anne" to "Anne",
+            shared = section,
+            canAdd = section,
+            canEditAndDelete = section,
+        )
+    val date = LocalDate.of(2026, 9, 29)
+    val prescription =
+        Prescription(
+            "chemo",
+            prescribedBy = "Dr. Martin",
+            prescribedOn = date,
+            medications = listOf(Medication("m1", "chemo", "Ondansetron", startDate = date)),
+        )
+    val medications = FakeMedicationRepository().apply { seed("p-anne", prescription) }
+    setNavHost(
+        Route.WHOSE_CARE,
+        careCircleRepository = circles,
+        careCircleInviteRepository = invites,
+        authRepository = auth,
+        medicationRepository = medications,
+    )
+    waitForTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag)
+        .performScrollTo()
+        .performClick()
+    waitForTag(C.Tag.prescriptionsItem("chemo"))
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).performClick()
+    waitForTag(C.Tag.prescription_detail_edit_button)
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).performClick()
+    waitForTag(C.Tag.prescription_form_prescribed_by_field)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_form_edit_title_for, "Anne"))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_prescribed_by_field)
+        .performTextReplacement("Dr. Rossi")
+    composeTestRule.onNodeWithTag(C.Tag.prescription_form_save_button).performClick()
+    waitForTag(C.Tag.prescription_detail_edit_button)
+    composeTestRule.onNodeWithTag(C.Tag.edited_by).assertExists()
+    composeTestRule.runOnIdle {
+      val updated = medications.prescriptionsOf("p-anne").single()
+      assertEquals("Dr. Rossi", updated.prescribedBy)
+      assertEquals("caregiver", updated.editedBy)
+      assertTrue(medications.prescriptionsOf("caregiver").isEmpty())
+    }
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_delete_confirm).performClick()
+    waitForTag(C.Tag.prescriptions_screen)
+    composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertDoesNotExist()
+    composeTestRule.runOnIdle { assertTrue(medications.prescriptionsOf("p-anne").isEmpty()) }
   }
 
   @Test
