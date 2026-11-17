@@ -178,6 +178,40 @@ class PrescriptionDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
   }
 
+  @Test
+  fun noAccess_saysWhy_withoutRetry() {
+    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState = PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+          caregiverOf = caregiverOf,
+      )
+    }
+    val cases =
+        listOf(
+            null to
+                (context.getString(R.string.prescriptions_signed_out_title) to
+                    context.getString(R.string.prescriptions_signed_out_hint)),
+            "Anne" to
+                (context.getString(R.string.prescriptions_no_access_title_for, "Anne") to
+                    context.getString(R.string.prescriptions_no_access_hint_for, "Anne")),
+        )
+    for ((patient, texts) in cases) {
+      composeTestRule.runOnIdle { caregiverOf = patient }
+      assertTextInside(texts.first, C.Tag.prescription_detail_no_access)
+      assertTextInside(texts.second, C.Tag.prescription_detail_no_access)
+      composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
+    }
+  }
+
   // ----- The prescription (Figma: "US-11 / Prescription detail") -----
 
   @Test
@@ -455,6 +489,18 @@ class PrescriptionDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_content).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_signedOut_saysSo_insteadOfAnError() {
+    val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
+    val viewModel = PrescriptionDetailViewModel("chemo", FakeAuthRepository(), repository)
+    composeTestRule.setContent {
+      PrescriptionDetailScreen(viewModel = viewModel, onBack = {}, onEdit = {}, onDeleted = {})
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_no_access).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
   }
 
   @Test

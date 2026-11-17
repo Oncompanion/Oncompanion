@@ -163,6 +163,11 @@ fun PrescriptionDetailContent(
                   modifier = Modifier.testTag(C.Tag.prescription_detail_retry_button),
               )
             }
+        PrescriptionsLoad.NO_ACCESS ->
+            NoAccessMessage(
+                caregiverOf,
+                Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_no_access),
+            )
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         PrescriptionsLoad.NOT_SHARED ->
             NotSharedMessage(

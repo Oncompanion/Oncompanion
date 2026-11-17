@@ -165,6 +165,11 @@ fun PrescriptionsContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
         PrescriptionsLoad.FAILED -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        PrescriptionsLoad.NO_ACCESS ->
+            NoAccessMessage(
+                caregiverOf,
+                Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_no_access),
+            )
         // The patient a caregiver follows doesn't share their prescriptions
         PrescriptionsLoad.NOT_SHARED ->
             NotSharedMessage(

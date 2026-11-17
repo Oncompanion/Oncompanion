@@ -232,7 +232,7 @@ class PrescriptionsViewModel(
         is CareSection.Loading ->
             withoutPrescriptions(PrescriptionsLoad.LOADING).copy(canAdd = section.canAdd)
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        CareSection.NoAccess -> withoutPrescriptions(PrescriptionsLoad.FAILED)
+        CareSection.NoAccess -> withoutPrescriptions(PrescriptionsLoad.NO_ACCESS)
         CareSection.NotShared -> withoutPrescriptions(PrescriptionsLoad.NOT_SHARED)
         // A patient can still add one if their list fails; a caregiver can't
         is CareSection.Failed ->

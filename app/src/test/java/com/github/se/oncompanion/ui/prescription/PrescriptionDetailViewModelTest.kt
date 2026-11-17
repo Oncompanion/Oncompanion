@@ -230,13 +230,15 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun signedOut_showsAnError() = runTest {
+  fun signedOut_hasNoAccess_notAnErrorNorNotFound() = runTest {
     repository.seed("alice", chemo)
     val vm = viewModel(auth = FakeAuthRepository())
 
     advanceUntilIdle()
 
-    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
+    // Retrying can't sign the patient back in: no access, not an error to retry
+    assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
+    assertFalse(vm.uiState.value.isNotFound)
   }
 
   @Test
@@ -412,7 +414,7 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun signedOutBeforeConfirming_showsTheErrorAndDeletesNothing() = runTest {
+  fun signedOutBeforeConfirming_saysSoAndDeletesNothing() = runTest {
     val auth = signedIn()
     val vm = confirmingDelete(auth = auth)
     auth.signOut()
@@ -420,8 +422,8 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    // Signing out shows the error, closes the confirmation and deletes nothing
-    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
+    // Signing out says so, closes the confirmation and deletes nothing
+    assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
     assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
@@ -536,6 +538,21 @@ class PrescriptionDetailViewModelTest {
 
     assertNull(viewModel.uiState.value.prescription)
     assertEquals(PrescriptionsLoad.LOADING, viewModel.uiState.value.load)
+  }
+
+  @Test
+  fun caregiver_removedFromTheCircle_hasNoAccess_notAnError() {
+    val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    patient.removesTheCaregiver()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+    assertFalse(viewModel.uiState.value.isNotFound)
+    assertNull(viewModel.uiState.value.prescription)
   }
 
   @Test

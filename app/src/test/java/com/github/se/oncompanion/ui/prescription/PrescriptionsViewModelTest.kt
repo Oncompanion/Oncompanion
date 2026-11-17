@@ -171,14 +171,15 @@ class PrescriptionsViewModelTest {
       }
 
   @Test
-  fun signedOut_showsAnError_withoutReading() =
+  fun signedOut_hasNoAccess_notAnError_withoutReading() =
       runTest(dispatcher) {
         repository.seed(uid, prescription("p1", "2026-09-29", "Ondansetron 8 mg"))
 
         val viewModel = viewModel(FakeAuthRepository())
         advanceUntilIdle()
 
-        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
+        // Retrying can't sign the patient back in: no access, not an error to retry
+        assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 
@@ -432,12 +433,27 @@ class PrescriptionsViewModelTest {
       }
 
   @Test
-  fun caregiver_noAccessThenNotShared_saysNotShared_insteadOfTheError() =
+  fun caregiver_removedFromTheCircle_hasNoAccess_notAnError() =
+      runTest(dispatcher) {
+        repository.seed("patient", prescription("p1", "2026-10-01", "Ondansetron 8 mg"))
+        val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+        val viewModel = caregiverViewModel(patient)
+        advanceUntilIdle()
+
+        patient.removesTheCaregiver()
+        advanceUntilIdle()
+
+        assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+        assertEquals(emptyList<String>(), viewModel.ids)
+      }
+
+  @Test
+  fun caregiver_noAccessThenNotShared_saysNotShared_insteadOfNoAccess() =
       runTest(dispatcher) {
         val patient = FollowedPatient().apply { removesTheCaregiver() }
         val viewModel = caregiverViewModel(patient)
         advanceUntilIdle()
-        assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
+        assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
 
         // The patient adds the caregiver back, without their prescriptions
         patient.shares(CarePermission.SYMPTOMS)

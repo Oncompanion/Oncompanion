@@ -467,6 +467,8 @@ object C {
     const val prescription_reject_dialog = "prescription_reject_dialog"
     const val prescription_reject_confirm = "prescription_reject_confirm"
     const val prescription_reject_cancel = "prescription_reject_cancel"
+    const val prescriptions_no_access = "prescriptions_no_access"
+    const val prescription_detail_no_access = "prescription_detail_no_access"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =

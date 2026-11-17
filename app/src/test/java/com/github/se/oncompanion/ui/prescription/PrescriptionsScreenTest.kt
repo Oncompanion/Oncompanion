@@ -346,6 +346,40 @@ class PrescriptionsScreenTest {
         .assertDoesNotExist()
   }
 
+  @Test
+  fun noAccess_saysWhy_withoutRetryOrAdding() {
+    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false),
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = caregiverOf,
+      )
+    }
+    val cases =
+        listOf(
+            null to
+                (context.getString(R.string.prescriptions_signed_out_title) to
+                    context.getString(R.string.prescriptions_signed_out_hint)),
+            "Anne" to
+                (context.getString(R.string.prescriptions_no_access_title_for, "Anne") to
+                    context.getString(R.string.prescriptions_no_access_hint_for, "Anne")),
+        )
+    for ((patient, texts) in cases) {
+      composeTestRule.runOnIdle { caregiverOf = patient }
+      assertTextInside(texts.first, C.Tag.prescriptions_no_access)
+      assertTextInside(texts.second, C.Tag.prescriptions_no_access)
+      composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptions_error).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertDoesNotExist()
+    }
+  }
+
   // ----- The list -----
 
   @Test
@@ -563,6 +597,18 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_signedOut_saysSo_insteadOfAnError() {
+    val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
+    val viewModel = PrescriptionsViewModel(FakeAuthRepository(), repository)
+    composeTestRule.setContent {
+      PrescriptionsScreen(viewModel = viewModel, onBack = {}, onAdd = {}, onScan = {}, onOpen = {})
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_no_access).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).assertDoesNotExist()
   }
 
   // ----- Waiting for the patient (US-43) -----

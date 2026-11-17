@@ -171,7 +171,7 @@ class PrescriptionDetailViewModel(
                 prescription = null,
                 load =
                     if (section == CareSection.NotShared) PrescriptionsLoad.NOT_SHARED
-                    else PrescriptionsLoad.FAILED,
+                    else PrescriptionsLoad.NO_ACCESS,
                 isOwn = false,
                 delete = delete.afterRead(false),
             )

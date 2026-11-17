@@ -5,7 +5,11 @@ package com.github.se.oncompanion.ui.prescription
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -32,6 +36,29 @@ enum class PrescriptionsLoad {
   FAILED,
   /** In caregiver mode, the patient doesn't share their prescriptions. */
   NOT_SHARED,
+  /**
+   * Nothing can be read, and retrying wouldn't help: nobody is signed in, or in caregiver mode the
+   * caregiver is no longer in the patient's circle.
+   */
+  NO_ACCESS,
+}
+
+/**
+ * Why the list or the detail can't show any prescription when there is
+ * [PrescriptionsLoad.NO_ACCESS]: the patient ([caregiverOf] null) is signed out, or the caregiver
+ * is no longer in the patient's circle. No Retry, since retrying can't change either.
+ */
+@Composable
+internal fun NoAccessMessage(caregiverOf: String?, modifier: Modifier = Modifier) {
+  LakeMessageState(
+      title =
+          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_title_for, it) }
+              ?: stringResource(R.string.prescriptions_signed_out_title),
+      message =
+          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_hint_for, it) }
+              ?: stringResource(R.string.prescriptions_signed_out_hint),
+      modifier = modifier,
+  )
 }
 
 /**
