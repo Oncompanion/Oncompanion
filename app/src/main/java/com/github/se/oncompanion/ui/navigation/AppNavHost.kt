@@ -270,6 +270,7 @@ private fun SessionNavHost(
             // In caregiver mode, the chosen patient's day, when they share their planning
             viewModel = viewModel { OverviewViewModel(patientUid = chosenPatient?.uid) },
             onOpenAppointment = appointmentOpener(navigationActions),
+            onOpenEvent = eventOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
         )
