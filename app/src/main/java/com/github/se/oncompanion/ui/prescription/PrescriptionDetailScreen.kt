@@ -161,16 +161,25 @@ fun PrescriptionDetailContent(
             )
         PrescriptionsLoad.NO_ACCESS ->
             NoAccessMessage(
+                uiState.isCaregiver,
                 caregiverOf,
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_no_access),
             )
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         PrescriptionsLoad.NOT_SHARED ->
-            NotSharedMessage(
-                caregiverOf.orEmpty(),
-                CarePermission.PRESCRIPTIONS,
-                Modifier.align(Alignment.Center),
-            )
+            // Without the name, the caregiver was just removed and leaves for Whose care?
+            if (caregiverOf == null)
+                NoAccessMessage(
+                    isCaregiver = true,
+                    caregiverOf = null,
+                    Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_no_access),
+                )
+            else
+                NotSharedMessage(
+                    caregiverOf,
+                    CarePermission.PRESCRIPTIONS,
+                    Modifier.align(Alignment.Center),
+                )
         PrescriptionsLoad.SHOWN ->
             // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
             if (prescription == null)

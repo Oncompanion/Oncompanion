@@ -69,18 +69,30 @@ internal fun PrescriptionMessage(
 
 /**
  * Why the list or the detail can't show any prescription when there is
- * [PrescriptionsLoad.NO_ACCESS]: the patient ([caregiverOf] null) is signed out, or the caregiver
- * is no longer in the patient's circle. No Retry, since retrying can't change either.
+ * [PrescriptionsLoad.NO_ACCESS]: the patient is signed out, or the caregiver ([isCaregiver]) is no
+ * longer in the patient's circle. No Retry, since retrying can't change either.
+ *
+ * @param caregiverOf the patient's first name, which is already gone once a removed caregiver has
+ *   left: the text then names nobody, but still says why
  */
 @Composable
-internal fun NoAccessMessage(caregiverOf: String?, modifier: Modifier = Modifier) {
-  PrescriptionMessage(
-      title =
-          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_title_for, it) }
-              ?: stringResource(R.string.prescriptions_signed_out_title),
-      hint =
-          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_hint_for, it) }
-              ?: stringResource(R.string.prescriptions_signed_out_hint),
-      modifier = modifier,
-  )
+internal fun NoAccessMessage(
+    isCaregiver: Boolean,
+    caregiverOf: String?,
+    modifier: Modifier = Modifier,
+) {
+  // Who can't read, and whose name is still known: the texts say why without a missing name
+  val (title, hint) =
+      when {
+        !isCaregiver ->
+            stringResource(R.string.prescriptions_signed_out_title) to
+                stringResource(R.string.prescriptions_signed_out_hint)
+        caregiverOf == null ->
+            stringResource(R.string.prescriptions_no_access_title_unnamed) to
+                stringResource(R.string.prescriptions_no_access_hint_unnamed)
+        else ->
+            stringResource(R.string.prescriptions_no_access_title_for, caregiverOf) to
+                stringResource(R.string.prescriptions_no_access_hint_for, caregiverOf)
+      }
+  PrescriptionMessage(title = title, hint = hint, modifier = modifier)
 }

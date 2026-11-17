@@ -238,6 +238,7 @@ class PrescriptionDetailViewModelTest {
 
     // Retrying can't sign the patient back in: no access, not an error to retry
     assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
+    assertFalse(vm.uiState.value.isCaregiver)
     assertFalse(vm.uiState.value.isNotFound)
   }
 
@@ -551,6 +552,8 @@ class PrescriptionDetailViewModelTest {
     dispatcher.scheduler.advanceUntilIdle()
 
     assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+    // Known from the start, so the text stays right once leave() clears the patient's name
+    assertTrue(viewModel.uiState.value.isCaregiver)
     assertFalse(viewModel.uiState.value.isNotFound)
     assertNull(viewModel.uiState.value.prescription)
   }

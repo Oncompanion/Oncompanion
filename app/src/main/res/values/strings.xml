@@ -587,6 +587,9 @@
     <!-- #277: a caregiver the patient removed from their circle, e.g. "You can\'t see Anne\'s prescriptions anymore" -->
     <string name="prescriptions_no_access_title_for">You can\'t see %1$s\'s prescriptions anymore</string>
     <string name="prescriptions_no_access_hint_for">You\'re no longer in %1$s\'s care circle.</string>
+    <!-- #490: the same, in the instant after the app forgot the patient\'s name -->
+    <string name="prescriptions_no_access_title_unnamed">You can\'t see these prescriptions anymore</string>
+    <string name="prescriptions_no_access_hint_unnamed">You\'re no longer in this care circle.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>

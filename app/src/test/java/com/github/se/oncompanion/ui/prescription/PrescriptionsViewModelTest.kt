@@ -180,6 +180,7 @@ class PrescriptionsViewModelTest {
 
         // Retrying can't sign the patient back in: no access, not an error to retry
         assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+        assertFalse(viewModel.uiState.value.isCaregiver)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 
@@ -444,6 +445,8 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+        // Known from the start, so the text stays right once leave() clears the patient's name
+        assertTrue(viewModel.uiState.value.isCaregiver)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 

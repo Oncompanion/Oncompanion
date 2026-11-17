@@ -38,6 +38,9 @@ import kotlinx.coroutines.launch
  *   doesn't exist
  * @property load where reading it is at: shown with no [prescription] means it doesn't exist
  * @property delete where the deletion of the prescription is at
+ * @property isCaregiver whether these are the prescriptions of a patient the user follows. Fixed
+ *   for the screen's whole life: once a removed caregiver leaves, the patient's name is gone before
+ *   the app moves to Whose care?, so the no-access text can't be chosen from that name (#490)
  * @property isOwn whether it is the user's own prescription: a caregiver only reads the patient's
  */
 data class PrescriptionDetailUiState(
@@ -45,6 +48,7 @@ data class PrescriptionDetailUiState(
     val load: PrescriptionsLoad = PrescriptionsLoad.LOADING,
     override val delete: DeletePhase = DeletePhase.IDLE,
     val isOwn: Boolean = true,
+    val isCaregiver: Boolean = false,
 ) : HasDeletePhase {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
@@ -88,7 +92,8 @@ class PrescriptionDetailViewModel(
 
   private val observeSection = ObserveCareSection(resolveSection)
 
-  private val _uiState = MutableStateFlow(PrescriptionDetailUiState())
+  private val _uiState =
+      MutableStateFlow(PrescriptionDetailUiState(isCaregiver = patientUid != null))
   val uiState: StateFlow<PrescriptionDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null

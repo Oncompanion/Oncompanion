@@ -347,12 +347,12 @@ class PrescriptionsScreenTest {
   }
 
   @Test
-  fun noAccess_saysWhy_withoutRetryOrAdding() {
-    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help
+  fun noAccess_saysWhy_evenAfterTheCaregiverLeft() {
+    var state by mutableStateOf(loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false))
     var caregiverOf: String? by mutableStateOf(null)
     composeTestRule.setContent {
       PrescriptionsContent(
-          uiState = loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false),
+          uiState = state,
           onBack = {},
           onAdd = {},
           onScan = {},
@@ -361,26 +361,66 @@ class PrescriptionsScreenTest {
           caregiverOf = caregiverOf,
       )
     }
+    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help.
+    // Once removed, leave() clears the patient's name before the app moves to Whose care?, so
+    // the caregiver's text can't depend on that name (#490)
+    val anne = "Anne"
     val cases =
         listOf(
-            null to
-                (context.getString(R.string.prescriptions_signed_out_title) to
-                    context.getString(R.string.prescriptions_signed_out_hint)),
-            "Anne" to
-                (context.getString(R.string.prescriptions_no_access_title_for, "Anne") to
-                    context.getString(R.string.prescriptions_no_access_hint_for, "Anne")),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false),
+                null as String?,
+                signedOut,
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false, isCaregiver = true),
+                anne,
+                removedFrom(anne),
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false, isCaregiver = true),
+                null,
+                removedUnnamed,
+            ),
+            Triple(
+                loaded.copy(
+                    load = PrescriptionsLoad.NOT_SHARED,
+                    canAdd = false,
+                    isCaregiver = true,
+                ),
+                null,
+                removedUnnamed,
+            ),
         )
-    for ((patient, texts) in cases) {
-      composeTestRule.runOnIdle { caregiverOf = patient }
+    for ((shown, patient, texts) in cases) {
+      composeTestRule.runOnIdle {
+        state = shown
+        caregiverOf = patient
+      }
       assertTextInside(texts.first, C.Tag.prescriptions_no_access)
       assertTextInside(texts.second, C.Tag.prescriptions_no_access)
+      // Never a title with no name, never a Retry that can't work
+      composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
       composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).assertDoesNotExist()
-      composeTestRule.onNodeWithTag(C.Tag.prescriptions_error).assertDoesNotExist()
-      composeTestRule.onNodeWithTag(C.Tag.prescriptions_empty).assertDoesNotExist()
+      composeTestRule
+          .onNode(hasText(" doesn't", substring = true), useUnmergedTree = true)
+          .assertDoesNotExist()
     }
   }
 
-  // ----- The list -----
+  private val signedOut
+    get() =
+        context.getString(R.string.prescriptions_signed_out_title) to
+            context.getString(R.string.prescriptions_signed_out_hint)
+
+  private val removedUnnamed
+    get() =
+        context.getString(R.string.prescriptions_no_access_title_unnamed) to
+            context.getString(R.string.prescriptions_no_access_hint_unnamed)
+
+  private fun removedFrom(patient: String) =
+      context.getString(R.string.prescriptions_no_access_title_for, patient) to
+          context.getString(R.string.prescriptions_no_access_hint_for, patient)
 
   @Test
   fun filled_showsEachPrescription_withItsMedicationNamesPrescriberAndDate() {

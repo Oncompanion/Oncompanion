@@ -228,12 +228,13 @@ class PrescriptionDetailScreenTest {
   }
 
   @Test
-  fun noAccess_saysWhy_withoutRetry() {
-    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help
+  fun noAccess_saysWhy_evenAfterTheCaregiverLeft() {
+    var state by
+        mutableStateOf(PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false))
     var caregiverOf: String? by mutableStateOf(null)
     composeTestRule.setContent {
       PrescriptionDetailContent(
-          uiState = PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
+          uiState = state,
           onBack = {},
           onRetry = {},
           onEdit = {},
@@ -243,25 +244,74 @@ class PrescriptionDetailScreenTest {
           caregiverOf = caregiverOf,
       )
     }
+    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help.
+    // Once removed, leave() clears the patient's name before the app moves to Whose care?, so
+    // the caregiver's text can't depend on that name (#490)
+    val anne = "Anne"
     val cases =
         listOf(
-            null to
-                (context.getString(R.string.prescriptions_signed_out_title) to
-                    context.getString(R.string.prescriptions_signed_out_hint)),
-            "Anne" to
-                (context.getString(R.string.prescriptions_no_access_title_for, "Anne") to
-                    context.getString(R.string.prescriptions_no_access_hint_for, "Anne")),
+            Triple(
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
+                null as String?,
+                signedOut,
+            ),
+            Triple(
+                PrescriptionDetailUiState(
+                    load = PrescriptionsLoad.NO_ACCESS,
+                    isOwn = false,
+                    isCaregiver = true,
+                ),
+                anne,
+                removedFrom(anne),
+            ),
+            Triple(
+                PrescriptionDetailUiState(
+                    load = PrescriptionsLoad.NO_ACCESS,
+                    isOwn = false,
+                    isCaregiver = true,
+                ),
+                null,
+                removedUnnamed,
+            ),
+            Triple(
+                PrescriptionDetailUiState(
+                    load = PrescriptionsLoad.NOT_SHARED,
+                    isOwn = false,
+                    isCaregiver = true,
+                ),
+                null,
+                removedUnnamed,
+            ),
         )
-    for ((patient, texts) in cases) {
-      composeTestRule.runOnIdle { caregiverOf = patient }
+    for ((shown, patient, texts) in cases) {
+      composeTestRule.runOnIdle {
+        state = shown
+        caregiverOf = patient
+      }
       assertTextInside(texts.first, C.Tag.prescription_detail_no_access)
       assertTextInside(texts.second, C.Tag.prescription_detail_no_access)
+      // Never a title with no name, never a Retry that can't work
+      composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
       composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
-      composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
+      composeTestRule
+          .onNode(hasText(" doesn't", substring = true), useUnmergedTree = true)
+          .assertDoesNotExist()
     }
   }
 
-  // ----- The prescription (Figma: "US-11 / Prescription detail") -----
+  private val signedOut
+    get() =
+        context.getString(R.string.prescriptions_signed_out_title) to
+            context.getString(R.string.prescriptions_signed_out_hint)
+
+  private val removedUnnamed
+    get() =
+        context.getString(R.string.prescriptions_no_access_title_unnamed) to
+            context.getString(R.string.prescriptions_no_access_hint_unnamed)
+
+  private fun removedFrom(patient: String) =
+      context.getString(R.string.prescriptions_no_access_title_for, patient) to
+          context.getString(R.string.prescriptions_no_access_hint_for, patient)
 
   @Test
   fun shown_headlineListsTheMedicationNames() {
