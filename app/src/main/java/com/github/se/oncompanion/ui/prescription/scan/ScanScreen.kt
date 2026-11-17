@@ -173,8 +173,14 @@ fun ScanScreen(
   // Turns the camera on once it's allowed and passes on what it reports; leaving the screen stops
   // the collection, which turns the camera off. A new camera (e.g. after a rotation) starts again
   // from "starting", so no photo can be taken before it's open. Not before the tip is closed: it
-  // shows before the camera opens
-  if (uiState.permission == CameraPermission.GRANTED && !uiState.showUprightTip) {
+  // shows before the camera opens. Off while a photo is checked: after Retake it starts again from
+  // "starting", so the shutter waits for the camera to really reopen with the viewfinder (with the
+  // camera left on, its "open" from before the photo enabled the shutter while it reconfigured)
+  if (
+      uiState.permission == CameraPermission.GRANTED &&
+          !uiState.showUprightTip &&
+          uiState.photo == null
+  ) {
     LaunchedEffect(camera) {
       try {
         camera.open(context, lifecycleOwner).collect { status ->

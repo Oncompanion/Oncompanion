@@ -13,6 +13,7 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
+import java.util.Date
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import org.junit.After
@@ -372,5 +373,57 @@ class UserProfileSecurityRulesTest {
     denied(userDoc(aliceUid).get(Source.SERVER))
     EmulatorTestData.signOutAndWaitForFirestore(aliceUid)
     denied(userDoc(aliceUid).update("hospital", "Signed out hospital"))
+  }
+
+  // ---- date of birth ----
+
+  /**
+   * A day in the past, today in the zone furthest ahead (its Zurich midnight up to 13 hours from
+   * now), null or no date of birth at all are accepted.
+   */
+  @Test
+  fun optionalDateOfBirthInThePastIsAllowedOnCreateAndUpdate(): Unit = runBlocking {
+    val valids =
+        listOf(
+            Timestamp(Date(0)),
+            Timestamp(Date(System.currentTimeMillis() - 60_000)),
+            Timestamp(Date(System.currentTimeMillis() + 13 * HOUR)),
+            null,
+        )
+    for (value in valids) {
+      allowed(userDoc(aliceUid).set(validProfile().apply { put("dateOfBirth", value) }))
+      allowed(userDoc(aliceUid).delete())
+    }
+    // Absent on create, then set, changed, cleared and removed on update
+    createAliceProfile()
+    for (value in valids) allowed(userDoc(aliceUid).update("dateOfBirth", value))
+    allowed(userDoc(aliceUid).update("dateOfBirth", FieldValue.delete()))
+    allowed(userDoc(aliceUid).update("firstName", "No date of birth"))
+  }
+
+  /**
+   * A date of birth later than 14 hours from now (a day not started anywhere yet) or of another
+   * type is refused on create and update.
+   */
+  @Test
+  fun futureOrWronglyTypedDateOfBirthIsDenied(): Unit = runBlocking {
+    val invalids =
+        listOf<Any>(
+            Timestamp(Date(System.currentTimeMillis() + 15 * HOUR)),
+            Timestamp(Date(System.currentTimeMillis() + 365 * 24 * HOUR)),
+            "1980-03-31",
+            19800331,
+            true,
+            mapOf("year" to 1980),
+        )
+    for (invalid in invalids) {
+      denied(userDoc(aliceUid).set(validProfile().apply { put("dateOfBirth", invalid) }))
+    }
+    createAliceProfile()
+    for (invalid in invalids) denied(userDoc(aliceUid).update("dateOfBirth", invalid))
+  }
+
+  private companion object {
+    const val HOUR = 60 * 60_000L
   }
 }

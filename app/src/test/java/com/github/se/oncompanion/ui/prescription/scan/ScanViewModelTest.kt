@@ -265,17 +265,22 @@ class ScanViewModelTest {
       }
 
   @Test
-  fun retake_deletesThePhoto_andShowsTheCameraAgain() =
+  fun retake_deletesThePhoto_andWaitsForTheCameraToReopen() =
       runTest(dispatcher) {
         cameraReady()
         viewModel.capture(writePhoto)
         advanceUntilIdle()
         val first = photosOnDisk.single()
+        // Off while the photo is checked
+        assertEquals(CameraStatus.STARTING, state.camera)
 
         viewModel.retake()
 
         assertFalse(first.exists())
         assertNull(state.photo)
+        // The camera was off while the photo was checked: no photo until it reports it's open
+        assertFalse(state.canCapture)
+        viewModel.onCameraReady()
         assertTrue(state.canCapture)
       }
 
@@ -288,6 +293,7 @@ class ScanViewModelTest {
         val first = photosOnDisk.single()
 
         viewModel.retake()
+        viewModel.onCameraReady()
         viewModel.capture(writePhoto)
         advanceUntilIdle()
 
@@ -418,6 +424,8 @@ class ScanViewModelTest {
 
         assertFalse(photo.exists())
         assertNull(state.nothingRead)
+        assertFalse(state.canCapture)
+        viewModel.onCameraReady()
         assertTrue(state.canCapture)
       }
 
@@ -462,6 +470,7 @@ class ScanViewModelTest {
         viewModel.usePhoto()
         advanceUntilIdle()
         viewModel.retake()
+        viewModel.onCameraReady()
 
         recognizer.result = ScannedSheets.sheet(3)
         viewModel.capture(writePhoto)
