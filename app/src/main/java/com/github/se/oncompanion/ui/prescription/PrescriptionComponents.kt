@@ -67,33 +67,6 @@ internal fun MessageArea(modifier: Modifier = Modifier, content: @Composable () 
 }
 
 /**
- * The one message the prescription screens show in place of their content (#277): a load error, a
- * prescription that no longer exists, no access. A [title], an optional [hint] and an optional
- * [actionLabel] such as "Retry". It draws the app's message state today; when the M3 State card
- * replaces it, only this function changes.
- *
- * @param actionTestTag the test tag of the button, shown when [actionLabel] isn't null
- */
-@Composable
-internal fun PrescriptionMessage(
-    title: String,
-    modifier: Modifier = Modifier,
-    hint: String? = null,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
-    actionTestTag: String = "",
-) {
-  LakeMessageState(
-      title = title,
-      modifier = modifier,
-      message = hint,
-      actionLabel = actionLabel,
-      onAction = onAction,
-      actionTestTag = actionTestTag,
-  )
-}
-
-/**
  * Why the list or the detail can't show any prescription when there is
  * [PrescriptionsLoad.NO_ACCESS]: the patient is signed out, or the caregiver ([isCaregiver]) is no
  * longer in the patient's circle. No Retry, since retrying can't change either.
@@ -120,5 +93,5 @@ internal fun NoAccessMessage(
             stringResource(R.string.prescriptions_no_access_title_for, caregiverOf) to
                 stringResource(R.string.prescriptions_no_access_hint_for, caregiverOf)
       }
-  PrescriptionMessage(title = title, hint = hint, modifier = modifier)
+  LakeMessageState(title = title, message = hint, modifier = modifier)
 }

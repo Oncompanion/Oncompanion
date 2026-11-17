@@ -594,8 +594,8 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
-  fun everyLoadMessage_isTheSharedPrescriptionMessage() {
-    // The same message as the list and the detail (#277): its tile shows inside each one
+  fun everyLoadMessage_isTheSharedMessageState() {
+    // The app's shared message state, as on the list and the detail (#277): its tile shows in each
     setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_FOUND))
     val cases =
         listOf(
@@ -666,9 +666,7 @@ class PrescriptionFormScreenTest {
     setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_SIGNED_IN))
 
     node(C.Tag.prescription_form_not_signed_in).assertExists()
-    composeTestRule
-        .onNodeWithText(string(R.string.prescription_form_not_signed_in_title))
-        .assertExists()
+    composeTestRule.onNodeWithText(string(R.string.prescriptions_signed_out_title)).assertExists()
     node(C.Tag.prescription_form_retry_button).assertDoesNotExist()
     assertNoForm()
   }

@@ -67,6 +67,7 @@ import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PaperLakeBand
@@ -397,23 +398,23 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
     // No retry: the form keeps listening and fills in if the prescription arrives later
     PrescriptionFormLoad.NOT_FOUND ->
         MessageArea(modifier.testTag(C.Tag.prescription_form_not_found)) {
-          PrescriptionMessage(
+          LakeMessageState(
               title = stringResource(R.string.prescription_form_not_found_title),
-              hint = stringResource(R.string.prescription_form_not_found_hint),
+              message = stringResource(R.string.prescription_form_not_found_hint),
           )
         }
     PrescriptionFormLoad.NOT_SIGNED_IN ->
         MessageArea(modifier.testTag(C.Tag.prescription_form_not_signed_in)) {
-          PrescriptionMessage(
-              title = stringResource(R.string.prescription_form_not_signed_in_title),
-              hint = stringResource(R.string.prescription_form_not_signed_in_hint),
+          LakeMessageState(
+              title = stringResource(R.string.prescriptions_signed_out_title),
+              message = stringResource(R.string.prescription_form_not_signed_in_hint),
           )
         }
     PrescriptionFormLoad.FAILED ->
         MessageArea(modifier.testTag(C.Tag.prescription_form_load_error)) {
-          PrescriptionMessage(
+          LakeMessageState(
               title = stringResource(R.string.prescription_form_load_error_title),
-              hint = stringResource(R.string.prescription_form_load_error_hint),
+              message = stringResource(R.string.prescription_form_load_error_hint),
               actionLabel = stringResource(R.string.prescription_form_retry),
               onAction = onRetry,
               actionTestTag = C.Tag.prescription_form_retry_button,

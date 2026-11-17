@@ -54,6 +54,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.AddedBy
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
 
@@ -425,9 +426,9 @@ private fun AddedByYouItem(
 private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
   MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_empty)) {
     Column(
-        Modifier.padding(horizontal = 32.dp),
+        Modifier.padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
       Icon(
           painter = painterResource(R.drawable.ic_prescriptions),
@@ -437,7 +438,7 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
       )
       Text(
           text = stringResource(R.string.prescriptions_empty_title),
-          style = MaterialTheme.typography.titleMedium,
+          style = MaterialTheme.typography.titleLarge,
           textAlign = TextAlign.Center,
       )
       Text(
@@ -456,11 +457,11 @@ private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
   MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_error)) {
-    PrescriptionMessage(
+    LakeMessageState(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
                 ?: stringResource(R.string.prescriptions_error_title),
-        hint = stringResource(R.string.prescriptions_error_hint),
+        message = stringResource(R.string.prescriptions_error_hint),
         actionLabel = stringResource(R.string.prescriptions_retry),
         onAction = onRetry,
         actionTestTag = C.Tag.prescriptions_retry_button,

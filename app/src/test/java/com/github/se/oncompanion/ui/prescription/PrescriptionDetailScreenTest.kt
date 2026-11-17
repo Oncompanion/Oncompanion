@@ -201,8 +201,8 @@ class PrescriptionDetailScreenTest {
   }
 
   @Test
-  fun everyMessage_isTheSharedPrescriptionMessage() {
-    // The same message as the list and the form (#277): its tile shows inside each one
+  fun everyMessage_isTheSharedMessageState() {
+    // The app's shared message state, as on the list and the form (#277): its tile shows in each
     var state by mutableStateOf(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
     setContentOf { state }
     val cases =

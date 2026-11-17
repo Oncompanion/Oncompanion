@@ -46,6 +46,7 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
 
@@ -151,9 +152,9 @@ fun PrescriptionDetailContent(
             )
         PrescriptionsLoad.FAILED ->
             MessageArea(Modifier.testTag(C.Tag.prescription_detail_error)) {
-              PrescriptionMessage(
+              LakeMessageState(
                   title = stringResource(R.string.prescription_detail_error_title),
-                  hint = stringResource(R.string.prescription_detail_error_hint),
+                  message = stringResource(R.string.prescription_detail_error_hint),
                   actionLabel = stringResource(R.string.prescription_detail_retry),
                   onAction = onRetry,
                   actionTestTag = C.Tag.prescription_detail_retry_button,
@@ -180,9 +181,9 @@ fun PrescriptionDetailContent(
             // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
             if (prescription == null)
                 MessageArea(Modifier.testTag(C.Tag.prescription_detail_not_found)) {
-                  PrescriptionMessage(
+                  LakeMessageState(
                       title = stringResource(R.string.prescription_detail_not_found_title),
-                      hint = stringResource(R.string.prescription_detail_not_found_hint),
+                      message = stringResource(R.string.prescription_detail_not_found_hint),
                   )
                 }
             // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
