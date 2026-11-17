@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.user
 
 import android.util.Log
+import com.github.se.oncompanion.model.common.toCalendarDay
+import com.github.se.oncompanion.model.common.toCalendarDayTimestamp
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
@@ -105,6 +107,7 @@ class UserProfileRepositoryFirestore(
           FIELD_FAMILY_NAME to profile.familyName,
           FIELD_CANCER_TYPE to profile.cancerType,
           FIELD_HOSPITAL to profile.hospital,
+          FIELD_DATE_OF_BIRTH to profile.dateOfBirth?.toCalendarDayTimestamp(),
       )
 
   private fun fromDocument(doc: DocumentSnapshot): UserProfile? {
@@ -117,6 +120,7 @@ class UserProfileRepositoryFirestore(
           familyName = doc.getString(FIELD_FAMILY_NAME),
           cancerType = doc.getString(FIELD_CANCER_TYPE),
           hospital = doc.getString(FIELD_HOSPITAL),
+          dateOfBirth = doc.getTimestamp(FIELD_DATE_OF_BIRTH)?.toCalendarDay(),
           // Pending server timestamps read as null until the write reaches the server
           createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
       )
@@ -135,6 +139,11 @@ class UserProfileRepositoryFirestore(
     /** Optional hospital text; missing and null fields both deserialize to null. */
     const val FIELD_HOSPITAL = "hospital"
     const val FIELD_CREATED_AT = "createdAt"
+    /**
+     * Optional date of birth, a calendar day (see `CalendarDay.kt`); missing and null fields both
+     * deserialize to null.
+     */
+    const val FIELD_DATE_OF_BIRTH = "dateOfBirth"
     private const val TAG = "UserProfileRepository"
   }
 }
