@@ -260,8 +260,6 @@ fun OverviewContent(
                   uiState.now.toLocalDate(),
                   onOpenPlanning,
                   onOpenAppointment,
-                  // Only the patient adds appointments
-                  canAdd = false,
                   modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
               )
               TodaySection(uiState.todayEntries, onOpenPlanning)

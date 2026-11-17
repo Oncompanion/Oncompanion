@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -346,7 +347,7 @@ class OverviewScreenTest {
   // ----- Screen wired to the ViewModel and navigation -----
 
   @Test
-  fun screen_showsTodaysNextEvent_beforeALaterAppointment_aboveTodaysList() {
+  fun screen_showsTodaysNextEvent_beforeALaterAppointment_andTodaysMedications() {
     val yoga =
         PlanningItem(
             PlanningSource.Event("gentle-yoga"),
@@ -361,20 +362,36 @@ class OverviewScreenTest {
             appointment.title,
             subtitle = appointment.place,
         )
+    val ondansetron =
+        PlanningItem(
+            PlanningSource.Medication("rx", "ondansetron"),
+            PlanningTiming.DateOnly(morning.toLocalDate()),
+            "Ondansetron",
+            frequency = "Twice a day",
+            dosage = "8 mg",
+        )
     val navigationActions =
-        setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(yoga, checkUp) })
+        setOverviewScreen(
+            FakePlanningRepository().apply { items.value = listOf(yoga, checkUp, ondansetron) }
+        )
 
     assertTextInside("Gentle yoga for patients", C.Tag.overview_next_up)
     assertTextInside("10:00 · Wellness center", C.Tag.overview_next_up)
+    val medication = C.Tag.overviewMedication(ondansetron.key)
+    assertTextInside("Ondansetron 8 mg", medication)
+    assertTextInside("Twice a day", medication)
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertDoesNotExist()
-    // Today's list stays under it until the medications card replaces it
-    composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem(yoga.key)).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.overview_today_list).assertDoesNotExist()
 
     composeTestRule.onNodeWithTag(C.Tag.overview_next_up).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.overview_see_planning).performScrollTo().performClick()
+    // Each card's link keeps the Figma's 20 dp row but a 48 dp touch target, and only opens
+    // Planning: the Next up link doesn't also open the event
+    listOf(C.Tag.overview_next_up_planning_link, C.Tag.overview_planning_link).forEach {
+      composeTestRule.onNodeWithTag(it).assertTouchHeightIsEqualTo(48.dp).performClick()
+    }
     composeTestRule.runOnIdle {
       // Planning is a tab: it opens with tab navigation, not stacked on the Overview
-      assertEquals(listOf(Route.PLANNING), navigationActions.openedTabs)
+      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedTabs)
       assertEquals(listOf(Screen.eventDetail("gentle-yoga")), navigationActions.openedRoutes)
     }
   }
@@ -413,6 +430,74 @@ class OverviewScreenTest {
           opened,
       )
     }
+  }
+
+  private fun medication(id: String, frequency: String? = "Once a day") =
+      TodayMedication(key = id, name = "Medication $id", frequency = frequency)
+
+  @Test
+  fun medications_showTheFirstTwo_andMoreOpensPlanning_onlyWhenThereAreMore() {
+    var state by mutableStateOf(loaded)
+    var openedPlanning = 0
+    composeTestRule.setContent {
+      OverviewContent(state, {}, onOpenPlanning = { openedPlanning++ }, {}, {})
+    }
+    listOf(2, 5).forEach { count ->
+      state = loaded.copy(todayMedications = List(count) { medication("m$it") })
+      composeTestRule.waitForIdle()
+      listOf("m0", "m1").forEach {
+        composeTestRule.onNodeWithTag(C.Tag.overviewMedication(it)).assertIsDisplayed()
+      }
+      composeTestRule.onNodeWithTag(C.Tag.overviewMedication("m2")).assertDoesNotExist()
+      val title =
+          if (count > 2) context.getString(R.string.overview_today_medications_count, count)
+          else context.getString(R.string.overview_today_medications)
+      assertTextInside(title, C.Tag.overview_medications)
+      val more = composeTestRule.onNodeWithTag(C.Tag.overview_more_medications)
+      if (count > 2) more.assertTextContains("3 more").assertHeightIsAtLeast(48.dp).performClick()
+      else more.assertDoesNotExist()
+    }
+    composeTestRule.runOnIdle { assertEquals(1, openedPlanning) }
+  }
+
+  @Test
+  fun medication_withoutFrequency_showsNoChip_andAnUnconfirmedOneSaysWhoAddedIt() {
+    setContent(
+        loaded.copy(
+            todayMedications =
+                listOf(medication("a", frequency = null).copy(notConfirmedAddedBy = "Sam"))
+        )
+    )
+    val row = C.Tag.overviewMedication("a")
+    assertTextInside(context.getString(R.string.added_by_not_confirmed, "Sam"), row)
+    composeTestRule
+        .onNode(hasText("Once a day") and hasAnyAncestor(hasTestTag(row)), useUnmergedTree = true)
+        .assertDoesNotExist()
+  }
+
+  @Test
+  fun nothingPlanned_replacesBothCards_andOpensPlanning_butMedicationsAloneShowWithoutNextUp() {
+    var state by mutableStateOf(loaded)
+    var openedPlanning = 0
+    composeTestRule.setContent {
+      OverviewContent(state, {}, onOpenPlanning = { openedPlanning++ }, {}, {})
+    }
+
+    assertTextInside(
+        context.getString(R.string.overview_nothing_today),
+        C.Tag.overview_nothing_planned,
+    )
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_medications).assertDoesNotExist()
+    // It opens Planning, where the day is filled in
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).performClick()
+    composeTestRule.runOnIdle { assertEquals(1, openedPlanning) }
+
+    state = loaded.copy(todayMedications = listOf(medication("a")))
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag(C.Tag.overview_medications).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertDoesNotExist()
   }
 
   @Test
@@ -624,7 +709,7 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun caregiverMode_hidesTheShortcutsAndTheAddHint_butKeepsTheProfile() {
+  fun caregiverMode_hidesTheShortcutsAndThePatientCards_butKeepsTheProfile() {
     composeTestRule.setContent {
       OverviewContent(
           uiState = loaded,
@@ -638,10 +723,8 @@ class OverviewScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     // The patient's cards of the Overview UX Refactor aren't the caregiver's yet
-    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertDoesNotExist()
-    composeTestRule
-        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
-        .assertDoesNotExist()
+    listOf(C.Tag.overview_next_up, C.Tag.overview_medications, C.Tag.overview_nothing_planned)
+        .forEach { composeTestRule.onNodeWithTag(it).assertDoesNotExist() }
     composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).assertIsDisplayed()
   }
 
@@ -777,7 +860,8 @@ class OverviewScreenTest {
 
     listOf(
             loaded.copy(nextUp = nextUp) to C.Tag.overview_next_up,
-            loaded to C.Tag.overview_no_appointment,
+            loaded.copy(todayMedications = listOf(medication("a"))) to C.Tag.overview_medications,
+            loaded to C.Tag.overview_nothing_planned,
         )
         .forEach { (shown, cardTag) ->
           state = shown
@@ -860,10 +944,19 @@ class OverviewScreenTest {
   @Test
   @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
   fun patientAt200Percent_everyCardAndLinkCanBeScrolledToWhole() {
-    setContent(loaded.copy(nextUp = nextUp.copy(title = "Oncology check-up with a long name")))
+    setContent(
+        loaded.copy(
+            nextUp = nextUp,
+            todayMedications =
+                List(3) { medication("m$it").copy(name = "Dexamethasone 4 mg, long name $it") },
+        )
+    )
     listOf(
             C.Tag.overview_next_up,
-            C.Tag.overview_see_planning,
+            C.Tag.overview_next_up_planning_link,
+            C.Tag.overview_planning_link,
+            C.Tag.overviewMedication("m1"),
+            C.Tag.overview_more_medications,
             C.Tag.overview_shortcut_care_circle,
         )
         .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }
@@ -1005,7 +1098,7 @@ class OverviewScreenTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun patientNextUpCardIsWhite_inBothThemes() {
+  fun patientCardsAreWhite_inBothThemes() {
     var dark by mutableStateOf(false)
     var state by mutableStateOf(loaded)
     composeTestRule.setContent {
@@ -1014,13 +1107,22 @@ class OverviewScreenTest {
     listOf(false to SurfaceContainerLowestLight, true to SurfaceContainerLowestDark).forEach {
         (isDark, card) ->
       dark = isDark
-      state = loaded.copy(nextUp = nextUp)
-      composeTestRule.waitForIdle()
-      // In the card's bottom-left corner padding, away from the badge and the text
-      val node = composeTestRule.onNodeWithTag(C.Tag.overview_next_up)
-      val height = node.fetchSemanticsNode().size.height
-      val y = with(composeTestRule.density) { height.toDp() } - 6.dp
-      assertSameColor("Next up, dark=$isDark", card, node.colorAt(24.dp, y))
+      listOf(
+              loaded.copy(nextUp = nextUp, todayMedications = listOf(medication("a"))) to
+                  listOf(C.Tag.overview_next_up, C.Tag.overview_medications),
+              loaded to listOf(C.Tag.overview_nothing_planned),
+          )
+          .forEach { (shown, tags) ->
+            state = shown
+            composeTestRule.waitForIdle()
+            tags.forEach { tag ->
+              // In the card's bottom-left corner padding, away from the badge and the text
+              val node = composeTestRule.onNodeWithTag(tag).performScrollTo()
+              val height = node.fetchSemanticsNode().size.height
+              val y = with(composeTestRule.density) { height.toDp() } - 6.dp
+              assertSameColor("$tag, dark=$isDark", card, node.colorAt(24.dp, y))
+            }
+          }
     }
   }
 }

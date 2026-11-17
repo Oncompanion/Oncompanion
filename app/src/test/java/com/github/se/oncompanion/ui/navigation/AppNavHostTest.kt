@@ -234,7 +234,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     // The default ViewModel works without Firebase: a greeting and the empty day
     composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
@@ -1501,14 +1501,11 @@ class AppNavHostTest {
   }
 
   @Test
-  fun overviewPlanningLinksOpenRealCalendar() {
+  fun overviewEmptyDayOpensRealCalendar() {
     setNavHost(Route.OVERVIEW)
-    listOf(C.Tag.overview_no_appointment, C.Tag.overview_see_planning).forEach { tag ->
-      composeTestRule.onNodeWithTag(tag).performScrollTo().performClick()
-      composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
-      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
-      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
-    }
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
   }
 
   @Test

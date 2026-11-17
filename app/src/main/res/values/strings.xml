@@ -73,7 +73,6 @@
     <string name="overview_today_at">Today, %1$s</string>
     <string name="overview_tomorrow_at">Tomorrow, %1$s</string>
     <string name="overview_no_appointment">No upcoming appointment</string>
-    <string name="overview_no_appointment_hint">Add your next appointment in Planning to see it here.</string>
     <string name="overview_open_planning">Open Planning</string>
     <string name="overview_today">Today</string>
     <string name="overview_see_planning">See planning</string>
@@ -81,6 +80,13 @@
     <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
     <string name="overview_next_up">Next up</string>
     <string name="overview_with_place">%1$s · %2$s</string>
+    <string name="overview_today_medications">Today\'s medications</string>
+    <string name="overview_today_medications_count">Today\'s medications · %1$d</string>
+    <plurals name="overview_more_medications">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
+    <string name="overview_planning_link">Planning</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
     <string name="overview_no_set_time">No set time</string>

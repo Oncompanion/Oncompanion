@@ -113,6 +113,11 @@ object C {
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
     const val overview_next_up = "overview_next_up"
+    const val overview_next_up_planning_link = "overview_next_up_planning_link"
+    const val overview_medications = "overview_medications"
+    const val overview_planning_link = "overview_planning_link"
+    const val overview_more_medications = "overview_more_medications"
+    const val overview_nothing_planned = "overview_nothing_planned"
     const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
@@ -244,6 +249,8 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    fun overviewMedication(key: String) = "overview_medication_$key"
 
     fun symptomJournalItem(symptomId: String) = "symptom_journal_item_$symptomId"
 
