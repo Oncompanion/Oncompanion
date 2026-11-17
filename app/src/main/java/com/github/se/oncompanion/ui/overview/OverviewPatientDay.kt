@@ -16,20 +16,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.Spacing
+import com.github.se.oncompanion.ui.theme.cardDetail
+import com.github.se.oncompanion.ui.theme.cardEyebrow
+import com.github.se.oncompanion.ui.theme.cardTitle
 import com.github.se.oncompanion.ui.theme.elevation1
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -173,15 +172,3 @@ private fun nextUpWhen(nextUp: NextUp, today: LocalDate): String {
 /** The Figma's teal disc behind each card's icon, and the icon in it. */
 private val BADGE_SIZE = 36.dp
 private val BADGE_ICON_SIZE = 18.dp
-
-/** The Figma's card eyebrow ("Next up"): SemiBold 14/18. */
-private val Typography.cardEyebrow: TextStyle
-  get() = labelLarge.copy(fontSize = 14.sp, lineHeight = 18.sp, letterSpacing = 0.015.em)
-
-/** The Figma's card title ("Gentle yoga for patients"): SemiBold 18/24. */
-private val Typography.cardTitle: TextStyle
-  get() = titleMedium.copy(fontSize = 18.sp)
-
-/** The Figma's card detail ("10:00 · Wellness center"): Regular 15/20. */
-private val Typography.cardDetail: TextStyle
-  get() = bodyMedium.copy(lineHeight = 20.sp)

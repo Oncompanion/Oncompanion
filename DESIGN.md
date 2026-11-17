@@ -125,6 +125,22 @@ typography:
     fontSize: "17px"
     fontWeight: 600
     lineHeight: "20px"
+  card-eyebrow:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "14px"
+    fontWeight: 600
+    lineHeight: "18px"
+    letterSpacing: "0.015em"
+  card-title:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: "24px"
+  card-detail:
+    fontFamily: "Figtree, Roboto, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: "20px"
 rounded:
   small: "8px"
   medium: "12px"
@@ -284,6 +300,7 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 - **Title Small** (600, 15/20): group headers in lists ("This month", "Scheduled", the week range).
 - **Body Large** (400, 17/26): field values and the date under the greeting. **Body Medium** (15/22): details. **Body Small** (13/18): helper text.
 - **Button label** (600, 17/20): every button, one step above Label Large as in the Figma buttons. **Label Large** (600, 15/20): chips, and the actions of snackbars and banners. **Label Medium** (13/16): navigation labels and tags ("Wellbeing"). **Label Small** (500, 12/16): weekday and month labels in calendars.
+- **Overview day cards**: **Card eyebrow** (600, 14/18) names the card ("Next up"), **Card title** (600, 18/24) the event, **Card detail** (400, 15/20) when and where.
 
 **The 200% Rule.** All text is sp and must reflow at 200% font scale: no fixed-height text containers, no truncated labels.
 
