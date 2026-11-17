@@ -385,6 +385,6 @@ Android notifications with the ribbon icon: what and when ("Oncology check-up at
 ### Don't:
 - **Don't** use gradients, anywhere.
 - **Don't** use red, or any colour, to judge a health value: ratings are the patient's own words.
-- **Don't** add a label above a heading (no eyebrows or kickers).
+- **Don't** add a label above a heading (no eyebrows or kickers), except the eyebrow that names a card on the Overview's day ("Next up", "Today's medications").
 - **Don't** use plant, medical-cross or heart-rate imagery as decoration.
 - **Don't** save anything the app drafted without the patient's confirmation.
