@@ -731,4 +731,12 @@
 
     <!-- Shared "Added by": a prescription a caregiver added, not confirmed by the patient yet (US-43) -->
     <string name="added_by_not_confirmed">Added by %1$s · Not confirmed</string>
+
+    <!-- Editing and deleting for the patient (US-46) -->
+    <!-- Shared: under an entry a caregiver edited, e.g. "Edited by Sam" -->
+    <string name="edited_by">Edited by %1$s</string>
+    <!-- A caregiver edits the patient's appointment, e.g. "Edit Anne's appointment" -->
+    <string name="appointment_edit_for">Edit %1$s\'s appointment</string>
+    <string name="appointment_delete_title_for">Delete %1$s\'s appointment?</string>
+    <string name="appointment_delete_message_for">It will be removed from %1$s\'s planning. You can\'t undo this.</string>
 </resources>

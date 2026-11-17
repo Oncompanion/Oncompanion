@@ -37,8 +37,8 @@ import java.time.format.FormatStyle
 /**
  * Collects the appointment draft and forwards confirmed input to its ViewModel.
  *
- * @param caregiverOf the first name of the patient a caregiver adds the appointment for (US-41),
- *   `null` for the user's own
+ * @param caregiverOf the first name of the patient a caregiver adds (US-41) or edits (US-46) the
+ *   appointment for, `null` for the user's own
  */
 @Composable
 fun AppointmentFormScreen(
@@ -84,8 +84,8 @@ fun AppointmentFormScreen(
 /**
  * Stateless add/edit form with optional manual location until hospital search is released.
  *
- * @param caregiverOf the patient's first name when a caregiver adds for them: the title says whose
- *   planning it is
+ * @param caregiverOf the patient's first name when a caregiver adds or edits for them: the title
+ *   says whose planning it is
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,6 +133,9 @@ fun AppointmentFormContent(
         title = {
           Text(
               when {
+                // A caregiver edits the patient's appointment (US-46)
+                state.isEditing && caregiverOf != null ->
+                    stringResource(R.string.appointment_edit_for, caregiverOf)
                 state.isEditing -> stringResource(R.string.appointment_edit)
                 caregiverOf != null -> stringResource(R.string.appointment_add_for, caregiverOf)
                 else -> stringResource(R.string.appointment_add)

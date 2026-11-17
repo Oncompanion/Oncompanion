@@ -4,6 +4,8 @@
 package com.github.se.oncompanion.model.medication
 
 import android.util.Log
+import com.github.se.oncompanion.model.common.toCalendarDay
+import com.github.se.oncompanion.model.common.toCalendarDayTimestamp
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.session.RejectedWritesProvider
 import com.github.se.oncompanion.model.session.SessionAccess
@@ -15,8 +17,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -193,12 +193,6 @@ class MedicationRepositoryFirestore(
     }
   }
 
-  // A calendar day is stored as the Timestamp of its midnight in Switzerland. Both directions use
-  // ZONE and never the phone's time zone, so the day read back is always the day that was saved.
-  private fun LocalDate.toTimestamp() = Timestamp(atStartOfDay(ZONE).toInstant())
-
-  private fun Timestamp.toLocalDate(): LocalDate = toInstant().atZone(ZONE).toLocalDate()
-
   /**
    * The fields of the prescription document, except `createdAt` and who added it, which never
    * change once it is created.
@@ -206,7 +200,7 @@ class MedicationRepositoryFirestore(
   private fun prescriptionFields(prescription: Prescription): Map<String, Any?> =
       mapOf(
           FIELD_PRESCRIBED_BY to prescription.prescribedBy,
-          FIELD_PRESCRIBED_ON to prescription.prescribedOn.toTimestamp(),
+          FIELD_PRESCRIBED_ON to prescription.prescribedOn.toCalendarDayTimestamp(),
           FIELD_MEDICATIONS to prescription.medications.map(::medicationFields),
           FIELD_CONFIRMATION to prescription.confirmation.name,
       )
@@ -227,7 +221,7 @@ class MedicationRepositoryFirestore(
           FIELD_NAME to medication.name,
           FIELD_DOSAGE to medication.dosage,
           FIELD_FREQUENCY to medication.frequency,
-          FIELD_START_DATE to medication.startDate.toTimestamp(),
+          FIELD_START_DATE to medication.startDate.toCalendarDayTimestamp(),
           FIELD_DURATION_DAYS to medication.durationDays,
       )
 
@@ -243,7 +237,7 @@ class MedicationRepositoryFirestore(
       Prescription(
               id = doc.id,
               prescribedBy = doc.getString(FIELD_PRESCRIBED_BY),
-              prescribedOn = requireNotNull(doc.getTimestamp(FIELD_PRESCRIBED_ON)).toLocalDate(),
+              prescribedOn = requireNotNull(doc.getTimestamp(FIELD_PRESCRIBED_ON)).toCalendarDay(),
               medications =
                   (doc.get(FIELD_MEDICATIONS) as List<*>)
                       .mapNotNull { toMedication(doc.id, it) }
@@ -277,7 +271,7 @@ class MedicationRepositoryFirestore(
                 name = fields[FIELD_NAME] as String,
                 dosage = fields[FIELD_DOSAGE] as String?,
                 frequency = fields[FIELD_FREQUENCY] as String?,
-                startDate = (fields[FIELD_START_DATE] as Timestamp).toLocalDate(),
+                startDate = (fields[FIELD_START_DATE] as Timestamp).toCalendarDay(),
                 // Only a whole number that fits in an Int: converting a decimal or a bigger number
                 // would turn it into a duration that looks valid
                 durationDays = (fields[FIELD_DURATION_DAYS] as Long?)?.let(Math::toIntExact),
@@ -310,11 +304,6 @@ class MedicationRepositoryFirestore(
     const val FIELD_FREQUENCY = "frequency"
     const val FIELD_START_DATE = "startDate"
     const val FIELD_DURATION_DAYS = "durationDays"
-
-    /**
-     * The time zone used to store calendar days, see [FIELD_PRESCRIBED_ON] and [FIELD_START_DATE].
-     */
-    val ZONE: ZoneId = ZoneId.of("Europe/Zurich")
 
     private const val TAG = "MedicationRepository"
   }

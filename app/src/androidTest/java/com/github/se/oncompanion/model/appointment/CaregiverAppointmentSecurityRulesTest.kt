@@ -21,8 +21,9 @@ import org.junit.runner.RunWith
 
 /**
  * Tests that firestore.rules let a caregiver add an appointment to a patient's planning only when
- * the patient shares Planning and lets them add (US-41), signed with their own uid, and never edit
- * or delete one. alice is the patient, carol her caregiver, dave a stranger.
+ * the patient shares Planning and lets them add (US-41), signed with their own uid, and edit or
+ * delete one only when the patient also lets them edit and delete there (US-46), signing their
+ * edit. alice is the patient, carol her caregiver, dave a stranger.
  */
 @RunWith(AndroidJUnit4::class)
 class CaregiverAppointmentSecurityRulesTest {
@@ -46,8 +47,15 @@ class CaregiverAppointmentSecurityRulesTest {
 
   @After fun tearDown(): Unit = runBlocking { EmulatorTestData.signOut() }
 
-  /** Alice changes what carol sees and may add to (from another device, bypassing the rules). */
-  private suspend fun shareWithCarol(see: List<String>, add: List<String>) {
+  /**
+   * Alice changes what carol sees, may add to, and may edit and delete in (from another device,
+   * bypassing the rules).
+   */
+  private suspend fun shareWithCarol(
+      see: List<String>,
+      add: List<String>,
+      edit: List<String> = emptyList(),
+  ) {
     fun list(names: List<String>) =
         names.joinToString(", ", "[", "]") { """{"stringValue": "$it"}""" }
     EmulatorTestData.replaceRawDocument(
@@ -57,6 +65,7 @@ class CaregiverAppointmentSecurityRulesTest {
             "relationship": {"stringValue": "SISTER"},
             "permissions": {"arrayValue": {"values": ${list(see)}}},
             "canAdd": {"arrayValue": {"values": ${list(add)}}},
+            "canEditAndDelete": {"arrayValue": {"values": ${list(edit)}}},
             "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
     )
   }
@@ -168,5 +177,133 @@ class CaregiverAppointmentSecurityRulesTest {
     denied(added.update("addedByName", "Bob"))
     denied(added.update("addedBy", FieldValue.delete()))
     allowed(added.delete())
+  }
+
+  /** An appointment alice added herself, before carol signs in again. */
+  private suspend fun alicesAppointment() =
+      planning(aliceUid).document().also {
+        EmulatorTestData.signIn("appointment-alice")
+        allowed(it.set(appointment()))
+        EmulatorTestData.signIn("appointment-carol")
+      }
+
+  /**
+   * Carol's edit of an appointment, signed with her uid, with [extra] fields (null removes one).
+   */
+  private fun carolsEdit(vararg extra: Pair<String, Any?>): Map<String, Any?> =
+      mapOf("notes" to "Bring the blood test", "editedBy" to carolUid, "editedByName" to "Carol") +
+          extra.map { (key, value) -> key to (value ?: FieldValue.delete()) }
+
+  @Test
+  fun caregiverAllowedToEditAndDelete_changesAnyAppointment_signedWithTheirUid(): Unit =
+      runBlocking {
+        shareWithCarol(
+            see = listOf("PLANNING"),
+            add = listOf("PLANNING"),
+            edit = listOf("PLANNING"),
+        )
+        val alices = alicesAppointment()
+        val carols = planning(aliceUid).document().also { allowed(it.set(carolsAppointment())) }
+
+        allowed(alices.update(carolsEdit()))
+        allowed(alices.delete())
+        // Who added it never changes, even for the caregiver who did
+        allowed(carols.update(carolsEdit()))
+        denied(carols.update(carolsEdit("addedByName" to "Bob")))
+        allowed(carols.delete())
+      }
+
+  @Test
+  fun caregiverWithoutTheSwitch_orWithoutAdding_orSharing_cantEditOrDelete(): Unit = runBlocking {
+    val alices = alicesAppointment()
+    val cases =
+        listOf(
+            // The switch is off
+            Triple(listOf("PLANNING"), listOf("PLANNING"), emptyList()),
+            // Allowed in another section only
+            Triple(
+                listOf("PLANNING", "SYMPTOMS"),
+                listOf("PLANNING", "SYMPTOMS"),
+                listOf("SYMPTOMS"),
+            ),
+            // The switch needs adding, and adding needs sharing
+            Triple(listOf("PLANNING"), emptyList(), listOf("PLANNING")),
+            Triple(emptyList(), listOf("PLANNING"), listOf("PLANNING")),
+        )
+    for ((see, add, edit) in cases) {
+      shareWithCarol(see, add, edit)
+      denied(alices.update(carolsEdit()))
+      denied(alices.delete())
+    }
+  }
+
+  @Test
+  fun caregiver_cantEditInSomeoneElsesName_orBreakTheValidation(): Unit = runBlocking {
+    shareWithCarol(see = listOf("PLANNING"), add = listOf("PLANNING"), edit = listOf("PLANNING"))
+    val alices = alicesAppointment()
+    val invalid =
+        listOf(
+            carolsEdit("editedBy" to aliceUid),
+            carolsEdit("editedBy" to null),
+            carolsEdit("editedByName" to null),
+            carolsEdit("editedByName" to "  "),
+            carolsEdit("editedByName" to "a".repeat(51)),
+            carolsEdit("addedBy" to carolUid, "addedByName" to "Carol"),
+            carolsEdit("title" to "  "),
+            carolsEdit("createdAt" to Timestamp.now()),
+        )
+    for (fields in invalid) denied(alices.update(fields))
+  }
+
+  @Test
+  fun removedCaregiver_orStranger_cantEditOrDelete(): Unit = runBlocking {
+    shareWithCarol(see = listOf("PLANNING"), add = listOf("PLANNING"), edit = listOf("PLANNING"))
+    val alices = alicesAppointment()
+    EmulatorTestData.deleteRawDocument(
+        "users/$aliceUid/${CareCircleRepositoryFirestore.COLLECTION}/$carolUid"
+    )
+    denied(alices.update(carolsEdit()))
+    denied(alices.delete())
+
+    EmulatorTestData.signIn("appointment-dave")
+    denied(
+        alices.update(mapOf("notes" to "Changed", "editedBy" to daveUid, "editedByName" to "Dave"))
+    )
+    denied(alices.delete())
+  }
+
+  @Test
+  fun newAppointment_cantSayItWasEdited(): Unit = runBlocking {
+    shareWithCarol(see = listOf("PLANNING"), add = listOf("PLANNING"), edit = listOf("PLANNING"))
+    denied(
+        planning(aliceUid)
+            .document()
+            .set(carolsAppointment("editedBy" to carolUid, "editedByName" to "Carol"))
+    )
+    EmulatorTestData.signIn("appointment-alice")
+    denied(planning(aliceUid).document().set(appointment("editedByName" to "Alice")))
+  }
+
+  @Test
+  fun patientEdit_removesTheCaregiversName_orKeepsIt_butCantChangeIt(): Unit = runBlocking {
+    shareWithCarol(see = listOf("PLANNING"), add = listOf("PLANNING"), edit = listOf("PLANNING"))
+    val alices = alicesAppointment()
+    allowed(alices.update(carolsEdit()))
+    EmulatorTestData.signIn("appointment-alice")
+
+    denied(alices.update(mapOf("editedBy" to aliceUid, "editedByName" to "Alice")))
+    denied(alices.update(mapOf("editedByName" to "Bob")))
+    denied(alices.update(mapOf("editedByName" to FieldValue.delete())))
+    // An older version of the app leaves the editor as it was
+    allowed(alices.update(mapOf("notes" to "Mine")))
+    allowed(
+        alices.update(
+            mapOf(
+                "notes" to "Mine",
+                "editedBy" to FieldValue.delete(),
+                "editedByName" to FieldValue.delete(),
+            )
+        )
+    )
   }
 }

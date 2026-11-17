@@ -2,15 +2,19 @@
 
 package com.github.se.oncompanion.ui.onboarding
 
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -21,16 +25,25 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.cancer.CancerTypes
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.assertSameColor
+import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestLight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class CancerTypeFieldTest {
@@ -272,5 +285,41 @@ class CancerTypeFieldTest {
     }
     composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(C.Tag.cancer_type_suggestions).assertDoesNotExist()
+  }
+
+  @Test
+  fun field_isAsWideAsTheSpaceItIsGiven() {
+    composeTestRule.setContent {
+      CancerTypeField(value = "", onValueChange = {}, modifier = Modifier.width(300.dp))
+    }
+
+    // As wide as the other onboarding fields (Figma), not the text field's own minimum
+    composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).assertWidthIsEqualTo(300.dp)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun suggestions_areAWhiteCard_inBothThemes() {
+    var dark by mutableStateOf(false)
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        CancerTypeField(value = current, onValueChange = { current = it })
+      }
+    }
+
+    listOf(false to SurfaceContainerLowestLight, true to SurfaceContainerLowestDark).forEach {
+        (isDark, white) ->
+      dark = isDark
+      current = ""
+      composeTestRule.onNodeWithTag(C.Tag.cancer_type_field).performTextInput("Br")
+      val menu = composeTestRule.onNodeWithTag(C.Tag.cancer_type_suggestions)
+      val size = menu.getUnclippedBoundsInRoot()
+      // The card's right edge, beside the items' text (Figma "Cancer type suggestions")
+      assertSameColor(
+          "menu, dark=$isDark",
+          white,
+          menu.colorAt(size.width - 4.dp, size.height / 2),
+      )
+    }
   }
 }

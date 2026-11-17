@@ -3,6 +3,7 @@
 
 package com.github.se.oncompanion.ui.appointment
 
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.carecircle.followedPatientAccess
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.model.carecircle.CareCircleMember
@@ -394,6 +395,119 @@ class AppointmentDetailViewModelTest {
         assertEquals(
             "Carol",
             (vm.uiState.value as AppointmentDetailUiState.Loaded).addedByName,
+        )
+      }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** "caregiver" follows "patient", who lets them add to, edit and delete in Planning. */
+  private fun allowedCaregiver() =
+      FollowedPatient(
+          CarePermission.PLANNING,
+          canAdd = setOf(CarePermission.PLANNING),
+          canEditAndDelete = setOf(CarePermission.PLANNING),
+      )
+
+  private fun viewModelOf(followed: FollowedPatient) =
+      AppointmentDetailViewModel(
+          "visit",
+          repository,
+          followed.auth,
+          patientUid = "patient",
+          resolveSection = followed.sectionAccess,
+      )
+
+  @Test
+  fun allowedCaregiver_deletesThePatientsAppointment_afterConfirming() =
+      runTest(dispatcher) {
+        repository.seed("patient", appointment)
+        val vm = viewModelOf(allowedCaregiver())
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canDelete)
+
+        vm.requestDelete()
+        assertTrue(repository.deleteRequests.isEmpty())
+        vm.confirmDelete()
+        advanceUntilIdle()
+
+        assertEquals(listOf("patient" to "visit"), repository.deleteRequests)
+        assertTrue(repository.appointments("patient").isEmpty())
+        assertTrue(vm.canLeaveAfterDeletion())
+      }
+
+  @Test
+  fun caregiverDeletionFails_keepsTheDialog_untilThePatientTurnsTheSwitchOff() =
+      runTest(dispatcher) {
+        repository.seed("patient", appointment)
+        val followed = allowedCaregiver()
+        val vm = viewModelOf(followed)
+        advanceUntilIdle()
+        repository.writeError = IllegalStateException("enqueue failed")
+
+        vm.requestDelete()
+        vm.confirmDelete()
+        advanceUntilIdle()
+        assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
+        assertTrue(vm.uiState.value.isDeleteDialogShown)
+        assertFalse(vm.canLeaveAfterDeletion())
+
+        // The switch off: no more Delete, and the dialog closes
+        followed.shares(CarePermission.PLANNING, canAdd = setOf(CarePermission.PLANNING))
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.canDelete)
+        assertFalse(vm.uiState.value.isDeleteDialogShown)
+        vm.confirmDelete()
+        assertEquals(1, repository.deleteRequests.size)
+      }
+
+  @Test
+  fun caregiverWithoutTheSwitch_orSignedOut_cantDelete() =
+      runTest(dispatcher) {
+        repository.seed("patient", appointment)
+        val followed =
+            FollowedPatient(CarePermission.PLANNING, canAdd = setOf(CarePermission.PLANNING))
+        val vm = viewModelOf(followed)
+        advanceUntilIdle()
+        vm.requestDelete()
+        assertFalse(vm.uiState.value.isDeleteDialogShown)
+
+        // Allowed, but signed out before confirming: nothing is deleted
+        followed.shares(
+            CarePermission.PLANNING,
+            canAdd = setOf(CarePermission.PLANNING),
+            canEditAndDelete = setOf(CarePermission.PLANNING),
+        )
+        advanceUntilIdle()
+        vm.requestDelete()
+        followed.auth.signOut()
+        vm.confirmDelete()
+        advanceUntilIdle()
+        assertTrue(repository.deleteRequests.isEmpty())
+      }
+
+  @Test
+  fun editedByACaregiver_thePatientSeesTheNameTheyGaveThem_theCaregiverTheStoredOne() =
+      runTest(dispatcher) {
+        val edited = appointment.copy(editedBy = "carol", editedByName = "Carol")
+        auth.signInWithGoogle("patient")
+        repository.seed("uid-patient", edited)
+        repository.seed("patient", edited)
+        val circle =
+            FakeCareCircleRepository().apply {
+              setMembers("uid-patient", listOf(CareCircleMember(uid = "carol", firstName = "Sis")))
+            }
+
+        val own =
+            AppointmentDetailViewModel("visit", repository, auth, careCircleRepository = circle)
+        val followed = viewModelOf(allowedCaregiver())
+        advanceUntilIdle()
+
+        val patientSees = own.uiState.value as AppointmentDetailUiState.Loaded
+        assertEquals("Sis", patientSees.editedByName)
+        assertEquals(null, patientSees.addedByName)
+        assertEquals(
+            "Carol",
+            (followed.uiState.value as AppointmentDetailUiState.Loaded).editedByName,
         )
       }
 }

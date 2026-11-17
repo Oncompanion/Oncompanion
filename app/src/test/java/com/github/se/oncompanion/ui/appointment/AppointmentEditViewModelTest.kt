@@ -5,6 +5,9 @@ package com.github.se.oncompanion.ui.appointment
 
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.user.FakeUserProfileRepository
+import com.github.se.oncompanion.model.user.Role
+import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import java.io.IOException
@@ -303,5 +306,82 @@ class AppointmentEditViewModelTest {
         assertNotEquals(SavePhase.SAVING, vm.uiState.value.save)
         assertFalse(vm.onCompletionHandled())
         assertTrue(repository.appointments("uid-patient").isEmpty())
+      }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** The signed-in user, "uid-patient" here, edits Anne's appointment as her caregiver Sam. */
+  private fun caregiverForm(appointments: AppointmentRepository = repository) =
+      AppointmentFormViewModel(
+          LocalDate.of(2026, 10, 20),
+          zone,
+          appointments,
+          auth,
+          appointment.id,
+          patientUid = "anne",
+          profileRepository =
+              FakeUserProfileRepository().apply {
+                seed(UserProfile("uid-patient", Role.CAREGIVER, firstName = "Sam"))
+              },
+      )
+
+  @Test
+  fun caregiver_editsThePatientsAppointment_signedAsEditor_keepingWhoAddedIt() =
+      runTest(dispatcher) {
+        repository.seed("anne", appointment.copy(addedBy = "bob", addedByName = "Bob"))
+        val vm = caregiverForm()
+        advanceUntilIdle()
+        assertEquals("Consultation", vm.uiState.value.title)
+
+        vm.onNotesChange("Fasting")
+        vm.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, vm.uiState.value.save)
+        val saved = repository.appointments("anne").single()
+        assertEquals("Fasting", saved.notes)
+        assertEquals("uid-patient", saved.editedBy)
+        assertEquals("Sam", saved.editedByName)
+        assertEquals("bob", saved.addedBy)
+        assertEquals("Bob", saved.addedByName)
+        assertEquals(appointment, repository.appointments("uid-patient").single())
+      }
+
+  @Test
+  fun patientEdit_removesTheCaregiversName() =
+      runTest(dispatcher) {
+        repository.seed("uid-patient", appointment.copy(editedBy = "carol", editedByName = "Carol"))
+        val vm = form()
+        advanceUntilIdle()
+
+        vm.onNotesChange("Mine")
+        vm.save()
+        advanceUntilIdle()
+
+        val saved = repository.appointments("uid-patient").single()
+        assertEquals("Mine", saved.notes)
+        assertNull(saved.editedBy)
+        assertNull(saved.editedByName)
+      }
+
+  /** Access taken away before an offline edit synchronizes: the server undoes it, and says so. */
+  @Test
+  fun caregiverEditRejectedByTheServer_isUndoneAndReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val appointments = FakeAppointmentRepository(rejectedWrites = rejectedWrites)
+        appointments.seed("anne", appointment)
+        appointments.serverRejectsWrites = true
+        val vm = caregiverForm(appointments)
+        advanceUntilIdle()
+        vm.onNotesChange("Fasting")
+
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, vm.uiState.value.save)
+        appointments.rejectPendingWrites()
+
+        assertEquals(listOf(appointment), appointments.appointments("anne"))
+        assertEquals(1, rejectedWrites.unseen.value)
       }
 }

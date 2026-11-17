@@ -1,4 +1,5 @@
 // Co-authored-by: Codex <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
@@ -193,5 +194,15 @@ class AppointmentEditScreenTest {
     }
     compose.onNodeWithTag(C.Tag.appointment_back).performScrollTo().performClick()
     assertEquals(1, backs)
+  }
+
+  /** A caregiver editing the patient's appointment (US-46) sees whose it is in the title. */
+  @Test
+  fun caregiverEdit_titleSaysWhoseAppointmentItIs() {
+    compose.setContent {
+      AppointmentFormContent(draft(), {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, caregiverOf = "Anne")
+    }
+    compose.onNodeWithText("Edit Anne's appointment").assertIsDisplayed()
+    compose.onNodeWithText("Save changes").performScrollTo().assertIsDisplayed()
   }
 }

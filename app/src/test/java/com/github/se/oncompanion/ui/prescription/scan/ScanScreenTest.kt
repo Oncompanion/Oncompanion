@@ -433,6 +433,34 @@ class ScanScreenTest {
   }
 
   @Test
+  fun photoBeingChecked_turnsTheCameraOff_andRetakeWaitsForItToReopen() {
+    grantCamera()
+    showScreen()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+
+    // Off while the photo is checked
+    assertEquals(1, camera.stops)
+
+    camera.opening = CompletableDeferred()
+    compose.onNodeWithTag(C.Tag.prescription_scan_retake_button).performClick()
+    compose.waitForIdle()
+
+    // Turned on again, but no photo until it has reopened
+    assertEquals(2, camera.starts)
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsNotEnabled()
+    camera.opening?.complete(Unit)
+    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).assertIsEnabled()
+
+    // The reopened camera takes the new photo, and is off again while it's checked
+    compose.onNodeWithTag(C.Tag.prescription_scan_capture_button).performClick()
+    compose.waitForIdle()
+    assertEquals(2, camera.photos.size)
+    assertEquals(2, camera.stops)
+  }
+
+  @Test
   fun usePhoto_readsThePrescription_andOpensTheFormWithItOnce() {
     grantCamera()
     showScreen()

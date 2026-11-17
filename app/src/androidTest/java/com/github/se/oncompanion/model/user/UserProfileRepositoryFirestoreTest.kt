@@ -13,6 +13,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -174,6 +175,7 @@ class UserProfileRepositoryFirestoreTest {
     assertEquals("familyName", UserProfileRepositoryFirestore.FIELD_FAMILY_NAME)
     assertEquals("cancerType", UserProfileRepositoryFirestore.FIELD_CANCER_TYPE)
     assertEquals("createdAt", UserProfileRepositoryFirestore.FIELD_CREATED_AT)
+    assertEquals("dateOfBirth", UserProfileRepositoryFirestore.FIELD_DATE_OF_BIRTH)
   }
 
   @Test
@@ -402,6 +404,69 @@ class UserProfileRepositoryFirestoreTest {
         "Alice",
         serverSnapshot(aliceUid).getString(UserProfileRepositoryFirestore.FIELD_FIRST_NAME),
     )
+  }
+
+  // ---- date of birth ----
+
+  /** The day is stored as its midnight in Switzerland and read back as the same day. */
+  @Test
+  fun dateOfBirthRoundTripsAsMidnightInZurichAndCanBeCleared(): Unit = runBlocking {
+    val born = LocalDate.of(1985, 6, 15)
+    repository.createProfile(alice().copy(dateOfBirth = born))
+    awaitServerAck()
+
+    assertEquals(born, repository.getProfile(aliceUid)!!.dateOfBirth)
+    // Midnight in Zurich on 15 June 1985 (summer time, UTC+2)
+    assertEquals(
+        Instant.parse("1985-06-14T22:00:00Z"),
+        serverSnapshot(aliceUid)
+            .getTimestamp(UserProfileRepositoryFirestore.FIELD_DATE_OF_BIRTH)!!
+            .toInstant(),
+    )
+    assertEquals("an accepted write is not reported", 0, rejectedWrites.unseen.value)
+
+    // Changed, then cleared
+    val changed = LocalDate.of(1981, 1, 1)
+    repository.updateProfile(alice().copy(dateOfBirth = changed))
+    awaitServerAck()
+    assertEquals(changed, repository.getProfile(aliceUid)!!.dateOfBirth)
+    repository.updateProfile(alice().copy(dateOfBirth = null))
+    awaitServerAck()
+    assertNull(repository.getProfile(aliceUid)!!.dateOfBirth)
+    assertNull(
+        serverSnapshot(aliceUid).getTimestamp(UserProfileRepositoryFirestore.FIELD_DATE_OF_BIRTH)
+    )
+    assertEquals(0, rejectedWrites.unseen.value)
+  }
+
+  /** A profile saved before the date of birth existed still loads, without one. */
+  @Test
+  fun profileWithoutDateOfBirthFieldStillLoads(): Unit = runBlocking {
+    EmulatorTestData.createRawDocument(
+        "users",
+        aliceUid,
+        """{"role": {"stringValue": "PATIENT"},
+           "firstName": {"stringValue": "Alice"},
+           "createdAt": {"timestampValue": "2024-01-01T00:00:00Z"}}""",
+    )
+
+    val stored = repository.getProfile(aliceUid)
+
+    assertNotNull(stored)
+    assertEquals("Alice", stored!!.firstName)
+    assertNull(stored.dateOfBirth)
+  }
+
+  @Test
+  fun createWithFutureDateOfBirthThrowsAndWritesNothing(): Unit = runBlocking {
+    val tomorrow = LocalDate.now().plusDays(1)
+    try {
+      repository.createProfile(alice().copy(dateOfBirth = tomorrow))
+      fail("Expected IllegalArgumentException")
+    } catch (e: IllegalArgumentException) {
+      // expected
+    }
+    assertFalse(serverSnapshot(aliceUid).exists())
   }
 
   // ---- server rejections: no exception, the change is rolled back ----

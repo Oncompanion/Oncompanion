@@ -4,6 +4,7 @@
 package com.github.se.oncompanion.model.user
 
 import java.time.Instant
+import java.time.LocalDate
 
 /** What the user chose during onboarding: a patient, or a caregiver who supports one. */
 enum class Role {
@@ -22,6 +23,7 @@ enum class Role {
  * @property cancerType optional free text (picked from suggestions or typed by the user)
  * @property hospital optional hospital name, including manually entered text
  * @property createdAt set by the server when the profile is created; `null` before that
+ * @property dateOfBirth optional calendar day, never in the future, see [isValid]
  */
 data class UserProfile(
     val uid: String,
@@ -31,15 +33,22 @@ data class UserProfile(
     val cancerType: String? = null,
     val createdAt: Instant? = null,
     val hospital: String? = null,
+    val dateOfBirth: LocalDate? = null,
 ) {
-  /** Whether the profile satisfies the same constraints as the Firestore security rules. */
-  fun isValid(): Boolean =
+  /**
+   * Whether the profile satisfies the same constraints as the Firestore security rules.
+   *
+   * @param today the current day where the phone is: a date of birth after it is refused. The rules
+   *   accept any day already started somewhere on Earth, so they never refuse what this accepts.
+   */
+  fun isValid(today: LocalDate = LocalDate.now()): Boolean =
       uid.isNotBlank() &&
           firstName.isNotBlank() &&
           firstName.length <= MAX_NAME_LENGTH &&
           (familyName == null || familyName.length <= MAX_NAME_LENGTH) &&
           (cancerType == null || cancerType.length <= MAX_CANCER_TYPE_LENGTH) &&
-          (hospital == null || hospital.length <= MAX_HOSPITAL_LENGTH)
+          (hospital == null || hospital.length <= MAX_HOSPITAL_LENGTH) &&
+          (dateOfBirth == null || !dateOfBirth.isAfter(today))
 
   companion object {
     /** Keep in sync with `firestore.rules`. */
