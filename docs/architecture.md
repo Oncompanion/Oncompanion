@@ -288,6 +288,18 @@ to the originating screen/day. Only creation sends the saved-day result to Plann
 shared `DetailWithActions` and `DetailActions`: supported actions stay visible in normal windows
 and scroll after the content in compact windows. Edit mode reuses the form's keyboard handling.
 
+### Appointment reminder choices
+
+Appointments store one shared `reminder` enum name: `NONE`, `FIFTEEN_MINUTES`, `ONE_HOUR`,
+`THREE_HOURS`, or `ONE_DAY`. Missing legacy fields read as `ONE_HOUR`; explicit malformed
+values exclude the document, following the existing appointment parser. Patient and authorized
+caregiver writes use the same schema and existing permissions. Ordinary form edits preserve the
+stored choice. This data layer does not schedule or deliver notifications; form controls and
+notification delivery are separate follow-ups to #489 and US-16.
+
+Deploy the updated Firestore rules before distributing a client that writes `reminder`: the
+previous field allowlist rejects it. No live rules deployment is part of this data-layer change.
+
 ## Appointment details (issue #205)
 
 `AppointmentDetailScreen` collects one `AppointmentDetailUiState`; its stateless Content follows

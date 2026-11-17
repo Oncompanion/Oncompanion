@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -31,6 +32,47 @@ import org.junit.runner.RunWith
 /** Verifies appointment storage and offline behavior through the emulator-connected client SDK. */
 @RunWith(AndroidJUnit4::class)
 class AppointmentRepositoryFirestoreTest {
+  /** Choices round-trip through storage; an offline update preserves the explicit opt-out. */
+  @Test
+  fun reminderChoicesPersistAndOfflineOptOutSynchronizes(): Unit = runBlocking {
+    for (reminder in AppointmentReminder.entries) {
+      val id = repository.addAppointment(uid, appointment().copy(reminder = reminder))
+      acknowledgeWrites()
+      assertEquals(reminder.name, serverDocument(id).getString("reminder"))
+      assertEquals(reminder, storedAppointment(id)?.reminder)
+    }
+    val id = repository.addAppointment(uid, appointment())
+    acknowledgeWrites()
+    val changed = requireNotNull(storedAppointment(id)).copy(reminder = AppointmentReminder.NONE)
+    db.disableNetwork().await()
+    try {
+      withTimeout(5_000) { repository.updateAppointment(uid, changed) }
+      assertEquals(AppointmentReminder.NONE, storedAppointment(id)?.reminder)
+    } finally {
+      db.enableNetwork().await()
+    }
+    acknowledgeWrites()
+    assertEquals("NONE", serverDocument(id).getString("reminder"))
+  }
+
+  /** Only absent legacy choices default; invalid stored data is excluded rather than guessed. */
+  @Test
+  fun legacyReminderDefaultsAndMalformedChoicesAreSkipped(): Unit = runBlocking {
+    rawAppointment("legacy-reminder", rawFields())
+    assertEquals(AppointmentReminder.ONE_HOUR, storedAppointment("legacy-reminder")?.reminder)
+    val invalidValues =
+        listOf(
+            JSONObject().put("stringValue", "TWO_HOURS"),
+            JSONObject().put("nullValue", JSONObject.NULL),
+            JSONObject().put("integerValue", "60"),
+        )
+    for ((index, invalid) in invalidValues.withIndex()) {
+      val id = "invalid-reminder-$index"
+      rawAppointment(id, rawFields().put("reminder", invalid))
+      assertNull(storedAppointment(id))
+    }
+  }
+
   private lateinit var repository: AppointmentRepositoryFirestore
   private lateinit var rejectedWrites: RejectedWrites
   private lateinit var uid: String
@@ -296,12 +338,13 @@ class AppointmentRepositoryFirestoreTest {
     acknowledgeWrites()
     val document = serverDocument(id)
     assertEquals(
-        setOf("title", "scheduledAt", "type", "location", "notes", "createdAt"),
+        setOf("title", "scheduledAt", "type", "location", "notes", "createdAt", "reminder"),
         document.data!!.keys,
     )
     assertEquals("Oncology consultation", document.getString("title"))
     assertEquals(appointment().scheduledAt, document.getTimestamp("scheduledAt")!!.toInstant())
     assertEquals("CONSULTATION", document.getString("type"))
+    assertEquals("ONE_HOUR", document.getString("reminder"))
     assertEquals("HUG", document.getString("location"))
     assertEquals("Bring documents", document.getString("notes"))
     assertNotNull(document.getTimestamp("createdAt"))

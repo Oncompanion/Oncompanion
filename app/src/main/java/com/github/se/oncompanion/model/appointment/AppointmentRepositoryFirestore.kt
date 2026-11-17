@@ -130,6 +130,7 @@ class AppointmentRepositoryFirestore(
           FIELD_TYPE to appointment.type.name,
           FIELD_LOCATION to appointment.location,
           FIELD_NOTES to appointment.notes,
+          FIELD_REMINDER to appointment.reminder.name,
       )
 
   /**
@@ -182,6 +183,13 @@ class AppointmentRepositoryFirestore(
               addedByName = document.getString(FIELD_ADDED_BY_NAME),
               editedBy = document.getString(FIELD_EDITED_BY),
               editedByName = document.getString(FIELD_EDITED_BY_NAME),
+              // Only absent legacy fields default; malformed choices must not enable reminders.
+              reminder =
+                  if (document.contains(FIELD_REMINDER))
+                      AppointmentReminder.valueOf(
+                          requireNotNull(document.getString(FIELD_REMINDER))
+                      )
+                  else AppointmentReminder.ONE_HOUR,
           )
           .also { require(it.isValid()) }
     } catch (_: RuntimeException) {
@@ -216,6 +224,8 @@ class AppointmentRepositoryFirestore(
     const val FIELD_EDITED_BY = "editedBy"
     /** That caregiver's first name, as shown in "Edited by". */
     const val FIELD_EDITED_BY_NAME = "editedByName"
+    /** Single reminder choice; missing on appointments saved before reminder configuration. */
+    const val FIELD_REMINDER = "reminder"
     private const val TAG = "AppointmentRepository"
   }
 }

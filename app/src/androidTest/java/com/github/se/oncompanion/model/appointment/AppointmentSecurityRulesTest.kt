@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -27,6 +28,22 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AppointmentSecurityRulesTest {
+  /** Both creates and updates enforce the same closed reminder choices, with legacy omission. */
+  @Test
+  fun reminderChoicesAreValidatedOnCreateAndUpdate(): Unit = runBlocking {
+    val document = appointments().document()
+    allowed(document.set(validFields()))
+    for (choice in listOf("NONE", "FIFTEEN_MINUTES", "ONE_HOUR", "THREE_HOURS", "ONE_DAY")) {
+      allowed(appointments().document().set(validFields() + ("reminder" to choice)))
+      allowed(document.update("reminder", choice))
+    }
+    for (invalid in listOf(null, "", "TWO_HOURS", 60, true, listOf("ONE_HOUR"))) {
+      deniedCreate(validFields() + ("reminder" to invalid))
+      denied(document.update(mapOf("reminder" to invalid)))
+    }
+    allowed(document.update("reminder", FieldValue.delete()))
+  }
+
   private lateinit var ownerUid: String
   private lateinit var otherUid: String
 
