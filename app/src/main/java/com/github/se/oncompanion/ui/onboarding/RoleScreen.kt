@@ -7,16 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,9 +32,10 @@ import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.auth.rememberGoogleCredentialProvider
 import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.theme.Spacing
 
 /**
- * First onboarding step (Figma "US-01 / Onboarding – Role"): patient or caregiver. The role decides
+ * First onboarding step (Figma "US-1 / Onboarding – Role"): patient or caregiver. The role decides
  * what the next steps ask (a caregiver has no cancer type) and can't change afterwards.
  *
  * @param onContinue called to go to the next step
@@ -65,7 +63,8 @@ fun RoleScreen(
 /**
  * Stateless content of the role step.
  *
- * @param email the signed-in account's, shown above "Use another account" when known
+ * @param email the signed-in account's, shown above "Use another account" when known; both sit just
+ *   above Continue, which stays at the bottom of the screen
  */
 @Composable
 fun RoleContent(
@@ -78,25 +77,22 @@ fun RoleContent(
     onUseAnotherAccount: () -> Unit = {},
 ) {
   Scaffold(modifier = modifier.testTag(C.Tag.onboarding_role_screen)) { innerPadding ->
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+    OnboardingStep(
+        title = stringResource(R.string.onboarding_role_title),
+        subtitle = stringResource(R.string.onboarding_role_subtitle),
+        innerPadding = innerPadding,
+        actions = {
+          SignedInAs(email, canSwitchAccount, onUseAnotherAccount)
+          Spacer(Modifier.height(Spacing.xs))
+          LakeButton(
+              text = stringResource(R.string.onboarding_continue),
+              onClick = onContinue,
+              enabled = selectedRole != null,
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_continue_button),
+          )
+        },
     ) {
-      Text(
-          text = stringResource(R.string.onboarding_role_title),
-          style = MaterialTheme.typography.headlineMedium,
-      )
-      Spacer(Modifier.height(8.dp))
-      Text(
-          text = stringResource(R.string.onboarding_role_subtitle),
-          style = MaterialTheme.typography.bodyLarge,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Spacer(Modifier.height(32.dp))
-      Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         RoleCard(
             title = stringResource(R.string.onboarding_role_patient),
             description = stringResource(R.string.onboarding_role_patient_description),
@@ -112,20 +108,14 @@ fun RoleContent(
             modifier = Modifier.testTag(C.Tag.onboarding_role_caregiver),
         )
       }
-      Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
-      LakeButton(
-          text = stringResource(R.string.onboarding_continue),
-          onClick = onContinue,
-          enabled = selectedRole != null,
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.onboarding_continue_button),
-      )
-      Spacer(Modifier.height(8.dp))
-      SignedInAs(email, canSwitchAccount, onUseAnotherAccount)
     }
   }
 }
 
-/** A selectable card for one role. */
+/**
+ * A selectable card for one role (Figma "I'm a patient"): a radio, then the role and what it means.
+ * Chosen, it takes the warm secondary container with a secondary outline; otherwise a plain card.
+ */
 @Composable
 private fun RoleCard(
     title: String,
@@ -136,11 +126,9 @@ private fun RoleCard(
 ) {
   val colors = MaterialTheme.colorScheme
   Surface(
-      shape = RoundedCornerShape(16.dp),
-      color = if (selected) colors.primaryContainer else colors.surface,
-      border =
-          if (selected) BorderStroke(2.dp, colors.primary)
-          else BorderStroke(1.dp, colors.outlineVariant),
+      shape = MaterialTheme.shapes.large,
+      color = if (selected) colors.secondaryContainer else colors.surfaceContainerLowest,
+      border = if (selected) BorderStroke(SELECTED_BORDER, colors.secondary) else null,
       modifier =
           modifier
               .fillMaxWidth()
@@ -151,25 +139,38 @@ private fun RoleCard(
               ),
   ) {
     Row(
-        modifier = Modifier.padding(20.dp),
+        modifier = Modifier.padding(Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
+      // Only drawn: the whole card is the radio button for TalkBack and taps
+      RadioButton(
+          selected = selected,
+          onClick = null,
+          colors =
+              RadioButtonDefaults.colors(
+                  selectedColor = colors.secondary,
+                  unselectedColor = colors.outline,
+              ),
+      )
       Column(
           modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.spacedBy(4.dp),
+          verticalArrangement = Arrangement.spacedBy(Spacing.xs),
       ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = if (selected) colors.onPrimaryContainer else colors.onSurface,
+            color = if (selected) colors.onSecondaryContainer else colors.onSurface,
         )
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
-            color = colors.onSurfaceVariant,
+            color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
         )
       }
     }
   }
 }
+
+// The Figma's outline of the chosen role
+private val SELECTED_BORDER = 1.5.dp
