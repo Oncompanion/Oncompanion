@@ -293,6 +293,7 @@ class CaregiverAppointmentSecurityRulesTest {
 
     denied(alices.update(mapOf("editedBy" to aliceUid, "editedByName" to "Alice")))
     denied(alices.update(mapOf("editedByName" to "Bob")))
+    denied(alices.update(mapOf("editedByName" to FieldValue.delete())))
     // An older version of the app leaves the editor as it was
     allowed(alices.update(mapOf("notes" to "Mine")))
     allowed(
