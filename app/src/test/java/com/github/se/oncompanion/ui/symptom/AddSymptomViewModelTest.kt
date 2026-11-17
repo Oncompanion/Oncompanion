@@ -980,4 +980,49 @@ class AddSymptomViewModelTest {
         assertEquals(listOf(logged), symptoms.symptoms("patient"))
         assertEquals(1, rejectedWrites.unseen.value)
       }
+
+  /**
+   * The patient and the caregiver edit the same symptom: the form saves the whole entry it showed,
+   * so the last save wins, as with the patient's own edits on two phones. Merging field by field
+   * would need the server, which an offline save can't wait for.
+   */
+  @Test
+  fun bothEditTheSameSymptom_theLastSaveWins() =
+      runTest(dispatcher) {
+        val viewModel = caregiverEditing()
+        advanceUntilIdle()
+
+        // The patient changes the intensity after the caregiver opened the form
+        repository.updateSymptom("patient", logged.copy(intensity = 8))
+        viewModel.onNotesChange("Slept badly")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.symptoms("patient").single()
+        assertEquals("Slept badly", saved.notes)
+        assertEquals(logged.intensity, saved.intensity)
+        assertEquals(uid, saved.editedBy)
+      }
+
+  /** The patient deletes the symptom while the caregiver edits it: the save can't bring it back. */
+  @Test
+  fun symptomDeletedWhileTheCaregiverEditsIt_staysDeleted_andTheRejectionIsReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val symptoms = FakeSymptomRepository(clock = { current }, rejectedWrites = rejectedWrites)
+        val viewModel = caregiverEditing(symptoms = symptoms)
+        advanceUntilIdle()
+        symptoms.deleteSymptom("patient", logged.id)
+
+        // Saved on the phone, then refused by the server, which no longer has the symptom
+        symptoms.serverRejectsWrites = true
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        symptoms.rejectPendingWrites()
+
+        assertTrue(symptoms.symptoms("patient").isEmpty())
+        assertEquals(1, rejectedWrites.unseen.value)
+      }
 }
