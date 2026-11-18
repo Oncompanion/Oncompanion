@@ -18,6 +18,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
@@ -320,7 +321,7 @@ class MedicationRepositoryFirestoreTest {
         FirebaseApp.initializeApp(
             FirebaseApp.getInstance().applicationContext,
             FirebaseApp.getInstance().options,
-            "patient-confirmation",
+            "patient-confirmation-${UUID.randomUUID()}",
         )
     val patientDb = FirebaseFirestore.getInstance(app)
     val patientAuth = FirebaseAuth.getInstance(app)
@@ -366,7 +367,8 @@ class MedicationRepositoryFirestoreTest {
     } finally {
       patientAuth.signOut()
       patientDb.terminate().await()
-      app.delete()
+      patientDb.clearPersistence().await()
+      // Auth retains named apps in its emulator registry; deleting one breaks later emulator tests.
     }
   }
 
