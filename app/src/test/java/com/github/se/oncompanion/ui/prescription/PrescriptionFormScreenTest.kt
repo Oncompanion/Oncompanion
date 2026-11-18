@@ -23,7 +23,9 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -607,6 +609,60 @@ class PrescriptionFormScreenTest {
   }
 
   @Test
+  fun everyLoadMessage_isTheSharedMessageState() {
+    // The app's shared message state, as on the list and the detail (#277): its tile shows in each
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_FOUND))
+    val cases =
+        listOf(
+            PrescriptionFormLoad.NOT_FOUND to C.Tag.prescription_form_not_found,
+            PrescriptionFormLoad.NOT_SIGNED_IN to C.Tag.prescription_form_not_signed_in,
+            PrescriptionFormLoad.FAILED to C.Tag.prescription_form_load_error,
+        )
+    for ((load, tag) in cases) {
+      composeTestRule.runOnIdle { uiState = uiState.copy(load = load) }
+      composeTestRule
+          .onNode(
+              hasTestTag(C.Tag.message_state_icon) and hasAnyAncestor(hasTestTag(tag)),
+              useUnmergedTree = true,
+          )
+          .assertExists()
+    }
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun loadFailure_retryIsFullyVisibleInLandscape() {
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+
+    node(C.Tag.prescription_form_retry_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun error_retryCanBeReached_onASmallPhoneSidewaysWithTheLargestFont() {
+    // Taller than the screen there: the message scrolls so Retry can still be tapped (#490)
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_form_retry_button)
+        .performScrollTo()
+        .assertIsFullyVisible()
+  }
+
+  @Test
+  fun error_spansTheWholeWidth_soItWrapsLikeOnTheOtherPrescriptionScreens() {
+    // The message state brings its own side padding: nothing is added around it (#490)
+    setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.FAILED))
+    val screen = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+    val message =
+        composeTestRule
+            .onNodeWithTag(C.Tag.prescription_form_load_error)
+            .fetchSemanticsNode()
+            .boundsInRoot
+    assertEquals(screen.left, message.left)
+    assertEquals(screen.right, message.right)
+  }
+
+  @Test
   fun notFoundSaysThePrescriptionNoLongerExists() {
     setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_FOUND))
 
@@ -625,9 +681,7 @@ class PrescriptionFormScreenTest {
     setContent(filled.copy(isEditing = true, load = PrescriptionFormLoad.NOT_SIGNED_IN))
 
     node(C.Tag.prescription_form_not_signed_in).assertExists()
-    composeTestRule
-        .onNodeWithText(string(R.string.prescription_form_not_signed_in_title))
-        .assertExists()
+    composeTestRule.onNodeWithText(string(R.string.prescriptions_signed_out_title)).assertExists()
     node(C.Tag.prescription_form_retry_button).assertDoesNotExist()
     assertNoForm()
   }

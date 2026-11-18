@@ -108,9 +108,7 @@ class PrescriptionDetailViewModelTest {
 
     val state = viewModel().uiState.value
 
-    assertTrue(state.isLoading)
-    assertFalse(state.hasError)
-    assertFalse(state.isNotFound)
+    assertEquals(PrescriptionsLoad.LOADING, state.load)
   }
 
   @Test
@@ -122,9 +120,7 @@ class PrescriptionDetailViewModelTest {
 
     val state = vm.uiState.value
     assertEquals(chemo, state.prescription)
-    assertFalse(state.isLoading)
-    assertFalse(state.hasError)
-    assertFalse(state.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, state.load)
   }
 
   @Test
@@ -134,7 +130,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertNull(vm.uiState.value.prescription)
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -151,7 +148,8 @@ class PrescriptionDetailViewModelTest {
 
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -161,7 +159,8 @@ class PrescriptionDetailViewModelTest {
 
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -187,7 +186,8 @@ class PrescriptionDetailViewModelTest {
     repository.deletePrescription("alice", "chemo")
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -196,15 +196,14 @@ class PrescriptionDetailViewModelTest {
     repository.readError = IllegalStateException("no cache")
     val vm = viewModel()
     advanceUntilIdle()
-    assertTrue(vm.uiState.value.hasError)
-    assertFalse(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
 
     repository.readError = null
     vm.load()
-    assertTrue(vm.uiState.value.isLoading)
+    assertEquals(PrescriptionsLoad.LOADING, vm.uiState.value.load)
     advanceUntilIdle()
 
-    assertFalse(vm.uiState.value.hasError)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
     assertEquals(chemo, vm.uiState.value.prescription)
   }
 
@@ -217,8 +216,7 @@ class PrescriptionDetailViewModelTest {
     repository.failRunningReads(IllegalStateException("access lost"))
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasError)
-    assertFalse(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
   }
 
   @Test
@@ -235,14 +233,14 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun signedOut_showsAnError() = runTest {
+  fun signedOut_isNotSignedIn_notAnErrorNorNotFound() = runTest {
     repository.seed("alice", chemo)
     val vm = viewModel(auth = FakeAuthRepository())
 
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasError)
-    assertFalse(vm.uiState.value.isLoading)
+    // Retrying can't sign the patient back in: no access, not an error to retry
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, vm.uiState.value.load)
   }
 
   @Test
@@ -258,28 +256,52 @@ class PrescriptionDetailViewModelTest {
     val vm = viewModel(auth = throwing)
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasError)
+    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
   }
 
   @Test
   fun defaultRepositories_canBeCreatedWithoutFirebase() {
     val viewModel = PrescriptionDetailViewModel("chemo")
     dispatcher.scheduler.advanceUntilIdle()
-    assertTrue(viewModel.uiState.value.hasError)
+    assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
+  }
+
+  @Test
+  fun whileReadingAgain_keepsWhatWasShown_butNeverAfterAccessWasLost() {
+    // Only a shown or loading prescription may stay while it is read again: losing the access
+    // never turns back into the prescription, even if one were still held (#490)
+    val cases =
+        listOf(
+            PrescriptionsLoad.SHOWN to chemo to PrescriptionsLoad.SHOWN,
+            PrescriptionsLoad.SHOWN to null to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.LOADING to chemo to PrescriptionsLoad.SHOWN,
+            PrescriptionsLoad.LOADING to null to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.FAILED to chemo to PrescriptionsLoad.FAILED,
+            // The first read failed: a new read is under way, as on main (a spinner, not the error)
+            PrescriptionsLoad.FAILED to null to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.NOT_SHARED to chemo to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.NO_ACCESS to chemo to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.NOT_SIGNED_IN to chemo to PrescriptionsLoad.LOADING,
+        )
+    for ((before, expected) in cases) {
+      val (load, prescription) = before
+      val state = PrescriptionDetailUiState(prescription = prescription, load = load)
+      assertEquals("$load with ${prescription?.id}", expected, state.loadWhileReading())
+    }
   }
 
   // ----- Delete (US-12) -----
 
   @Test
   fun canEditAndDelete_onlyAShownPrescription() {
-    val shown = PrescriptionDetailUiState(prescription = chemo, isLoading = false)
+    val shown = PrescriptionDetailUiState(prescription = chemo, load = PrescriptionsLoad.SHOWN)
 
     assertTrue(shown.canDelete)
     assertTrue(shown.canEdit)
     listOf(
             PrescriptionDetailUiState(),
             shown.copy(prescription = null),
-            shown.copy(hasError = true),
+            shown.copy(load = PrescriptionsLoad.FAILED),
             shown.copy(delete = DeletePhase.DELETING),
             shown.copy(delete = DeletePhase.DELETED),
         )
@@ -318,8 +340,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
-    // Not shown as "no longer exists" while the screen closes
-    assertFalse(vm.uiState.value.isNotFound)
+    // Still shown, not "no longer exists", while the screen closes
+    assertEquals(chemo, vm.uiState.value.prescription)
     assertEquals(emptyList<Prescription>(), repository.prescriptionsOf("alice"))
   }
 
@@ -418,7 +440,7 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun signedOutBeforeConfirming_showsTheErrorAndDeletesNothing() = runTest {
+  fun signedOutBeforeConfirming_saysSoAndDeletesNothing() = runTest {
     val auth = signedIn()
     val vm = confirmingDelete(auth = auth)
     auth.signOut()
@@ -426,8 +448,8 @@ class PrescriptionDetailViewModelTest {
     vm.confirmDelete()
     advanceUntilIdle()
 
-    // Signing out shows the error, closes the confirmation and deletes nothing
-    assertTrue(vm.uiState.value.hasError)
+    // Signing out says so, closes the confirmation and deletes nothing
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, vm.uiState.value.load)
     assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
@@ -470,7 +492,8 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     assertFalse(vm.uiState.value.isDeleteDialogShown)
-    assertTrue(vm.uiState.value.isNotFound)
+    assertEquals(PrescriptionsLoad.SHOWN, vm.uiState.value.load)
+    assertNull(vm.uiState.value.prescription)
   }
 
   @Test
@@ -480,7 +503,7 @@ class PrescriptionDetailViewModelTest {
     repository.failRunningReads(IllegalStateException("access lost"))
     advanceUntilIdle()
 
-    assertTrue(vm.uiState.value.hasError)
+    assertEquals(PrescriptionsLoad.FAILED, vm.uiState.value.load)
     assertFalse(vm.uiState.value.isDeleteDialogShown)
   }
 
@@ -514,9 +537,7 @@ class PrescriptionDetailViewModelTest {
     val viewModel = caregiverViewModel(CarePermission.SYMPTOMS)
     dispatcher.scheduler.advanceUntilIdle()
 
-    assertTrue(viewModel.uiState.value.isNotShared)
-    assertFalse(viewModel.uiState.value.isNotFound)
-    assertFalse(viewModel.uiState.value.hasError)
+    assertEquals(PrescriptionsLoad.NOT_SHARED, viewModel.uiState.value.load)
   }
 
   /** A caregiver's view of "patient"'s prescription, while [patient] changes the access. */
@@ -542,7 +563,36 @@ class PrescriptionDetailViewModelTest {
     dispatcher.scheduler.advanceUntilIdle()
 
     assertNull(viewModel.uiState.value.prescription)
-    assertTrue(viewModel.uiState.value.isLoading)
+    assertEquals(PrescriptionsLoad.LOADING, viewModel.uiState.value.load)
+  }
+
+  @Test
+  fun caregiver_removedFromTheCircle_hasNoAccess_notAnError() {
+    val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    patient.removesTheCaregiver()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
+    assertNull(viewModel.uiState.value.prescription)
+  }
+
+  @Test
+  fun caregiver_signingOut_isNotSignedIn_notRemovedFromTheCircle() {
+    val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    // Still in the circle: they signed out, nobody removed them (#490)
+    patient.auth.signOut()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, viewModel.uiState.value.load)
+    assertNull(viewModel.uiState.value.prescription)
   }
 
   @Test
@@ -551,14 +601,13 @@ class PrescriptionDetailViewModelTest {
     repository.seed("patient", chemo)
     val viewModel = followedViewModel(patient)
     dispatcher.scheduler.advanceUntilIdle()
-    assertTrue(viewModel.uiState.value.isNotShared)
+    assertEquals(PrescriptionsLoad.NOT_SHARED, viewModel.uiState.value.load)
 
     repository.readError = IllegalStateException("Permission denied")
     patient.shares(CarePermission.PRESCRIPTIONS)
     dispatcher.scheduler.advanceUntilIdle()
 
-    assertTrue(viewModel.uiState.value.hasError)
-    assertFalse(viewModel.uiState.value.isNotShared)
+    assertEquals(PrescriptionsLoad.FAILED, viewModel.uiState.value.load)
   }
 
   @Test

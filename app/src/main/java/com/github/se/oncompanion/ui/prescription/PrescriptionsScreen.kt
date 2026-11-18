@@ -42,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,11 +57,6 @@ import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-/** "29 Sep 2026", as in the prescription form. The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
  * The prescriptions list (US-11 "See my saved prescriptions", Figma: "US-11 / Prescription list"):
@@ -164,29 +160,42 @@ fun PrescriptionsContent(
     // Room is kept at the bottom only for buttons that are shown
     val buttonRoom = if (uiState.canAdd) BUTTON_ROOM else 0.dp
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
-      when {
-        uiState.isLoading ->
+      when (uiState.load) {
+        PrescriptionsLoad.LOADING ->
             CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
-        uiState.hasError -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        PrescriptionsLoad.FAILED -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        PrescriptionsLoad.NOT_SIGNED_IN ->
+            MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) { SignedOutMessage() }
+        PrescriptionsLoad.NO_ACCESS ->
+            MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
+              NoAccessMessage(caregiverOf)
+            }
         // The patient a caregiver follows doesn't share their prescriptions
-        uiState.isNotShared && caregiverOf != null ->
-            NotSharedMessage(
-                caregiverOf,
-                CarePermission.PRESCRIPTIONS,
-                Modifier.align(Alignment.Center),
-            )
-        uiState.prescriptions.isEmpty() -> EmptyState(caregiverOf, buttonRoom)
-        else ->
-            PrescriptionList(
-                uiState,
-                caregiverOf = caregiverOf,
-                buttonRoom = buttonRoom,
-                onOpen = onOpen,
-                onReview = onReview,
-                onDismiss = onDismiss,
-            )
+        PrescriptionsLoad.NOT_SHARED ->
+            // Without the name, the caregiver was just removed and leaves for Whose care?
+            if (caregiverOf == null)
+                MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
+                  NoAccessMessage(caregiverOf = null)
+                }
+            else
+                NotSharedMessage(
+                    caregiverOf,
+                    CarePermission.PRESCRIPTIONS,
+                    Modifier.align(Alignment.Center),
+                )
+        PrescriptionsLoad.SHOWN ->
+            if (uiState.prescriptions.isEmpty()) EmptyState(caregiverOf, buttonRoom)
+            else
+                PrescriptionList(
+                    uiState,
+                    caregiverOf = caregiverOf,
+                    buttonRoom = buttonRoom,
+                    onOpen = onOpen,
+                    onReview = onReview,
+                    onDismiss = onDismiss,
+                )
       }
     }
   }
@@ -328,7 +337,7 @@ private fun PrescriptionItem(
     state: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-  val date = prescription.prescribedOn.format(dateFormatter)
+  val date = prescription.prescribedOn.format(prescriptionDateFormatter)
   val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
   ListItem(
       headlineContent = {
@@ -417,26 +426,39 @@ private fun AddedByYouItem(
  */
 @Composable
 private fun EmptyState(caregiverOf: String?, buttonRoom: Dp) {
-  CenteredMessage(testTag = C.Tag.prescriptions_empty, bottom = buttonRoom) {
-    Icon(
-        painter = painterResource(R.drawable.ic_prescriptions),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(48.dp),
-    )
-    MessageTexts(
-        title = stringResource(R.string.prescriptions_empty_title),
-        hint =
-            caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
-                ?: stringResource(R.string.prescriptions_empty_hint),
-    )
+  MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_empty)) {
+    Column(
+        Modifier.padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+      Icon(
+          painter = painterResource(R.drawable.ic_prescriptions),
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(48.dp),
+      )
+      Text(
+          text = stringResource(R.string.prescriptions_empty_title),
+          style = MaterialTheme.typography.titleLarge,
+          textAlign = TextAlign.Center,
+      )
+      Text(
+          text =
+              caregiverOf?.let { stringResource(R.string.prescriptions_empty_hint_for, it) }
+                  ?: stringResource(R.string.prescriptions_empty_hint),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+      )
+    }
   }
 }
 
 /** The list couldn't be loaded: whose it is, and a way to retry. */
 @Composable
 private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit) {
-  CenteredMessage(testTag = C.Tag.prescriptions_error, bottom = buttonRoom) {
+  MessageArea(Modifier.padding(bottom = buttonRoom).testTag(C.Tag.prescriptions_error)) {
     LakeMessageState(
         title =
             caregiverOf?.let { stringResource(R.string.prescriptions_error_title_for, it) }
@@ -446,21 +468,6 @@ private fun ErrorState(caregiverOf: String?, buttonRoom: Dp, onRetry: () -> Unit
         onAction = onRetry,
         actionTestTag = C.Tag.prescriptions_retry_button,
     )
-  }
-}
-
-/** Centers [content] in the space above the buttons, [bottom] high. */
-@Composable
-private fun CenteredMessage(testTag: String, bottom: Dp, content: @Composable () -> Unit) {
-  Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .padding(start = 32.dp, end = 32.dp, bottom = bottom)
-              .testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    content()
   }
 }
 

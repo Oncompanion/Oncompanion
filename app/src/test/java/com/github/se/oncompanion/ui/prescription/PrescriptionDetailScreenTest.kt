@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,6 +38,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
@@ -87,7 +89,8 @@ class PrescriptionDetailScreenTest {
       )
 
   private val loading = PrescriptionDetailUiState()
-  private val shown = PrescriptionDetailUiState(prescription = chemo, isLoading = false)
+  private val shown =
+      PrescriptionDetailUiState(prescription = chemo, load = PrescriptionsLoad.SHOWN)
 
   private fun setContent(
       state: PrescriptionDetailUiState,
@@ -152,7 +155,7 @@ class PrescriptionDetailScreenTest {
   fun error_showsRetry_whichCallsBack() {
     var retries = 0
     setContent(
-        PrescriptionDetailUiState(isLoading = false, hasError = true),
+        PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED),
         onRetry = { retries++ },
     )
 
@@ -167,15 +170,88 @@ class PrescriptionDetailScreenTest {
   }
 
   @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun error_retryIsFullyVisibleInLandscape() {
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun error_retryCanBeReached_onASmallPhoneSidewaysWithTheLargestFont() {
+    // Taller than the screen there: the message scrolls so Retry can still be tapped (#490)
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescription_detail_retry_button)
+        .performScrollTo()
+        .assertIsFullyVisible()
+  }
+
+  @Test
+  fun error_spansTheWholeWidth_soItWrapsLikeOnTheOtherPrescriptionScreens() {
+    // The message state brings its own side padding: nothing is added around it (#490)
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+    val screen = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+    val message =
+        composeTestRule
+            .onNodeWithTag(C.Tag.prescription_detail_error)
+            .fetchSemanticsNode()
+            .boundsInRoot
+    assertEquals(screen.left, message.left)
+    assertEquals(screen.right, message.right)
+  }
+
+  @Test
   fun error_neverBlamesTheConnection() {
-    setContent(PrescriptionDetailUiState(isLoading = false, hasError = true))
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
 
     composeTestRule.onNodeWithText("connection", substring = true).assertDoesNotExist()
   }
 
   @Test
+  fun everyMessage_isTheSharedMessageState() {
+    // The app's shared message state, as on the list and the form (#277): its tile shows in each
+    var state by mutableStateOf(PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED))
+    setContentOf { state }
+    val cases =
+        listOf(
+            PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED) to
+                C.Tag.prescription_detail_error,
+            PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN) to
+                C.Tag.prescription_detail_not_found,
+            PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS) to
+                C.Tag.prescription_detail_no_access,
+        )
+    for ((shown, tag) in cases) {
+      composeTestRule.runOnIdle { state = shown }
+      composeTestRule
+          .onNode(
+              hasTestTag(C.Tag.message_state_icon) and hasAnyAncestor(hasTestTag(tag)),
+              useUnmergedTree = true,
+          )
+          .assertExists()
+    }
+  }
+
+  /** Like [setContent], with a state the test can change. */
+  private fun setContentOf(state: () -> PrescriptionDetailUiState) {
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState = state(),
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+      )
+    }
+  }
+
+  @Test
   fun notFound_saysItNoLongerExists_withoutRetry() {
-    setContent(PrescriptionDetailUiState(isLoading = false))
+    setContent(PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN))
 
     assertTextInside(
         context.getString(R.string.prescription_detail_not_found_title),
@@ -188,7 +264,92 @@ class PrescriptionDetailScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
   }
 
-  // ----- The prescription (Figma: "US-11 / Prescription detail") -----
+  @Test
+  fun noAccess_saysWhy_evenAfterTheCaregiverLeft() {
+    var state by
+        mutableStateOf(
+            PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, canChange = false)
+        )
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionDetailContent(
+          uiState = state,
+          onBack = {},
+          onRetry = {},
+          onEdit = {},
+          onDelete = {},
+          onConfirmDelete = {},
+          onCancelDelete = {},
+          caregiverOf = caregiverOf,
+      )
+    }
+    // Signed out, patient or caregiver: "You're signed out", even while the patient's name is
+    // still known. Signed in but no longer in the circle (a caregiver): "no longer in the care
+    // circle", named or not, since leave() clears the name before Whose care? (#490)
+    val anne = "Anne"
+    val cases =
+        listOf(
+            Triple(
+                PrescriptionDetailUiState(
+                    load = PrescriptionsLoad.NOT_SIGNED_IN,
+                    canChange = false,
+                ),
+                null as String?,
+                signedOut,
+            ),
+            Triple(
+                PrescriptionDetailUiState(
+                    load = PrescriptionsLoad.NOT_SIGNED_IN,
+                    canChange = false,
+                ),
+                anne,
+                signedOut,
+            ),
+            Triple(
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, canChange = false),
+                anne,
+                removedFrom(anne),
+            ),
+            Triple(
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, canChange = false),
+                null,
+                removedUnnamed,
+            ),
+            Triple(
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SHARED, canChange = false),
+                null,
+                removedUnnamed,
+            ),
+        )
+    for ((shown, patient, texts) in cases) {
+      composeTestRule.runOnIdle {
+        state = shown
+        caregiverOf = patient
+      }
+      assertTextInside(texts.first, C.Tag.prescription_detail_no_access)
+      assertTextInside(texts.second, C.Tag.prescription_detail_no_access)
+      // Never a title with no name, never a Retry that can't work
+      composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
+      composeTestRule
+          .onNode(hasText(" doesn't", substring = true), useUnmergedTree = true)
+          .assertDoesNotExist()
+    }
+  }
+
+  private val signedOut
+    get() =
+        context.getString(R.string.prescriptions_signed_out_title) to
+            context.getString(R.string.prescriptions_signed_out_hint)
+
+  private val removedUnnamed
+    get() =
+        context.getString(R.string.prescriptions_no_access_title_unnamed) to
+            context.getString(R.string.prescriptions_no_access_hint_unnamed)
+
+  private fun removedFrom(patient: String) =
+      context.getString(R.string.prescriptions_no_access_title_for, patient) to
+          context.getString(R.string.prescriptions_no_access_hint_for, patient)
 
   @Test
   fun shown_headlineListsTheMedicationNames() {
@@ -309,10 +470,10 @@ class PrescriptionDetailScreenTest {
   fun editButton_onlyWhileThePrescriptionIsShown() {
     listOf(
             loading,
-            PrescriptionDetailUiState(isLoading = false, hasError = true),
-            PrescriptionDetailUiState(isLoading = false),
+            PrescriptionDetailUiState(load = PrescriptionsLoad.FAILED),
+            PrescriptionDetailUiState(load = PrescriptionsLoad.SHOWN),
             // A read error after it was shown: what is on screen may be out of date
-            shown.copy(hasError = true),
+            shown.copy(load = PrescriptionsLoad.FAILED),
         )
         .forEach { state -> assertEquals("Edit for $state", false, state.canEdit) }
     setContent(loading)
@@ -468,6 +629,18 @@ class PrescriptionDetailScreenTest {
   }
 
   @Test
+  fun screen_signedOut_saysSo_insteadOfAnError() {
+    val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
+    val viewModel = PrescriptionDetailViewModel("chemo", FakeAuthRepository(), repository)
+    composeTestRule.setContent {
+      PrescriptionDetailScreen(viewModel = viewModel, onBack = {}, onEdit = {}, onDeleted = {})
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_no_access).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescription_detail_retry_button).assertDoesNotExist()
+  }
+
+  @Test
   fun screen_confirmedDeletion_deletesAndLeavesOnce() {
     val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
     val viewModel = PrescriptionDetailViewModel("chemo", signedIn("alice"), repository)
@@ -524,7 +697,9 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun caregiver_prescriptionsNotShared_saysSo_insteadOfNotFound() {
-    setCaregiverContent(PrescriptionDetailUiState(isLoading = false, isNotShared = true))
+    setCaregiverContent(
+        PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SHARED, canChange = false)
+    )
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()

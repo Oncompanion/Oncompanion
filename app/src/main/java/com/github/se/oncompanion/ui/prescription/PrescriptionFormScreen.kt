@@ -3,9 +3,9 @@
 
 package com.github.se.oncompanion.ui.prescription
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -69,6 +69,7 @@ import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
 import com.github.se.oncompanion.ui.common.DeleteDialogTags
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeSnackbarHost
 import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.PaperLakeBand
@@ -82,9 +83,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-/** "29 Sep 2026". The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 // The start date in a medication's row, short like the rest of the row: "29 Sep"
 private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
@@ -398,60 +396,46 @@ private fun FormTopAppBar(
  */
 @Composable
 private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier: Modifier) {
-  Column(
-      modifier = modifier.fillMaxSize().padding(horizontal = 32.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    when (load) {
-      PrescriptionFormLoad.LOADING ->
+  when (load) {
+    PrescriptionFormLoad.LOADING ->
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           CircularProgressIndicator(Modifier.testTag(C.Tag.prescription_form_loading))
-      // No retry: the form keeps listening and fills in if the prescription arrives later
-      PrescriptionFormLoad.NOT_FOUND ->
-          LoadMessage(
-              C.Tag.prescription_form_not_found,
-              R.string.prescription_form_not_found_title,
-              R.string.prescription_form_not_found_hint,
+        }
+    // No retry: the form keeps listening and fills in if the prescription arrives later
+    PrescriptionFormLoad.NOT_FOUND ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_found)) {
+          LakeMessageState(
+              title = stringResource(R.string.prescription_form_not_found_title),
+              message = stringResource(R.string.prescription_form_not_found_hint),
           )
-      PrescriptionFormLoad.NOT_SIGNED_IN ->
-          LoadMessage(
-              C.Tag.prescription_form_not_signed_in,
-              R.string.prescription_form_not_signed_in_title,
-              R.string.prescription_form_not_signed_in_hint,
+        }
+    PrescriptionFormLoad.NOT_SIGNED_IN ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_signed_in)) {
+          LakeMessageState(
+              title = stringResource(R.string.prescriptions_signed_out_title),
+              message = stringResource(R.string.prescription_form_not_signed_in_hint),
           )
-      PrescriptionFormLoad.NOT_ALLOWED ->
-          LoadMessage(
-              C.Tag.prescription_form_not_allowed,
-              R.string.prescription_form_not_allowed_title,
-              R.string.prescription_form_not_allowed_hint,
+        }
+    // No retry either: the form keeps listening and fills in if the permission is given back
+    PrescriptionFormLoad.NOT_ALLOWED ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_allowed)) {
+          LakeMessageState(
+              title = stringResource(R.string.prescription_form_not_allowed_title),
+              message = stringResource(R.string.prescription_form_not_allowed_hint),
           )
-      PrescriptionFormLoad.FAILED -> {
-        LoadMessage(
-            C.Tag.prescription_form_load_error,
-            R.string.prescription_form_load_error_title,
-            R.string.prescription_form_load_error_hint,
-        )
-        LakeButton(
-            text = stringResource(R.string.prescription_form_retry),
-            onClick = onRetry,
-            modifier = Modifier.testTag(C.Tag.prescription_form_retry_button),
-        )
-      }
-      // The fields are shown instead
-      PrescriptionFormLoad.READY -> Unit
-    }
-  }
-}
-
-/** The title and hint of a [LoadState] message, found by tests through [testTag]. */
-@Composable
-private fun LoadMessage(testTag: String, @StringRes title: Int, @StringRes hint: Int) {
-  Column(
-      modifier = Modifier.testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-  ) {
-    MessageTexts(title = stringResource(title), hint = stringResource(hint))
+        }
+    PrescriptionFormLoad.FAILED ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_load_error)) {
+          LakeMessageState(
+              title = stringResource(R.string.prescription_form_load_error_title),
+              message = stringResource(R.string.prescription_form_load_error_hint),
+              actionLabel = stringResource(R.string.prescription_form_retry),
+              onAction = onRetry,
+              actionTestTag = C.Tag.prescription_form_retry_button,
+          )
+        }
+    // The fields are shown instead
+    PrescriptionFormLoad.READY -> Unit
   }
 }
 
@@ -665,7 +649,7 @@ private fun DateField(
   var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
   ClickableReadOnlyField(
-      value = date.format(dateFormatter),
+      value = date.format(prescriptionDateFormatter),
       label = label,
       onClick = { pickerOpen = true },
       onClickLabel = stringResource(R.string.prescription_form_pick_date),
