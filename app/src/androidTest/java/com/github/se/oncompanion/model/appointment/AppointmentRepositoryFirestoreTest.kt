@@ -55,9 +55,9 @@ class AppointmentRepositoryFirestoreTest {
     assertEquals("NONE", serverDocument(id).getString("reminder"))
   }
 
-  /** Only absent legacy choices default; invalid stored data is excluded rather than guessed. */
+  /** Legacy records default; unfamiliar or malformed choices keep the appointment visible. */
   @Test
-  fun legacyReminderDefaultsAndMalformedChoicesAreSkipped(): Unit = runBlocking {
+  fun legacyDefaultsAndUnrecognizedRemindersKeepAppointmentsVisible(): Unit = runBlocking {
     rawAppointment("legacy-reminder", rawFields())
     assertEquals(AppointmentReminder.ONE_HOUR, storedAppointment("legacy-reminder")?.reminder)
     val invalidValues =
@@ -65,12 +65,32 @@ class AppointmentRepositoryFirestoreTest {
             JSONObject().put("stringValue", "TWO_HOURS"),
             JSONObject().put("nullValue", JSONObject.NULL),
             JSONObject().put("integerValue", "60"),
+            JSONObject().put("stringValue", ""),
+            JSONObject().put("stringValue", "TWO_DAYS"),
+            JSONObject().put("booleanValue", true),
+            JSONObject().put("arrayValue", JSONObject()),
+            JSONObject().put("mapValue", JSONObject()),
         )
     for ((index, invalid) in invalidValues.withIndex()) {
       val id = "invalid-reminder-$index"
       rawAppointment(id, rawFields().put("reminder", invalid))
-      assertNull(storedAppointment(id))
+      val appointment = requireNotNull(storedAppointment(id))
+      assertEquals(id, appointment.id)
+      assertEquals("Consultation", appointment.title)
+      assertEquals(Instant.parse("2026-10-15T08:00:00Z"), appointment.scheduledAt)
+      assertEquals(AppointmentReminder.NONE, appointment.reminder)
+      val listed =
+          withTimeout(10_000) {
+            repository.observeAppointments(uid).first { entries -> entries.any { it.id == id } }
+          }
+      assertEquals(appointment, listed.single { it.id == id })
     }
+    val listed = withTimeout(10_000) { repository.observeAppointments(uid).first() }
+    assertEquals(invalidValues.size + 1, listed.size)
+    assertEquals(
+        AppointmentReminder.ONE_HOUR,
+        listed.single { it.id == "legacy-reminder" }.reminder,
+    )
   }
 
   private lateinit var repository: AppointmentRepositoryFirestore

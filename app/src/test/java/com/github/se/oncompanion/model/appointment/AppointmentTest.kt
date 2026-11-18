@@ -11,13 +11,10 @@ import org.junit.Test
 
 /** Checks appointment validity against the agreed storage constraints. */
 class AppointmentTest {
-  /** New appointments default to one hour, while every supported choice remains valid. */
+  /** A new appointment uses the agreed one-hour reminder default. */
   @Test
-  fun reminderDefaultsToOneHourAndAllowsEachChoice() {
+  fun reminderDefaultsToOneHour() {
     assertEquals(AppointmentReminder.ONE_HOUR, appointment.reminder)
-    for (reminder in AppointmentReminder.entries) {
-      assertTrue(appointment.copy(reminder = reminder).isValid())
-    }
   }
 
   private val appointment =

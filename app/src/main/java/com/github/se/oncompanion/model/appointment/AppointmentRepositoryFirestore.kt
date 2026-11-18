@@ -164,6 +164,13 @@ class AppointmentRepositoryFirestore(
     require(value.isNotBlank() && '/' !in value) { "Invalid document path segment" }
   }
 
+  // Unknown future choices must not hide an otherwise valid appointment or enable a reminder.
+  private fun reminderFrom(document: DocumentSnapshot): AppointmentReminder {
+    if (!document.contains(FIELD_REMINDER)) return AppointmentReminder.ONE_HOUR
+    val stored = document.get(FIELD_REMINDER)
+    return AppointmentReminder.entries.firstOrNull { it.name == stored } ?: AppointmentReminder.NONE
+  }
+
   private fun fromDocument(document: DocumentSnapshot): Appointment? {
     if (!document.exists()) return null
     return try {
@@ -183,13 +190,7 @@ class AppointmentRepositoryFirestore(
               addedByName = document.getString(FIELD_ADDED_BY_NAME),
               editedBy = document.getString(FIELD_EDITED_BY),
               editedByName = document.getString(FIELD_EDITED_BY_NAME),
-              // Only absent legacy fields default; malformed choices must not enable reminders.
-              reminder =
-                  if (document.contains(FIELD_REMINDER))
-                      AppointmentReminder.valueOf(
-                          requireNotNull(document.getString(FIELD_REMINDER))
-                      )
-                  else AppointmentReminder.ONE_HOUR,
+              reminder = reminderFrom(document),
           )
           .also { require(it.isValid()) }
     } catch (_: RuntimeException) {
