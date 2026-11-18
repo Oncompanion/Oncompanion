@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
@@ -36,30 +37,23 @@ import kotlinx.coroutines.launch
  *
  * @property prescription the prescription, or `null` while loading, after an error, or if it
  *   doesn't exist
- * @property isLoading true until the prescription arrives
- * @property hasError true if it couldn't be loaded (or nobody is signed in)
+ * @property load where reading it is at: shown with no [prescription] means it doesn't exist
  * @property delete where the deletion of the prescription is at
- * @property isOwn whether it is the user's own prescription: a caregiver only reads the patient's
- * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
+ * @property canChange whether edit and delete are allowed in this section
  */
 data class PrescriptionDetailUiState(
     val prescription: Prescription? = null,
-    val isLoading: Boolean = true,
-    val hasError: Boolean = false,
+    val load: PrescriptionsLoad = PrescriptionsLoad.LOADING,
     override val delete: DeletePhase = DeletePhase.IDLE,
-    val isOwn: Boolean = true,
-    val isNotShared: Boolean = false,
+    val canChange: Boolean = true,
 ) : HasDeletePhase {
-  /** The prescription doesn't exist (e.g. deleted on another device). */
-  val isNotFound: Boolean
-    get() = !isLoading && !hasError && !isNotShared && prescription == null
-
   /**
    * The prescription is shown and can be corrected: not after a read error, when what is on screen
    * may be out of date.
    */
   val canEdit: Boolean
-    get() = isOwn && prescription != null && !isLoading && !hasError && !delete.isUnderWay
+    get() =
+        canChange && prescription != null && load == PrescriptionsLoad.SHOWN && !delete.isUnderWay
 
   /** The prescription is shown and can be deleted. */
   override val canDelete: Boolean
@@ -67,11 +61,31 @@ data class PrescriptionDetailUiState(
 }
 
 /**
+ * What the detail shows while the prescription is read again, with the access known: the
+ * prescription kept from before, a read error over it, or a spinner while nothing is kept. After
+ * the access was lost, the read has to show the prescription again first, even if one were still
+ * held (#490).
+ */
+internal fun PrescriptionDetailUiState.loadWhileReading(): PrescriptionsLoad =
+    when (load) {
+      PrescriptionsLoad.SHOWN,
+      PrescriptionsLoad.LOADING ->
+          if (prescription == null) PrescriptionsLoad.LOADING else PrescriptionsLoad.SHOWN
+      // A read error stays shown over the prescription kept from before it; with none kept, the
+      // new read is under way
+      PrescriptionsLoad.FAILED ->
+          if (prescription == null) PrescriptionsLoad.LOADING else PrescriptionsLoad.FAILED
+      PrescriptionsLoad.NOT_SHARED,
+      PrescriptionsLoad.NOT_SIGNED_IN,
+      PrescriptionsLoad.NO_ACCESS -> PrescriptionsLoad.LOADING
+    }
+
+/**
  * Loads one prescription of the signed-in user and keeps it up to date, so a correction saved in
  * the form shows when the user comes back. The repository reads from the local cache, so the detail
  * also works offline. Deletes the prescription once the user confirms (US-12). In caregiver mode
- * (US-20), the prescription is the followed patient's, read-only, when they share their
- * prescriptions.
+ * (US-20), the prescription is the followed patient's when shared; editing and deleting require the
+ * patient's permission for Prescriptions (US-46).
  *
  * @param patientUid in caregiver mode, the patient whose prescription is shown; null for the user's
  *   own
@@ -112,7 +126,7 @@ class PrescriptionDetailViewModel(
 
   /** Starts (or, after an error, restarts) observing the prescription. */
   fun load() {
-    _uiState.update { it.copy(isLoading = true, hasError = false) }
+    _uiState.update { it.copy(load = PrescriptionsLoad.LOADING) }
     observe()
   }
 
@@ -121,6 +135,7 @@ class PrescriptionDetailViewModel(
     // Only one read at a time, so a second retry doesn't add a second listener
     observation?.cancel()
     observation = viewModelScope.launch {
+      var hasShown = false
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
             // A rejected prescription is gone for everyone, as a deleted one (US-43)
             val prescription =
@@ -136,7 +151,16 @@ class PrescriptionDetailViewModel(
                   it?.namedBy(names)
                 }
           }
-          .collect { section -> _uiState.update { it.showing(section) } }
+          .collect { section ->
+            _uiState.update {
+              val next = it.showing(section)
+              // A changed access must be checked again before offering an old action.
+              if (hasShown && section is CareSection.Loading && section.accessKnown)
+                  next.copy(canChange = false, delete = next.delete.afterRead(false))
+              else next
+            }
+            if (section is CareSection.Shown) hasShown = true
+          }
     }
   }
 
@@ -151,14 +175,12 @@ class PrescriptionDetailViewModel(
         // What is shown stays until the prescription arrives (e.g. after a failed deletion), but
         // not while the access itself isn't known: then nothing of it may show
         is CareSection.Loading ->
-            if (section.accessKnown) copy(isLoading = prescription == null, isNotShared = false)
+            if (section.accessKnown) copy(load = loadWhileReading())
             else
                 copy(
                     prescription = null,
-                    isLoading = true,
-                    hasError = false,
-                    isNotShared = false,
-                    isOwn = false,
+                    load = PrescriptionsLoad.LOADING,
+                    canChange = false,
                     delete = delete.afterRead(false),
                 )
         // Nothing to read: not shared, or nobody to read it for
@@ -166,28 +188,25 @@ class PrescriptionDetailViewModel(
         CareSection.NotShared ->
             copy(
                 prescription = null,
-                isLoading = false,
-                hasError = section == CareSection.NoAccess,
-                isNotShared = section == CareSection.NotShared,
-                isOwn = false,
+                load =
+                    if (section == CareSection.NotShared) PrescriptionsLoad.NOT_SHARED
+                    else noAccessLoad(authRepository),
+                canChange = false,
                 delete = delete.afterRead(false),
             )
         is CareSection.Failed ->
             copy(
-                isLoading = false,
-                hasError = true,
-                isNotShared = false,
+                load = PrescriptionsLoad.FAILED,
                 delete = delete.afterRead(false),
             )
         // A prescription deleted elsewhere can't be deleted here: the confirmation is dropped
         is CareSection.Shown ->
             copy(
                 prescription = section.data,
-                isLoading = false,
-                hasError = false,
-                isNotShared = false,
-                isOwn = section.canEdit,
-                delete = delete.afterRead(deletable = section.data != null),
+                load = PrescriptionsLoad.SHOWN,
+                canChange = section.canEditEntries,
+                delete =
+                    delete.afterRead(deletable = section.data != null && section.canEditEntries),
             )
       }
 
@@ -206,7 +225,10 @@ class PrescriptionDetailViewModel(
       deletion.confirm(
           signedInUid = { authRepository.signedInUid(TAG) },
           stopObserving = { observation?.cancel() },
-          delete = { uid -> manageMedicationSchedule.delete(uid, prescriptionId) },
+          delete = { uid ->
+            // The actor authenticates the write; the prescription belongs to the followed patient.
+            manageMedicationSchedule.delete(patientUid ?: uid, prescriptionId)
+          },
           onFailure = { observe() },
       )
 
