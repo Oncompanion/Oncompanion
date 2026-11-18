@@ -601,7 +601,7 @@ Read failures offer Retry. No patient record or appointment time changes.
 `AppAppearanceViewModel` observes device settings independently of the authenticated session.
 `MainActivity` keeps the existing splash until routing and the first appearance read are ready.
 A failed initial read releases startup using Follow device without overwriting saved preferences;
-IO failures are retried. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
+IO failures are retried; failures after a successful read preserve the last resolved appearance. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
 configuration before applying the override and otherwise uses the existing explicit light/dark
 palettes. A ContextThemeWrapper supplies matching Android night resources while retaining Activity
 access for scanning and sign-in. Updating that choice

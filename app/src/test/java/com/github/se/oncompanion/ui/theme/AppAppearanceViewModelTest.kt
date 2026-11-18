@@ -72,6 +72,37 @@ class AppAppearanceViewModelTest {
   }
 
   @Test
+  fun laterIoFailuresRetainDarkUntilTheStoreRecovers() = runTest {
+    val repo = FakeSettingsRepository(DeviceSettings(AppearancePreference.DARK))
+    val vm = model(repo)
+    runCurrent()
+    repo.observationFailure.value = IOException("disk")
+    runCurrent()
+    repeat(3) {
+      advanceTimeBy(1_000)
+      runCurrent()
+      assertEquals(AppearancePreference.DARK, vm.uiState.value.appearance)
+    }
+    repo.observationFailure.value = null
+    repo.settings.value = DeviceSettings(AppearancePreference.LIGHT)
+    advanceTimeBy(1_000)
+    runCurrent()
+    assertEquals(AppearancePreference.LIGHT, vm.uiState.value.appearance)
+    assertTrue(repo.writes.isEmpty())
+  }
+
+  @Test
+  fun laterUnexpectedFailureRetainsTheLastReadChoice() = runTest {
+    val repo = FakeSettingsRepository(DeviceSettings(AppearancePreference.DARK))
+    val vm = model(repo)
+    runCurrent()
+    repo.observationFailure.value = IllegalStateException("broken")
+    runCurrent()
+    assertEquals(AppearancePreference.DARK, vm.uiState.value.appearance)
+    assertTrue(repo.writes.isEmpty())
+  }
+
+  @Test
   fun appearanceOverridesResolveForBothSystemThemes() {
     for (systemDark in listOf(false, true)) {
       assertEquals(systemDark, AppearancePreference.FOLLOW_DEVICE.usesDarkTheme(systemDark))

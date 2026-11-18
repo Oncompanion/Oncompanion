@@ -30,16 +30,23 @@ class AppAppearanceViewModel(
             if (cause is IOException) {
               // A disk failure must not hold the splash indefinitely or overwrite saved
               // preferences.
-              state.value = AppAppearanceUiState(AppearancePreference.FOLLOW_DEVICE)
+              useStartupFallback()
               delay(1_000)
               true
             } else false
           }
           .catch { cause ->
             if (cause is CancellationException) throw cause
-            state.value = AppAppearanceUiState(AppearancePreference.FOLLOW_DEVICE)
+            useStartupFallback()
           }
           .collect { state.value = AppAppearanceUiState(it.appearance) }
+    }
+  }
+
+  // A later disk failure must not replace a choice that was already restored or selected.
+  private fun useStartupFallback() {
+    if (state.value.appearance == null) {
+      state.value = AppAppearanceUiState(AppearancePreference.FOLLOW_DEVICE)
     }
   }
 }
