@@ -48,6 +48,42 @@ class AppAppearanceThemeTest {
     assertLake(AppearancePreference.LIGHT, Color(0xFFC3B5E0))
   }
 
+  @Test
+  @Config(qualifiers = "notnight")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun switchingAppearanceUpdatesTheExistingLakeWithoutDiscardingState() {
+    var choice by mutableStateOf(AppearancePreference.LIGHT)
+    var identity: Any? = null
+    compose.setContent {
+      AppAppearanceTheme(choice) {
+        identity = remember { Any() }
+        LakeTopAppBar(
+            "Settings",
+            navigationIcon = {},
+            modifier = Modifier.width(390.dp).testTag("bar"),
+            time = LocalTime.NOON,
+        )
+      }
+    }
+    val initial = identity
+    for ((preference, color) in
+        listOf(
+            AppearancePreference.LIGHT to Color(0xFFC3B5E0),
+            AppearancePreference.DARK to Color(0xFF463C66),
+            AppearancePreference.LIGHT to Color(0xFFC3B5E0),
+        )) {
+      compose.runOnIdle { choice = preference }
+      compose.waitForIdle()
+      val bar = compose.onNodeWithTag("bar").captureToImage().toPixelMap()
+      assertSameColor(
+          "Salève after $preference",
+          color,
+          bar[bar.width - 40, bar.height - 20],
+      )
+      assertSame(initial, identity)
+    }
+  }
+
   private fun assertLake(choice: AppearancePreference, expected: Color) {
     var activity: Activity? = null
     compose.setContent {

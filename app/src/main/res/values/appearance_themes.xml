@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: ChatGPT <noreply@openai.com> -->
+<resources>
+    <!-- Distinct empty overlays keep Compose's light and dark vector cache entries separate. -->
+    <style name="OncompanionResourcesLight" parent="" />
+    <style name="OncompanionResourcesDark" parent="" />
+</resources>

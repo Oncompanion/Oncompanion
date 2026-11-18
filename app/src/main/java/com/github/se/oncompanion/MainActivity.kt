@@ -54,9 +54,8 @@ class MainActivity : ComponentActivity() {
       startViewModel.startRoute.value == null ||
           appearanceViewModel.uiState.value.appearance == null
     }
-    // Transparent status and navigation bars: the app's background shows behind them, instead of
-    // the old XML theme's purple status bar. Screens use Scaffold, which keeps content clear of
-    // them.
+    // Start edge-to-edge layout; the shared appearance root sets icon contrast and keeps the
+    // default navigation-bar scrims. Screens use Scaffold to keep controls clear of the bars.
     enableEdgeToEdge()
     setContent {
       AppAppearanceRoot(this, appearanceViewModel) {

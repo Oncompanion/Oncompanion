@@ -604,7 +604,8 @@ A failed initial read releases startup using Follow device without overwriting s
 IO failures are retried; failures after a successful read preserve the last resolved appearance. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
 configuration before applying the override and otherwise uses the existing explicit light/dark
 palettes. A ContextThemeWrapper supplies matching Android night resources while retaining Activity
-access for scanning and sign-in. Updating that choice
+access for scanning and sign-in. Distinct empty light/dark overlays keep Compose vector-cache
+entries separate, so changing appearance redraws existing illustrations without replacing screen state. Updating that choice
 does not recreate navigation or discard screen state. The Google-branded button retains its
 prescribed colors but follows the same effective app appearance. MainActivity and emulator journeys share AppAppearanceRoot, which collects the preference,
 resolves the effective theme once and applies the root surface and system bars. System-bar icon

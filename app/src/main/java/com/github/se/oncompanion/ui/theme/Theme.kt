@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.settings.AppearancePreference
 
 private val LightColorScheme =
@@ -134,7 +135,10 @@ internal fun AppAppearanceTheme(darkTheme: Boolean, content: @Composable () -> U
             Configuration(configuration).apply {
               uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or night
             }
-        config to ContextThemeWrapper(context, 0).apply { applyOverrideConfiguration(config) }
+        // Compose caches vectors by Theme equality, which ignores the resource configuration.
+        val overlay =
+            if (darkTheme) R.style.OncompanionResourcesDark else R.style.OncompanionResourcesLight
+        config to ContextThemeWrapper(context, overlay).apply { applyOverrideConfiguration(config) }
       }
   CompositionLocalProvider(
       LocalConfiguration provides themed.first,
