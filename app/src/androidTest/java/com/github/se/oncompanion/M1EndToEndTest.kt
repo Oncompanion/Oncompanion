@@ -273,7 +273,7 @@ class M1EndToEndTest {
 
   /** From the Overview: a symptom logged in a few taps appears in the journal. */
   private fun logSymptom() {
-    ui.open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
+    ui.open(C.Tag.overview_journal_link, hasTestTag(C.Tag.symptom_journal_add))
     ui.open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType("FATIGUE"))).performClick()
 
     // Saving returns to the journal, with the new entry
@@ -291,7 +291,7 @@ class M1EndToEndTest {
     // tapped
     val entry =
         hasText(string(R.string.symptom_type_fatigue), substring = true) and hasClickAction()
-    ui.open(C.Tag.overview_shortcut_symptoms, entry)
+    ui.open(C.Tag.overview_journal_link, entry)
     ui.open(entry, hasTestTag(C.Tag.symptom_detail_delete)).reveal().performClick()
     // Back in the journal, which is empty again
     ui.open(C.Tag.symptom_delete_confirm, hasTestTag(C.Tag.symptom_journal_empty))

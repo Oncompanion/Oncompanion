@@ -1,0 +1,14 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- "Icon/symptom-pain" from the Figma (outlined, 24 dp): tinted by the Icon that shows it -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12 3V8 M12 16V21 M3 12H8 M16 12H21 M5.6 5.6L9.1 9.1 M14.9 14.9L18.4 18.4 M18.4 5.6L14.9 9.1 M9.1 14.9L5.6 18.4"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
