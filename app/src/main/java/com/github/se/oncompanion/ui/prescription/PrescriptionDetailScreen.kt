@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.prescription
 
@@ -46,6 +47,7 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.EditedBy
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
@@ -213,8 +215,12 @@ fun PrescriptionDetailContent(
 
   if (uiState.isDeleteDialogShown) {
     DeleteConfirmationDialog(
-        title = stringResource(R.string.prescription_delete_title),
-        message = stringResource(R.string.prescription_delete_message),
+        title =
+            if (caregiverOf == null) stringResource(R.string.prescription_delete_title)
+            else stringResource(R.string.prescription_delete_title_for, caregiverOf),
+        message =
+            if (caregiverOf == null) stringResource(R.string.prescription_delete_message)
+            else stringResource(R.string.prescription_delete_message_for, caregiverOf),
         error = stringResource(R.string.prescription_delete_error),
         confirmLabel = stringResource(R.string.prescription_delete_confirm),
         cancelLabel = stringResource(R.string.prescription_delete_cancel),
@@ -244,6 +250,8 @@ private fun PrescriptionDetail(prescription: Prescription) {
           isConfirmed = prescription.isConfirmed,
       )
     }
+    // The latest editor is independent from who first added the prescription.
+    prescription.editedByName?.let { EditedBy(it, Modifier.padding(horizontal = Spacing.lg)) }
     // The prescriber is optional: no row when the user didn't give one
     val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
     if (prescribedBy.isNotEmpty()) {

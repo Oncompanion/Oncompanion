@@ -56,7 +56,7 @@ service cloud.firestore {
     // Who last edited an entry: nothing when the patient did, or the signed-in caregiver's uid and
     // first name when a caregiver did (US-46), so nobody can edit in someone else's name. The
     // patient may also leave the editor as it was: older versions of the app don't remove it.
-    // Keep in sync with Appointment (MAX_ADDED_BY_NAME_LENGTH).
+    // Keep in sync with Appointment and SymptomEntry (MAX_ADDED_BY_NAME_LENGTH).
     function isValidEditor(ownerUid, data, previous) {
       return isOwner(ownerUid)
           ? !data.keys().hasAny(['editedBy', 'editedByName'])
@@ -85,10 +85,17 @@ service cloud.firestore {
     // it; the patient's own is always confirmed. Keep in sync with PrescriptionConfirmation.
     function isValidPrescription(data) {
       return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications',
-                                  'addedBy', 'addedByName', 'confirmation'])
+                                  'addedBy', 'addedByName', 'confirmation', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['prescribedOn', 'createdAt', 'medications'])
           && confirmationOf(data) in ['CONFIRMED', 'PENDING', 'REJECTED']
           && (data.get('addedBy', null) != null || confirmationOf(data) == 'CONFIRMED')
+          // Editor metadata is optional on old records and is always stored as a complete pair.
+          && (isNotEdited(data)
+              || (data.get('editedBy', null) is string
+                  && data.editedBy.size() > 0
+                  && data.get('editedByName', null) is string
+                  && data.editedByName.trim().size() > 0
+                  && data.editedByName.size() <= 50))
           && optionalString(data, 'prescribedBy', 100)
           && data.prescribedOn is timestamp
           && data.createdAt is timestamp
@@ -123,14 +130,17 @@ service cloud.firestore {
           && !existsAfter(path)
           && confirmationOf(get(path).data) == 'PENDING'
           && data.addedBy == get(path).data.addedBy
-          && data.addedByName == get(path).data.addedByName;
+          && data.addedByName == get(path).data.addedByName
+          // Rejection moves the last caregiver editor with the prescription, without forging it.
+          && data.get('editedBy', null) == get(path).data.get('editedBy', null)
+          && data.get('editedByName', null) == get(path).data.get('editedByName', null);
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY, MAX_NOTES_LENGTH,
     // MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
       return data.keys().hasOnly(['types', 'intensity', 'occurredAt', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['types', 'occurredAt', 'createdAt'])
           // One or more symptoms, each at most once
           && data.types is list
@@ -298,18 +308,23 @@ service cloud.firestore {
       // medications, in one document. There is no medications collection.
       match /prescriptions/{prescriptionId} {
         allow read: if canRead(uid, 'PRESCRIPTIONS');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'PRESCRIPTIONS');
         // A caregiver the patient lets add prescriptions creates one waiting for the patient,
         // signed with their identity (US-43)
         allow create: if canAddTo(uid, 'PRESCRIPTIONS')
                       && isValidPrescription(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && (isOwner(uid) || confirmationOf(request.resource.data) == 'PENDING')
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'PRESCRIPTIONS')
                       && isValidPrescription(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
-                      && decidesConfirmation(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
+                      // A caregiver can correct the record, but only the patient confirms it.
+                      && (isOwner(uid)
+                          ? decidesConfirmation(request.resource.data, resource.data)
+                          : confirmationOf(request.resource.data) == confirmationOf(resource.data))
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
@@ -330,17 +345,21 @@ service cloud.firestore {
 
       // ---------- Symptoms ----------
       // /users/{uid}/symptoms/{symptomId}: the symptom journal. Editing an entry follows the same
-      // validation as logging it, and keeps when it was first logged.
+      // validation as logging it, and keeps when it was first logged and who logged it. Edited and
+      // deleted by the owner, or by a member the owner lets edit and delete there (US-46), who
+      // signs their edit.
       match /symptoms/{symptomId} {
         allow read: if canRead(uid, 'SYMPTOMS');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'SYMPTOMS');
         allow create: if canAddTo(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 

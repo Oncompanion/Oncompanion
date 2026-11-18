@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.prescription
 
@@ -61,6 +62,7 @@ import com.github.se.oncompanion.domain.medication.scan.MedicationDetail
 import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.AddedBy
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
 import com.github.se.oncompanion.ui.common.DeleteConfirmationDialog
@@ -92,7 +94,7 @@ private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENG
  *
  * @param onClose called when the user leaves the form without saving
  * @param onSaved called once the prescription is saved
- * @param caregiverOf the first name of the patient a caregiver adds the prescription for (US-43),
+ * @param caregiverOf the first name of the patient a caregiver adds or edits the prescription for,
  *   `null` for a patient
  * @param onRejected called once the patient rejected the prescription a caregiver added: it no
  *   longer exists, so the form doesn't return to its detail
@@ -247,6 +249,8 @@ fun PrescriptionFormContent(
         if (uiState.isScanned) ReviewNotice(uiState)
         // A prescription a caregiver added asks the patient to check it before confirming (US-43)
         if (uiState.isToConfirm) ConfirmNotice()
+        // A caregiver can correct a pending prescription, but saving never confirms it.
+        uiState.pendingAddedByName?.let { AddedBy(it, isConfirmed = false) }
 
         // What the medications share: the doctor (optional) and the date of the prescription
         val prescribedByCheck = uiState.checkOf(ScannedField.PrescribedBy, "prescribed_by")
@@ -355,6 +359,8 @@ private fun FormTopAppBar(
         Text(
             when {
               uiState.isToConfirm -> stringResource(R.string.prescription_confirm_title)
+              uiState.isEditing && caregiverOf != null ->
+                  stringResource(R.string.prescription_form_edit_title_for, caregiverOf)
               uiState.isEditing -> stringResource(R.string.prescription_form_edit_title)
               // A caregiver's title says whose prescriptions it goes to (US-43)
               caregiverOf != null && uiState.isScanned ->
@@ -408,6 +414,14 @@ private fun LoadState(load: PrescriptionFormLoad, onRetry: () -> Unit, modifier:
           LakeMessageState(
               title = stringResource(R.string.prescriptions_signed_out_title),
               message = stringResource(R.string.prescription_form_not_signed_in_hint),
+          )
+        }
+    // No retry either: the form keeps listening and fills in if the permission is given back
+    PrescriptionFormLoad.NOT_ALLOWED ->
+        MessageArea(modifier.testTag(C.Tag.prescription_form_not_allowed)) {
+          LakeMessageState(
+              title = stringResource(R.string.prescription_form_not_allowed_title),
+              message = stringResource(R.string.prescription_form_not_allowed_hint),
           )
         }
     PrescriptionFormLoad.FAILED ->

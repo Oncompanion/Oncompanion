@@ -143,15 +143,20 @@ class SymptomEntryTest {
     assertFalse(other.copy(notes = "n".repeat(1001)).isValid())
   }
 
+  /** A caregiver who added (US-22) or edited (US-46) an entry signs it with a name. */
   @Test
   fun caregiversEntry_needsTheirName_ofAtMostFiftyCharacters() {
     val now = Instant.parse("2026-10-05T09:00:00Z")
-    val signed = valid.copy(addedBy = "caregiver", addedByName = "Sam")
+    val added = valid.copy(addedBy = "caregiver", addedByName = "Sam")
+    val edited = valid.copy(editedBy = "caregiver", editedByName = "Sam")
 
-    assertTrue(signed.isValid(now))
+    assertTrue(added.isValid(now))
+    assertTrue(edited.isValid(now))
     for (name in listOf(null, "  ", "a".repeat(SymptomEntry.MAX_ADDED_BY_NAME_LENGTH + 1))) {
-      assertFalse(signed.copy(addedByName = name).isValid(now))
+      assertFalse(added.copy(addedByName = name).isValid(now))
+      assertFalse(edited.copy(editedByName = name).isValid(now))
     }
     assertNull(valid.addedBy)
+    assertNull(valid.editedBy)
   }
 }

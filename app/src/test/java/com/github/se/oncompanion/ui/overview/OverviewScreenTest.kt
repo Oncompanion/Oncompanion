@@ -99,6 +99,15 @@ class OverviewScreenTest {
           place = "HUG, Oncology day unit",
       )
 
+  private val nextUp =
+      NextUp(
+          TodayItemKind.APPOINTMENT,
+          appointment.id,
+          appointment.title,
+          appointment.dateTime,
+          appointment.place,
+      )
+
   private fun entry(id: String, hour: Int?, status: TodayItemStatus?, kind: TodayItemKind) =
       TodayEntry(
           key = id,
@@ -130,7 +139,11 @@ class OverviewScreenTest {
     }
   }
 
-  private fun setContent(state: OverviewUiState, onRetry: () -> Unit = {}) {
+  private fun setContent(
+      state: OverviewUiState,
+      onRetry: () -> Unit = {},
+      caregiverOf: String? = null,
+  ) {
     composeTestRule.setContent {
       OverviewContent(
           uiState = state,
@@ -138,9 +151,13 @@ class OverviewScreenTest {
           onOpenPlanning = {},
           onOpenAppointment = {},
           onRetry = onRetry,
+          caregiverOf = caregiverOf,
       )
     }
   }
+
+  /** The caregiver's day, which keeps the appointment card and the "Today" list for now. */
+  private fun setCaregiverDay(state: OverviewUiState) = setContent(state, caregiverOf = "Anne")
 
   private fun setOverviewScreen(
       planning: FakePlanningRepository = FakePlanningRepository(),
@@ -261,8 +278,8 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun emptyDay_showsNoAppointment_andNothingToday() {
-    setContent(loaded)
+  fun caregiverEmptyDay_showsNoAppointment_andNothingToday() {
+    setCaregiverDay(loaded)
     composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     assertTextInside(
         context.getString(R.string.overview_no_appointment),
@@ -273,8 +290,8 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun nextAppointment_showsTitleDateAndPlace() {
-    setContent(loaded.copy(nextAppointment = appointment))
+  fun caregiverNextAppointment_showsTitleDateAndPlace() {
+    setCaregiverDay(loaded.copy(nextAppointment = appointment))
 
     val card = C.Tag.overview_next_appointment
     composeTestRule.onNodeWithTag(card).assertIsDisplayed()
@@ -284,34 +301,29 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun appointmentToday_saysToday() {
-    setContent(
-        loaded.copy(
-            nextAppointment = appointment.copy(dateTime = morning.withHour(15), place = null)
+  fun caregiverAppointment_saysTodayOrOnlyItsDate() {
+    var state by mutableStateOf(loaded)
+    composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}, caregiverOf = "Anne") }
+    listOf(
+            morning.withHour(15) to "Today, Sat 3 Oct · 15:00",
+            morning.plusDays(5) to "Thu 8 Oct · 09:00",
         )
-    )
-    assertTextInside("Today, Sat 3 Oct · 15:00", C.Tag.overview_next_appointment)
+        .forEach { (time, shown) ->
+          state = loaded.copy(nextAppointment = appointment.copy(dateTime = time, place = null))
+          composeTestRule.waitForIdle()
+          assertTextInside(shown, C.Tag.overview_next_appointment)
+        }
   }
 
   @Test
-  fun appointmentInSomeDays_showsOnlyItsDate() {
-    setContent(
-        loaded.copy(
-            nextAppointment = appointment.copy(dateTime = morning.plusDays(5), place = null)
-        )
-    )
-    assertTextInside("Thu 8 Oct · 09:00", C.Tag.overview_next_appointment)
-  }
-
-  @Test
-  fun todayItems_showTimeTitleSubtitleAndStatus() {
+  fun caregiverTodayItems_showTimeTitleSubtitleAndStatus() {
     val entries =
         listOf(
             entry("med", 8, TodayItemStatus.DONE, TodayItemKind.MEDICATION),
             entry("yoga", 10, TodayItemStatus.NEXT, TodayItemKind.EVENT),
             entry("visit", 15, TodayItemStatus.LATER, TodayItemKind.APPOINTMENT),
         )
-    setContent(loaded.copy(todayEntries = entries))
+    setCaregiverDay(loaded.copy(todayEntries = entries))
 
     composeTestRule.onNodeWithTag(C.Tag.overview_today_list).assertIsDisplayed()
     entries.forEach { entry ->
@@ -334,7 +346,7 @@ class OverviewScreenTest {
   // ----- Screen wired to the ViewModel and navigation -----
 
   @Test
-  fun screen_showsThePlanningData() {
+  fun screen_showsTodaysNextEvent_beforeALaterAppointment_aboveTodaysList() {
     val yoga =
         PlanningItem(
             PlanningSource.Event("gentle-yoga"),
@@ -349,31 +361,57 @@ class OverviewScreenTest {
             appointment.title,
             subtitle = appointment.place,
         )
-    setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(yoga, checkUp) })
-
-    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
-    assertTextInside("Oncology check-up", C.Tag.overview_next_appointment)
-    composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem(yoga.key)).assertExists()
-  }
-
-  @Test
-  fun appointmentCardOpensDetailsAndSeePlanningOpensTab() {
-    val checkUp =
-        PlanningItem(
-            PlanningSource.Appointment("check-up"),
-            PlanningTiming.Timed(appointment.dateTime.toInstant(ZoneOffset.UTC)),
-            appointment.title,
-        )
     val navigationActions =
-        setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(checkUp) })
+        setOverviewScreen(FakePlanningRepository().apply { items.value = listOf(yoga, checkUp) })
 
-    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    assertTextInside("Gentle yoga for patients", C.Tag.overview_next_up)
+    assertTextInside("10:00 · Wellness center", C.Tag.overview_next_up)
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertDoesNotExist()
+    // Today's list stays under it until the medications card replaces it
+    composeTestRule.onNodeWithTag(C.Tag.overviewTodayItem(yoga.key)).assertExists()
+
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).performClick()
     composeTestRule.onNodeWithTag(C.Tag.overview_see_planning).performScrollTo().performClick()
-
     composeTestRule.runOnIdle {
       // Planning is a tab: it opens with tab navigation, not stacked on the Overview
       assertEquals(listOf(Route.PLANNING), navigationActions.openedTabs)
-      assertEquals(listOf(Screen.appointmentDetail("check-up")), navigationActions.openedRoutes)
+      assertEquals(listOf(Screen.eventDetail("gentle-yoga")), navigationActions.openedRoutes)
+    }
+  }
+
+  @Test
+  fun nextUp_saysWhenAndWhere_andOpensTheAppointmentOrTheEvent() {
+    var state by mutableStateOf(loaded)
+    val opened = mutableListOf<String>()
+    composeTestRule.setContent {
+      OverviewContent(
+          uiState = state,
+          onShortcutClick = {},
+          onOpenPlanning = {},
+          onOpenAppointment = { opened += "appointment $it" },
+          onRetry = {},
+          onOpenEvent = { opened += "event $it" },
+      )
+    }
+    val checkUp = NextUp(TodayItemKind.APPOINTMENT, "check-up", "Check-up", morning.withHour(15))
+    listOf(
+            checkUp.copy(place = "HUG") to "15:00 · HUG",
+            checkUp.copy(dateTime = appointment.dateTime) to "Tomorrow, Sun 4 Oct · 09:30",
+            checkUp.copy(dateTime = morning.plusDays(5), place = "HUG") to
+                "Thu 8 Oct · 09:00 · HUG",
+            checkUp.copy(kind = TodayItemKind.EVENT, id = "yoga", place = " ") to "15:00",
+        )
+        .forEach { (nextUp, shown) ->
+          state = loaded.copy(nextUp = nextUp)
+          composeTestRule.waitForIdle()
+          composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertTextContains(shown)
+          composeTestRule.onNodeWithTag(C.Tag.overview_next_up).performClick()
+        }
+    composeTestRule.runOnIdle {
+      assertEquals(
+          List(3) { "appointment check-up" } + "event yoga",
+          opened,
+      )
     }
   }
 
@@ -422,8 +460,8 @@ class OverviewScreenTest {
   // ----- Review fixes -----
 
   @Test
-  fun happeningNow_showsANowChip() {
-    setContent(
+  fun caregiverHappeningNow_showsANowChip() {
+    setCaregiverDay(
         loaded.copy(
             todayEntries = listOf(entry("chemo", 9, TodayItemStatus.NOW, TodayItemKind.APPOINTMENT))
         )
@@ -432,8 +470,8 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun medicationWithoutTime_showsNoSetTime_andNoStatus() {
-    setContent(
+  fun caregiverMedicationWithoutTime_showsNoSetTime_andNoStatus() {
+    setCaregiverDay(
         loaded.copy(todayEntries = listOf(entry("med", null, null, TodayItemKind.MEDICATION)))
     )
     val row = C.Tag.overviewTodayItem("med")
@@ -449,8 +487,8 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun medicationOfAnUnconfirmedPrescription_saysItIsNotConfirmed() {
-    setContent(
+  fun caregiverMedicationOfAnUnconfirmedPrescription_saysItIsNotConfirmed() {
+    setCaregiverDay(
         loaded.copy(
             todayEntries =
                 listOf(
@@ -599,18 +637,12 @@ class OverviewScreenTest {
     }
     composeTestRule.onNodeWithTag(C.Tag.overview_shortcuts).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
+    // The patient's cards of the Overview UX Refactor aren't the caregiver's yet
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertDoesNotExist()
     composeTestRule
         .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
         .assertDoesNotExist()
     composeTestRule.onNodeWithTag(OverviewShortcut.PROFILE.testTag).assertIsDisplayed()
-  }
-
-  @Test
-  fun patientMode_suggestsAddingAnAppointment() {
-    setContent(loaded)
-    composeTestRule
-        .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
-        .assertExists()
   }
 
   @Test
@@ -739,13 +771,16 @@ class OverviewScreenTest {
       composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
   @Test
-  fun header_isOnTop_andTheAppointmentCardOverlapsItsLowerEdge_withOrWithoutAnAppointment() {
-    var state by mutableStateOf(loaded.copy(nextAppointment = appointment))
+  fun header_isOnTop_andTheFirstCardOverlapsItsLowerEdge_whateverTheDay() {
+    var state by mutableStateOf(loaded)
     composeTestRule.setContent { OverviewContent(state, {}, {}, {}, {}) }
 
-    listOf(appointment to C.Tag.overview_next_appointment, null to C.Tag.overview_no_appointment)
-        .forEach { (next, cardTag) ->
-          state = loaded.copy(nextAppointment = next)
+    listOf(
+            loaded.copy(nextUp = nextUp) to C.Tag.overview_next_up,
+            loaded to C.Tag.overview_no_appointment,
+        )
+        .forEach { (shown, cardTag) ->
+          state = shown
           composeTestRule.waitForIdle()
           val header = bounds(C.Tag.overview_header)
           val card = bounds(cardTag)
@@ -770,11 +805,11 @@ class OverviewScreenTest {
   @Test
   @Config(qualifiers = LANDSCAPE_PHONE)
   fun landscape_headerIsTheBand_andTheCardIsBelowIt() {
-    setContent(loaded.copy(nextAppointment = appointment))
+    setContent(loaded.copy(nextUp = nextUp))
 
     val header = bounds(C.Tag.overview_header)
     assertTrue("the band, not the 210 dp header: ${header.height}", header.height < 210.dp)
-    assertTrue(bounds(C.Tag.overview_next_appointment).top >= header.bottom)
+    assertTrue(bounds(C.Tag.overview_next_up).top >= header.bottom)
   }
 
   @Test
@@ -795,9 +830,15 @@ class OverviewScreenTest {
 
   @Test
   @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
-  fun at200Percent_aRowsTimeGoesAboveItsTitle_andEverythingCanBeScrolledToWhole() {
+  fun caregiverAt200Percent_aRowsTimeGoesAboveItsTitle_andEverythingCanBeScrolledToWhole() {
     val med = entry("med", 8, TodayItemStatus.DONE, TodayItemKind.MEDICATION)
-    setContent(loaded.copy(nextAppointment = appointment, todayEntries = listOf(med)))
+    setCaregiverDay(
+        loaded.copy(
+            nextAppointment = appointment,
+            todayEntries = listOf(med),
+            sharedSections = setOf(CarePermission.SYMPTOMS),
+        )
+    )
 
     val row = C.Tag.overviewTodayItem("med")
     composeTestRule.onNodeWithTag(row).performScrollTo()
@@ -807,9 +848,21 @@ class OverviewScreenTest {
             .getUnclippedBoundsInRoot()
     assertTrue("08:00 above its title", textIn("08:00").bottom <= textIn(med.title).top)
     listOf(
-            C.Tag.overview_greeting,
+            C.Tag.overview_whose_care,
             C.Tag.overview_next_appointment,
             row,
+            C.Tag.overview_see_planning,
+            C.Tag.overview_shortcut_symptoms,
+        )
+        .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun patientAt200Percent_everyCardAndLinkCanBeScrolledToWhole() {
+    setContent(loaded.copy(nextUp = nextUp.copy(title = "Oncology check-up with a long name")))
+    listOf(
+            C.Tag.overview_next_up,
             C.Tag.overview_see_planning,
             C.Tag.overview_shortcut_care_circle,
         )
@@ -817,8 +870,10 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun defaultFont_aRowsTimeIsBesideItsTitle() {
-    setContent(loaded.copy(todayEntries = listOf(entry("med", 8, null, TodayItemKind.MEDICATION))))
+  fun caregiverDefaultFont_aRowsTimeIsBesideItsTitle() {
+    setCaregiverDay(
+        loaded.copy(todayEntries = listOf(entry("med", 8, null, TodayItemKind.MEDICATION)))
+    )
 
     val row = C.Tag.overviewTodayItem("med")
     fun textIn(text: String) =
@@ -833,7 +888,7 @@ class OverviewScreenTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun cardsAreWhite_withATonalDatePill_tilesTonal_andTheSkyFollowsTheTime_inBothThemes() {
+  fun caregiverCardsAreWhite_withATonalDatePill_tilesTonal_andTheSkyFollowsTheTime_inBothThemes() {
     var dark by mutableStateOf(false)
     var now by mutableStateOf(morning)
     var empty by mutableStateOf(false)
@@ -846,11 +901,13 @@ class OverviewScreenTest {
                 todayEntries =
                     if (empty) emptyList()
                     else listOf(entry("med", 8, null, TodayItemKind.MEDICATION)),
+                sharedSections = setOf(CarePermission.SYMPTOMS),
             ),
             {},
             {},
             {},
             {},
+            caregiverOf = "Anne",
         )
       }
     }
@@ -936,13 +993,34 @@ class OverviewScreenTest {
       }
     }
     composeTestRule.runOnUiThread(show)
-    composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertIsDisplayed()
 
     // Rotating recreates the activity; the Overview's ViewModel survives it
     composeTestRule.activityRule.scenario.recreate()
     composeTestRule.runOnUiThread(show)
 
     composeTestRule.onNodeWithTag(C.Tag.overview_header).assertIsDisplayed()
-    assertTextInside(appointment.title, C.Tag.overview_next_appointment)
+    assertTextInside(appointment.title, C.Tag.overview_next_up)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun patientNextUpCardIsWhite_inBothThemes() {
+    var dark by mutableStateOf(false)
+    var state by mutableStateOf(loaded)
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = dark) { OverviewContent(state, {}, {}, {}, {}) }
+    }
+    listOf(false to SurfaceContainerLowestLight, true to SurfaceContainerLowestDark).forEach {
+        (isDark, card) ->
+      dark = isDark
+      state = loaded.copy(nextUp = nextUp)
+      composeTestRule.waitForIdle()
+      // In the card's bottom-left corner padding, away from the badge and the text
+      val node = composeTestRule.onNodeWithTag(C.Tag.overview_next_up)
+      val height = node.fetchSemanticsNode().size.height
+      val y = with(composeTestRule.density) { height.toDp() } - 6.dp
+      assertSameColor("Next up, dark=$isDark", card, node.colorAt(24.dp, y))
+    }
   }
 }

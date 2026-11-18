@@ -79,6 +79,8 @@
     <string name="overview_see_planning">See planning</string>
     <string name="overview_nothing_today">Nothing planned today</string>
     <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
+    <string name="overview_next_up">Next up</string>
+    <string name="overview_with_place">%1$s · %2$s</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
     <string name="overview_no_set_time">No set time</string>
@@ -590,6 +592,13 @@
     <string name="prescriptions_no_access_title_unnamed">You can\'t see these prescriptions anymore</string>
     <string name="prescriptions_no_access_hint_unnamed">You\'re no longer in this care circle.</string>
 
+    <!-- Caregiver prescription edits (US-46) -->
+    <string name="prescription_form_edit_title_for">Edit %1$s\'s prescription</string>
+    <string name="prescription_delete_title_for">Delete %1$s\'s prescription?</string>
+    <string name="prescription_delete_message_for">It will be removed from %1$s\'s prescriptions with all its medications. You can\'t undo this.</string>
+    <string name="prescription_form_not_allowed_title">This prescription can\'t be edited</string>
+    <string name="prescription_form_not_allowed_hint">You don\'t currently have permission to edit this patient\'s prescriptions.</string>
+
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
     <string name="prescription_scan_close">Close</string>
@@ -741,4 +750,8 @@
     <string name="appointment_edit_for">Edit %1$s\'s appointment</string>
     <string name="appointment_delete_title_for">Delete %1$s\'s appointment?</string>
     <string name="appointment_delete_message_for">It will be removed from %1$s\'s planning. You can\'t undo this.</string>
+    <!-- A caregiver edits or deletes the patient's symptom, e.g. "Delete Anne's entry?" -->
+    <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
+    <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
+    <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
 </resources>
