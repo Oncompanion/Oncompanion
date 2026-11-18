@@ -38,9 +38,6 @@ import kotlinx.coroutines.launch
  *   doesn't exist
  * @property load where reading it is at: shown with no [prescription] means it doesn't exist
  * @property delete where the deletion of the prescription is at
- * @property isCaregiver whether these are the prescriptions of a patient the user follows. Fixed
- *   for the screen's whole life: once a removed caregiver leaves, the patient's name is gone before
- *   the app moves to Whose care?, so the no-access text can't be chosen from that name (#490)
  * @property isOwn whether it is the user's own prescription: a caregiver only reads the patient's
  */
 data class PrescriptionDetailUiState(
@@ -48,7 +45,6 @@ data class PrescriptionDetailUiState(
     val load: PrescriptionsLoad = PrescriptionsLoad.LOADING,
     override val delete: DeletePhase = DeletePhase.IDLE,
     val isOwn: Boolean = true,
-    val isCaregiver: Boolean = false,
 ) : HasDeletePhase {
   /**
    * The prescription is shown and can be corrected: not after a read error, when what is on screen
@@ -76,6 +72,7 @@ internal fun PrescriptionDetailUiState.loadWhileReading(): PrescriptionsLoad =
       // A read error stays shown over the prescription kept from before it
       PrescriptionsLoad.FAILED -> PrescriptionsLoad.FAILED
       PrescriptionsLoad.NOT_SHARED,
+      PrescriptionsLoad.NOT_SIGNED_IN,
       PrescriptionsLoad.NO_ACCESS -> PrescriptionsLoad.LOADING
     }
 
@@ -105,8 +102,7 @@ class PrescriptionDetailViewModel(
 
   private val observeSection = ObserveCareSection(resolveSection)
 
-  private val _uiState =
-      MutableStateFlow(PrescriptionDetailUiState(isCaregiver = patientUid != null))
+  private val _uiState = MutableStateFlow(PrescriptionDetailUiState())
   val uiState: StateFlow<PrescriptionDetailUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
@@ -180,7 +176,7 @@ class PrescriptionDetailViewModel(
                 prescription = null,
                 load =
                     if (section == CareSection.NotShared) PrescriptionsLoad.NOT_SHARED
-                    else PrescriptionsLoad.NO_ACCESS,
+                    else noAccessLoad(authRepository),
                 isOwn = false,
                 delete = delete.afterRead(false),
             )

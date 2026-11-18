@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -41,9 +42,11 @@ enum class PrescriptionsLoad {
   FAILED,
   /** In caregiver mode, the patient doesn't share their prescriptions. */
   NOT_SHARED,
+  /** Nobody is signed in, patient or caregiver: retrying can't help, signing in again does. */
+  NOT_SIGNED_IN,
   /**
-   * Nothing can be read, and retrying wouldn't help: nobody is signed in, or in caregiver mode the
-   * caregiver is no longer in the patient's circle.
+   * Signed in, but not in the circle of the patient whose prescriptions these are: a caregiver the
+   * patient removed. Retrying wouldn't help.
    */
   NO_ACCESS,
 }
@@ -67,31 +70,38 @@ internal fun MessageArea(modifier: Modifier = Modifier, content: @Composable () 
 }
 
 /**
- * Why the list or the detail can't show any prescription when there is
- * [PrescriptionsLoad.NO_ACCESS]: the patient is signed out, or the caregiver ([isCaregiver]) is no
- * longer in the patient's circle. No Retry, since retrying can't change either.
+ * Why nothing can be read when the access check finds no access: nobody is signed in, or the user
+ * is signed in but not in the patient's circle. Asked of the sign-in itself, so a caregiver who
+ * signs out is never told they were removed (#490).
+ */
+internal fun noAccessLoad(auth: AuthRepository): PrescriptionsLoad =
+    if (runCatching { auth.currentUser }.getOrNull() == null) PrescriptionsLoad.NOT_SIGNED_IN
+    else PrescriptionsLoad.NO_ACCESS
+
+/** What the list and the detail say at [PrescriptionsLoad.NOT_SIGNED_IN], to anyone. */
+@Composable
+internal fun SignedOutMessage() {
+  LakeMessageState(
+      title = stringResource(R.string.prescriptions_signed_out_title),
+      message = stringResource(R.string.prescriptions_signed_out_hint),
+  )
+}
+
+/**
+ * What the list and the detail say at [PrescriptionsLoad.NO_ACCESS]: the caregiver is no longer in
+ * the patient's circle. No Retry, since retrying can't change it.
  *
  * @param caregiverOf the patient's first name, which is already gone once a removed caregiver has
  *   left: the text then names nobody, but still says why
  */
 @Composable
-internal fun NoAccessMessage(
-    isCaregiver: Boolean,
-    caregiverOf: String?,
-    modifier: Modifier = Modifier,
-) {
-  // Who can't read, and whose name is still known: the texts say why without a missing name
-  val (title, hint) =
-      when {
-        !isCaregiver ->
-            stringResource(R.string.prescriptions_signed_out_title) to
-                stringResource(R.string.prescriptions_signed_out_hint)
-        caregiverOf == null ->
-            stringResource(R.string.prescriptions_no_access_title_unnamed) to
-                stringResource(R.string.prescriptions_no_access_hint_unnamed)
-        else ->
-            stringResource(R.string.prescriptions_no_access_title_for, caregiverOf) to
-                stringResource(R.string.prescriptions_no_access_hint_for, caregiverOf)
-      }
-  LakeMessageState(title = title, message = hint, modifier = modifier)
+internal fun NoAccessMessage(caregiverOf: String?) {
+  LakeMessageState(
+      title =
+          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_title_for, it) }
+              ?: stringResource(R.string.prescriptions_no_access_title_unnamed),
+      message =
+          caregiverOf?.let { stringResource(R.string.prescriptions_no_access_hint_for, it) }
+              ?: stringResource(R.string.prescriptions_no_access_hint_unnamed),
+  )
 }

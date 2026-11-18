@@ -166,16 +166,18 @@ fun PrescriptionsContent(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescriptions_loading)
             )
         PrescriptionsLoad.FAILED -> ErrorState(caregiverOf, buttonRoom, onRetry)
+        PrescriptionsLoad.NOT_SIGNED_IN ->
+            MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) { SignedOutMessage() }
         PrescriptionsLoad.NO_ACCESS ->
             MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
-              NoAccessMessage(uiState.isCaregiver, caregiverOf)
+              NoAccessMessage(caregiverOf)
             }
         // The patient a caregiver follows doesn't share their prescriptions
         PrescriptionsLoad.NOT_SHARED ->
             // Without the name, the caregiver was just removed and leaves for Whose care?
             if (caregiverOf == null)
                 MessageArea(Modifier.testTag(C.Tag.prescriptions_no_access)) {
-                  NoAccessMessage(isCaregiver = true, caregiverOf = null)
+                  NoAccessMessage(caregiverOf = null)
                 }
             else
                 NotSharedMessage(

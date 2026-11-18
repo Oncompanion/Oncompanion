@@ -160,16 +160,20 @@ fun PrescriptionDetailContent(
                   actionTestTag = C.Tag.prescription_detail_retry_button,
               )
             }
+        PrescriptionsLoad.NOT_SIGNED_IN ->
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+              SignedOutMessage()
+            }
         PrescriptionsLoad.NO_ACCESS ->
             MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
-              NoAccessMessage(uiState.isCaregiver, caregiverOf)
+              NoAccessMessage(caregiverOf)
             }
         // The patient a caregiver follows doesn't share their prescriptions (anymore)
         PrescriptionsLoad.NOT_SHARED ->
             // Without the name, the caregiver was just removed and leaves for Whose care?
             if (caregiverOf == null)
                 MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
-                  NoAccessMessage(isCaregiver = true, caregiverOf = null)
+                  NoAccessMessage(caregiverOf = null)
                 }
             else
                 NotSharedMessage(

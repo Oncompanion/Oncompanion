@@ -171,7 +171,7 @@ class PrescriptionsViewModelTest {
       }
 
   @Test
-  fun signedOut_hasNoAccess_notAnError_withoutReading() =
+  fun signedOut_isNotSignedIn_notAnError_withoutReading() =
       runTest(dispatcher) {
         repository.seed(uid, prescription("p1", "2026-09-29", "Ondansetron 8 mg"))
 
@@ -179,8 +179,7 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         // Retrying can't sign the patient back in: no access, not an error to retry
-        assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
-        assertFalse(viewModel.uiState.value.isCaregiver)
+        assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, viewModel.uiState.value.load)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 
@@ -445,8 +444,22 @@ class PrescriptionsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
-        // Known from the start, so the text stays right once leave() clears the patient's name
-        assertTrue(viewModel.uiState.value.isCaregiver)
+        assertEquals(emptyList<String>(), viewModel.ids)
+      }
+
+  @Test
+  fun caregiver_signingOut_isNotSignedIn_notRemovedFromTheCircle() =
+      runTest(dispatcher) {
+        repository.seed("patient", prescription("p1", "2026-10-01", "Ondansetron 8 mg"))
+        val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+        val viewModel = caregiverViewModel(patient)
+        advanceUntilIdle()
+
+        // Still in the circle: they signed out, nobody removed them (#490)
+        patient.auth.signOut()
+        advanceUntilIdle()
+
+        assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, viewModel.uiState.value.load)
         assertEquals(emptyList<String>(), viewModel.ids)
       }
 

@@ -272,41 +272,34 @@ class PrescriptionDetailScreenTest {
           caregiverOf = caregiverOf,
       )
     }
-    // Signed out (the patient), or removed from the circle (a caregiver): retrying can't help.
-    // Once removed, leave() clears the patient's name before the app moves to Whose care?, so
-    // the caregiver's text can't depend on that name (#490)
+    // Signed out, patient or caregiver: "You're signed out", even while the patient's name is
+    // still known. Signed in but no longer in the circle (a caregiver): "no longer in the care
+    // circle", named or not, since leave() clears the name before Whose care? (#490)
     val anne = "Anne"
     val cases =
         listOf(
             Triple(
-                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SIGNED_IN, isOwn = false),
                 null as String?,
                 signedOut,
             ),
             Triple(
-                PrescriptionDetailUiState(
-                    load = PrescriptionsLoad.NO_ACCESS,
-                    isOwn = false,
-                    isCaregiver = true,
-                ),
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SIGNED_IN, isOwn = false),
+                anne,
+                signedOut,
+            ),
+            Triple(
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
                 anne,
                 removedFrom(anne),
             ),
             Triple(
-                PrescriptionDetailUiState(
-                    load = PrescriptionsLoad.NO_ACCESS,
-                    isOwn = false,
-                    isCaregiver = true,
-                ),
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NO_ACCESS, isOwn = false),
                 null,
                 removedUnnamed,
             ),
             Triple(
-                PrescriptionDetailUiState(
-                    load = PrescriptionsLoad.NOT_SHARED,
-                    isOwn = false,
-                    isCaregiver = true,
-                ),
+                PrescriptionDetailUiState(load = PrescriptionsLoad.NOT_SHARED, isOwn = false),
                 null,
                 removedUnnamed,
             ),

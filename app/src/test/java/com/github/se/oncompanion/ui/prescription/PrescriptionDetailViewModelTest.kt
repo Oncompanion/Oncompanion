@@ -230,15 +230,14 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun signedOut_hasNoAccess_notAnErrorNorNotFound() = runTest {
+  fun signedOut_isNotSignedIn_notAnErrorNorNotFound() = runTest {
     repository.seed("alice", chemo)
     val vm = viewModel(auth = FakeAuthRepository())
 
     advanceUntilIdle()
 
     // Retrying can't sign the patient back in: no access, not an error to retry
-    assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
-    assertFalse(vm.uiState.value.isCaregiver)
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, vm.uiState.value.load)
   }
 
   @Test
@@ -277,6 +276,7 @@ class PrescriptionDetailViewModelTest {
             PrescriptionsLoad.FAILED to chemo to PrescriptionsLoad.FAILED,
             PrescriptionsLoad.NOT_SHARED to chemo to PrescriptionsLoad.LOADING,
             PrescriptionsLoad.NO_ACCESS to chemo to PrescriptionsLoad.LOADING,
+            PrescriptionsLoad.NOT_SIGNED_IN to chemo to PrescriptionsLoad.LOADING,
         )
     for ((before, expected) in cases) {
       val (load, prescription) = before
@@ -444,7 +444,7 @@ class PrescriptionDetailViewModelTest {
     advanceUntilIdle()
 
     // Signing out says so, closes the confirmation and deletes nothing
-    assertEquals(PrescriptionsLoad.NO_ACCESS, vm.uiState.value.load)
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, vm.uiState.value.load)
     assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
     assertEquals(listOf(chemo), repository.prescriptionsOf("alice"))
   }
@@ -572,8 +572,21 @@ class PrescriptionDetailViewModelTest {
     dispatcher.scheduler.advanceUntilIdle()
 
     assertEquals(PrescriptionsLoad.NO_ACCESS, viewModel.uiState.value.load)
-    // Known from the start, so the text stays right once leave() clears the patient's name
-    assertTrue(viewModel.uiState.value.isCaregiver)
+    assertNull(viewModel.uiState.value.prescription)
+  }
+
+  @Test
+  fun caregiver_signingOut_isNotSignedIn_notRemovedFromTheCircle() {
+    val patient = FollowedPatient(CarePermission.PRESCRIPTIONS)
+    repository.seed("patient", chemo)
+    val viewModel = followedViewModel(patient)
+    dispatcher.scheduler.advanceUntilIdle()
+
+    // Still in the circle: they signed out, nobody removed them (#490)
+    patient.auth.signOut()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(PrescriptionsLoad.NOT_SIGNED_IN, viewModel.uiState.value.load)
     assertNull(viewModel.uiState.value.prescription)
   }
 

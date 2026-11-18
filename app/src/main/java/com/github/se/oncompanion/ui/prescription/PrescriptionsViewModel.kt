@@ -50,9 +50,6 @@ import kotlinx.coroutines.launch
  * @property caregiverUid in caregiver mode, the signed-in caregiver: only the prescriptions they
  *   added are grouped, with whether the patient accepted or rejected them. Null for the patient,
  *   who sees every caregiver's grouped while they wait.
- * @property isCaregiver whether these are the prescriptions of a patient the user follows. Fixed
- *   for the screen's whole life: once a removed caregiver leaves, the patient's name is gone before
- *   the app moves to Whose care?, so the no-access text can't be chosen from that name (#490)
  * @property seen in caregiver mode, the accepted prescriptions whose acceptance they closed
  */
 data class PrescriptionsUiState(
@@ -62,7 +59,6 @@ data class PrescriptionsUiState(
     val canAdd: Boolean = false,
     val caregiverUid: String? = null,
     val seen: Set<String> = emptySet(),
-    val isCaregiver: Boolean = false,
 ) {
   /**
    * The prescriptions a caregiver added that show above the others, in the order of [prescriptions]
@@ -126,10 +122,7 @@ class PrescriptionsViewModel(
 
   private val observeSection = ObserveCareSection(resolveSection)
 
-  private val _uiState =
-      MutableStateFlow(
-          PrescriptionsUiState(today = LocalDate.now(clock), isCaregiver = patientUid != null)
-      )
+  private val _uiState = MutableStateFlow(PrescriptionsUiState(today = LocalDate.now(clock)))
   val uiState: StateFlow<PrescriptionsUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
@@ -239,7 +232,7 @@ class PrescriptionsViewModel(
         is CareSection.Loading ->
             withoutPrescriptions(PrescriptionsLoad.LOADING).copy(canAdd = section.canAdd)
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        CareSection.NoAccess -> withoutPrescriptions(PrescriptionsLoad.NO_ACCESS)
+        CareSection.NoAccess -> withoutPrescriptions(noAccessLoad(authRepository))
         CareSection.NotShared -> withoutPrescriptions(PrescriptionsLoad.NOT_SHARED)
         // A patient can still add one if their list fails; a caregiver can't
         is CareSection.Failed ->
