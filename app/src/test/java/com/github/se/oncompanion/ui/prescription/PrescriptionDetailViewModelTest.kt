@@ -264,7 +264,7 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun whileReadingAgain_neverShowsAPrescriptionToSomeoneWhoLostAccess() {
+  fun whileReadingAgain_keepsWhatWasShown_butNeverAfterAccessWasLost() {
     // Only a shown or loading prescription may stay while it is read again: losing the access
     // never turns back into the prescription, even if one were still held (#490)
     val cases =
@@ -274,6 +274,8 @@ class PrescriptionDetailViewModelTest {
             PrescriptionsLoad.LOADING to chemo to PrescriptionsLoad.SHOWN,
             PrescriptionsLoad.LOADING to null to PrescriptionsLoad.LOADING,
             PrescriptionsLoad.FAILED to chemo to PrescriptionsLoad.FAILED,
+            // The first read failed: a new read is under way, as on main (a spinner, not the error)
+            PrescriptionsLoad.FAILED to null to PrescriptionsLoad.LOADING,
             PrescriptionsLoad.NOT_SHARED to chemo to PrescriptionsLoad.LOADING,
             PrescriptionsLoad.NO_ACCESS to chemo to PrescriptionsLoad.LOADING,
             PrescriptionsLoad.NOT_SIGNED_IN to chemo to PrescriptionsLoad.LOADING,

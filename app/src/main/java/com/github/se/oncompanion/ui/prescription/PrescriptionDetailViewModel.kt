@@ -60,17 +60,19 @@ data class PrescriptionDetailUiState(
 
 /**
  * What the detail shows while the prescription is read again, with the access known: the
- * prescription kept from before, a read error over it, or nothing yet. Only a shown or loading
- * prescription may stay: after the access was lost, the read has to show it again first, even if
- * one were still held (#490).
+ * prescription kept from before, a read error over it, or a spinner while nothing is kept. After
+ * the access was lost, the read has to show the prescription again first, even if one were still
+ * held (#490).
  */
 internal fun PrescriptionDetailUiState.loadWhileReading(): PrescriptionsLoad =
     when (load) {
       PrescriptionsLoad.SHOWN,
       PrescriptionsLoad.LOADING ->
           if (prescription == null) PrescriptionsLoad.LOADING else PrescriptionsLoad.SHOWN
-      // A read error stays shown over the prescription kept from before it
-      PrescriptionsLoad.FAILED -> PrescriptionsLoad.FAILED
+      // A read error stays shown over the prescription kept from before it; with none kept, the
+      // new read is under way
+      PrescriptionsLoad.FAILED ->
+          if (prescription == null) PrescriptionsLoad.LOADING else PrescriptionsLoad.FAILED
       PrescriptionsLoad.NOT_SHARED,
       PrescriptionsLoad.NOT_SIGNED_IN,
       PrescriptionsLoad.NO_ACCESS -> PrescriptionsLoad.LOADING
