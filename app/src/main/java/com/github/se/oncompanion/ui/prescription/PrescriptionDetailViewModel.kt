@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
@@ -39,7 +40,7 @@ import kotlinx.coroutines.launch
  * @property isLoading true until the prescription arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
  * @property delete where the deletion of the prescription is at
- * @property isOwn whether it is the user's own prescription: a caregiver only reads the patient's
+ * @property canChange whether edit and delete are allowed in this section
  * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
  */
 data class PrescriptionDetailUiState(
@@ -47,8 +48,8 @@ data class PrescriptionDetailUiState(
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     override val delete: DeletePhase = DeletePhase.IDLE,
-    val isOwn: Boolean = true,
     val isNotShared: Boolean = false,
+    val canChange: Boolean = true,
 ) : HasDeletePhase {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
@@ -59,7 +60,7 @@ data class PrescriptionDetailUiState(
    * may be out of date.
    */
   val canEdit: Boolean
-    get() = isOwn && prescription != null && !isLoading && !hasError && !delete.isUnderWay
+    get() = canChange && prescription != null && !isLoading && !hasError && !delete.isUnderWay
 
   /** The prescription is shown and can be deleted. */
   override val canDelete: Boolean
@@ -70,8 +71,8 @@ data class PrescriptionDetailUiState(
  * Loads one prescription of the signed-in user and keeps it up to date, so a correction saved in
  * the form shows when the user comes back. The repository reads from the local cache, so the detail
  * also works offline. Deletes the prescription once the user confirms (US-12). In caregiver mode
- * (US-20), the prescription is the followed patient's, read-only, when they share their
- * prescriptions.
+ * (US-20), the prescription is the followed patient's when shared; editing and deleting require the
+ * patient's permission for Prescriptions (US-46).
  *
  * @param patientUid in caregiver mode, the patient whose prescription is shown; null for the user's
  *   own
@@ -121,6 +122,7 @@ class PrescriptionDetailViewModel(
     // Only one read at a time, so a second retry doesn't add a second listener
     observation?.cancel()
     observation = viewModelScope.launch {
+      var hasShown = false
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
             // A rejected prescription is gone for everyone, as a deleted one (US-43)
             val prescription =
@@ -136,7 +138,16 @@ class PrescriptionDetailViewModel(
                   it?.namedBy(names)
                 }
           }
-          .collect { section -> _uiState.update { it.showing(section) } }
+          .collect { section ->
+            _uiState.update {
+              val next = it.showing(section)
+              // A changed access must be checked again before offering an old action.
+              if (hasShown && section is CareSection.Loading && section.accessKnown)
+                  next.copy(canChange = false, delete = next.delete.afterRead(false))
+              else next
+            }
+            if (section is CareSection.Shown) hasShown = true
+          }
     }
   }
 
@@ -158,7 +169,7 @@ class PrescriptionDetailViewModel(
                     isLoading = true,
                     hasError = false,
                     isNotShared = false,
-                    isOwn = false,
+                    canChange = false,
                     delete = delete.afterRead(false),
                 )
         // Nothing to read: not shared, or nobody to read it for
@@ -169,7 +180,7 @@ class PrescriptionDetailViewModel(
                 isLoading = false,
                 hasError = section == CareSection.NoAccess,
                 isNotShared = section == CareSection.NotShared,
-                isOwn = false,
+                canChange = false,
                 delete = delete.afterRead(false),
             )
         is CareSection.Failed ->
@@ -186,8 +197,9 @@ class PrescriptionDetailViewModel(
                 isLoading = false,
                 hasError = false,
                 isNotShared = false,
-                isOwn = section.canEdit,
-                delete = delete.afterRead(deletable = section.data != null),
+                canChange = section.canEditEntries,
+                delete =
+                    delete.afterRead(deletable = section.data != null && section.canEditEntries),
             )
       }
 
@@ -206,7 +218,10 @@ class PrescriptionDetailViewModel(
       deletion.confirm(
           signedInUid = { authRepository.signedInUid(TAG) },
           stopObserving = { observation?.cancel() },
-          delete = { uid -> manageMedicationSchedule.delete(uid, prescriptionId) },
+          delete = { uid ->
+            // The actor authenticates the write; the prescription belongs to the followed patient.
+            manageMedicationSchedule.delete(patientUid ?: uid, prescriptionId)
+          },
           onFailure = { observe() },
       )
 

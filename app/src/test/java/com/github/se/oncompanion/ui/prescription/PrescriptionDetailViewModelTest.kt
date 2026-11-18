@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
@@ -23,6 +24,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -592,5 +595,163 @@ class PrescriptionDetailViewModelTest {
         PrescriptionConfirmation.PENDING,
         viewModel.uiState.value.prescription?.confirmation,
     )
+  }
+
+  /** A patient who permits changes to prescriptions, using the shared caregiver fixture. */
+  private fun editablePatient() =
+      FollowedPatient(
+          CarePermission.PRESCRIPTIONS,
+          canAdd = setOf(CarePermission.PRESCRIPTIONS),
+          canEditAndDelete = setOf(CarePermission.PRESCRIPTIONS),
+      )
+
+  @Test
+  fun caregiverAllowedToChange_deletesOnlyThePatientsPrescriptionAfterConfirmation() = runTest {
+    val patient = editablePatient()
+    repository.seed("patient", chemo)
+    repository.seed("caregiver", chemo)
+    val vm = followedViewModel(patient)
+    advanceUntilIdle()
+    assertTrue(vm.uiState.value.canEdit)
+    vm.requestDelete()
+    vm.cancelDelete()
+    assertEquals(listOf(chemo), repository.prescriptionsOf("patient"))
+    vm.requestDelete()
+    vm.confirmDelete()
+    advanceUntilIdle()
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
+    assertTrue(repository.prescriptionsOf("patient").isEmpty())
+    assertEquals(listOf(chemo), repository.prescriptionsOf("caregiver"))
+  }
+
+  @Test
+  fun permissionRevokedWhileConfirming_closesDialogAndCannotReopenAfterRegrant() = runTest {
+    val patient = editablePatient()
+    repository.seed("patient", chemo)
+    val vm = followedViewModel(patient)
+    advanceUntilIdle()
+    vm.requestDelete()
+    patient.shares(CarePermission.PRESCRIPTIONS)
+    advanceUntilIdle()
+    assertFalse(vm.uiState.value.canEdit)
+    assertFalse(vm.uiState.value.isDeleteDialogShown)
+    vm.confirmDelete()
+    advanceUntilIdle()
+    assertEquals(listOf(chemo), repository.prescriptionsOf("patient"))
+    patient.shares(
+        CarePermission.PRESCRIPTIONS,
+        canAdd = setOf(CarePermission.PRESCRIPTIONS),
+        canEditAndDelete = setOf(CarePermission.PRESCRIPTIONS),
+    )
+    advanceUntilIdle()
+    assertTrue(vm.uiState.value.canEdit)
+    assertEquals(DeletePhase.IDLE, vm.uiState.value.delete)
+  }
+
+  @Test
+  fun caregiverDeleteFailureAllowsRetry_andLaterServerRejectionRestoresPrescription() = runTest {
+    val patient = editablePatient()
+    repository.seed("patient", chemo)
+    val vm = followedViewModel(patient)
+    advanceUntilIdle()
+    vm.requestDelete()
+    repository.writeError = IllegalStateException("local failure")
+    vm.confirmDelete()
+    advanceUntilIdle()
+    assertEquals(DeletePhase.FAILED, vm.uiState.value.delete)
+    assertTrue(vm.uiState.value.isDeleteDialogShown)
+    repository.writeError = null
+    repository.serverRejectsWrites = true
+    vm.confirmDelete()
+    advanceUntilIdle()
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
+    repository.rejectPendingWrites()
+    assertEquals(listOf(chemo), repository.prescriptionsOf("patient"))
+  }
+
+  @Test
+  fun editorNameFollowsCircleRename_andFallsBackToStoredNameAfterRemoval() = runTest {
+    val circles = FakeCareCircleRepository()
+    repository.seed("alice", chemo.copy(editedBy = "sam", editedByName = "Stored"))
+    circles.setMembers("alice", listOf(CareCircleMember(uid = "sam", firstName = "Sophie")))
+    val vm =
+        PrescriptionDetailViewModel(
+            "chemo",
+            signedIn(),
+            repository,
+            careCircleRepository = circles,
+        )
+    advanceUntilIdle()
+    assertEquals("Sophie", vm.uiState.value.prescription?.editedByName)
+    circles.setMembers("alice", emptyList())
+    advanceUntilIdle()
+    assertEquals("Stored", vm.uiState.value.prescription?.editedByName)
+  }
+
+  @Test
+  fun permissionReloadDisablesActionsBeforeTheReplacementReadArrives() = runTest {
+    val patient = editablePatient()
+    repository.seed("patient", chemo)
+    val gate = CompletableDeferred<Unit>()
+    var reads = 0
+    val delayed =
+        object : MedicationRepository by repository {
+          override fun observePrescription(uid: String, id: String): Flow<Prescription?> = flow {
+            if (++reads > 1) gate.await()
+            emitAll(repository.observePrescription(uid, id))
+          }
+        }
+    val vm =
+        PrescriptionDetailViewModel(
+            "chemo",
+            patient.auth,
+            delayed,
+            patientUid = "patient",
+            resolveSection = patient.sectionAccess,
+        )
+    advanceUntilIdle()
+    vm.requestDelete()
+    patient.shares(CarePermission.PRESCRIPTIONS)
+    advanceUntilIdle()
+    assertFalse(vm.uiState.value.canEdit)
+    assertFalse(vm.uiState.value.isDeleteDialogShown)
+    vm.confirmDelete()
+    assertEquals(listOf(chemo), repository.prescriptionsOf("patient"))
+    gate.complete(Unit)
+    advanceUntilIdle()
+    assertFalse(vm.uiState.value.canEdit)
+  }
+
+  @Test
+  fun accountChangedAfterDeletion_doesNotLeaveTheDialogDeleting() = runTest {
+    val patient = editablePatient()
+    repository.seed("patient", chemo)
+    // Hold completion after the write to reproduce an account change during deletion.
+    val completed = CompletableDeferred<Unit>()
+    val delayed =
+        object : MedicationRepository by repository {
+          override suspend fun deletePrescription(uid: String, id: String) {
+            repository.deletePrescription(uid, id)
+            completed.await()
+          }
+        }
+    val vm =
+        PrescriptionDetailViewModel(
+            "chemo",
+            patient.auth,
+            delayed,
+            patientUid = "patient",
+            resolveSection = patient.sectionAccess,
+        )
+    advanceUntilIdle()
+    vm.requestDelete()
+    vm.confirmDelete()
+    advanceUntilIdle()
+    assertTrue(repository.prescriptionsOf("patient").isEmpty())
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
+    patient.auth.signOut()
+    completed.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
   }
 }
