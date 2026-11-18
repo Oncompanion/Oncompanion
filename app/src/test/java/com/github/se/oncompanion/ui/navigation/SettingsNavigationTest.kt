@@ -64,6 +64,16 @@ class SettingsNavigationTest {
     }
     compose.onNodeWithTag(C.Tag.profile_settings).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performClick()
+    compose.onNodeWithTag(C.Tag.appearance_screen).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.APPEARANCE, nav.currentDestination?.route) }
+    compose.onNodeWithTag(C.Tag.settings_back).performClick()
+    compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performClick()
+    compose.onNodeWithTag(C.Tag.appearance_screen).assertIsDisplayed()
+    compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.SETTINGS, nav.currentDestination?.route) }
     compose.onNodeWithTag(C.Tag.settings_back).performClick()
     compose.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     compose.runOnIdle { assertEquals(Screen.PROFILE, nav.currentDestination?.route) }

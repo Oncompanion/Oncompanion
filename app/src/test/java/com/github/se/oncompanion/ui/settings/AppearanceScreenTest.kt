@@ -39,6 +39,16 @@ class AppearanceScreenTest {
       AppearancePreference.entries
           .filter { it != value }
           .forEach { compose.onNodeWithTag(appearanceTag(it)).assertIsNotSelected() }
+      compose
+          .onAllNodesWithTag(C.Tag.appearance_selected, useUnmergedTree = true)
+          .assertCountEquals(1)
+      compose
+          .onNode(
+              hasTestTag(C.Tag.appearance_selected) and
+                  hasAnyAncestor(hasTestTag(appearanceTag(value))),
+              useUnmergedTree = true,
+          )
+          .assertExists()
       assertEquals(value, choice)
     }
   }
@@ -50,18 +60,35 @@ class AppearanceScreenTest {
     compose.setContent { OncompanionTheme { AppearanceContent(state, {}, {}, { retries++ }) } }
     compose.onNodeWithTag(C.Tag.settings_loading).assertIsDisplayed()
     compose.runOnIdle { state = SettingsUiState(readFailed = true) }
+    compose.onNodeWithText("Couldn't read your preferences.").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.settings_retry).performClick()
     assertEquals(1, retries)
     compose.runOnIdle {
       state = SettingsUiState(DeviceSettings(), savePhase = SettingsSavePhase.SAVING)
     }
-    compose.onNodeWithTag(C.Tag.settings_saving).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_loading).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.appearance_dark).assertIsNotEnabled()
     compose.runOnIdle {
       state = SettingsUiState(DeviceSettings(), savePhase = SettingsSavePhase.FAILED)
     }
     compose.onNodeWithTag(C.Tag.settings_save_error).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appearance_device).assertIsSelected()
+  }
+
+  @Test
+  fun savingDoesNotMoveTheRowsOrShowAnError() {
+    var state by mutableStateOf(SettingsUiState(DeviceSettings()))
+    compose.setContent { OncompanionTheme { AppearanceContent(state, {}, {}, {}) } }
+    val row = compose.onNodeWithTag(C.Tag.appearance_device)
+    val before = row.fetchSemanticsNode().boundsInRoot
+    compose.runOnIdle { state = state.copy(savePhase = SettingsSavePhase.SAVING) }
+    row.assertIsNotEnabled()
+    assertEquals(before, row.fetchSemanticsNode().boundsInRoot)
+    compose.onNodeWithTag(C.Tag.settings_save_error).assertDoesNotExist()
+    compose.onNodeWithText("""Use your phone's light or dark mode""").assertIsDisplayed()
+    compose
+        .onNodeWithText("Changes apply immediately across the app and are saved on this phone.")
+        .assertIsDisplayed()
   }
 
   @Test

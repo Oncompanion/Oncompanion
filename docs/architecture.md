@@ -594,8 +594,8 @@ does not join SessionAccess cleanup. Notification settings will be account-speci
 
 Settings now exposes only Appearance and its saved value. `SettingsViewModel` observes the same
 repository in both settings destinations; the shared repository keeps them synchronized.
-`AppearanceContent` uses selectable radio rows for Follow device, Light and Dark. Writes disable
-selection until complete; failures retain the last confirmed choice and allow another attempt.
+`AppearanceContent` uses selectable rows with a trailing checkmark for Follow device, Light and Dark. Writes disable
+selection until complete without shifting the list with a save spinner; failures retain the last confirmed choice and allow another attempt.
 Read failures offer Retry. No patient record or appointment time changes.
 
 `AppAppearanceViewModel` observes device settings independently of the authenticated session.

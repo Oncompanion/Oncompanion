@@ -5,6 +5,8 @@ package com.github.se.oncompanion.ui.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,7 +76,13 @@ fun AppearanceContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
               }
-              RadioButton(selected, onClick = null, enabled = !state.saving)
+              if (selected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.testTag(C.Tag.appearance_selected),
+                )
+              }
             }
           }
         }
@@ -115,7 +123,6 @@ internal fun ColumnScope.SettingsFeedback(state: SettingsUiState, onRetry: () ->
   } else if (state.settings == null) {
     CircularProgressIndicator(Modifier.testTag(C.Tag.settings_loading))
   }
-  if (state.saving) CircularProgressIndicator(Modifier.testTag(C.Tag.settings_saving))
   if (state.saveFailed)
       Text(
           stringResource(R.string.settings_save_error),

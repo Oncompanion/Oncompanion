@@ -345,6 +345,12 @@ class M1EndToEndTest {
     ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
     captureSettings("settings-appearance-category.png")
     ui.open(C.Tag.settings_appearance, hasTestTag(C.Tag.appearance_dark))
+    ui.tag(C.Tag.appearance_light).reveal().performClick()
+    ui.tag(C.Tag.appearance_light).assertIsSelected()
+    captureSettings("settings-appearance-light.png")
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.settings_appearance))
+    captureSettings("settings-light.png")
+    ui.open(C.Tag.settings_appearance, hasTestTag(C.Tag.appearance_dark))
     ui.tag(C.Tag.appearance_dark).reveal().performClick()
     ui.tag(C.Tag.appearance_dark).assertIsSelected()
     captureSettings("settings-appearance-dark.png")
@@ -354,7 +360,7 @@ class M1EndToEndTest {
             (hasText(string(R.string.appearance_dark), substring = true) or
                 hasAnyDescendant(hasText(string(R.string.appearance_dark))))
     )
-    captureSettings("settings-foundation.png")
+    captureSettings("settings-dark.png")
     ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
   }
 
