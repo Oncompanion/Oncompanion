@@ -291,9 +291,11 @@ and scroll after the content in compact windows. Edit mode reuses the form's key
 ### Appointment reminder choices
 
 Appointments store one shared `reminder` enum name: `NONE`, `FIFTEEN_MINUTES`, `ONE_HOUR`,
-`THREE_HOURS`, or `ONE_DAY`. Missing legacy fields read as `ONE_HOUR`; explicit malformed
-values exclude the document, following the existing appointment parser. Patient and authorized
-caregiver writes use the same schema and existing permissions. Ordinary form edits preserve the
+`THREE_HOURS`, or `ONE_DAY`. Missing legacy fields read as `ONE_HOUR`. Unknown choices (including
+ones introduced by a newer app) and explicit non-string or null values read as `NONE`: the
+appointment remains visible without enabling an unintended reminder. Other malformed appointment
+fields still follow the existing document validation. Patient and authorized caregiver writes use
+the same strict schema and existing permissions. Ordinary form edits preserve the
 stored choice. This data layer does not schedule or deliver notifications; form controls and
 notification delivery are separate follow-ups to #489 and US-16.
 
