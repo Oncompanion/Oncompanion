@@ -4,13 +4,18 @@
 
 package com.github.se.oncompanion.ui.theme
 
+import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import com.github.se.oncompanion.model.settings.AppearancePreference
 
 private val LightColorScheme =
@@ -112,5 +117,29 @@ internal val LocalAppDarkTheme = staticCompositionLocalOf<Boolean?> { null }
 /** Applies one persisted preference to the existing palettes without replacing screen state. */
 @Composable
 fun AppAppearanceTheme(preference: AppearancePreference, content: @Composable () -> Unit) {
-  OncompanionTheme(darkTheme = preference.usesDarkTheme(isSystemInDarkTheme()), content = content)
+  AppAppearanceTheme(darkTheme = preference.usesDarkTheme(isSystemInDarkTheme()), content = content)
+}
+
+/** Keeps Android drawable and string resources in the same appearance as the Compose palette. */
+@Composable
+internal fun AppAppearanceTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
+  val configuration = LocalConfiguration.current
+  val context = LocalContext.current
+  // An override wrapper preserves the Activity in the context chain for scanning and sign-in.
+  val themed =
+      remember(configuration, context, darkTheme) {
+        val night =
+            if (darkTheme) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+        val config =
+            Configuration(configuration).apply {
+              uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or night
+            }
+        config to ContextThemeWrapper(context, 0).apply { applyOverrideConfiguration(config) }
+      }
+  CompositionLocalProvider(
+      LocalConfiguration provides themed.first,
+      LocalContext provides themed.second,
+  ) {
+    OncompanionTheme(darkTheme, content)
+  }
 }

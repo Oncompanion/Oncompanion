@@ -602,7 +602,9 @@ Read failures offer Retry. No patient record or appointment time changes.
 `MainActivity` keeps the existing splash until routing and the first appearance read are ready.
 A failed initial read releases startup using Follow device without overwriting saved preferences;
 IO failures are retried. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
-configuration and otherwise uses the existing explicit light/dark palettes. Updating that choice
+configuration before applying the override and otherwise uses the existing explicit light/dark
+palettes. A ContextThemeWrapper supplies matching Android night resources while retaining Activity
+access for scanning and sign-in. Updating that choice
 does not recreate navigation or discard screen state. The Google-branded button retains its
 prescribed colors but follows the same effective app appearance. System-bar icon contrast follows
 the app override. Android-owned permission dialogs and the initial OS splash retain OS behavior.
