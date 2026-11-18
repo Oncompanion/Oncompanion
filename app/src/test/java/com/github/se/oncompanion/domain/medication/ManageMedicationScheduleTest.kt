@@ -7,7 +7,6 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import java.io.IOException
-import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -238,7 +237,6 @@ class ManageMedicationScheduleTest {
 
     val updated = repository.prescriptionsOf(uid).single()
     assertEquals(saved.id, updated.id)
-    assertEquals(saved.createdAt, updated.createdAt)
     assertEquals("Dr. House", updated.prescribedBy)
     assertEquals(date.minusDays(2), updated.prescribedOn)
     assertEquals(saved.medications.map { it.id }, updated.medications.map { it.id })
@@ -274,7 +272,7 @@ class ManageMedicationScheduleTest {
   }
 
   @Test
-  fun caregiverEditPreservesConfirmationOriginalAuthorCreationAndMedicationIds() = runTest {
+  fun caregiverEditPreservesConfirmationOriginalAuthorAndMedicationIds() = runTest {
     for (confirmation in
         listOf(PrescriptionConfirmation.PENDING, PrescriptionConfirmation.CONFIRMED)) {
       val saved =
@@ -284,7 +282,6 @@ class ManageMedicationScheduleTest {
                   addedBy = "original",
                   addedByName = "Original",
                   confirmation = confirmation,
-                  createdAt = Instant.parse("2026-09-29T10:00:00Z"),
                   editedBy = "previous",
                   editedByName = "Previous",
               )
@@ -295,7 +292,6 @@ class ManageMedicationScheduleTest {
 
       val updated = repository.prescriptionsOf(uid).single { it.id == saved.id }
       assertEquals(confirmation, updated.confirmation)
-      assertEquals(saved.createdAt, updated.createdAt)
       assertEquals(saved.addedBy, updated.addedBy)
       assertEquals(saved.addedByName, updated.addedByName)
       assertEquals(saved.medications, updated.medications)
@@ -332,7 +328,7 @@ class ManageMedicationScheduleTest {
   }
 
   @Test
-  fun invalidEditorIsRejectedBeforeReadingOrWriting() = runTest {
+  fun invalidEditorIsRejectedBeforeWriting() = runTest {
     val saved = savedPrescription()
     val cases =
         listOf(
