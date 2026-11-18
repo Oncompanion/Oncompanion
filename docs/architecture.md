@@ -389,6 +389,7 @@ Known limitations:
 - If the patient changes their first name, caregivers keep the old one: a patient makes no other writes into caregivers' data, so the new name isn't pushed into each caregiver's `patients` list.
 - Someone with a patient account can't join a circle; they would need to sign in with another Google account.
 - An expired invite stays in the patient's list until they cancel or renew it, since there is no server code to clean it up.
+- A refused write on an invite puts its code in the phone's log: the Firestore SDK logs the document's path (`invites/<code>`), and no public API silences it (#287). It is accepted because the line stays on the phone, and the code it names almost never works: a refused creation never existed, and a used or cancelled invite is deleted. The exceptions are a refused edit or cancellation of a pending invite, which only happen if the rules refuse what a released app sends. So **a change to the invite rules, or to `detailKeys()` / `isValidCareCircleMemberDetails()` that members share, must keep accepting the edits and cancellations that released apps send**: rules apply to every user at once, while the app updates later.
 - A removal that a caregiver's device already saw shows as "checking access" (`CareAccess.Unconfirmed`), not `Denied`, until the server confirms it: the Firestore cache can't tell a deleted member document from one it never fetched. No patient data is shown meanwhile.
 
 ## Sign-out (issue #35)
