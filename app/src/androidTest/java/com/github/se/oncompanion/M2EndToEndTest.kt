@@ -163,8 +163,7 @@ class M2EndToEndTest {
     signOutThroughProfile()
 
     // Sign-out clears local data: an existing circle must be found again through Whose care.
-    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
-    assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
+    signIn(caregiver, caregiverTitle())
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     assertSymptom("NAUSEA", caregiverNotes)
@@ -173,9 +172,7 @@ class M2EndToEndTest {
     ui.open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
-    credentials.select(patient)
-    ui.open(C.Tag.google_sign_in_button, patientGreeting())
-    assertEquals(patient.uid, FirebaseEmulator.auth.currentUser?.uid)
+    signIn(patient, patientGreeting())
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     val addedBy = compose.activity.getString(R.string.symptom_added_by, circleName)
@@ -194,13 +191,10 @@ class M2EndToEndTest {
     ui.open(C.Tag.symptom_back_button, patientGreeting())
     assertAcceptedMember()
     revokeSymptomSharing()
-    ui.open(C.Tag.care_circle_member_back_button, hasTestTag(C.Tag.care_circle_member_list))
-    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    leaveMember()
     signOutThroughProfile()
 
-    credentials.select(caregiver)
-    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
-    assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
+    signIn(caregiver, caregiverTitle())
     // Both shortcuts use the same shared-sections snapshot; Planning's spinner is independent.
     ui.tag(C.Tag.overview_shortcut_prescriptions).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.overview_shortcut_symptoms).assertDoesNotExist()
