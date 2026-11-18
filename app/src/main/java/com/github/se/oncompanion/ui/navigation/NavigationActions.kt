@@ -5,6 +5,7 @@ package com.github.se.oncompanion.ui.navigation
 
 import android.net.Uri
 import androidx.navigation.NavHostController
+import com.github.se.oncompanion.model.symptom.SymptomType
 import java.time.LocalDate
 
 /**
@@ -92,7 +93,13 @@ object Screen {
   /** The [SYMPTOM_DETAIL] screen of the symptom [symptomId]. */
   fun symptomDetail(symptomId: String) = "symptoms_detail/$symptomId"
 
-  const val SYMPTOM_ADD = "symptoms_add"
+  const val SYMPTOM_TYPE = "type"
+  const val SYMPTOM_ADD = "symptoms_add?type={$SYMPTOM_TYPE}"
+
+  /** The [SYMPTOM_ADD] screen, with [type] already picked if given (the Overview's check-in). */
+  fun symptomAdd(type: SymptomType? = null) =
+      if (type == null) "symptoms_add" else "symptoms_add?type=${type.name}"
+
   const val SYMPTOM_EDIT = "symptoms_edit/{$SYMPTOM_DETAIL_ID}"
 
   /** The [SYMPTOM_EDIT] screen of the symptom [symptomId]. */

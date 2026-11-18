@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
@@ -435,11 +436,29 @@ private fun SessionNavHost(
             caregiverOf = chosenPatient?.firstName,
         )
       }
-      composable(Screen.SYMPTOM_ADD) {
-        // Saving returns to the journal, where the new entry is at the top
+      composable(
+          Screen.SYMPTOM_ADD,
+          arguments =
+              listOf(
+                  navArgument(Screen.SYMPTOM_TYPE) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                  }
+              ),
+      ) { entry ->
+        // A check-in tile on the Overview opens the form with its symptom picked; an unknown name
+        // opens it empty
+        val picked =
+            entry.arguments?.getString(Screen.SYMPTOM_TYPE)?.let { name ->
+              SymptomType.entries.firstOrNull { it.name == name }
+            }
+        // Saving returns to where the form was opened: the journal, where the new entry is at the
+        // top, or the Overview
         // In caregiver mode, the symptom goes in the chosen patient's journal (US-22)
         AddSymptomScreen(
-            viewModel = viewModel { AddSymptomViewModel(patientUid = chosenPatient?.uid) },
+            viewModel =
+                viewModel { AddSymptomViewModel(patientUid = chosenPatient?.uid, picked = picked) },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
             caregiverOf = chosenPatient?.firstName,

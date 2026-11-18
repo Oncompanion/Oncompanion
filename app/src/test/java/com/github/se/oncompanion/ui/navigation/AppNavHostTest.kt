@@ -1669,6 +1669,32 @@ class AppNavHostTest {
   }
 
   @Test
+  fun symptomAddRoute_picksTheGivenSymptom_andAnUnknownOneOpensItEmpty() {
+    setNavHost(Route.SYMPTOMS, authRepository = signedInPatient())
+
+    composeTestRule.runOnIdle { navController.navigate(Screen.symptomAdd(SymptomType.FEVER)) }
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.FEVER.name))
+        .performScrollTo()
+        .assertIsSelected()
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.PAIN.name))
+        .performScrollTo()
+        .assertIsNotSelected()
+
+    composeTestRule.runOnIdle {
+      navController.popBackStack()
+      navController.navigate("symptoms_add?type=SNEEZING")
+    }
+    SymptomType.entries.forEach {
+      composeTestRule
+          .onNodeWithTag(C.Tag.symptomAddType(it.name))
+          .performScrollTo()
+          .assertIsNotSelected()
+    }
+  }
+
+  @Test
   fun symptomJournalAddButton_opensTheAddScreen_andCloseReturns() {
     setNavHost(Route.SYMPTOMS, authRepository = signedInPatient())
     composeTestRule.onNodeWithTag(C.Tag.symptom_journal_add).performClick()
@@ -2121,7 +2147,8 @@ class AppNavHostTest {
     assertEquals("overview", Route.OVERVIEW)
     assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("prescriptions_scan", Screen.PRESCRIPTION_SCAN)
-    assertEquals("symptoms_add", Screen.SYMPTOM_ADD)
+    assertEquals("symptoms_add", Screen.symptomAdd())
+    assertEquals("symptoms_add?type=FEVER", Screen.symptomAdd(SymptomType.FEVER))
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)
