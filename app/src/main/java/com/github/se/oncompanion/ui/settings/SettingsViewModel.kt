@@ -12,13 +12,32 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * Mutually exclusive phases of a settings write; failures keep the confirmed selection editable.
+ */
+enum class SettingsSavePhase {
+  /** No write is pending. */
+  IDLE,
+  /** A local write is pending and selection is disabled. */
+  SAVING,
+  /** The last write failed and the user can try again. */
+  FAILED,
+}
+
 /** The confirmed device preference and any pending operation or recoverable failure. */
 data class SettingsUiState(
     val settings: DeviceSettings? = null,
     val readFailed: Boolean = false,
-    val saving: Boolean = false,
-    val saveFailed: Boolean = false,
-)
+    val savePhase: SettingsSavePhase = SettingsSavePhase.IDLE,
+) {
+  /** Whether selection must wait for the pending local write. */
+  val saving: Boolean
+    get() = savePhase == SettingsSavePhase.SAVING
+
+  /** Whether the last write needs a recoverable error message. */
+  val saveFailed: Boolean
+    get() = savePhase == SettingsSavePhase.FAILED
+}
 
 /** Observes and saves device preferences without depending on authentication. */
 class SettingsViewModel(
@@ -55,17 +74,22 @@ class SettingsViewModel(
     val current = state.value
     if (current.settings == null || current.saving || current.settings.appearance == appearance)
         return
-    state.value = current.copy(saving = true, saveFailed = false)
+    state.value = current.copy(savePhase = SettingsSavePhase.SAVING)
     viewModelScope.launch {
       try {
         repository.setAppearance(appearance)
-        state.value = state.value.copy(settings = DeviceSettings(appearance))
+        state.value =
+            state.value.copy(
+                settings = state.value.settings?.copy(appearance = appearance),
+                savePhase = SettingsSavePhase.IDLE,
+            )
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        state.value = state.value.copy(saveFailed = true)
+        state.value = state.value.copy(savePhase = SettingsSavePhase.FAILED)
       } finally {
-        state.value = state.value.copy(saving = false)
+        // Cancellation unlocks the rows without overwriting a completed or failed operation.
+        if (state.value.saving) state.value = state.value.copy(savePhase = SettingsSavePhase.IDLE)
       }
     }
   }

@@ -98,6 +98,44 @@ class SettingsViewModelTest {
   }
 
   @Test
+  fun pendingWriteAndLocalSuccessDoNotDependOnObservationEcho() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    val repo =
+        FakeSettingsRepository().apply {
+          writeGate = gate
+          emitWrites = false
+        }
+    val vm = model(repo)
+    runCurrent()
+    vm.selectAppearance(AppearancePreference.DARK)
+    runCurrent()
+    assertEquals(SettingsSavePhase.SAVING, vm.uiState.value.savePhase)
+    assertEquals(AppearancePreference.FOLLOW_DEVICE, vm.uiState.value.settings!!.appearance)
+    vm.selectAppearance(AppearancePreference.LIGHT)
+    assertEquals(listOf(AppearancePreference.DARK), repo.writes)
+    gate.complete(Unit)
+    runCurrent()
+    assertEquals(SettingsSavePhase.IDLE, vm.uiState.value.savePhase)
+    assertEquals(AppearancePreference.DARK, vm.uiState.value.settings!!.appearance)
+    assertEquals(AppearancePreference.FOLLOW_DEVICE, repo.settings.value.appearance)
+  }
+
+  @Test
+  fun retryCancelsThePreviousObservation() = runTest {
+    val repo = FakeSettingsRepository()
+    val vm = model(repo)
+    runCurrent()
+    repeat(3) {
+      vm.retry()
+      runCurrent()
+      assertEquals(1, repo.activeObservations)
+    }
+    repo.settings.value = DeviceSettings(AppearancePreference.DARK)
+    runCurrent()
+    assertEquals(AppearancePreference.DARK, vm.uiState.value.settings!!.appearance)
+  }
+
+  @Test
   fun cancellationIsNotShownAsAnError() = runTest {
     val repo = FakeSettingsRepository().apply { readFailure = CancellationException("cancel") }
     val vm = model(repo)

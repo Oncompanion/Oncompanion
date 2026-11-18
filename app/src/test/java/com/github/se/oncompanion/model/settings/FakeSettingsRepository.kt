@@ -14,6 +14,14 @@ class FakeSettingsRepository(initial: DeviceSettings = DeviceSettings()) : Setti
   val settings = MutableStateFlow(initial)
   /** Failure injected into an already-running observation. */
   val observationFailure = MutableStateFlow<Exception?>(null)
+  /** Number of live collectors, used to detect duplicate observations after Retry. */
+  var activeObservations = 0
+    private set
+
+  /** Lets a test keep a local write pending. */
+  var writeGate: CompletableDeferred<Unit>? = null
+  /** Suppresses the observation echo so tests exercise the ViewModel's successful local update. */
+  var emitWrites = true
   val writes = mutableListOf<AppearancePreference>()
   /** Suspends each new observation until a test releases startup. */
   var readGate: CompletableDeferred<Unit>? = null
@@ -21,19 +29,25 @@ class FakeSettingsRepository(initial: DeviceSettings = DeviceSettings()) : Setti
   var writeFailure: Exception? = null
 
   override fun observeSettings(): Flow<DeviceSettings> = flow {
-    readGate?.await()
-    readFailure?.let { throw it }
-    emitAll(
-        settings.combine(observationFailure) { current, failure ->
-          failure?.let { throw it }
-          current
-        }
-    )
+    activeObservations++
+    try {
+      readGate?.await()
+      readFailure?.let { throw it }
+      emitAll(
+          settings.combine(observationFailure) { current, failure ->
+            failure?.let { throw it }
+            current
+          }
+      )
+    } finally {
+      activeObservations--
+    }
   }
 
   override suspend fun setAppearance(appearance: AppearancePreference) {
     writes += appearance
+    writeGate?.await()
     writeFailure?.let { throw it }
-    settings.value = DeviceSettings(appearance)
+    if (emitWrites) settings.value = settings.value.copy(appearance = appearance)
   }
 }

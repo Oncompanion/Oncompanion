@@ -52,10 +52,14 @@ class AppearanceScreenTest {
     compose.runOnIdle { state = SettingsUiState(readFailed = true) }
     compose.onNodeWithTag(C.Tag.settings_retry).performClick()
     assertEquals(1, retries)
-    compose.runOnIdle { state = SettingsUiState(DeviceSettings(), saving = true) }
+    compose.runOnIdle {
+      state = SettingsUiState(DeviceSettings(), savePhase = SettingsSavePhase.SAVING)
+    }
     compose.onNodeWithTag(C.Tag.settings_saving).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appearance_dark).assertIsNotEnabled()
-    compose.runOnIdle { state = SettingsUiState(DeviceSettings(), saveFailed = true) }
+    compose.runOnIdle {
+      state = SettingsUiState(DeviceSettings(), savePhase = SettingsSavePhase.FAILED)
+    }
     compose.onNodeWithTag(C.Tag.settings_save_error).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.appearance_device).assertIsSelected()
   }
