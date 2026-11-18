@@ -248,9 +248,9 @@ class M2EndToEndTest {
   }
 
   /**
-   * US-46: the patient lets the caregiver edit and delete symptoms, the caregiver edits one entry
-   * and deletes another, then the patient takes back editing and deleting but keeps sharing and
-   * adding.
+   * US-46: the patient lets the caregiver edit and delete symptoms, the caregiver edits the
+   * patient's entry and deletes their own, then the patient takes back editing and deleting but
+   * keeps sharing and adding.
    */
   @Test
   fun patientLetsTheCaregiverEditAndDeleteSymptoms_thenTakesItBack() {
@@ -286,25 +286,29 @@ class M2EndToEndTest {
 
     signIn(caregiver, caregiverTitle())
     openSymptoms()
-    editNotes(caregiverNotes, editedNotes)
-    deleteAfterCancellingOnce(patientNotes)
+    // The patient's own entry, so who edited it differs from who added it
+    editNotes("FATIGUE", patientNotes, editedNotes)
+    assertEditedByOwnName(editedNotes)
+    deleteAfterCancellingOnce(caregiverNotes)
     ui.open(C.Tag.symptom_back_button, caregiverTitle())
     signOutThroughProfile()
 
-    // The patient sees the edit, signed with the name they gave the member, and who added it
+    // The patient sees the edit, signed with the name they gave the member, on their own entry
     signIn(patient, patientGreeting())
     openSymptoms()
     // Once the journal has loaded, the deleted entry is gone for the patient too
-    assertSymptom("NAUSEA", editedNotes)
-    ui.waitFor(symptomRow(patientNotes), gone = true)
+    assertSymptom("FATIGUE", editedNotes)
+    ui.waitFor(symptomRow(caregiverNotes), gone = true)
     ui.open(symptomRow(editedNotes), hasTestTag(C.Tag.symptom_detail_content))
     ui.waitFor(hasTestTag(C.Tag.symptom_detail_notes) and text(editedNotes))
         .reveal()
         .assertIsDisplayed()
-    for (attribution in listOf(R.string.symptom_added_by, R.string.edited_by)) {
-      val expected = compose.activity.getString(attribution, circleName)
-      ui.waitFor(hasText(expected), unmerged = true).reveal().assertIsDisplayed()
-    }
+    val editedBy = compose.activity.getString(R.string.edited_by, circleName)
+    ui.waitFor(hasTestTag(C.Tag.edited_by) and hasText(editedBy), unmerged = true)
+        .reveal()
+        .assertIsDisplayed()
+    // The patient logged it: editing it doesn't make the caregiver its author
+    compose.onNodeWithTag(C.Tag.added_by, useUnmergedTree = true).assertDoesNotExist()
     ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
     ui.open(C.Tag.symptom_back_button, patientGreeting())
     assertAcceptedMember()
@@ -315,7 +319,7 @@ class M2EndToEndTest {
     // A fresh session still sees and adds symptoms, but can no longer edit or delete them
     signIn(caregiver, caregiverTitle())
     openSymptoms()
-    assertSymptom("NAUSEA", editedNotes)
+    assertSymptom("FATIGUE", editedNotes)
     ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
     assertReadOnly(editedNotes)
   }
@@ -705,8 +709,8 @@ class M2EndToEndTest {
     ui.open(C.Tag.care_circle_back_button, patientGreeting())
   }
 
-  /** Edits the notes of the entry showing [from] through its detail, and saves. */
-  private fun editNotes(from: String, to: String) {
+  /** Edits the notes of the [type] entry showing [from] through its detail, and saves. */
+  private fun editNotes(type: String, from: String, to: String) {
     ui.open(symptomRow(from), hasTestTag(C.Tag.symptom_detail_content))
     ui.open(C.Tag.symptom_detail_edit, hasTestTag(C.Tag.symptom_add_notes))
     ui.tag(C.Tag.symptom_add_notes).reveal().replaceText(to)
@@ -716,7 +720,18 @@ class M2EndToEndTest {
         hasTestTag(C.Tag.symptom_detail_notes) and text(to),
     )
     ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
-    assertSymptom("NAUSEA", to)
+    assertSymptom(type, to)
+  }
+
+  /** The caregiver sees their own name on their edit, never the patient's private contact name. */
+  private fun assertEditedByOwnName(notes: String) {
+    ui.open(symptomRow(notes), hasTestTag(C.Tag.symptom_detail_content))
+    val ownName = compose.activity.getString(R.string.edited_by, caregiver.firstName)
+    ui.waitFor(hasTestTag(C.Tag.edited_by) and hasText(ownName), unmerged = true)
+        .reveal()
+        .assertIsDisplayed()
+    assertPrivateNameAbsent()
+    ui.open(C.Tag.symptom_back_button, hasTestTag(C.Tag.symptom_journal_list))
   }
 
   /** Cancels the deletion of the entry showing [notes] once, then deletes it. */
