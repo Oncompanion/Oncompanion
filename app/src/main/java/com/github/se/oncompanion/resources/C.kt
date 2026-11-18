@@ -112,6 +112,7 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_next_up = "overview_next_up"
     const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
@@ -471,10 +472,14 @@ object C {
     const val prescription_reject_dialog = "prescription_reject_dialog"
     const val prescription_reject_confirm = "prescription_reject_confirm"
     const val prescription_reject_cancel = "prescription_reject_cancel"
+    const val prescriptions_no_access = "prescriptions_no_access"
+    const val prescription_detail_no_access = "prescription_detail_no_access"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
+
+    const val prescription_form_not_allowed = "prescription_form_not_allowed"
 
     // Medication detail (US-35)
     const val medication_detail_screen = "medication_detail_screen"

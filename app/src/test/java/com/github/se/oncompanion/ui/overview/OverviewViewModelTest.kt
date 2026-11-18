@@ -373,6 +373,71 @@ class OverviewViewModelTest {
     )
   }
 
+  // ----- Patient's day (Overview UX Refactor) -----
+
+  @Test
+  fun nextUp_isTodaysNextEventOrAppointment_elseTheNextAppointment() {
+    val today = now.toLocalDate()
+    val tomorrow = today.plusDays(1)
+    listOf(
+            // Today's next one, an event or an appointment, before any later appointment
+            listOf(appointment("later", now.plusDays(1)), event("yoga", now.withHour(10))) to
+                "yoga",
+            listOf(event("yoga", now.withHour(12)), appointment("blood", now.withHour(11))) to
+                "blood",
+            // One that has started, even this minute, isn't next any more
+            listOf(appointment("started", now.withHour(8)), event("walk", now.withHour(12))) to
+                "walk",
+            listOf(
+                event("now", now),
+                appointment("past", now.withHour(8)),
+                appointment("later", now.plusDays(1)),
+            ) to "later",
+            // Nothing more today: the next appointment, even weeks away, but not a later event
+            listOf(
+                event("tomorrow", tomorrow.atTime(10, 0)),
+                appointment("check-up", now.plusWeeks(3)),
+            ) to "check-up",
+            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to null,
+        )
+        .forEach { (items, expected) ->
+          val vm = viewModel(planning = planning(*items.toTypedArray()))
+          assertEquals(items.toString(), expected, vm.uiState.value.nextUp?.id)
+        }
+  }
+
+  @Test
+  fun nextUp_saysWhatItIs_whenAndWhere_andMovesOnOnceItStarts() {
+    val clock = TestClock(now)
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    event("yoga", now.withHour(10)),
+                    appointment("check-up", now.plusDays(2), place = "HUG"),
+                ),
+            clock = clock,
+        )
+    assertEquals(
+        NextUp(TodayItemKind.EVENT, "yoga", "Event yoga", now.withHour(10), "Place yoga"),
+        vm.uiState.value.nextUp,
+    )
+
+    clock.time = now.withHour(10).plusMinutes(1)
+    vm.refreshNow()
+
+    assertEquals(
+        NextUp(
+            TodayItemKind.APPOINTMENT,
+            "check-up",
+            "Appointment check-up",
+            now.plusDays(2),
+            "HUG",
+        ),
+        vm.uiState.value.nextUp,
+    )
+  }
+
   @Test
   fun medication_showsItsFrequency_andNoStatus() {
     val vm = viewModel(planning = planning(medication("m", frequency = "Twice a day")))

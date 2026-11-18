@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 
 /**
  * A screen for end-to-end tests (debug builds only) that shows [content]. Like [MainActivity], it
@@ -18,6 +19,8 @@ class AppHostActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // As in MainActivity: the screens that listen take the phone's recognizer from here
+    SpeechRecognizerProvider.install(applicationContext)
     setContent { content.value() }
   }
 

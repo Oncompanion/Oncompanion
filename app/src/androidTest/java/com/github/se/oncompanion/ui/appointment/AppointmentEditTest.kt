@@ -123,7 +123,7 @@ class AppointmentEditTest {
     // The Overview shows its card once the day's planning has been read
     ui.open(
         C.Tag.bottom_navigation_tab_overview,
-        hasTestTag(C.Tag.overview_next_appointment) and
+        hasTestTag(C.Tag.overview_next_up) and
             hasText("Updated oncology follow-up", substring = true),
     )
     runBlocking {

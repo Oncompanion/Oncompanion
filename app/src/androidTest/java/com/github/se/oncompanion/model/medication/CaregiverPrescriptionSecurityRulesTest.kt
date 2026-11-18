@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.model.medication
 
@@ -22,8 +23,9 @@ import org.junit.runner.RunWith
 /**
  * Tests that firestore.rules let a caregiver add a prescription for a patient only when the patient
  * shares their prescriptions and lets them add (US-43): waiting for the patient, signed with their
- * own uid, and never confirmed, edited or deleted by them. Only the patient confirms or rejects it.
- * alice is the patient, carol her caregiver, dave a stranger.
+ * own uid. Editing and deleting also require the patient's switch (US-46); a caregiver never
+ * confirms or rejects it. Only the patient decides its confirmation state. alice is the patient,
+ * carol her caregiver, dave a stranger.
  */
 @RunWith(AndroidJUnit4::class)
 class CaregiverPrescriptionSecurityRulesTest {
@@ -48,11 +50,19 @@ class CaregiverPrescriptionSecurityRulesTest {
   @After fun tearDown(): Unit = runBlocking { EmulatorTestData.signOut() }
 
   /** Alice changes what carol sees and may add to (from another device, bypassing the rules). */
-  private suspend fun shareWithCarol(see: List<String>, add: List<String>) =
-      shareWith(carolUid, see, add)
+  private suspend fun shareWithCarol(
+      see: List<String>,
+      add: List<String>,
+      edit: List<String> = emptyList(),
+  ) = shareWith(carolUid, see, add, edit)
 
   /** Alice changes what the member [uid] sees and may add to, bypassing the rules. */
-  private suspend fun shareWith(uid: String, see: List<String>, add: List<String>) {
+  private suspend fun shareWith(
+      uid: String,
+      see: List<String>,
+      add: List<String>,
+      edit: List<String> = emptyList(),
+  ) {
     fun list(names: List<String>) =
         names.joinToString(", ", "[", "]") { """{"stringValue": "$it"}""" }
     EmulatorTestData.replaceRawDocument(
@@ -62,6 +72,7 @@ class CaregiverPrescriptionSecurityRulesTest {
             "relationship": {"stringValue": "SISTER"},
             "permissions": {"arrayValue": {"values": ${list(see)}}},
             "canAdd": {"arrayValue": {"values": ${list(add)}}},
+            "canEditAndDelete": {"arrayValue": {"values": ${list(edit)}}},
             "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
     )
   }
@@ -149,14 +160,15 @@ class CaregiverPrescriptionSecurityRulesTest {
   }
 
   @Test
-  fun caregiver_cantConfirmEditOrDelete_evenTheirOwnPrescription(): Unit = runBlocking {
-    val doc = prescriptions(aliceUid).document()
-    allowed(doc.set(carolsPrescription()))
+  fun caregiverWithoutTheSwitch_cantConfirmEditOrDelete_evenTheirOwnPrescription(): Unit =
+      runBlocking {
+        val doc = prescriptions(aliceUid).document()
+        allowed(doc.set(carolsPrescription()))
 
-    denied(doc.update("confirmation", "CONFIRMED"))
-    denied(doc.update("prescribedBy", "Dr. Martin"))
-    denied(doc.delete())
-  }
+        denied(doc.update("confirmation", "CONFIRMED"))
+        denied(doc.update("prescribedBy", "Dr. Martin"))
+        denied(doc.delete())
+      }
 
   @Test
   fun patient_confirmsOnlyOnce_andCantEditWithoutConfirming(): Unit = runBlocking {
@@ -253,5 +265,184 @@ class CaregiverPrescriptionSecurityRulesTest {
     denied(rejected(aliceUid).get())
     denied(kept.update("prescribedBy", "Dr. Martin"))
     allowed(kept.delete())
+  }
+
+  // ---- A caregiver editing and deleting with the patient's permission (US-46) ----
+
+  /** Carol's signed edit; null removes a field to exercise malformed writes. */
+  private fun carolsEdit(vararg extra: Pair<String, Any?>): Map<String, Any?> =
+      mapOf("prescribedBy" to "Dr. Martin", "editedBy" to carolUid, "editedByName" to "Carol") +
+          extra.map { (key, value) -> key to (value ?: FieldValue.delete()) }
+
+  /** The patient allows editing and deleting prescriptions, in addition to adding and sharing. */
+  private suspend fun allowCarolToEdit() =
+      shareWithCarol(
+          see = listOf("PRESCRIPTIONS"),
+          add = listOf("PRESCRIPTIONS"),
+          edit = listOf("PRESCRIPTIONS"),
+      )
+
+  /** Alice's own legacy prescription, which has no explicit confirmation field. */
+  private suspend fun alicesPrescription(): DocumentReference {
+    val doc = prescriptions(aliceUid).document()
+    EmulatorTestData.signIn("presc-alice")
+    allowed(doc.set(prescription()))
+    EmulatorTestData.signIn("presc-carol")
+    return doc
+  }
+
+  @Test
+  fun authorizedCaregiver_editsAndDeletesPatientAndOtherCaregiverPrescriptions(): Unit =
+      runBlocking {
+        allowCarolToEdit()
+        val alices = alicesPrescription()
+        val carols = prescriptions(aliceUid).document()
+        allowed(carols.set(carolsPrescription()))
+        // Dave's authorship is also immutable when another authorized caregiver corrects the
+        // record.
+        shareWith(daveUid, see = listOf("PRESCRIPTIONS"), add = listOf("PRESCRIPTIONS"))
+        EmulatorTestData.signIn("presc-dave")
+        val daves = prescriptions(aliceUid).document()
+        allowed(daves.set(carolsPrescription("addedBy" to daveUid, "addedByName" to "Dave")))
+        EmulatorTestData.signIn("presc-carol")
+
+        for (doc in listOf(alices, carols, daves)) {
+          allowed(doc.update(carolsEdit()))
+          allowed(doc.delete())
+        }
+      }
+
+  @Test
+  fun caregiverEdit_preservesPendingAndConfirmed_andCannotDecideTheirState(): Unit = runBlocking {
+    allowCarolToEdit()
+    val pending = prescriptions(aliceUid).document()
+    allowed(pending.set(carolsPrescription()))
+    val confirmed = prescriptions(aliceUid).document()
+    allowed(confirmed.set(carolsPrescription()))
+    EmulatorTestData.signIn("presc-alice")
+    allowed(confirmed.update("confirmation", "CONFIRMED"))
+    EmulatorTestData.signIn("presc-carol")
+
+    allowed(pending.update(carolsEdit()))
+    allowed(confirmed.update(carolsEdit()))
+    denied(pending.update(carolsEdit("confirmation" to "CONFIRMED")))
+    denied(pending.update(carolsEdit("confirmation" to "REJECTED")))
+    denied(pending.update(carolsEdit("confirmation" to null)))
+    denied(confirmed.update(carolsEdit("confirmation" to "PENDING")))
+    denied(confirmed.update(carolsEdit("confirmation" to "REJECTED")))
+    // Missing on a legacy document means confirmed, not an opportunity to downgrade it.
+    val legacy = alicesPrescription()
+    allowed(legacy.update(carolsEdit("confirmation" to "CONFIRMED")))
+    denied(legacy.update(carolsEdit("confirmation" to "PENDING")))
+  }
+
+  @Test
+  fun caregiverWithoutSwitchAddingOrSharing_cannotEditOrDelete(): Unit = runBlocking {
+    val doc = alicesPrescription()
+    val cases =
+        listOf(
+            Triple(listOf("PRESCRIPTIONS"), listOf("PRESCRIPTIONS"), emptyList()),
+            Triple(
+                listOf("PRESCRIPTIONS", "SYMPTOMS"),
+                listOf("PRESCRIPTIONS", "SYMPTOMS"),
+                listOf("SYMPTOMS"),
+            ),
+            Triple(listOf("PRESCRIPTIONS"), emptyList(), listOf("PRESCRIPTIONS")),
+            Triple(emptyList(), listOf("PRESCRIPTIONS"), listOf("PRESCRIPTIONS")),
+        )
+    for ((see, add, edit) in cases) {
+      shareWithCarol(see, add, edit)
+      denied(doc.update(carolsEdit()))
+      denied(doc.delete())
+    }
+  }
+
+  @Test
+  fun removedOrUnrelatedCaregiver_cannotEditOrDelete(): Unit = runBlocking {
+    allowCarolToEdit()
+    val doc = alicesPrescription()
+    EmulatorTestData.deleteRawDocument(
+        "users/$aliceUid/${CareCircleRepositoryFirestore.COLLECTION}/$carolUid"
+    )
+    denied(doc.update(carolsEdit()))
+    denied(doc.delete())
+    EmulatorTestData.signIn("presc-dave")
+    denied(doc.update(carolsEdit("editedBy" to daveUid, "editedByName" to "Dave")))
+    denied(doc.delete())
+  }
+
+  @Test
+  fun caregiverCannotForgeEditorChangeAuthorOrCorruptPrescription(): Unit = runBlocking {
+    allowCarolToEdit()
+    val doc = prescriptions(aliceUid).document()
+    allowed(doc.set(carolsPrescription()))
+    val invalid =
+        listOf(
+            carolsEdit("editedBy" to aliceUid),
+            carolsEdit("editedBy" to null),
+            carolsEdit("editedByName" to null),
+            carolsEdit("editedByName" to "  "),
+            carolsEdit("editedByName" to "a".repeat(51)),
+            carolsEdit("editedByName" to 7),
+            carolsEdit("addedBy" to daveUid),
+            carolsEdit("addedByName" to "Dave"),
+            carolsEdit("createdAt" to Timestamp.now()),
+            carolsEdit("prescribedOn" to null),
+            carolsEdit("prescribedOn" to "tomorrow"),
+            carolsEdit("prescribedBy" to "a".repeat(101)),
+            carolsEdit("medications" to emptyList<Any>()),
+            carolsEdit("medications" to List(21) { mapOf("id" to "m$it") }),
+            carolsEdit("extraField" to "unexpected"),
+        )
+    for (fields in invalid) denied(doc.update(fields))
+  }
+
+  @Test
+  fun newPrescriptionCannotClaimAnEditor_patientOrCaregiver(): Unit = runBlocking {
+    allowCarolToEdit()
+    denied(
+        prescriptions(aliceUid)
+            .document()
+            .set(carolsPrescription("editedBy" to carolUid, "editedByName" to "Carol"))
+    )
+    EmulatorTestData.signIn("presc-alice")
+    denied(
+        prescriptions(aliceUid)
+            .document()
+            .set(prescription("editedBy" to carolUid, "editedByName" to "Carol"))
+    )
+  }
+
+  @Test
+  fun patientCanClearOrKeepPreviousEditor_butCannotForgeOne(): Unit = runBlocking {
+    allowCarolToEdit()
+    val doc = alicesPrescription()
+    allowed(doc.update(carolsEdit()))
+    EmulatorTestData.signIn("presc-alice")
+    denied(doc.update(mapOf("editedBy" to aliceUid, "editedByName" to "Alice")))
+    denied(doc.update("editedByName", "Dave"))
+    denied(doc.update("editedByName", FieldValue.delete()))
+    // Compatibility with older clients which do not know about editor fields.
+    allowed(doc.update("prescribedBy", "Dr. Rossi"))
+    allowed(
+        doc.update(mapOf("editedBy" to FieldValue.delete(), "editedByName" to FieldValue.delete()))
+    )
+  }
+
+  @Test
+  fun patientRejectsEditedPendingPrescription_preservingHistoricalEditor(): Unit = runBlocking {
+    allowCarolToEdit()
+    val doc = prescriptions(aliceUid).document()
+    allowed(doc.set(carolsPrescription()))
+    allowed(doc.update(carolsEdit()))
+    EmulatorTestData.signIn("presc-alice")
+    val asRejected =
+        carolsPrescription(
+            "confirmation" to "REJECTED",
+            "editedBy" to carolUid,
+            "editedByName" to "Carol",
+        )
+    denied(reject(doc, asRejected + ("editedByName" to "Dave")))
+    allowed(reject(doc, asRejected))
   }
 }
