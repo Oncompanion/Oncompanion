@@ -11,8 +11,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.speech.RecognitionListener
 import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer as AndroidRecognizer
@@ -35,6 +37,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSpeechRecognizer
+import org.robolectric.util.ReflectionHelpers
 
 /**
  * Listening with the phone's recognizer, simulated by Robolectric: what the user hears back in each
@@ -90,6 +93,83 @@ class AndroidSpeechRecognizerTest {
     assertTrue(intent.getBooleanExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false))
     assertEquals(1, intent.getIntExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 0))
     assertEquals(context.packageName, intent.getStringExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE))
+    // Segments, so the patient can pause; the silence must be an Int for Google's recognizer
+    assertEquals(
+        RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+        intent.getStringExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION),
+    )
+    for (silence in
+        listOf(
+            RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+            RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+        )) {
+      assertEquals(silence, 5_000, intent.getIntExtra(silence, 0))
+    }
+  }
+
+  @Test
+  fun phonesBeforeAndroid13AreNotAskedForSegments() {
+    val sdk = Build.VERSION.SDK_INT
+    ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", Build.VERSION_CODES.S_V2)
+    try {
+      val intent = recognizerIntent(SpeechLanguage.ENGLISH, context.packageName)
+
+      assertFalse(intent.hasExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION))
+      assertFalse(
+          intent.hasExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS)
+      )
+    } finally {
+      ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", sdk)
+    }
+  }
+
+  @Test
+  fun sentencesSaidBetweenPausesAreJoinedInOrder() = runTest {
+    val session = startListening()
+
+    listener.onPartialResults(results("I'm tired"))
+    listener.onSegmentResults(results("I'm tired"))
+    listener.onPartialResults(results("and nauseous"))
+    listener.onSegmentResults(results("and nauseous"))
+    listener.onEndOfSegmentedSession()
+    runCurrent()
+
+    assertEquals(
+        listOf(
+            SpeechEvent.PartialText("I'm tired"),
+            SpeechEvent.PartialText("I'm tired"),
+            SpeechEvent.PartialText("I'm tired and nauseous"),
+            SpeechEvent.PartialText("I'm tired and nauseous"),
+            SpeechEvent.FinalText("I'm tired and nauseous"),
+        ),
+        session.events,
+    )
+    assertTrue(session.job.isCompleted)
+    assertTrue(android.isDestroyed)
+  }
+
+  @Test
+  fun silenceAfterASentenceKeepsWhatWasHeard() = runTest {
+    // Ended by silence after a sentence: what was heard is kept
+    val afterASentence = startListening()
+    listener.onSegmentResults(results("I'm tired"))
+    android.triggerOnError(AndroidRecognizer.ERROR_SPEECH_TIMEOUT)
+    runCurrent()
+    assertEquals(SpeechEvent.FinalText("I'm tired"), afterASentence.events.last())
+
+    // A session that heard nothing still ends with nothing heard
+    val silent = startListening()
+    listener.onSegmentResults(results("  "))
+    listener.onEndOfSegmentedSession()
+    runCurrent()
+    assertEquals(listOf(SpeechEvent.Failed(SpeechError.NO_SPEECH)), silent.events)
+
+    // A real failure after a sentence is still a failure
+    val failed = startListening()
+    listener.onSegmentResults(results("I'm tired"))
+    android.triggerOnError(AndroidRecognizer.ERROR_NETWORK)
+    runCurrent()
+    assertEquals(SpeechEvent.Failed(SpeechError.NEEDS_CONNECTION), failed.events.last())
   }
 
   @Test
@@ -297,6 +377,24 @@ class AndroidSpeechRecognizerTest {
   /** Android's recognizer created by the last [startListening]. */
   private val android
     get() = shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+
+  /**
+   * The listener given to Android's recognizer, for the Android 13 calls Robolectric can't trigger
+   * (`onSegmentResults`, `onEndOfSegmentedSession`).
+   */
+  private val listener: RecognitionListener
+    get() {
+      val state =
+          ShadowSpeechRecognizer::class
+              .java
+              .getDeclaredMethod("getState")
+              .apply { isAccessible = true }
+              .invoke(android)
+      return state.javaClass
+          .getDeclaredField("recognitionListener")
+          .apply { isAccessible = true }
+          .get(state) as RecognitionListener
+    }
 
   /** Starts listening, and lets Android's recognizer receive its listener and intent. */
   private fun TestScope.startListening(
