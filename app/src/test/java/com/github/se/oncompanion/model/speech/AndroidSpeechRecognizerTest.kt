@@ -224,6 +224,34 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun doneDuringPauses_returnsEverySentenceOnce_andReleasesTheRecognizer() = runTest {
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
+    val session = startListening(recognizer = recognizer)
+    listener.onSegmentResults(results("I'm tired"))
+    listener.onPartialResults(results("and nauseous"))
+
+    // Done: Android finishes the sentence being said, then ends the session
+    recognizer.stop()
+    listener.onSegmentResults(results("and nauseous"))
+    listener.onEndOfSegmentedSession()
+    // A late answer after the end adds nothing
+    android.triggerOnResults(results("and nauseous"))
+    runCurrent()
+
+    assertEquals(
+        listOf(
+            SpeechEvent.PartialText("I'm tired"),
+            SpeechEvent.PartialText("I'm tired and nauseous"),
+            SpeechEvent.PartialText("I'm tired and nauseous"),
+            SpeechEvent.FinalText("I'm tired and nauseous"),
+        ),
+        session.events,
+    )
+    assertTrue(session.job.isCompleted)
+    assertTrue(android.isDestroyed)
+  }
+
+  @Test
   fun stoppingBeforeSpeakingIsNothingHeardNotAFailure() = runTest {
     // Some phones end a stop before any speech with ERROR_CLIENT: only after a stop is it silence
     val cases = listOf(true to SpeechError.NO_SPEECH, false to SpeechError.FAILED)
