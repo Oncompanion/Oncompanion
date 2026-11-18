@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -22,6 +23,37 @@ import org.junit.Assert.*
 /** Exercises confirmed creation and exact local-time validation without Firebase. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppointmentFormViewModelTest {
+  /** Every choice can be saved on a new appointment without notification permission APIs. */
+  @Test
+  fun createsEveryReminderChoiceAndFreezesItAfterSave() =
+      runTest(dispatcher) {
+        for (choice in AppointmentReminder.entries) {
+          val form = AppointmentFormViewModel(day, ZoneId.of("Europe/Zurich"), repo, auth)
+          advanceUntilIdle()
+          assertEquals(AppointmentReminder.ONE_HOUR, form.uiState.value.reminder)
+          form.onTitleChange("Visit")
+          form.onTimeChange(LocalTime.NOON)
+          form.onReminderChange(choice)
+          form.save()
+          advanceUntilIdle()
+          assertEquals(choice, repo.appointments("uid-patient").last().reminder)
+          form.onReminderChange(AppointmentReminder.ONE_DAY)
+          assertEquals(choice, form.uiState.value.reminder)
+        }
+      }
+
+  /** Switching accounts clears the previous patient's unsaved reminder choice. */
+  @Test
+  fun accountChangeClearsReminderDraft() =
+      runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onReminderChange(AppointmentReminder.NONE)
+        auth.signOut()
+        auth.signInWithGoogle("another")
+        advanceUntilIdle()
+        assertEquals(AppointmentReminder.ONE_HOUR, vm.uiState.value.reminder)
+      }
+
   private val dispatcher = StandardTestDispatcher()
   private val day = LocalDate.of(2026, 10, 15)
   private val repo = FakeAppointmentRepository()

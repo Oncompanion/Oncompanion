@@ -38,6 +38,27 @@ class AppointmentEditViewModelTest {
         }
       }
 
+  /** A reminder-only draft is dirty and survives later repository snapshots and retry. */
+  @Test
+  fun reminderOnlyEditIsPreservedAndSaved() =
+      runTest(dispatcher) {
+        val vm = form()
+        advanceUntilIdle()
+        vm.onReminderChange(AppointmentReminder.NONE)
+        repository.seed("uid-patient", appointment.copy(title = "Updated elsewhere"))
+        advanceUntilIdle()
+        assertEquals(AppointmentReminder.NONE, vm.uiState.value.reminder)
+        vm.load()
+        advanceUntilIdle()
+        assertEquals(AppointmentReminder.NONE, vm.uiState.value.reminder)
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(
+            AppointmentReminder.NONE,
+            repository.appointments("uid-patient").single().reminder,
+        )
+      }
+
   private val dispatcher = StandardTestDispatcher()
   private val repository = FakeAppointmentRepository()
   private val auth = FakeAuthRepository()
@@ -349,6 +370,7 @@ class AppointmentEditViewModelTest {
         advanceUntilIdle()
         assertEquals("Consultation", vm.uiState.value.title)
 
+        vm.onReminderChange(AppointmentReminder.NONE)
         vm.onNotesChange("Fasting")
         vm.save()
         advanceUntilIdle()
@@ -356,6 +378,7 @@ class AppointmentEditViewModelTest {
         assertEquals(SavePhase.SAVED, vm.uiState.value.save)
         val saved = repository.appointments("anne").single()
         assertEquals("Fasting", saved.notes)
+        assertEquals(AppointmentReminder.NONE, saved.reminder)
         assertEquals("uid-patient", saved.editedBy)
         assertEquals("Sam", saved.editedByName)
         assertEquals("bob", saved.addedBy)
@@ -390,6 +413,7 @@ class AppointmentEditViewModelTest {
         appointments.serverRejectsWrites = true
         val vm = caregiverForm(appointments)
         advanceUntilIdle()
+        vm.onReminderChange(AppointmentReminder.NONE)
         vm.onNotesChange("Fasting")
 
         vm.save()

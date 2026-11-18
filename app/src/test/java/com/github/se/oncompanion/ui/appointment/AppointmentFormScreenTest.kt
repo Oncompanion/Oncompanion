@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -282,6 +283,7 @@ class AppointmentFormScreenTest {
   fun fieldsAndSaveRemainAbovePortraitKeyboard() {
     show(state().copy(title = "Visit", time = LocalTime.NOON))
     compose.showKeyboard(700)
+    compose.onNodeWithTag(C.Tag.appointment_reminder).performScrollTo().assertIsAboveKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().assertIsAboveKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsAboveKeyboard(700)
   }
@@ -294,6 +296,7 @@ class AppointmentFormScreenTest {
     show(state().copy(title = "Visit", time = LocalTime.NOON), caregiverOf = "Anne")
     compose.onNodeWithText("Add an appointment for Anne").assertIsDisplayed()
     compose.showKeyboard(280)
+    compose.onNodeWithTag(C.Tag.appointment_reminder).performScrollTo().assertIsAboveKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().apply {
       assertIsAboveKeyboard(280)
       assertIsFullyVisible()

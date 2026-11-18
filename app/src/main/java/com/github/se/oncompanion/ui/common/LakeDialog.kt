@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.common
@@ -47,7 +48,8 @@ class DialogTags(
  * @param isDestructive makes [confirmLabel] red, for an action that can't be undone
  * @param focusCancel puts the focus on [cancelLabel] first, when it is the safer choice (e.g.
  *   staying signed in with changes not yet saved online)
- * @param content shown under [message], scrolling with it, e.g. a "Don't show this again" checkbox
+ * @param content shown instead of an empty message, or under [message], scrolling with it, e.g. a
+ *   "Don't show this again" checkbox
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,11 +91,12 @@ fun LakeDialog(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-          Text(
-              message,
-              style = MaterialTheme.typography.bodyMedium,
-              color = colors.onSurfaceVariant,
-          )
+          if (message.isNotEmpty())
+              Text(
+                  message,
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = colors.onSurfaceVariant,
+              )
           if (error != null) {
             Text(
                 text = error,

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -23,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentReminder
 import com.github.se.oncompanion.model.appointment.AppointmentType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.*
@@ -78,6 +80,7 @@ fun AppointmentFormScreen(
       modifier,
       onRetry = viewModel::load,
       caregiverOf = caregiverOf,
+      onReminderChange = viewModel::onReminderChange,
   )
 }
 
@@ -104,6 +107,7 @@ fun AppointmentFormContent(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
     caregiverOf: String? = null,
+    onReminderChange: (AppointmentReminder) -> Unit = {},
 ) {
   var dateOpen by remember { mutableStateOf(false) }
   var timeOpen by remember { mutableStateOf(false) }
@@ -265,6 +269,7 @@ fun AppointmentFormContent(
           )
         }
       }
+      AppointmentReminderField(state.reminder, state.editable, onReminderChange)
       // Temporary manual entry: hospital search is deferred until its service is configured.
       Column {
         LakeTextField(
