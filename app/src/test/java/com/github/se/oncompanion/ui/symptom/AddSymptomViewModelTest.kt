@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.symptom
 
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -900,5 +901,128 @@ class AddSymptomViewModelTest {
 
         assertNull(savedEntry().addedBy)
         assertNull(savedEntry().addedByName)
+      }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** The signed-in caregiver Sam, editing [entry] in "patient"'s journal. */
+  private fun caregiverEditing(
+      entry: SymptomEntry = logged,
+      symptoms: FakeSymptomRepository = repository,
+  ): AddSymptomViewModel {
+    symptoms.seed("patient", entry)
+    return AddSymptomViewModel(
+        auth,
+        symptoms,
+        clock,
+        symptomId = entry.id,
+        patientUid = "patient",
+        profileRepository =
+            FakeUserProfileRepository().apply {
+              seed(UserProfile(uid, Role.CAREGIVER, firstName = "Sam"))
+            },
+    )
+  }
+
+  @Test
+  fun caregiver_editsThePatientsSymptom_signedAsEditor_keepingWhoAddedIt() =
+      runTest(dispatcher) {
+        val viewModel = caregiverEditing(logged.copy(addedBy = "bob", addedByName = "Bob"))
+        advanceUntilIdle()
+        assertEquals(logged.types, viewModel.state.types)
+
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        assertTrue(repository.symptoms(uid).isEmpty())
+        val saved = repository.symptoms("patient").single()
+        assertEquals(6, saved.intensity)
+        assertEquals(uid, saved.editedBy)
+        assertEquals("Sam", saved.editedByName)
+        assertEquals("bob", saved.addedBy)
+        assertEquals("Bob", saved.addedByName)
+      }
+
+  @Test
+  fun patientEdit_removesTheCaregiversName() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(editedBy = "bob", editedByName = "Bob"))
+        advanceUntilIdle()
+
+        viewModel.onIntensityChange(2)
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.symptoms(uid).single()
+        assertEquals(2, saved.intensity)
+        assertNull(saved.editedBy)
+        assertNull(saved.editedByName)
+      }
+
+  /** Access taken away before an offline edit synchronizes: the server undoes it, and says so. */
+  @Test
+  fun caregiverEditRejectedByTheServer_isUndoneAndReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val symptoms = FakeSymptomRepository(clock = { current }, rejectedWrites = rejectedWrites)
+        symptoms.serverRejectsWrites = true
+        val viewModel = caregiverEditing(symptoms = symptoms)
+        advanceUntilIdle()
+
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        symptoms.rejectPendingWrites()
+
+        assertEquals(listOf(logged), symptoms.symptoms("patient"))
+        assertEquals(1, rejectedWrites.unseen.value)
+      }
+
+  /**
+   * The patient and the caregiver edit the same symptom: the form saves the whole entry it showed,
+   * so the last save wins, as with the patient's own edits on two phones. Merging field by field
+   * would need the server, which an offline save can't wait for.
+   */
+  @Test
+  fun bothEditTheSameSymptom_theLastSaveWins() =
+      runTest(dispatcher) {
+        val viewModel = caregiverEditing()
+        advanceUntilIdle()
+
+        // The patient changes the intensity after the caregiver opened the form
+        repository.updateSymptom("patient", logged.copy(intensity = 8))
+        viewModel.onNotesChange("Slept badly")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.symptoms("patient").single()
+        assertEquals("Slept badly", saved.notes)
+        assertEquals(logged.intensity, saved.intensity)
+        assertEquals(uid, saved.editedBy)
+      }
+
+  /** The patient deletes the symptom while the caregiver edits it: the save can't bring it back. */
+  @Test
+  fun symptomDeletedWhileTheCaregiverEditsIt_staysDeleted_andTheRejectionIsReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val symptoms = FakeSymptomRepository(clock = { current }, rejectedWrites = rejectedWrites)
+        val viewModel = caregiverEditing(symptoms = symptoms)
+        advanceUntilIdle()
+        symptoms.deleteSymptom("patient", logged.id)
+
+        // Saved on the phone, then refused by the server, which no longer has the symptom
+        symptoms.serverRejectsWrites = true
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        symptoms.rejectPendingWrites()
+
+        assertTrue(symptoms.symptoms("patient").isEmpty())
+        assertEquals(1, rejectedWrites.unseen.value)
       }
 }

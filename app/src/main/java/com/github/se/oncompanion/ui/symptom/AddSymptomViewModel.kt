@@ -141,11 +141,13 @@ data class AddSymptomUiState(
  *
  * In caregiver mode (US-22), it logs the symptom in the journal of [patientUid], signed with the
  * caregiver's uid and first name; the rules only accept it if the patient lets them add symptoms.
+ * It edits one of the patient's the same way, signed as its last editor, if the patient lets them
+ * edit and delete symptoms (US-46).
  *
  * @param clock the current time, and the time zone the day and time are chosen in
  * @param symptomId the symptom to edit, or `null` to log a new one
- * @param patientUid in caregiver mode, the patient whose journal gets the symptom; null for the
- *   user's own
+ * @param patientUid in caregiver mode, the patient whose journal gets the new or edited symptom;
+ *   null for the user's own
  * @param profileRepository the caregiver's profile, for the first name the symptom is signed with
  */
 class AddSymptomViewModel(
@@ -187,7 +189,8 @@ class AddSymptomViewModel(
       // Null when the symptom no longer exists (e.g. deleted on another device)
       val entry: SymptomEntry? =
           try {
-            symptomRepository.observeSymptom(uid, id).first()
+            // A caregiver edits the patient's symptom
+            symptomRepository.observeSymptom(patientUid ?: uid, id).first()
           } catch (e: CancellationException) {
             throw e
           } catch (e: Exception) {
@@ -293,20 +296,11 @@ class AddSymptomViewModel(
     _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
-        if (symptomId != null) symptomRepository.updateSymptom(uid, entry)
-        else if (patientUid == null) symptomRepository.addSymptom(uid, entry)
-        // A caregiver's symptom goes in the patient's journal, signed with who added it
-        else {
-          val signed = entry.copy(addedBy = uid, addedByName = caregiverName(uid))
-          // Reading the name can take a while: the account may have changed meanwhile
-          currentCoroutineContext().ensureActive()
-          if (authRepository.signedInUid(TAG) != uid) {
-            _uiState.update {
-              it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
-            }
-            return@launch
+        if (!store(uid, entry)) {
+          _uiState.update {
+            it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
           }
-          symptomRepository.addSymptom(patientUid, signed)
+          return@launch
         }
         _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
@@ -316,6 +310,28 @@ class AddSymptomViewModel(
         _uiState.update { it.copy(save = SavePhase.EDITING, error = AddSymptomError.SAVE_FAILED) }
       }
     }
+  }
+
+  /**
+   * Logs or updates [entry] in the journal it belongs to. A caregiver's goes in the patient's
+   * journal, signed with who added or edited it. Returns false, saving nothing, if the account
+   * changed while the caregiver's name was read.
+   */
+  private suspend fun store(uid: String, entry: SymptomEntry): Boolean {
+    val owner = patientUid ?: uid
+    val signed =
+        if (patientUid == null) entry
+        else {
+          val name = caregiverName(uid)
+          // Reading the name can take a while: the account may have changed meanwhile
+          currentCoroutineContext().ensureActive()
+          if (authRepository.signedInUid(TAG) != uid) return false
+          if (symptomId != null) entry.copy(editedBy = uid, editedByName = name)
+          else entry.copy(addedBy = uid, addedByName = name)
+        }
+    if (symptomId != null) symptomRepository.updateSymptom(owner, signed)
+    else symptomRepository.addSymptom(owner, signed)
+    return true
   }
 
   /** The error has been shown. */
