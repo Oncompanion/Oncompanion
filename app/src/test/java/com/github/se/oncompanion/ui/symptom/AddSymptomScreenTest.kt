@@ -40,6 +40,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.speech.FakeSpeechRecognizer
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomType
@@ -712,7 +713,8 @@ class AddSymptomScreenTest {
         FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
           runBlocking { it.signInWithGoogle("token") }
         }
-    val viewModel = AddSymptomViewModel(auth, repository, clock)
+    val viewModel =
+        AddSymptomViewModel(auth, repository, clock, speechRecognizer = FakeSpeechRecognizer())
     var savedCount = 0
     composeTestRule.setContent {
       AddSymptomScreen(viewModel = viewModel, onBack = {}, onSaved = { savedCount++ })
@@ -742,7 +744,14 @@ class AddSymptomScreenTest {
         FakeAuthRepository(onSignIn = { AuthUser(uid = "alice") }).also {
           runBlocking { it.signInWithGoogle("token") }
         }
-    val viewModel = AddSymptomViewModel(auth, repository, clock, symptomId = logged.id)
+    val viewModel =
+        AddSymptomViewModel(
+            auth,
+            repository,
+            clock,
+            symptomId = logged.id,
+            speechRecognizer = FakeSpeechRecognizer(),
+        )
     var savedCount = 0
     composeTestRule.setContent {
       AddSymptomScreen(viewModel = viewModel, onBack = {}, onSaved = { savedCount++ })
