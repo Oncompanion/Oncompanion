@@ -78,6 +78,8 @@
     <string name="overview_see_planning">See planning</string>
     <string name="overview_nothing_today">Nothing planned today</string>
     <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
+    <string name="overview_nothing_else_today">Nothing else today</string>
+    <string name="overview_nothing_else_today_hint">Today\'s plan is in Planning.</string>
     <string name="overview_next_up">Next up</string>
     <string name="overview_with_place">%1$s · %2$s</string>
     <string name="overview_today_medications">Today\'s medications</string>

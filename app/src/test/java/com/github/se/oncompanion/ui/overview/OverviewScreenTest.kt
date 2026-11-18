@@ -501,6 +501,24 @@ class OverviewScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).performClick()
     composeTestRule.runOnIdle { assertEquals(1, openedPlanning) }
 
+    // Once today's only appointment has started, the day wasn't empty: nothing *else* is planned
+    state =
+        loaded.copy(
+            todayEntries = listOf(entry("a", 8, TodayItemStatus.DONE, TodayItemKind.APPOINTMENT))
+        )
+    composeTestRule.waitForIdle()
+    assertTextInside(
+        context.getString(R.string.overview_nothing_else_today),
+        C.Tag.overview_nothing_planned,
+    )
+    assertTextInside(
+        context.getString(R.string.overview_nothing_else_today_hint),
+        C.Tag.overview_nothing_planned,
+    )
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_nothing_today))
+        .assertDoesNotExist()
+
     state = loaded.copy(todayMedications = listOf(medication("a")))
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(C.Tag.overview_medications).assertIsDisplayed()

@@ -72,7 +72,8 @@ internal fun PatientDay(
   val nextUp = uiState.nextUp
   val medications = uiState.todayMedications
   if (nextUp == null && medications.isEmpty()) {
-    NothingPlannedCard(onOpenPlanning, modifier)
+    // Something was planned if today lists anything: it's all behind the patient by now
+    NothingPlannedCard(uiState.todayEntries.isNotEmpty(), onOpenPlanning, modifier)
     return
   }
   if (nextUp != null) {
@@ -340,11 +341,16 @@ private fun MorePill(count: Int, onOpenPlanning: () -> Unit) {
 }
 
 /**
- * "Today · Nothing planned today", when there is neither a next event nor a medication. Tapping it
- * opens Planning, where the day is filled in.
+ * "Today · Nothing planned today", when there is neither a next event nor a medication, or "Nothing
+ * else today" when the day's plans have all started ([dayStarted]). Tapping it opens Planning,
+ * where the day is filled in.
  */
 @Composable
-private fun NothingPlannedCard(onOpenPlanning: () -> Unit, modifier: Modifier) {
+private fun NothingPlannedCard(
+    dayStarted: Boolean,
+    onOpenPlanning: () -> Unit,
+    modifier: Modifier,
+) {
   DayCard(modifier.testTag(C.Tag.overview_nothing_planned), onClick = onOpenPlanning) {
     Row(
         Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
@@ -355,12 +361,18 @@ private fun NothingPlannedCard(onOpenPlanning: () -> Unit, modifier: Modifier) {
       Column(Modifier.weight(1f)) {
         Eyebrow(stringResource(R.string.overview_today))
         Text(
-            stringResource(R.string.overview_nothing_today),
+            stringResource(
+                if (dayStarted) R.string.overview_nothing_else_today
+                else R.string.overview_nothing_today
+            ),
             style = MaterialTheme.typography.cardTitle,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            stringResource(R.string.overview_nothing_today_hint),
+            stringResource(
+                if (dayStarted) R.string.overview_nothing_else_today_hint
+                else R.string.overview_nothing_today_hint
+            ),
             style = MaterialTheme.typography.cardDetail,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
