@@ -83,7 +83,9 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.settings.AppearanceScreen
 import com.github.se.oncompanion.ui.settings.SettingsScreen
+import com.github.se.oncompanion.ui.settings.SettingsViewModel
 import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
 import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
@@ -668,7 +670,16 @@ private fun SessionNavHost(
       }
     }
     navigation(startDestination = Screen.SETTINGS, route = Route.SETTINGS) {
-      composable(Screen.SETTINGS) { SettingsScreen(onBack = navigationActions::goBack) }
+      composable(Screen.SETTINGS) {
+        SettingsScreen(
+            viewModel { SettingsViewModel() },
+            onBack = navigationActions::goBack,
+            onAppearance = { navigationActions.navigateTo(Screen.APPEARANCE) },
+        )
+      }
+      composable(Screen.APPEARANCE) {
+        AppearanceScreen(viewModel { SettingsViewModel() }, onBack = navigationActions::goBack)
+      }
     }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) {

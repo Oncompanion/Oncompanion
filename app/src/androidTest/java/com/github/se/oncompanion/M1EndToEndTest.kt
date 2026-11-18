@@ -12,8 +12,10 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -26,6 +28,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.settings.AppearancePreference
+import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
@@ -77,11 +81,17 @@ class M1EndToEndTest {
   // the collection is shared by every test run: its own id, deleted after the test
   private val ligueEvent = "m1-event-$run"
 
-  @Before fun setUp(): Unit = runBlocking { EmulatorTestData.signOut() }
+  @Before
+  fun setUp(): Unit = runBlocking {
+    SettingsRepositoryProvider.install(compose.activity.applicationContext)
+    SettingsRepositoryProvider.repository.setAppearance(AppearancePreference.FOLLOW_DEVICE)
+    EmulatorTestData.signOut()
+  }
 
   @After
   fun tearDown(): Unit = runBlocking {
     AppHostActivity.content.value = {}
+    SettingsRepositoryProvider.repository.setAppearance(AppearancePreference.FOLLOW_DEVICE)
     EmulatorTestData.signOut()
     runCatching { EmulatorTestData.deleteRawDocument("events/$ligueEvent") }
   }
@@ -327,7 +337,13 @@ class M1EndToEndTest {
   private fun openSettingsAndReturnToProfile() {
     captureSettings("settings-profile-entry.png")
     ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
-    ui.tag(C.Tag.settings_empty).reveal().assertIsDisplayed()
+    ui.open(C.Tag.settings_appearance, hasTestTag(C.Tag.appearance_dark))
+    ui.tag(C.Tag.appearance_dark).reveal().performClick()
+    ui.tag(C.Tag.appearance_dark).assertIsSelected()
+    captureSettings("settings-appearance-dark.png")
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.settings_appearance))
+    ui.tag(C.Tag.settings_appearance)
+        .assert(hasAnyDescendant(hasText(string(R.string.appearance_dark))))
     captureSettings("settings-foundation.png")
     ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
   }

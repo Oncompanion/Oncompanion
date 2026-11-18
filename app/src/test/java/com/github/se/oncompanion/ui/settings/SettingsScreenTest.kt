@@ -8,45 +8,49 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.model.settings.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
-import org.junit.Assert.assertEquals
-import org.junit.Rule
-import org.junit.Test
+import org.junit.*
+import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** Checks the Settings shell before preference categories are implemented. */
+/** Verifies the only implemented category and its observed current value. */
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
   @get:Rule val compose = createComposeRule()
 
   @Test
-  fun emptySettings_hasTitleAndBackWithoutUnbuiltCategories() {
+  fun screenShowsTheSavedChoiceAndBothNavigationCallbacks() {
+    val repo = FakeSettingsRepository(DeviceSettings(AppearancePreference.DARK))
+    val vm = SettingsViewModel(repo)
     var backs = 0
-    compose.setContent { OncompanionTheme { SettingsScreen(onBack = { backs++ }) } }
-    compose.onNodeWithText("Settings").assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.settings_empty).assertIsDisplayed()
-    listOf("Appearance", "Language", "Date and time", "Notifications").forEach {
-      compose.onNodeWithText(it).assertDoesNotExist()
-    }
+    var appearances = 0
+    compose.setContent { OncompanionTheme { SettingsScreen(vm, { backs++ }, { appearances++ }) } }
+    compose.onNodeWithText("Dark").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performClick()
     compose.onNodeWithTag(C.Tag.settings_back).performClick()
     assertEquals(1, backs)
+    assertEquals(1, appearances)
+    listOf("Language", "Date and time", "Notifications", "Text size").forEach {
+      compose.onNodeWithText(it).assertDoesNotExist()
+    }
   }
 
   @Test
   @Config(qualifiers = LANDSCAPE_PHONE)
-  fun landscapeAt200Percent_keepsMessageAndBackReachable() {
+  fun landscapeAt200PercentKeepsCategoryAndBackReachable() {
     compose.setContent {
       OncompanionTheme {
         CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
-          SettingsContent(onBack = {})
+          SettingsContent(SettingsUiState(DeviceSettings()), {}, {}, {})
         }
       }
     }
-    compose.onNodeWithTag(C.Tag.settings_empty).performScrollTo().assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performScrollTo().assertIsFullyVisible()
     compose.onNodeWithTag(C.Tag.settings_back).assertIsFullyVisible()
   }
 }
