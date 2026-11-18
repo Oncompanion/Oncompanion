@@ -14,6 +14,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -114,6 +115,79 @@ class M1EndToEndTest {
 
     signInAndOnboard(firstName = "Sam")
     inviteToCareCircle(firstName = "Julie")
+  }
+
+  /** Every editable Profile field stays saved after visiting Settings and returning. */
+  @Test
+  fun editedProfile_survivesSettingsRoundTrip() {
+    ui.startApp(signIn)
+    signInAndOnboard(firstName = "Sam")
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_edit))
+    ui.open(C.Tag.profile_edit, hasTestTag(C.Tag.edit_profile_first_name))
+    val fields =
+        listOf(
+            C.Tag.edit_profile_first_name to "Jamie",
+            C.Tag.edit_profile_family_name to "Taylor",
+            C.Tag.cancer_type_field to "Example type",
+            C.Tag.hospital_field to "Example hospital",
+        )
+    for ((tag, value) in fields) ui.tag(tag).reveal().replaceText(value)
+    ui.open(C.Tag.edit_profile_save, hasTestTag(C.Tag.profile_screen))
+    ui.waitFor(hasTestTag(C.Tag.profile_name) and hasText("Jamie Taylor"))
+    ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+
+    // Check both the displayed profile and a fresh edit destination's persisted values.
+    for ((tag, value) in
+        listOf(
+            C.Tag.profile_first_name to "Jamie",
+            C.Tag.profile_family_name to "Taylor",
+            C.Tag.profile_cancer_type to "Example type",
+            C.Tag.profile_hospital to "Example hospital",
+        )) {
+      ui.waitFor(hasTestTag(tag) and hasAnyDescendant(hasText(value))).reveal().assertIsDisplayed()
+    }
+    ui.open(C.Tag.profile_edit, hasTestTag(C.Tag.edit_profile_first_name))
+    for ((tag, value) in fields) ui.tag(tag).reveal().assertTextContains(value)
+  }
+
+  /** Settings survives a real rotation; toolbar and Android Back retain the same Profile. */
+  @Test
+  fun settingsRotation_backReturnsToTheSameProfile() {
+    ui.startApp(signIn)
+    signInAndOnboard(firstName = "Sam")
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_edit))
+    ui.tag(C.Tag.profile_settings).reveal().fullyVisible()
+    captureSettings("settings-profile-portrait.png")
+    try {
+      for (systemBack in listOf(false, true)) {
+        rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+        ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+        ui.tag(C.Tag.settings_empty).reveal().assertIsDisplayed()
+        captureSettings("settings-portrait.png")
+        rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+        ui.tag(C.Tag.settings_screen).assertIsDisplayed()
+        ui.tag(C.Tag.settings_empty).reveal().fullyVisible()
+        ui.tag(C.Tag.settings_back).reveal().fullyVisible()
+        captureSettings("settings-landscape.png")
+        if (systemBack) {
+          compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+          ui.waitFor(hasTestTag(C.Tag.profile_screen))
+        } else {
+          ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+        }
+        ui.waitFor(hasTestTag(C.Tag.profile_name) and hasText("Sam")).reveal().assertIsDisplayed()
+        ui.waitFor(
+                hasTestTag(C.Tag.profile_email) and hasAnyDescendant(hasText("m1-$run@example.com"))
+            )
+            .reveal()
+            .assertIsDisplayed()
+        ui.tag(C.Tag.profile_settings).reveal().fullyVisible()
+        captureSettings("settings-profile-landscape.png")
+      }
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
   }
 
   // ---- steps ----
