@@ -69,6 +69,7 @@ import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
 import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestLight
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
@@ -137,6 +138,12 @@ class OverviewScreenTest {
 
     override fun navigateToTab(route: String) {
       openedTabs += route
+    }
+
+    val openedPlanningDays = mutableListOf<LocalDate>()
+
+    override fun navigateToPlanningOn(date: LocalDate) {
+      openedPlanningDays += date
     }
   }
 
@@ -390,8 +397,9 @@ class OverviewScreenTest {
       composeTestRule.onNodeWithTag(it).assertTouchHeightIsEqualTo(48.dp).performClick()
     }
     composeTestRule.runOnIdle {
-      // Planning is a tab: it opens with tab navigation, not stacked on the Overview
-      assertEquals(listOf(Route.PLANNING, Route.PLANNING), navigationActions.openedTabs)
+      // Both links open Planning on today, whatever day it showed last
+      val today = morning.toLocalDate()
+      assertEquals(listOf(today, today), navigationActions.openedPlanningDays)
       assertEquals(listOf(Screen.eventDetail("gentle-yoga")), navigationActions.openedRoutes)
     }
   }

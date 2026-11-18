@@ -286,7 +286,7 @@ private fun SessionNavHost(
               patientUid = chosenPatient?.uid,
           )
         }
-        // Return to this calendar instance and reveal the saved day, including another week.
+        // Reveal the day handed over (a saved appointment's, or today from the Overview)
         val savedDate by
             entry.savedStateHandle
                 .getStateFlow<String?>(Screen.APPOINTMENT_SAVED_DATE, null)

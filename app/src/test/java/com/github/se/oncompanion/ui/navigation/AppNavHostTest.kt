@@ -99,6 +99,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -1507,6 +1508,47 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
   }
+
+  @Test
+  fun overviewLinks_openPlanningOnToday_evenAfterBrowsingAnotherWeek() {
+    // Three medications today, so the card shows "1 more" under the first two
+    val medications =
+        FakePlanningRepository().apply {
+          items.value =
+              listOf("Ondansetron", "Dexamethasone", "Paracetamol").map {
+                PlanningItem(
+                    PlanningSource.Medication("rx", it),
+                    PlanningTiming.DateOnly(LocalDate.now()),
+                    it,
+                )
+              }
+        }
+    setNavHost(Route.OVERVIEW, medications, authRepository = signedInPatient())
+
+    for (link in listOf(C.Tag.overview_more_medications, C.Tag.overview_planning_link)) {
+      // Browse next week from the Planning tab, then come back to the Overview
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+      val today = planningHeading()
+      composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+      composeTestRule.runOnIdle { assertNotEquals(today, planningHeading()) }
+      composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
+
+      composeTestRule.onNodeWithTag(link).performScrollTo().performClick()
+
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+      composeTestRule.runOnIdle { assertEquals(link, today, planningHeading()) }
+      composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
+    }
+  }
+
+  /** The day Planning shows, as its heading reads it. */
+  private fun planningHeading() =
+      composeTestRule
+          .onNodeWithTag(C.Tag.planning_heading)
+          .fetchSemanticsNode()
+          .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+          .single()
+          .text
 
   @Test
   fun planningAgendaKeepsScrollAndSingleObservationAcrossTabs() {
