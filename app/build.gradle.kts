@@ -169,6 +169,7 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
 }
 
 dependencies {
+  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.core.splashscreen)
   // Prescription scan (US-10): camera preview and capture
