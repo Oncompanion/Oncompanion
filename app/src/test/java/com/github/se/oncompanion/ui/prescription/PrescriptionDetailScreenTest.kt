@@ -516,7 +516,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun caregiver_seesThePatientsPrescription_withoutEditOrDelete() {
-    setCaregiverContent(shown.copy(isOwn = false, canChange = false))
+    setCaregiverContent(shown.copy(canChange = false))
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_edit_button).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_delete_button).assertDoesNotExist()
@@ -524,9 +524,7 @@ class PrescriptionDetailScreenTest {
 
   @Test
   fun caregiver_prescriptionsNotShared_saysSo_insteadOfNotFound() {
-    setCaregiverContent(
-        PrescriptionDetailUiState(isLoading = false, isNotShared = true, isOwn = false)
-    )
+    setCaregiverContent(PrescriptionDetailUiState(isLoading = false, isNotShared = true))
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.prescription_detail_not_found).assertDoesNotExist()
@@ -570,7 +568,7 @@ class PrescriptionDetailScreenTest {
 
   // ----- Authorized caregiver edits and deletion (US-46) -----
 
-  private val editablePatientPrescription = shown.copy(isOwn = false, canChange = true)
+  private val editablePatientPrescription = shown.copy(canChange = true)
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)

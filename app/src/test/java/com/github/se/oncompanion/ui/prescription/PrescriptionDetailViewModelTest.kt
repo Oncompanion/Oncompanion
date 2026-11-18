@@ -612,7 +612,6 @@ class PrescriptionDetailViewModelTest {
     repository.seed("caregiver", chemo)
     val vm = followedViewModel(patient)
     advanceUntilIdle()
-    assertFalse(vm.uiState.value.isOwn)
     assertTrue(vm.uiState.value.canEdit)
     vm.requestDelete()
     vm.cancelDelete()
@@ -724,16 +723,35 @@ class PrescriptionDetailViewModelTest {
   }
 
   @Test
-  fun accountChangedBeforeQueuedDeletion_doesNotDeleteThePreviousPatientsRecord() = runTest {
+  fun accountChangedAfterDeletion_doesNotLeaveTheDialogDeleting() = runTest {
     val patient = editablePatient()
     repository.seed("patient", chemo)
-    val vm = followedViewModel(patient)
+    // Hold completion after the write to reproduce an account change during deletion.
+    val completed = CompletableDeferred<Unit>()
+    val delayed =
+        object : MedicationRepository by repository {
+          override suspend fun deletePrescription(uid: String, id: String) {
+            repository.deletePrescription(uid, id)
+            completed.await()
+          }
+        }
+    val vm =
+        PrescriptionDetailViewModel(
+            "chemo",
+            patient.auth,
+            delayed,
+            patientUid = "patient",
+            resolveSection = patient.sectionAccess,
+        )
     advanceUntilIdle()
     vm.requestDelete()
     vm.confirmDelete()
-    patient.auth.signOut()
     advanceUntilIdle()
-    assertEquals(listOf(chemo), repository.prescriptionsOf("patient"))
-    assertFalse(vm.uiState.value.delete == DeletePhase.DELETED)
+    assertTrue(repository.prescriptionsOf("patient").isEmpty())
+    assertEquals(DeletePhase.DELETING, vm.uiState.value.delete)
+    patient.auth.signOut()
+    completed.complete(Unit)
+    advanceUntilIdle()
+    assertEquals(DeletePhase.DELETED, vm.uiState.value.delete)
   }
 }

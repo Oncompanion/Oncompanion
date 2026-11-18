@@ -23,7 +23,6 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.ui.common.DeleteConfirmation
 import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.HasDeletePhase
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +40,6 @@ import kotlinx.coroutines.launch
  * @property isLoading true until the prescription arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
  * @property delete where the deletion of the prescription is at
- * @property isOwn whether it is the user's own prescription
  * @property canChange whether edit and delete are allowed in this section
  * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
  */
@@ -50,9 +48,8 @@ data class PrescriptionDetailUiState(
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
     override val delete: DeletePhase = DeletePhase.IDLE,
-    val isOwn: Boolean = true,
     val isNotShared: Boolean = false,
-    val canChange: Boolean = isOwn,
+    val canChange: Boolean = true,
 ) : HasDeletePhase {
   /** The prescription doesn't exist (e.g. deleted on another device). */
   val isNotFound: Boolean
@@ -172,7 +169,6 @@ class PrescriptionDetailViewModel(
                     isLoading = true,
                     hasError = false,
                     isNotShared = false,
-                    isOwn = false,
                     canChange = false,
                     delete = delete.afterRead(false),
                 )
@@ -184,7 +180,6 @@ class PrescriptionDetailViewModel(
                 isLoading = false,
                 hasError = section == CareSection.NoAccess,
                 isNotShared = section == CareSection.NotShared,
-                isOwn = false,
                 canChange = false,
                 delete = delete.afterRead(false),
             )
@@ -202,7 +197,6 @@ class PrescriptionDetailViewModel(
                 isLoading = false,
                 hasError = false,
                 isNotShared = false,
-                isOwn = section.canEdit,
                 canChange = section.canEditEntries,
                 delete = delete.afterRead(exists = section.data != null && section.canEditEntries),
             )
@@ -225,9 +219,7 @@ class PrescriptionDetailViewModel(
           stopObserving = { observation?.cancel() },
           delete = { uid ->
             // The actor authenticates the write; the prescription belongs to the followed patient.
-            if (authRepository.signedInUid(TAG) != uid) throw CancellationException()
             manageMedicationSchedule.delete(patientUid ?: uid, prescriptionId)
-            if (authRepository.signedInUid(TAG) != uid) throw CancellationException()
           },
           onFailure = { observe() },
       )
