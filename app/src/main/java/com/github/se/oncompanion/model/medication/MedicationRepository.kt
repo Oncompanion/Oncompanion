@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.medication
@@ -40,7 +41,7 @@ interface MedicationRepository {
 
   /**
    * Saves a new prescription with its medications. [Prescription.createdAt] is ignored and set by
-   * the server.
+   * the server. A new prescription has no editor attribution.
    *
    * @throws IllegalArgumentException if the prescription is not [Prescription.isValid]
    */
@@ -49,9 +50,11 @@ interface MedicationRepository {
   /**
    * Replaces the content of an existing prescription: its medications become exactly
    * [Prescription.medications], so the ones left out are deleted. [Prescription.createdAt] never
-   * changes. Does nothing if the prescription doesn't exist. Offline, a device that has never
-   * loaded the prescription can't tell: the update is kept and sent when the connection comes back,
-   * and nothing is saved if the prescription doesn't exist.
+   * changes; original author attribution also stays. Editor attribution describes the last
+   * caregiver edit, or is cleared after a patient edit. Does nothing if the prescription doesn't
+   * exist. Offline, a device that has never loaded the prescription can't tell: the update is kept
+   * and sent when the connection comes back, and nothing is saved if the prescription doesn't
+   * exist.
    *
    * @throws IllegalArgumentException if the prescription is not [Prescription.isValid]
    */
