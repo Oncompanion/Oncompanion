@@ -735,4 +735,8 @@
     <string name="appointment_edit_for">Edit %1$s\'s appointment</string>
     <string name="appointment_delete_title_for">Delete %1$s\'s appointment?</string>
     <string name="appointment_delete_message_for">It will be removed from %1$s\'s planning. You can\'t undo this.</string>
+    <!-- A caregiver edits or deletes the patient's symptom, e.g. "Delete Anne's entry?" -->
+    <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
+    <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
+    <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
 </resources>
