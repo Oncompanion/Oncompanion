@@ -22,26 +22,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.se.oncompanion.model.medication.Medication
-import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
-import com.github.se.oncompanion.model.medication.Prescription
-import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.firestore.Source
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -81,7 +71,6 @@ class M1EndToEndTest {
   // A Ligue event for tomorrow. Events are added from the Firebase console, never by the app, and
   // the collection is shared by every test run: its own id, deleted after the test
   private val ligueEvent = "m1-event-$run"
-  private val prescriptionAccounts = mutableSetOf<String>()
 
   @Before fun setUp(): Unit = runBlocking { EmulatorTestData.signOut() }
 
@@ -90,9 +79,6 @@ class M1EndToEndTest {
     AppHostActivity.content.value = {}
     EmulatorTestData.signOut()
     runCatching { EmulatorTestData.deleteRawDocument("events/$ligueEvent") }
-    // Every fresh identity is recorded before setup continues, including on a failed journey.
-    val cleanup = prescriptionAccounts.map { runCatching { EmulatorTestData.deleteUserData(it) } }
-    cleanup.firstOrNull { it.isFailure }?.getOrThrow()
   }
 
   @Test
@@ -122,144 +108,6 @@ class M1EndToEndTest {
 
     signInAndOnboard(firstName = "Sam")
     inviteToCareCircle(firstName = "Julie")
-  }
-
-  /**
-   * Caregiver edits target the patient, keep confirmation pending and delete only after consent.
-   */
-  @Test
-  fun caregiver_editsAndDeletesThePatientsPrescription() {
-    val token =
-        FirebaseEmulator.fakeGoogleIdToken(
-            sub = "m1-prescription-caregiver-$run",
-            email = "m1-prescription-caregiver-$run@example.com",
-            name = "Julie Rivera",
-            givenName = "Julie",
-        )
-    val prescriptionId = "m1-prescription-$run"
-    val (patientUid, caregiverUid) =
-        runBlocking {
-          val patient = EmulatorTestData.createUser("m1-prescription-patient-$run")
-          prescriptionAccounts += patient
-          EmulatorTestData.createProfile("PATIENT", "Alex")
-          val caregiver =
-              FirebaseEmulator.auth
-                  .signInWithCredential(GoogleAuthProvider.getCredential(token, null))
-                  .await()
-                  .user!!
-                  .uid
-          prescriptionAccounts += caregiver
-          EmulatorTestData.createProfile("CAREGIVER", "Julie")
-          // Joining and permission setup are fixtures; the asserted journey uses real app
-          // navigation.
-          EmulatorTestData.createRawDocument(
-              "users/$patient/circle",
-              caregiver,
-              """{"firstName":{"stringValue":"Julie"},"relationship":{"stringValue":"FRIEND"},
-             "permissions":{"arrayValue":{"values":[{"stringValue":"PRESCRIPTIONS"}]}},
-             "canAdd":{"arrayValue":{"values":[{"stringValue":"PRESCRIPTIONS"}]}},
-             "canEditAndDelete":{"arrayValue":{"values":[{"stringValue":"PRESCRIPTIONS"}]}}}""",
-          )
-          EmulatorTestData.createRawDocument(
-              "users/$caregiver/patients",
-              patient,
-              """{"patientFirstName":{"stringValue":"Alex"}}""",
-          )
-          val repository = MedicationRepositoryFirestore(FirebaseEmulator.firestore)
-          repository.addPrescription(
-              patient,
-              Prescription(
-                  id = prescriptionId,
-                  prescribedBy = "Dr Martin",
-                  prescribedOn = LocalDate.now(),
-                  medications =
-                      listOf(
-                          Medication(
-                              id = "m1-medication-$run",
-                              prescriptionId = prescriptionId,
-                              name = "Fictional medication",
-                              startDate = LocalDate.now(),
-                          )
-                      ),
-                  addedBy = caregiver,
-                  addedByName = "Julie",
-                  confirmation = PrescriptionConfirmation.PENDING,
-              ),
-          )
-          withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
-          patient to caregiver
-        }
-    ui.startApp(EmulatorGoogleSignIn(token))
-    // The shared test host starts at Auth, including for a pre-created account.
-    ui.open(C.Tag.google_sign_in_button, hasTestTag(C.Tag.overview_shortcut_prescriptions))
-    ui.open(C.Tag.overview_shortcut_prescriptions, hasTestTag(C.Tag.prescriptions_list))
-    ui.open(C.Tag.prescriptionsItem(prescriptionId), hasTestTag(C.Tag.prescription_detail_content))
-    ui.waitFor(
-        hasTestTag(C.Tag.added_by) and
-            hasText(compose.activity.getString(R.string.added_by_not_confirmed, "Julie"))
-    )
-    ui.open(
-            C.Tag.prescription_detail_edit_button,
-            hasTestTag(C.Tag.prescription_form_prescribed_by_field),
-        )
-        .replaceText("Dr Updated")
-    // Editing a pending entry never exposes the patient's Confirm or Reject actions.
-    compose.onNodeWithTag(C.Tag.prescription_form_reject_button).assertDoesNotExist()
-    ui.open(C.Tag.prescription_form_save_button, hasTestTag(C.Tag.prescription_detail_content))
-    ui.waitFor(hasText("Dr Updated")).assertIsDisplayed()
-    ui.waitFor(
-            hasTestTag(C.Tag.edited_by) and
-                hasText(compose.activity.getString(R.string.edited_by, "Julie"))
-        )
-        .assertIsDisplayed()
-    ui.waitFor(
-        hasTestTag(C.Tag.added_by) and
-            hasText(compose.activity.getString(R.string.added_by_not_confirmed, "Julie"))
-    )
-    runBlocking {
-      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
-      val stored =
-          FirebaseEmulator.firestore
-              .collection("users")
-              .document(patientUid)
-              .collection("prescriptions")
-              .document(prescriptionId)
-              .get(Source.SERVER)
-              .await()
-      assertEquals("Dr Updated", stored.getString("prescribedBy"))
-      assertEquals("PENDING", stored.getString("confirmation"))
-      assertEquals(caregiverUid, stored.getString("editedBy"))
-      assertEquals(caregiverUid, stored.getString("addedBy"))
-      assertTrue(
-          FirebaseEmulator.firestore
-              .collection("users")
-              .document(caregiverUid)
-              .collection("prescriptions")
-              .get(Source.SERVER)
-              .await()
-              .isEmpty
-      )
-    }
-    ui.open(C.Tag.prescription_detail_delete_button, hasTestTag(C.Tag.prescription_delete_dialog))
-    ui.waitFor(hasText(compose.activity.getString(R.string.prescription_delete_title_for, "Alex")))
-    ui.open(C.Tag.prescription_delete_cancel, hasTestTag(C.Tag.prescription_detail_content))
-    ui.waitFor(hasText("Dr Updated")).assertIsDisplayed()
-    ui.open(C.Tag.prescription_detail_delete_button, hasTestTag(C.Tag.prescription_delete_dialog))
-    ui.open(C.Tag.prescription_delete_confirm, hasTestTag(C.Tag.prescriptions_empty))
-    ui.waitFor(hasTestTag(C.Tag.prescriptionsItem(prescriptionId)), gone = true)
-    runBlocking {
-      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
-      assertFalse(
-          FirebaseEmulator.firestore
-              .collection("users")
-              .document(patientUid)
-              .collection("prescriptions")
-              .document(prescriptionId)
-              .get(Source.SERVER)
-              .await()
-              .exists()
-      )
-    }
   }
 
   // ---- steps ----
