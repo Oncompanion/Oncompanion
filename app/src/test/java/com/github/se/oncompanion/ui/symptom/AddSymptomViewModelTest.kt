@@ -991,6 +991,33 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun androidsAnswer_afterThePatientLeftDictating_isIgnored() =
+      runTest(dispatcher) {
+        // Cancelled while Android asked, or a new form after the app was restarted meanwhile
+        val leftDictating: List<Pair<String, () -> AddSymptomViewModel>> =
+            listOf(
+                "cancelled" to
+                    {
+                      viewModel().also {
+                        it.onSpeak(hasMicrophone = false)
+                        it.cancelVoice()
+                      }
+                    },
+                "restarted" to { viewModel() },
+            )
+        for ((how, form) in leftDictating) {
+          for (granted in listOf(true, false)) {
+            val viewModel = form()
+            viewModel.onMicrophoneAnswer(granted)
+            advanceUntilIdle()
+
+            assertNull("$how, granted=$granted", viewModel.state.voice)
+            assertEquals("$how, granted=$granted", emptyList<SpeechLanguage>(), speech.languages)
+          }
+        }
+      }
+
+  @Test
   fun listening_showsTheWordsAsTheyAreSaid_thenWhatWasPickedUp() =
       runTest(dispatcher) {
         val viewModel = listening()

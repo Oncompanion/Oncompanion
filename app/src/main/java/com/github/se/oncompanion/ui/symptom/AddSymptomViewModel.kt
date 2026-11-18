@@ -344,14 +344,18 @@ class AddSymptomViewModel(
    * app first says why it needs it; the screen then asks Android and calls [onMicrophoneAnswer].
    */
   fun onSpeak(hasMicrophone: Boolean) {
-    val state = _uiState.value
-    if (!state.canDictate || state.save != SavePhase.EDITING || !state.isFormShown) return
+    if (!_uiState.value.canStartDictating) return
     if (hasMicrophone) startListening()
     else _uiState.update { it.copy(voice = VoiceUiState.ExplainingMicrophone) }
   }
 
-  /** Android's answer when asked for the microphone: listens if [granted]. */
+  /**
+   * Android's answer when asked for the microphone: listens if [granted]. An answer that comes
+   * after the patient left dictating (cancelled, or the app was restarted meanwhile) is ignored.
+   */
   fun onMicrophoneAnswer(granted: Boolean) {
+    val state = _uiState.value
+    if (state.voice != VoiceUiState.ExplainingMicrophone || !state.canStartDictating) return
     if (granted) startListening()
     else _uiState.update { it.copy(voice = VoiceUiState.MicrophoneRefused) }
   }
@@ -490,6 +494,10 @@ class AddSymptomViewModel(
       if (state.save != SavePhase.EDITING || !state.isFormShown) state else transform(state)
     }
   }
+
+  /** The phone can dictate and the form can still change: not saving, and loaded when editing. */
+  private val AddSymptomUiState.canStartDictating: Boolean
+    get() = canDictate && save == SavePhase.EDITING && isFormShown
 
   private fun AddSymptomUiState.withFutureCheck(): AddSymptomUiState {
     val now = ZonedDateTime.now(clock)
