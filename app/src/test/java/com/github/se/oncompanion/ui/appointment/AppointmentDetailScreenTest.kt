@@ -21,6 +21,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.appointment.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
 import java.time.*
@@ -318,5 +320,77 @@ class AppointmentDetailScreenTest {
     }
 
     compose.onNodeWithText("Anne doesn't share Planning with you").assertIsDisplayed()
+  }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** Anne's appointment, as her caregiver allowed to edit and delete it, with [deletion]. */
+  private fun showAllowedCaregiver(
+      deletion: DeletePhase = DeletePhase.IDLE,
+      onEdit: () -> Unit = {},
+  ) {
+    compose.setContent {
+      AppointmentDetailContent(
+          AppointmentDetailUiState.Loaded(appointment, deletion, isOwn = false, canChange = true),
+          {},
+          {},
+          onEdit = onEdit,
+          onDelete = {},
+          caregiverOf = "Anne",
+      )
+    }
+  }
+
+  @Test
+  fun allowedCaregiver_seesEditAndDelete_andTheDialogSaysWhoseAppointmentItIs() {
+    var edits = 0
+    showAllowedCaregiver(DeletePhase.CONFIRMING) { edits++ }
+
+    compose.onNodeWithText("Delete Anne's appointment?").assertIsDisplayed()
+    compose
+        .onNodeWithText("It will be removed from Anne's planning. You can't undo this.")
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertExists()
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
+    assertEquals(1, edits)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun allowedCaregiver_actionsAndDialog_fitInLandscape() {
+    showAllowedCaregiver()
+    compose
+        .onNodeWithTag(C.Tag.appointment_detail_content)
+        .performScrollToNode(hasTestTag(C.Tag.appointment_detail_delete_button))
+    compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).assertIsFullyVisible()
+  }
+
+  @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
+  fun caregiverDeleteDialog_fitsASmallLandscapePhone() {
+    showAllowedCaregiver(DeletePhase.CONFIRMING)
+    compose.onNodeWithTag(C.Tag.appointment_delete_confirm).assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.appointment_delete_cancel).assertIsFullyVisible()
+  }
+
+  /** An appointment a caregiver edited says who did (US-46), under who added it, which stays. */
+  @Test
+  fun editedByACaregiver_saysWhoEditedIt_underWhoAddedIt() {
+    var state by
+        mutableStateOf<AppointmentDetailUiState>(
+            AppointmentDetailUiState.Loaded(
+                appointment,
+                addedByName = "Sam",
+                editedByName = "Carol",
+            )
+        )
+    compose.setContent { AppointmentDetailContent(state, {}, {}, ZoneId.of("Europe/Zurich")) }
+    compose.onNodeWithTag(C.Tag.added_by).assertTextEquals("Added by Sam")
+    compose.onNodeWithTag(C.Tag.edited_by).assertTextEquals("Edited by Carol")
+
+    compose.runOnIdle { state = AppointmentDetailUiState.Loaded(appointment) }
+    compose.onNodeWithTag(C.Tag.edited_by).assertDoesNotExist()
   }
 }

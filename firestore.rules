@@ -22,7 +22,8 @@ service cloud.firestore {
     // Each user has one profile document: /users/{uid}. Only they can read or write it.
     // Keep the limits in sync with UserProfile (MAX_NAME_LENGTH, MAX_CANCER_TYPE_LENGTH, MAX_HOSPITAL_LENGTH).
     function isValidProfile(data) {
-      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt'])
+      return data.keys().hasOnly(['role', 'firstName', 'familyName', 'cancerType', 'hospital', 'createdAt',
+                                  'dateOfBirth'])
           && data.keys().hasAll(['role', 'firstName', 'createdAt'])
           && data.role in ['PATIENT', 'CAREGIVER']
           && data.firstName is string
@@ -31,6 +32,14 @@ service cloud.firestore {
           && optionalString(data, 'familyName', 50)
           && optionalString(data, 'cancerType', 100)
           && optionalString(data, 'hospital', 100)
+          // The optional date of birth is a day already started somewhere on Earth. It is stored as
+          // its midnight in Zurich, and a day starts at most 13 hours earlier (UTC+14, Kiribati):
+          // the 14 hours let users ahead of Zurich (Australia...) enter their own today, with a
+          // margin for the phone's clock. The app refuses days after the phone's today
+          // (UserProfile.isValid).
+          && (data.get('dateOfBirth', null) == null
+              || (data.dateOfBirth is timestamp
+                  && data.dateOfBirth <= request.time + duration.value(14, 'h')))
           && data.createdAt is timestamp;
     }
     // Who added an entry: nothing when the patient did, or the signed-in caregiver's uid and first
@@ -43,6 +52,24 @@ service cloud.firestore {
               && data.get('addedByName', null) is string
               && data.addedByName.trim().size() > 0
               && data.addedByName.size() <= 50;
+    }
+    // Who last edited an entry: nothing when the patient did, or the signed-in caregiver's uid and
+    // first name when a caregiver did (US-46), so nobody can edit in someone else's name. The
+    // patient may also leave the editor as it was: older versions of the app don't remove it.
+    // Keep in sync with Appointment and SymptomEntry (MAX_ADDED_BY_NAME_LENGTH).
+    function isValidEditor(ownerUid, data, previous) {
+      return isOwner(ownerUid)
+          ? !data.keys().hasAny(['editedBy', 'editedByName'])
+              || (data.get('editedBy', null) == previous.get('editedBy', null)
+                  && data.get('editedByName', null) == previous.get('editedByName', null))
+          : data.get('editedBy', null) == request.auth.uid
+              && data.get('editedByName', null) is string
+              && data.editedByName.trim().size() > 0
+              && data.editedByName.size() <= 50;
+    }
+    // A new entry has no editor yet
+    function isNotEdited(data) {
+      return !data.keys().hasAny(['editedBy', 'editedByName']);
     }
     // The attribution of an entry never changes, also when the patient corrects it
     function keepsAttribution(data, previous) {
@@ -103,7 +130,7 @@ service cloud.firestore {
     // MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
       return data.keys().hasOnly(['types', 'intensity', 'occurredAt', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['types', 'occurredAt', 'createdAt'])
           // One or more symptoms, each at most once
           && data.types is list
@@ -129,8 +156,9 @@ service cloud.firestore {
     // ---------- Appointments ----------
     // Schema: title (required nonblank string, at most 100), scheduledAt (timestamp),
     // type (recorded category), location (optional string, 200), notes (optional string, 1000),
-    // createdAt (server timestamp), and addedBy/addedByName for a caregiver's appointment (see
-    // isValidAttribution). Identity and ownership come from the document path.
+    // createdAt (server timestamp), addedBy/addedByName for a caregiver's appointment (see
+    // isValidAttribution), and editedBy/editedByName once a caregiver edited it (see
+    // isValidEditor). Identity and ownership come from the document path.
     function hasAppointmentTitleText(title) {
       // Match Kotlin Char.isWhitespace, including Unicode spaces that Rules trim() preserves.
       return title.matches('(?s).*[^\\x{0009}-\\x{000D}\\x{001C}-\\x{0020}\\x{00A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}].*');
@@ -139,7 +167,7 @@ service cloud.firestore {
     // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
     function isValidAppointment(data) {
       return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
           && data.title is string
           && hasAppointmentTitleText(data.title)
@@ -228,12 +256,12 @@ service cloud.firestore {
           && section in member.data.permissions;
     }
     // The owner, or a member the owner shares `section` with (a CarePermission). Read only:
-    // writes stay owner-only, except adding where canAdd allows it.
+    // writes stay owner-only, except where canAddTo or canEditIn allow them.
     function canRead(ownerUid, section) {
       return isOwner(ownerUid) || sharesWith(ownerUid, section);
     }
     // The owner, or a member who sees `section` and whom the owner lets add to it (canAdd). Only
-    // for creating: a member never edits or deletes.
+    // for creating: editing and deleting need canEditIn.
     function canAddTo(ownerUid, section) {
       return isOwner(ownerUid) || (signedIn() && memberAdds(get(memberDoc(ownerUid)), section));
     }
@@ -241,6 +269,16 @@ service cloud.firestore {
       return memberShares(member, section)
           && member.data.get('canAdd', null) is list
           && section in member.data.canAdd;
+    }
+    // The owner, or a member who adds to `section` and whom the owner also lets edit and delete
+    // there (canEditAndDelete, US-46): any entry of the section, the patient's included.
+    function canEditIn(ownerUid, section) {
+      return isOwner(ownerUid) || (signedIn() && memberEdits(get(memberDoc(ownerUid)), section));
+    }
+    function memberEdits(member, section) {
+      return memberAdds(member, section)
+          && member.data.get('canEditAndDelete', null) is list
+          && section in member.data.canEditAndDelete;
     }
 
     match /users/{uid} {
@@ -292,35 +330,41 @@ service cloud.firestore {
 
       // ---------- Symptoms ----------
       // /users/{uid}/symptoms/{symptomId}: the symptom journal. Editing an entry follows the same
-      // validation as logging it, and keeps when it was first logged.
+      // validation as logging it, and keeps when it was first logged and who logged it. Edited and
+      // deleted by the owner, or by a member the owner lets edit and delete there (US-46), who
+      // signs their edit.
       match /symptoms/{symptomId} {
         allow read: if canRead(uid, 'SYMPTOMS');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'SYMPTOMS');
         allow create: if canAddTo(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
       // ---------- Appointments ----------
       // /users/{uid}/appointments/{appointmentId}: read by the owner and by members the owner
       // shares Planning with. Created by the owner, or by a member the owner lets add to Planning
-      // (US-41), signed with their uid; edited and deleted by the owner only, who keeps who added
-      // it.
+      // (US-41), signed with their uid. Edited and deleted by the owner, or by a member the owner
+      // lets edit and delete there (US-46), who signs their edit; who added it never changes.
       match /appointments/{appointmentId} {
         allow read: if canRead(uid, 'PLANNING');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'PLANNING');
         allow create: if canAddTo(uid, 'PLANNING')
                       && isValidAppointment(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'PLANNING')
                       && isValidAppointment(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 

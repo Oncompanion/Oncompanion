@@ -81,6 +81,8 @@ object C {
     const val account_check_loading = "account_check_loading"
     const val account_check_use_another_account = "account_check_use_another_account"
     const val onboarding_role_screen = "onboarding_role_screen"
+    const val onboarding_band = "onboarding_band"
+    const val onboarding_status_bar = "onboarding_status_bar"
     const val onboarding_role_patient = "onboarding_role_patient"
     const val onboarding_role_caregiver = "onboarding_role_caregiver"
     const val onboarding_continue_button = "onboarding_continue_button"
@@ -110,6 +112,7 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_next_up = "overview_next_up"
     const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
@@ -370,6 +373,8 @@ object C {
     const val not_shared = "not_shared"
     // Caregiver mode: who added an entry for the patient
     const val added_by = "added_by"
+    // Who last edited an entry for the patient (US-46)
+    const val edited_by = "edited_by"
 
     // Care circle invite code
     const val care_circle_invite_screen = "care_circle_invite_screen"

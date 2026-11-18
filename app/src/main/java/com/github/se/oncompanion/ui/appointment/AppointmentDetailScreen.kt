@@ -33,6 +33,7 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.EditedBy
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -126,7 +127,7 @@ fun AppointmentDetailContent(
                 )
               },
           ) {
-            AppointmentFields(state.appointment, zoneId, state.addedByName)
+            AppointmentFields(state.appointment, zoneId, state.addedByName, state.editedByName)
           }
       else ->
           Column(Modifier.fillMaxSize().padding(padding)) {
@@ -146,9 +147,14 @@ fun AppointmentDetailContent(
     }
   }
   if (state.isDeleteDialogShown) {
+    // A caregiver deletes the patient's appointment: the dialog says whose it is (US-46)
     DeleteConfirmationDialog(
-        title = stringResource(R.string.appointment_delete_title),
-        message = stringResource(R.string.appointment_delete_message),
+        title =
+            caregiverOf?.let { stringResource(R.string.appointment_delete_title_for, it) }
+                ?: stringResource(R.string.appointment_delete_title),
+        message =
+            caregiverOf?.let { stringResource(R.string.appointment_delete_message_for, it) }
+                ?: stringResource(R.string.appointment_delete_message),
         error = stringResource(R.string.appointment_delete_error),
         confirmLabel = stringResource(R.string.appointment_delete_confirm),
         cancelLabel = stringResource(R.string.appointment_delete_cancel),
@@ -181,7 +187,12 @@ private fun DetailFeedback(@StringRes message: Int, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId, addedByName: String?) {
+private fun AppointmentFields(
+    appointment: Appointment,
+    zoneId: ZoneId,
+    addedByName: String?,
+    editedByName: String?,
+) {
   val type =
       when (appointment.type) {
         AppointmentType.TREATMENT -> R.string.appointment_treatment
@@ -200,6 +211,8 @@ private fun AppointmentFields(appointment: Appointment, zoneId: ZoneId, addedByN
     Text(appointment.title, style = MaterialTheme.typography.headlineMedium)
     // An appointment a caregiver added for the patient says who did (US-41)
     addedByName?.let { AddedBy(it) }
+    // And who last edited it, if a caregiver did (US-46)
+    editedByName?.let { EditedBy(it) }
   }
   // Appointments record a start instant only; display it using the English UI language and the
   // phone's clock format.

@@ -270,6 +270,7 @@ private fun SessionNavHost(
             // In caregiver mode, the chosen patient's day, when they share their planning
             viewModel = viewModel { OverviewViewModel(patientUid = chosenPatient?.uid) },
             onOpenAppointment = appointmentOpener(navigationActions),
+            onOpenEvent = eventOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
         )
@@ -312,7 +313,8 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
-        // In caregiver mode, the chosen patient's appointment, read-only
+        // In caregiver mode, the chosen patient's appointment, which the patient may let the
+        // caregiver edit and delete (US-46)
         val detail: AppointmentDetailViewModel = viewModel {
           AppointmentDetailViewModel(id, patientUid = chosenPatient?.uid)
         }
@@ -332,8 +334,13 @@ private fun SessionNavHost(
           arguments = listOf(navArgument(Screen.APPOINTMENT_ID) { type = NavType.StringType }),
       ) { entry ->
         val id = requireNotNull(entry.arguments?.getString(Screen.APPOINTMENT_ID))
+        // In caregiver mode, the chosen patient's appointment (US-46)
         val form: AppointmentFormViewModel = viewModel {
-          AppointmentFormViewModel(LocalDate.now(), appointmentId = id)
+          AppointmentFormViewModel(
+              LocalDate.now(),
+              appointmentId = id,
+              patientUid = chosenPatient?.uid,
+          )
         }
         AppointmentFormScreen(
             form,
@@ -342,6 +349,7 @@ private fun SessionNavHost(
               if (navController.currentBackStackEntry == entry) navigationActions.goBack()
             },
             onSignedOut = signOut,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
       composable(
@@ -443,10 +451,15 @@ private fun SessionNavHost(
       ) { entry ->
         val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
         // Saving returns to the detail, which shows the change
+        // In caregiver mode, the chosen patient's symptom (US-46)
         AddSymptomScreen(
-            viewModel = viewModel { AddSymptomViewModel(symptomId = symptomId) },
+            viewModel =
+                viewModel {
+                  AddSymptomViewModel(symptomId = symptomId, patientUid = chosenPatient?.uid)
+                },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }

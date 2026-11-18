@@ -35,9 +35,11 @@ interface AppointmentRepository {
   fun observeAppointment(uid: String, id: String): Flow<Appointment?>
 
   /**
-   * Enqueues changes to the existing [appointment] for [uid], preserving its stored creation time.
-   * Returns without waiting for server acknowledgement, including offline. An absent document is
-   * never created; its deferred update rejection is reported, not thrown to the caller.
+   * Enqueues changes to the existing [appointment] for [uid], preserving its stored creation time
+   * and who added it. Its `editedBy` signs a caregiver's edit (US-46); without it, the edit is the
+   * patient's and no caregiver shows as the last editor. Returns without waiting for server
+   * acknowledgement, including offline. An absent document is never created; its deferred update
+   * rejection is reported, not thrown to the caller.
    *
    * Validation and immediate enqueue failures are thrown. Later server rejection may roll back
    * locally visible changes; completion does not confirm server acceptance or a disk flush.

@@ -141,4 +141,50 @@ class ResolveSectionAccessTest {
         collect(CarePermission.PLANNING, "alice").last(),
     )
   }
+
+  @Test
+  fun caregiver_canEditEntries_onlyWhereThePatientLetsThemAndTheyAdd() = runTest {
+    circle.setMembers(
+        "alice",
+        listOf(
+            CareCircleMember(
+                uid = "bob",
+                firstName = "Bob",
+                permissions =
+                    setOf(CarePermission.PLANNING, CarePermission.EVENTS, CarePermission.SYMPTOMS),
+                canAdd = setOf(CarePermission.PLANNING, CarePermission.EVENTS),
+                // Symptoms without adding, as a document written around the app could hold
+                canEditAndDelete = setOf(CarePermission.PLANNING, CarePermission.SYMPTOMS),
+            )
+        ),
+    )
+    auth.signInWithGoogle("bob")
+    val cases =
+        listOf(
+            CarePermission.PLANNING to
+                SectionAccess.Readable(
+                    "alice",
+                    canEdit = false,
+                    canAdd = true,
+                    canEditEntries = true,
+                ),
+            CarePermission.EVENTS to
+                SectionAccess.Readable(
+                    "alice",
+                    canEdit = false,
+                    canAdd = true,
+                    canEditEntries = false,
+                ),
+            CarePermission.SYMPTOMS to
+                SectionAccess.Readable(
+                    "alice",
+                    canEdit = false,
+                    canAdd = false,
+                    canEditEntries = false,
+                ),
+        )
+    for ((section, expected) in cases) {
+      assertEquals(section.name, expected, collect(section, "alice").last())
+    }
+  }
 }

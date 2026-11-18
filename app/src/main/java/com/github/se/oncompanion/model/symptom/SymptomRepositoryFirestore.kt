@@ -91,14 +91,17 @@ class SymptomRepositoryFirestore(
         // update() only changes an existing document, unlike set(); createdAt is left untouched.
         // Not
         // awaited, like deleteSymptom
-        collection(uid).document(entry.id).update(fieldsOf(entry)).addOnFailureListener { e ->
-          Log.e(
-              TAG,
-              "Couldn't update the symptom ${entry.id} (deleted or rejected); rolled back",
-              e,
-          )
-          rejectedWrites.report()
-        }
+        collection(uid)
+            .document(entry.id)
+            .update(fieldsOf(entry) + editorOf(entry))
+            .addOnFailureListener { e ->
+              Log.e(
+                  TAG,
+                  "Couldn't update the symptom ${entry.id} (deleted or rejected); rolled back",
+                  e,
+              )
+              rejectedWrites.report()
+            }
       }
 
   override suspend fun deleteSymptom(uid: String, id: String): Unit = SessionAccess.operation {
@@ -116,6 +119,17 @@ class SymptomRepositoryFirestore(
   private fun attributionOf(entry: SymptomEntry): Map<String, Any?> =
       if (entry.addedBy == null) emptyMap()
       else mapOf(FIELD_ADDED_BY to entry.addedBy, FIELD_ADDED_BY_NAME to entry.addedByName)
+
+  /**
+   * Who edited [entry]: the caregiver who signed it (US-46), or nobody when the patient did, which
+   * removes an earlier caregiver's name since the patient's edit is now the last one.
+   */
+  private fun editorOf(entry: SymptomEntry): Map<String, Any?> =
+      mapOf(
+          FIELD_EDITED_BY to (entry.editedBy ?: FieldValue.delete()),
+          FIELD_EDITED_BY_NAME to
+              (entry.editedByName.takeIf { entry.editedBy != null } ?: FieldValue.delete()),
+      )
 
   /** What the user entered, as stored in Firestore (everything except the ID and createdAt). */
   private fun fieldsOf(entry: SymptomEntry): Map<String, Any?> =
@@ -143,6 +157,8 @@ class SymptomRepositoryFirestore(
           createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.toInstant(),
           addedBy = doc.getString(FIELD_ADDED_BY),
           addedByName = doc.getString(FIELD_ADDED_BY_NAME),
+          editedBy = doc.getString(FIELD_EDITED_BY),
+          editedByName = doc.getString(FIELD_EDITED_BY_NAME),
       )
     } catch (e: Exception) {
       Log.e(TAG, "Malformed symptom document ${doc.id}", e)
@@ -160,6 +176,10 @@ class SymptomRepositoryFirestore(
     const val FIELD_CREATED_AT = "createdAt"
     const val FIELD_ADDED_BY = "addedBy"
     const val FIELD_ADDED_BY_NAME = "addedByName"
+    /** The uid of the caregiver who last edited it (US-46); absent when the patient did. */
+    const val FIELD_EDITED_BY = "editedBy"
+    /** That caregiver's first name, as shown in "Edited by". */
+    const val FIELD_EDITED_BY_NAME = "editedByName"
     private const val TAG = "SymptomRepository"
   }
 }

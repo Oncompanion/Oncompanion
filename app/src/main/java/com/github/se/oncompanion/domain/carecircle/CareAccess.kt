@@ -37,22 +37,28 @@ sealed interface CareAccess {
    *   ones for a caregiver
    * @property isOwn true for the patient's own data, false when a caregiver looks at a patient's
    * @property addable the sections a caregiver may also add to (`canAdd`, US-22), among [sections]
+   * @property editable the sections where a caregiver may also edit and delete any entry
+   *   (`canEditAndDelete`, US-46), among [addable]
    */
   data class Granted(
       val ownerUid: String,
       val sections: Set<CarePermission>,
       val isOwn: Boolean,
       val addable: Set<CarePermission> = emptySet(),
+      val editable: Set<CarePermission> = emptySet(),
   ) : CareAccess {
 
     /** Whether [section] of [ownerUid]'s data may be shown. */
     fun canSee(section: CarePermission): Boolean = section in sections
 
     /**
-     * Whether edit and delete actions may be offered. Only the patient edits their own data; a
-     * member may at most add to the sections in [addable].
+     * Whether everything may be changed: only the patient's own data. A member may at most add to
+     * the sections in [addable], and edit and delete entries in [editable].
      */
     val canEdit: Boolean
       get() = isOwn
+
+    /** Whether the entries of [section] may be edited and deleted (US-46). */
+    fun canEditEntriesOf(section: CarePermission): Boolean = isOwn || section in editable
   }
 }

@@ -39,10 +39,12 @@ import kotlinx.coroutines.launch
  * @property isLoading true until the symptom arrives
  * @property hasError true if it couldn't be loaded (or nobody is signed in)
  * @property delete where the deletion of the symptom is at
- * @property canEdit whether the symptom can be edited or deleted: only in the user's own journal
+ * @property canEdit whether the symptom can be edited or deleted: in the user's own journal, or in
+ *   the patient's when they let the caregiver edit and delete symptoms (US-46)
  * @property isNotShared in caregiver mode, the patient doesn't share their symptoms: no symptom
  * @property addedByName who added the symptom, if a caregiver did: for the patient, the name they
  *   gave that member in their circle
+ * @property editedByName who last edited it, if a caregiver did (US-46), named like [addedByName]
  */
 data class SymptomDetailUiState(
     val entry: SymptomEntry? = null,
@@ -52,6 +54,7 @@ data class SymptomDetailUiState(
     val canEdit: Boolean = true,
     val isNotShared: Boolean = false,
     val addedByName: String? = null,
+    val editedByName: String? = null,
 ) : HasDeletePhase {
   /** The symptom is shown and can be deleted. */
   override val canDelete: Boolean
@@ -65,7 +68,8 @@ data class SymptomDetailUiState(
 /**
  * Loads one symptom of the signed-in user's journal (US-8), keeps it up to date, and deletes it
  * once the user confirms (US-9). In caregiver mode (US-20), the symptom is the followed patient's,
- * read-only, when they share their symptoms.
+ * when they share their symptoms: read-only, unless they let the caregiver edit and delete them
+ * (US-46).
  *
  * @param patientUid in caregiver mode, the patient whose symptom is shown; null for the user's own
  */
@@ -145,6 +149,7 @@ class SymptomDetailViewModel(
                 copy(
                     entry = null,
                     addedByName = null,
+                    editedByName = null,
                     isLoading = true,
                     hasError = false,
                     isNotShared = false,
@@ -157,6 +162,7 @@ class SymptomDetailViewModel(
             copy(
                 entry = null,
                 addedByName = null,
+                editedByName = null,
                 isLoading = false,
                 hasError = section == CareSection.NoAccess,
                 isNotShared = section == CareSection.NotShared,
@@ -170,17 +176,19 @@ class SymptomDetailViewModel(
                 isNotShared = false,
                 delete = delete.afterRead(false),
             )
-        // A symptom deleted elsewhere can't be deleted here: the confirmation is dropped
+        // A symptom deleted elsewhere, or that the patient no longer lets the caregiver delete,
+        // can't be deleted here: the confirmation is dropped
         is CareSection.Shown -> {
           val (shown, names) = section.data
           copy(
               entry = shown,
               addedByName = shown?.let { addedByName(it.addedBy, it.addedByName, names) },
+              editedByName = shown?.let { addedByName(it.editedBy, it.editedByName, names) },
               isLoading = false,
               hasError = false,
               isNotShared = false,
-              canEdit = section.canEdit,
-              delete = delete.afterRead(exists = shown != null),
+              canEdit = section.canEditEntries,
+              delete = delete.afterRead(deletable = shown != null && section.canEditEntries),
           )
         }
       }
@@ -192,14 +200,16 @@ class SymptomDetailViewModel(
   fun cancelDelete() = deletion.cancel()
 
   /**
-   * Deletes the symptom. Like logging one, this returns once it is deleted on the device, also
-   * offline: the journal no longer shows it and the server deletes it when there is a connection.
+   * Deletes the symptom: the user's own, or in caregiver mode the patient's, which the rules only
+   * accept while the patient lets them edit and delete symptoms (US-46). Like logging one, this
+   * returns once it is deleted on the device, also offline: the journal no longer shows it and the
+   * server deletes it when there is a connection.
    */
   fun confirmDelete() =
       deletion.confirm(
           signedInUid = { authRepository.signedInUid(TAG) },
           stopObserving = { observation?.cancel() },
-          delete = { uid -> symptomRepository.deleteSymptom(uid, symptomId) },
+          delete = { uid -> symptomRepository.deleteSymptom(patientUid ?: uid, symptomId) },
           onFailure = { observe() },
       )
 

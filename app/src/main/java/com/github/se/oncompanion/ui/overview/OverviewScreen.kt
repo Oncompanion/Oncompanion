@@ -146,6 +146,7 @@ fun OverviewScreen(
     onOpenAppointment: (String) -> Unit = {
       navigationActions.navigateTo(Screen.appointmentDetail(it))
     },
+    onOpenEvent: (String) -> Unit = { navigationActions.navigateTo(Screen.eventDetail(it)) },
     caregiverOf: String? = null,
     onSwitchPatient: () -> Unit = {},
 ) {
@@ -163,6 +164,7 @@ fun OverviewScreen(
       // Planning is a tab: switch to it like the bottom bar does
       onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
       onOpenAppointment = onOpenAppointment,
+      onOpenEvent = onOpenEvent,
       onRetry = viewModel::loadDay,
       modifier = modifier,
       caregiverOf = caregiverOf,
@@ -185,6 +187,7 @@ fun OverviewScreen(
  *
  * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
  * @param onOpenAppointment opens the recorded appointment directly
+ * @param onOpenEvent opens the event shown in the patient's "Next up"
  * @param onRetry reloads the day after an error
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
@@ -198,6 +201,7 @@ fun OverviewContent(
     onOpenAppointment: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenEvent: (String) -> Unit = {},
     caregiverOf: String? = null,
     onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
@@ -241,13 +245,23 @@ fun OverviewContent(
             // show
             uiState.isNotShared && caregiverOf != null ->
                 NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+            // The patient's day follows the Overview UX Refactor; the caregiver's comes later
+            caregiverOf == null ->
+                PatientDay(
+                    uiState,
+                    onOpenPlanning,
+                    onOpenAppointment,
+                    onOpenEvent,
+                    modifier = if (overlaps) Modifier.overlapLayout() else Modifier,
+                )
             else -> {
               NextAppointmentCard(
                   uiState.nextAppointment,
                   uiState.now.toLocalDate(),
                   onOpenPlanning,
                   onOpenAppointment,
-                  canAdd = caregiverOf == null,
+                  // Only the patient adds appointments
+                  canAdd = false,
                   modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
               )
               TodaySection(uiState.todayEntries, onOpenPlanning)
@@ -277,12 +291,14 @@ private val HEADER_OVERLAP = 42.dp
  * Moves the card up over the header's lower edge without leaving a gap under it, and raises it with
  * Elevation 1, the shadow DESIGN.md keeps for this card.
  */
-private fun Modifier.overlapHeader(): Modifier = layout { measurable, constraints ->
+private fun Modifier.overlapHeader(): Modifier = overlapLayout().elevation1(Shapes.large)
+
+/** Moves the card up over the header's lower edge without leaving a gap under it. */
+private fun Modifier.overlapLayout(): Modifier = layout { measurable, constraints ->
   val placeable = measurable.measure(constraints)
   val overlap = HEADER_OVERLAP.roundToPx()
   layout(placeable.width, placeable.height - overlap) { placeable.place(0, -overlap) }
 }
-    .elevation1(Shapes.large)
 
 /**
  * The greeting (or "Anne's care ▾" for a caregiver), today's date and the profile button, on the

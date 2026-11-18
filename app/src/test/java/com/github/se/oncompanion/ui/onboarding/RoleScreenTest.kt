@@ -15,11 +15,16 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -30,8 +35,19 @@ import com.github.se.oncompanion.model.session.SessionAccess
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.assertIsFullyVisible
+import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
+import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.SecondaryContainerDark
+import com.github.se.oncompanion.ui.theme.SecondaryContainerLight
+import com.github.se.oncompanion.ui.theme.SecondaryDark
+import com.github.se.oncompanion.ui.theme.SecondaryLight
+import com.github.se.oncompanion.ui.theme.Spacing
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
+import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestLight
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -39,6 +55,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class RoleScreenTest {
@@ -358,5 +376,77 @@ class RoleScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.profile_sign_out_dialog).assertIsDisplayed()
     assertEquals(0, signedOut)
+  }
+
+  // --- Look (Figma "US-1 / Onboarding – Role") ---
+
+  private fun bounds(tag: String) =
+      composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun content_theChosenRole_isTheWarmOutlinedCard_theOtherAPlainOne_inBothThemes() {
+    var dark by mutableStateOf(false)
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = dark) { RoleContent(Role.PATIENT, {}, {}) }
+    }
+
+    listOf(
+            Triple(false, SecondaryContainerLight to SecondaryLight, SurfaceContainerLowestLight),
+            Triple(true, SecondaryContainerDark to SecondaryDark, SurfaceContainerLowestDark),
+        )
+        .forEach { (isDark, chosenColors, plain) ->
+          dark = isDark
+          composeTestRule.waitForIdle()
+          val (fill, outline) = chosenColors
+          val chosen = composeTestRule.onNodeWithTag(C.Tag.onboarding_role_patient)
+          val other = composeTestRule.onNodeWithTag(C.Tag.onboarding_role_caregiver)
+          // In the cards' top padding, away from the rounded corners
+          assertSameColor("chosen card, dark=$isDark", fill, chosen.colorAt(100.dp, 8.dp))
+          assertSameColor("its outline, dark=$isDark", outline, chosen.colorAt(100.dp, 0.75.dp))
+          assertSameColor("other card, dark=$isDark", plain, other.colorAt(100.dp, 8.dp))
+          assertSameColor("no outline, dark=$isDark", plain, other.colorAt(100.dp, 0.75.dp))
+        }
+  }
+
+  @Test
+  fun content_theBandIsOnTop_andContinueAtTheBottom_justBelowUseAnotherAccount() {
+    composeTestRule.setContent {
+      RoleContent(Role.PATIENT, {}, {}, email = "alex.martin@example.com")
+    }
+
+    val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val band = bounds(C.Tag.onboarding_band)
+    assertEquals(0.dp, band.top)
+    assertEquals(root.width, band.width)
+    // The strip behind the status bar, so the scrolled step never passes under its icons
+    composeTestRule
+        .onNodeWithTag(C.Tag.onboarding_status_bar, useUnmergedTree = true)
+        .assertExists()
+    val title =
+        composeTestRule
+            .onNodeWithText(context.getString(R.string.onboarding_role_title))
+            .getUnclippedBoundsInRoot()
+    assertTrue("The question is under the band", title.top >= band.bottom)
+    val account = bounds(C.Tag.onboarding_use_another_account)
+    val continueButton = bounds(C.Tag.onboarding_continue_button)
+    assertTrue("Use another account is above Continue", account.bottom <= continueButton.top)
+    assertEquals(root.height - Spacing.xl, continueButton.bottom)
+  }
+
+  @Test
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun content_at200Percent_onASmallPhone_everythingCanBeScrolledToWhole() {
+    composeTestRule.setContent {
+      RoleContent(Role.PATIENT, {}, {}, email = "alex.martin@example.com")
+    }
+
+    listOf(
+            C.Tag.onboarding_role_patient,
+            C.Tag.onboarding_role_caregiver,
+            C.Tag.onboarding_use_another_account,
+            C.Tag.onboarding_continue_button,
+        )
+        .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }
   }
 }

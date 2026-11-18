@@ -42,7 +42,7 @@ sealed interface AppointmentDetailUiState : HasDeletePhase {
     get() = DeletePhase.IDLE
 
   override val canDelete: Boolean
-    get() = this is Loaded && isOwn && !delete.isUnderWay
+    get() = this is Loaded && canChange && !delete.isUnderWay
 
   /** Waiting for this patient's locally available appointment. */
   data object Loading : AppointmentDetailUiState
@@ -50,15 +50,20 @@ sealed interface AppointmentDetailUiState : HasDeletePhase {
   /**
    * All recorded patient fields are available for display.
    *
-   * @property isOwn whether it is the user's own appointment: a caregiver only reads the patient's
+   * @property isOwn whether it is the user's own appointment, not the patient's a caregiver follows
+   * @property canChange whether it can be edited and deleted: the user's own, or the patient's when
+   *   they let the caregiver edit and delete in Planning (US-46)
    * @property addedByName who added it, if a caregiver did (US-41): for the patient, the name they
    *   gave that member in their circle; otherwise the name stored with it
+   * @property editedByName who last edited it, if a caregiver did (US-46), named like [addedByName]
    */
   data class Loaded(
       val appointment: Appointment,
       override val delete: DeletePhase = DeletePhase.IDLE,
       val isOwn: Boolean = true,
+      val canChange: Boolean = isOwn,
       val addedByName: String? = appointment.addedByName,
+      val editedByName: String? = appointment.editedByName,
   ) : AppointmentDetailUiState
 
   /** In caregiver mode, the patient doesn't share their planning. */
@@ -73,8 +78,8 @@ sealed interface AppointmentDetailUiState : HasDeletePhase {
 
 /**
  * Observes one appointment while ensuring account changes clear the previous patient's data. In
- * caregiver mode (US-20), the appointment is the followed patient's, read-only, when they share
- * their planning.
+ * caregiver mode (US-20), the appointment is the followed patient's, when they share their
+ * planning: read-only, unless they let the caregiver edit and delete in Planning (US-46).
  *
  * @param patientUid in caregiver mode, the patient whose appointment is shown; null for the user's
  *   own
@@ -118,6 +123,7 @@ class AppointmentDetailViewModel(
 
   /** Queues deletion for the displayed owner, suppressing results from replaced sessions. */
   fun confirmDelete() {
+    if (patientUid != null) return confirmPatientDelete(patientUid)
     val uid = owner ?: return
     val generation = session
     deletion.confirm(
@@ -138,10 +144,24 @@ class AppointmentDetailViewModel(
     )
   }
 
+  /**
+   * In caregiver mode, deletes the patient's appointment, which the rules only accept while the
+   * patient lets the caregiver edit and delete in Planning (US-46). A failure reads it again,
+   * keeping the dialog and its error.
+   */
+  private fun confirmPatientDelete(patientUid: String) {
+    deletion.confirm(
+        signedInUid = { runCatching { authRepository.currentUser?.uid }.getOrNull() },
+        stopObserving = { authentication?.cancel() },
+        delete = { repository.deleteAppointment(patientUid, appointmentId) },
+        onFailure = { followPatient(patientUid) },
+    )
+  }
+
   /** Whether completion still belongs to the patient whose detail is on screen. */
   fun canLeaveAfterDeletion(): Boolean =
       state.value.delete == DeletePhase.DELETED &&
-          owner?.let { isCurrentSession(it, session) } == true
+          (patientUid != null || owner?.let { isCurrentSession(it, session) } == true)
 
   private fun isCurrentSession(uid: String, generation: Long): Boolean =
       generation == session &&
@@ -159,10 +179,11 @@ class AppointmentDetailViewModel(
   }
 
   /**
-   * In caregiver mode, reads the patient's appointment while they share their planning. Nothing can
-   * be deleted, so the session checks of the patient's own detail aren't needed: an account or
-   * access change restarts the read from [AppointmentDetailUiState.Loading], and a read error
-   * doesn't stop following the access (e.g. "not shared" once the patient stops sharing).
+   * In caregiver mode, reads the patient's appointment while they share their planning. An account
+   * or access change restarts the read from [AppointmentDetailUiState.Loading], and a read error
+   * doesn't stop following the access (e.g. "not shared" once the patient stops sharing). Once the
+   * access is known, the appointment on screen stays until it is read again, so a failed deletion
+   * keeps its dialog.
    */
   private fun followPatient(patientUid: String) {
     authentication?.cancel()
@@ -170,16 +191,33 @@ class AppointmentDetailViewModel(
       ObserveCareSection(resolveSection)(CarePermission.PLANNING, patientUid) { ownerUid ->
             repository.observeAppointment(ownerUid, appointmentId)
           }
-          .collect { state.value = patientAppointment(it) }
+          .collect { section ->
+            val current = state.value
+            val keepsShown =
+                section is CareSection.Loading &&
+                    section.accessKnown &&
+                    current is AppointmentDetailUiState.Loaded
+            if (!keepsShown) state.value = patientAppointment(section, current.delete)
+          }
     }
   }
 
   /** What the caregiver sees for [section]: the patient's appointment, or why it isn't shown. */
-  private fun patientAppointment(section: CareSection<Appointment?>): AppointmentDetailUiState =
+  private fun patientAppointment(
+      section: CareSection<Appointment?>,
+      delete: DeletePhase,
+  ): AppointmentDetailUiState =
       when (section) {
         is CareSection.Shown ->
-            section.data?.let { AppointmentDetailUiState.Loaded(it, isOwn = false) }
-                ?: AppointmentDetailUiState.Unavailable
+            section.data?.let {
+              AppointmentDetailUiState.Loaded(
+                  it,
+                  // Closed for good when the patient no longer lets the caregiver delete it
+                  delete.afterRead(deletable = section.canEditEntries),
+                  isOwn = false,
+                  canChange = section.canEditEntries,
+              )
+            } ?: AppointmentDetailUiState.Unavailable
         CareSection.NotShared -> AppointmentDetailUiState.NotShared
         is CareSection.Loading -> AppointmentDetailUiState.Loading
         CareSection.NoAccess -> AppointmentDetailUiState.Unavailable
@@ -228,8 +266,9 @@ class AppointmentDetailViewModel(
             appointment?.let {
               AppointmentDetailUiState.Loaded(
                   it,
-                  state.value.delete.afterRead(exists = true),
+                  state.value.delete.afterRead(deletable = true),
                   addedByName = addedByName(it.addedBy, it.addedByName, names),
+                  editedByName = addedByName(it.editedBy, it.editedByName, names),
               )
             } ?: AppointmentDetailUiState.Unavailable
           }

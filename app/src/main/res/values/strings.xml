@@ -79,6 +79,8 @@
     <string name="overview_see_planning">See planning</string>
     <string name="overview_nothing_today">Nothing planned today</string>
     <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
+    <string name="overview_next_up">Next up</string>
+    <string name="overview_with_place">%1$s · %2$s</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
     <string name="overview_no_set_time">No set time</string>
@@ -725,4 +727,16 @@
 
     <!-- Shared "Added by": a prescription a caregiver added, not confirmed by the patient yet (US-43) -->
     <string name="added_by_not_confirmed">Added by %1$s · Not confirmed</string>
+
+    <!-- Editing and deleting for the patient (US-46) -->
+    <!-- Shared: under an entry a caregiver edited, e.g. "Edited by Sam" -->
+    <string name="edited_by">Edited by %1$s</string>
+    <!-- A caregiver edits the patient's appointment, e.g. "Edit Anne's appointment" -->
+    <string name="appointment_edit_for">Edit %1$s\'s appointment</string>
+    <string name="appointment_delete_title_for">Delete %1$s\'s appointment?</string>
+    <string name="appointment_delete_message_for">It will be removed from %1$s\'s planning. You can\'t undo this.</string>
+    <!-- A caregiver edits or deletes the patient's symptom, e.g. "Delete Anne's entry?" -->
+    <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
+    <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
+    <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
 </resources>

@@ -175,8 +175,11 @@ class ScanViewModel(
           _uiState.update { it.copy(isCapturing = false) }
           return@launch
         }
-        // Shown to the user to check before it's used
-        _uiState.update { it.copy(isCapturing = false, photo = file) }
+        // Shown to the user to check before it's used. The camera is turned off meanwhile, and
+        // reports "open" again only once it has reopened after Retake
+        _uiState.update {
+          it.copy(isCapturing = false, photo = file, camera = CameraStatus.STARTING)
+        }
       } catch (e: CancellationException) {
         photoStore.delete(file)
         throw e
