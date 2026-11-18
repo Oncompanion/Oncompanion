@@ -606,8 +606,9 @@ configuration before applying the override and otherwise uses the existing expli
 palettes. A ContextThemeWrapper supplies matching Android night resources while retaining Activity
 access for scanning and sign-in. Updating that choice
 does not recreate navigation or discard screen state. The Google-branded button retains its
-prescribed colors but follows the same effective app appearance. System-bar icon contrast follows
-the app override. Android-owned permission dialogs and the initial OS splash retain OS behavior.
+prescribed colors but follows the same effective app appearance. MainActivity and emulator journeys share AppAppearanceRoot, which collects the preference,
+resolves the effective theme once and applies the root surface and system bars. System-bar icon
+contrast follows the app override; navigation bars retain AndroidX default contrast scrims on API 28. Android-owned permission dialogs and the initial OS splash retain OS behavior.
 
 Both destinations use theme colors, shapes, typography and spacing, and scroll at large text
 sizes and in landscape. Rotation tests recreate the Activity and restore content with the same

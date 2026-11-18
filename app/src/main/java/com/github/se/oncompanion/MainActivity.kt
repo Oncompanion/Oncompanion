@@ -5,18 +5,10 @@ package com.github.se.oncompanion
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.domain.auth.SignOutProvider
@@ -25,15 +17,12 @@ import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsPreferences
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.model.session.PreferencesCleanupJournal
-import com.github.se.oncompanion.model.settings.AppearancePreference
 import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
-import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.StartViewModel
-import com.github.se.oncompanion.ui.theme.AppAppearanceTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceRoot
 import com.github.se.oncompanion.ui.theme.AppAppearanceViewModel
-import com.github.se.oncompanion.ui.theme.usesDarkTheme
 
 /** Installs session recovery before authenticated navigation or Firestore operations start. */
 class MainActivity : ComponentActivity() {
@@ -70,27 +59,9 @@ class MainActivity : ComponentActivity() {
     // them.
     enableEdgeToEdge()
     setContent {
-      val appearanceState by appearanceViewModel.uiState.collectAsStateWithLifecycle()
-      val choice = appearanceState.appearance ?: AppearancePreference.FOLLOW_DEVICE
-      val darkTheme = choice.usesDarkTheme(isSystemInDarkTheme())
-      SideEffect {
-        val style =
-            SystemBarStyle.auto(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT,
-            ) {
-              darkTheme
-            }
-        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-      }
-      AppAppearanceTheme(choice) {
-        Surface(
-            modifier = Modifier.fillMaxSize().testTag(C.Tag.main_screen_container),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-          val startRoute by startViewModel.startRoute.collectAsStateWithLifecycle()
-          startRoute?.let { AppNavHost(startRoute = it) }
-        }
+      AppAppearanceRoot(this, appearanceViewModel) {
+        val startRoute by startViewModel.startRoute.collectAsStateWithLifecycle()
+        startRoute?.let { AppNavHost(startRoute = it) }
       }
     }
   }
