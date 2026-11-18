@@ -6,18 +6,22 @@ package com.github.se.oncompanion
 
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
@@ -27,6 +31,7 @@ import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -98,6 +103,7 @@ class M1EndToEndTest {
     deleteSymptom()
     seeProfileAndAddHospital(firstName = "Sam", hospital = "HUG Geneva")
     checkProfileLandscape()
+    openSettingsAndReturnToProfile()
     signOut()
     signInAgain(firstName = "Sam", nextAppointment = "Oncology check-up")
   }
@@ -315,6 +321,25 @@ class M1EndToEndTest {
         hasTestTag(C.Tag.profile_hospital) and
             (hasText(hospital, substring = true) or hasAnyDescendant(hasText(hospital)))
     )
+  }
+
+  /** Settings is reachable from the real patient Profile and Back retains that profile. */
+  private fun openSettingsAndReturnToProfile() {
+    captureSettings("settings-profile-entry.png")
+    ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+    ui.tag(C.Tag.settings_empty).reveal().assertIsDisplayed()
+    captureSettings("settings-foundation.png")
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+  }
+
+  private fun captureSettings(name: String) {
+    File(compose.activity.cacheDir, name).outputStream().use {
+      compose
+          .onRoot()
+          .captureToImage()
+          .asAndroidBitmap()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
   }
 
   /**

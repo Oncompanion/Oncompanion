@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -201,6 +203,12 @@ object C {
     const val symptom_detail_symptoms = "symptom_detail_symptoms"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
+    // Settings
+    const val settings_screen = "settings_screen"
+    const val settings_back = "settings_back"
+    const val settings_empty = "settings_empty"
+    const val profile_settings = "profile_settings"
+
     // Profile
     const val profile_edit = "profile_edit"
     const val edit_profile_screen = "edit_profile_screen"

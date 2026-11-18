@@ -568,3 +568,23 @@ The read-only page follows appointment details for M2: the standard Material too
 Paper lake toolbar and full Figma restyle. It shows recorded fields only, with no inferred intake
 times or unsaved Notes field. View prescription pushes the existing prescription detail, and Back
 pops to the medication and then the original Planning day and scroll position.
+
+## Device settings (#507)
+
+Profile opens the Settings nested graph and Back returns to the same Profile entry.
+Only implemented preference categories appear; the foundation shows a short empty state
+until Appearance (#508) is added. The Settings body scrolls at large text sizes and in landscape.
+
+`SettingsRepository` is the device-local contract, provided by `SettingsRepositoryProvider`.
+`SettingsRepositoryDataStore` persists `DeviceSettings` in one application-scoped Preferences
+DataStore (`device_settings`). Appearance defaults to `FOLLOW_DEVICE`; explicit Light and Dark
+values are groundwork for #508 and are not exposed by this PR. Unknown values fall back to the
+device default without deleting unrelated preferences. Read/write errors propagate to callers;
+no corrupt-file reset silently discards preferences.
+
+The Activity installs the application context before any settings consumer is created.
+The provider creates its store lazily and can be replaced with the shared fake in tests.
+Settings are independent of Firebase and uid: sign-out and account changes do not clear them,
+and local reads/writes work offline. This store contains no patient/session data and intentionally
+does not join SessionAccess cleanup. Notification settings will be account-specific work under
+#134, separate from this device store.
