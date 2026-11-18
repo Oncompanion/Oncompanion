@@ -471,15 +471,34 @@ service cloud.firestore {
               && confirmationOf(get(path).data) == 'PENDING'
               && get(path).data.get('addedBy', null) == request.auth.uid;
         }
+        // Sent once, ever: its marker in notificationsSent doesn't exist yet, and is written in
+        // the same batch. The marker outlives the TTL, so a resend after it is refused too.
+        function isFirstSending() {
+          let marker = /databases/$(database)/documents/users/$(uid)/notificationsSent/$(notificationId);
+          return !exists(marker) && existsAfter(marker);
+        }
         allow read: if isOwner(uid);
         allow create: if signedIn()
                       && !isOwner(uid)
                       && canAddTo(uid, 'PRESCRIPTIONS')
                       && isValidNotification(request.resource.data)
-                      && isAboutOwnPendingPrescription(request.resource.data);
+                      && isAboutOwnPendingPrescription(request.resource.data)
+                      && isFirstSending();
         allow update: if isOwner(uid)
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen'])
                       && request.resource.data.seen == true;
+      }
+
+      // ---------- Notifications sent ----------
+      // /users/{uid}/notificationsSent/{kind}_{itemId}: an empty marker that the notification with
+      // the same ID was sent, so it is never sent twice, even after the TTL deleted it. Written
+      // only with that notification, by the caregiver who sends it; then nobody reads, changes or
+      // deletes it.
+      match /notificationsSent/{notificationId} {
+        allow create: if signedIn()
+                      && request.resource.data.keys().size() == 0
+                      && getAfter(/databases/$(database)/documents/users/$(uid)/notifications/$(notificationId))
+                             .data.actorUid == request.auth.uid;
       }
 
       // Everything personal (entries, records, reminders...) goes under the user, in a collection

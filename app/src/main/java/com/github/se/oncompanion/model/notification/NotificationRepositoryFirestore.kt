@@ -62,9 +62,10 @@ class NotificationRepositoryFirestore(
   override suspend fun notify(recipientUid: String, notification: CircleNotification): Unit =
       SessionAccess.operation {
         require(notification.isValid()) { "Invalid notification" }
-        notifications(recipientUid)
-            .document(notification.id)
+        // With its marker, in one write: the rules accept a notification only once, ever
+        db.batch()
             .set(
+                notifications(recipientUid).document(notification.id),
                 mapOf(
                     FIELD_KIND to notification.kind.name,
                     FIELD_ITEM_ID to notification.itemId,
@@ -74,8 +75,10 @@ class NotificationRepositoryFirestore(
                     // From the phone's clock: synced late, it expires sooner, never later (rules)
                     FIELD_EXPIRES_AT to Timestamp(clock().plus(CircleNotification.KEPT_FOR)),
                     FIELD_SEEN to false,
-                )
+                ),
             )
+            .set(sent(recipientUid).document(notification.id), emptyMap<String, Any>())
+            .commit()
             .addOnFailureListener { e ->
               // Expected when it was already sent. Not the message: it holds the document path
               Log.w(
@@ -103,6 +106,9 @@ class NotificationRepositoryFirestore(
   private fun notifications(uid: String) =
       db.collection(USERS).document(uid).collection(NOTIFICATIONS)
 
+  /** The markers of the notifications sent to [uid], kept after the notifications expire. */
+  private fun sent(uid: String) = db.collection(USERS).document(uid).collection(NOTIFICATIONS_SENT)
+
   /**
    * The notification in [doc], or `null` if it can't be read (e.g. a kind this app doesn't know).
    */
@@ -123,6 +129,7 @@ class NotificationRepositoryFirestore(
     const val TAG = "NotificationRepository"
     const val USERS = "users"
     const val NOTIFICATIONS = "notifications"
+    const val NOTIFICATIONS_SENT = "notificationsSent"
     const val FIELD_KIND = "kind"
     const val FIELD_ITEM_ID = "itemId"
     const val FIELD_ACTOR_UID = "actorUid"

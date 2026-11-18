@@ -18,8 +18,9 @@ interface NotificationRepository {
    * the item first, so the rules can check it. Its `createdAt` is ignored and set by the server,
    * and Firestore deletes it after [CircleNotification.KEPT_FOR].
    *
-   * Sent once per item: sending it again is refused by the server and ignored, so a retry never
-   * makes a seen notification unseen. A refusal is never reported to the user, whose item is saved.
+   * Sent once per item, ever: a marker written with it outlives the notification, so sending it
+   * again, even after it expired, is refused by the server and ignored. A retry never brings back a
+   * notification or makes it unseen. A refusal is never reported to the user, whose item is saved.
    *
    * @throws IllegalArgumentException if the notification is not [CircleNotification.isValid]
    */
