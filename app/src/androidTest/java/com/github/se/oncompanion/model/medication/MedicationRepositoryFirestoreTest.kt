@@ -9,12 +9,16 @@ import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
@@ -305,6 +309,66 @@ class MedicationRepositoryFirestoreTest {
       assertFalse(serverPrescription(saved.id).exists())
       assertEquals(0, rejectedWrites.unseen.value)
       EmulatorTestData.signIn("alice")
+    }
+  }
+
+  /** A queued caregiver correction survives a patient confirmation on another device. */
+  @Test
+  fun offlineCaregiverEditPreservesPatientConfirmationMadeOnAnotherDevice(): Unit = runBlocking {
+    val saved = carolAddsAPrescriptionForAlice(allowEditing = true)
+    val patientEmail = FirebaseEmulator.auth.currentUser!!.email!!
+    val app =
+        FirebaseApp.initializeApp(
+            FirebaseApp.getInstance().applicationContext,
+            FirebaseApp.getInstance().options,
+            "patient-confirmation-${UUID.randomUUID()}",
+        )
+    val patientDb = FirebaseFirestore.getInstance(app)
+    val patientAuth = FirebaseAuth.getInstance(app)
+    patientAuth.useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
+    patientDb.useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+    try {
+      patientAuth.signInWithEmailAndPassword(patientEmail, "password123").await()
+      val carolUid = EmulatorTestData.signIn("presc-repo-carol")
+      val cached = repository.observePrescription(aliceUid, saved.id).awaitFirst { it != null }!!
+      assertEquals(PrescriptionConfirmation.PENDING, cached.confirmation)
+      db.disableNetwork().await()
+      try {
+        withTimeout(5.seconds) {
+          assertTrue(
+              ManageMedicationSchedule(repository)
+                  .update(
+                      aliceUid,
+                      saved.id,
+                      cached.toDraft().copy(prescribedBy = "Dr. Rossi"),
+                      carolUid,
+                      "Carol",
+                  )
+          )
+        }
+        // The patient's independent client confirms while the caregiver's write is queued.
+        patientDb
+            .collection("users")
+            .document(aliceUid)
+            .collection("prescriptions")
+            .document(saved.id)
+            .update("confirmation", "CONFIRMED")
+            .await()
+      } finally {
+        db.enableNetwork().await()
+      }
+      awaitServerAck()
+      val stored = serverPrescription(saved.id)
+      assertEquals("Dr. Rossi", stored.getString("prescribedBy"))
+      assertEquals("CONFIRMED", stored.getString("confirmation"))
+      assertEquals(carolUid, stored.getString("editedBy"))
+      assertEquals(saved.addedBy, stored.getString("addedBy"))
+      assertEquals(0, rejectedWrites.unseen.value)
+    } finally {
+      patientAuth.signOut()
+      patientDb.terminate().await()
+      patientDb.clearPersistence().await()
+      // Auth retains named apps in its emulator registry; deleting one breaks later emulator tests.
     }
   }
 

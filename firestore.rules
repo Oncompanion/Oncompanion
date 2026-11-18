@@ -56,7 +56,7 @@ service cloud.firestore {
     // Who last edited an entry: nothing when the patient did, or the signed-in caregiver's uid and
     // first name when a caregiver did (US-46), so nobody can edit in someone else's name. The
     // patient may also leave the editor as it was: older versions of the app don't remove it.
-    // Keep in sync with Appointment (MAX_ADDED_BY_NAME_LENGTH).
+    // Keep in sync with Appointment and SymptomEntry (MAX_ADDED_BY_NAME_LENGTH).
     function isValidEditor(ownerUid, data, previous) {
       return isOwner(ownerUid)
           ? !data.keys().hasAny(['editedBy', 'editedByName'])
@@ -140,7 +140,7 @@ service cloud.firestore {
     // MAX_CLOCK_DRIFT).
     function isValidSymptom(data) {
       return data.keys().hasOnly(['types', 'intensity', 'occurredAt', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['types', 'occurredAt', 'createdAt'])
           // One or more symptoms, each at most once
           && data.types is list
@@ -345,17 +345,21 @@ service cloud.firestore {
 
       // ---------- Symptoms ----------
       // /users/{uid}/symptoms/{symptomId}: the symptom journal. Editing an entry follows the same
-      // validation as logging it, and keeps when it was first logged.
+      // validation as logging it, and keeps when it was first logged and who logged it. Edited and
+      // deleted by the owner, or by a member the owner lets edit and delete there (US-46), who
+      // signs their edit.
       match /symptoms/{symptomId} {
         allow read: if canRead(uid, 'SYMPTOMS');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'SYMPTOMS');
         allow create: if canAddTo(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'SYMPTOMS')
                       && isValidSymptom(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 

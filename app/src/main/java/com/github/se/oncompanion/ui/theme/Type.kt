@@ -65,3 +65,18 @@ val Typography =
  */
 val Typography.buttonLabel: TextStyle
   get() = labelLarge.copy(fontSize = 17.sp, lineHeight = 20.sp)
+
+/**
+ * The eyebrow that names a card of the Overview's day ("Next up", "Today's medications"): Figma
+ * SemiBold 14/18, a step below Label Large so the card's title leads.
+ */
+val Typography.cardEyebrow: TextStyle
+  get() = labelLarge.copy(fontSize = 14.sp, lineHeight = 18.sp, letterSpacing = 0.015.em)
+
+/** The title of a card of the Overview's day ("Gentle yoga for patients"): Figma SemiBold 18/24. */
+val Typography.cardTitle: TextStyle
+  get() = titleMedium.copy(fontSize = 18.sp)
+
+/** The detail under a card's title ("10:00 · Wellness center"): Figma Regular 15/20. */
+val Typography.cardDetail: TextStyle
+  get() = bodyMedium.copy(lineHeight = 20.sp)

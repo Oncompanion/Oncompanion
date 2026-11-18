@@ -270,6 +270,7 @@ private fun SessionNavHost(
             // In caregiver mode, the chosen patient's day, when they share their planning
             viewModel = viewModel { OverviewViewModel(patientUid = chosenPatient?.uid) },
             onOpenAppointment = appointmentOpener(navigationActions),
+            onOpenEvent = eventOpener(navigationActions),
             caregiverOf = chosenPatient?.firstName,
             onSwitchPatient = { navigationActions.navigateTo(Screen.WHOSE_CARE_SWITCH) },
         )
@@ -450,10 +451,15 @@ private fun SessionNavHost(
       ) { entry ->
         val symptomId = entry.arguments?.getString(Screen.SYMPTOM_DETAIL_ID).orEmpty()
         // Saving returns to the detail, which shows the change
+        // In caregiver mode, the chosen patient's symptom (US-46)
         AddSymptomScreen(
-            viewModel = viewModel { AddSymptomViewModel(symptomId = symptomId) },
+            viewModel =
+                viewModel {
+                  AddSymptomViewModel(symptomId = symptomId, patientUid = chosenPatient?.uid)
+                },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
+            caregiverOf = chosenPatient?.firstName,
         )
       }
     }

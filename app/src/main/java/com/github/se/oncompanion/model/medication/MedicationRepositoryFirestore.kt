@@ -107,7 +107,12 @@ class MedicationRepositoryFirestore(
         // prescription doesn't exist. The list of medications is replaced as a whole.
         prescriptions(uid)
             .document(prescription.id)
-            .update(prescriptionFields(prescription) + editorFields(prescription))
+            .update(
+                // A caregiver must not overwrite a patient decision made since the cached read.
+                (if (prescription.editedBy == null) prescriptionFields(prescription)
+                else prescriptionFields(prescription) - FIELD_CONFIRMATION) +
+                    editorFields(prescription)
+            )
             .reportServerRejection(prescription.id)
       }
 

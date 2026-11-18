@@ -198,7 +198,8 @@ class PrescriptionDetailViewModel(
                 hasError = false,
                 isNotShared = false,
                 canChange = section.canEditEntries,
-                delete = delete.afterRead(exists = section.data != null && section.canEditEntries),
+                delete =
+                    delete.afterRead(deletable = section.data != null && section.canEditEntries),
             )
       }
 

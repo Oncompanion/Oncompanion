@@ -5,7 +5,6 @@ package com.github.se.oncompanion.domain.medication
 
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
-import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import kotlinx.coroutines.flow.first
 
@@ -88,15 +87,6 @@ class ManageMedicationSchedule(
       editedBy: String? = null,
       editedByName: String? = null,
   ): Boolean {
-    require((editedBy == null) == (editedByName == null)) { "An editor signs with both" }
-    require(
-        editedBy == null ||
-            (editedBy.isNotBlank() &&
-                !editedByName.isNullOrBlank() &&
-                editedByName.length <= Prescription.MAX_ADDED_BY_NAME_LENGTH)
-    ) {
-      "Invalid editor signature"
-    }
     require(draft.isValid()) { "Invalid prescription draft" }
     // Without this read, the caller couldn't tell a saved correction from one that was dropped
     val saved =
@@ -107,7 +97,6 @@ class ManageMedicationSchedule(
         draft
             .toPrescription(prescriptionId, medicationRepository::newId)
             .copy(
-                createdAt = saved.createdAt,
                 editedBy = editedBy,
                 editedByName = editedByName,
                 addedBy = saved.addedBy,
@@ -117,6 +106,7 @@ class ManageMedicationSchedule(
                         PrescriptionConfirmation.CONFIRMED
                     else saved.confirmation,
             )
+    require(prescription.isValid()) { "Invalid prescription" }
     medicationRepository.updatePrescription(uid, prescription)
     return true
   }

@@ -161,6 +161,8 @@ class SymptomRepositoryFirestoreTest {
     assertEquals("occurredAt", SymptomRepositoryFirestore.FIELD_OCCURRED_AT)
     assertEquals("notes", SymptomRepositoryFirestore.FIELD_NOTES)
     assertEquals("createdAt", SymptomRepositoryFirestore.FIELD_CREATED_AT)
+    assertEquals("editedBy", SymptomRepositoryFirestore.FIELD_EDITED_BY)
+    assertEquals("editedByName", SymptomRepositoryFirestore.FIELD_EDITED_BY_NAME)
   }
 
   @Test
@@ -535,5 +537,43 @@ class SymptomRepositoryFirestoreTest {
           db.collection(symptomsPath(aliceUid)).document(id).get(Source.SERVER).await()
         }
     assertFalse("the deletion reaches the server once online", server.exists())
+  }
+
+  // ---- a caregiver the patient lets edit and delete (US-46) ----
+
+  /**
+   * A caregiver the patient lets edit and delete symptoms signs their edit; the patient's next edit
+   * removes their name.
+   */
+  @Test
+  fun caregiverEdit_isSigned_andThePatientsNextEditRemovesTheName(): Unit = runBlocking {
+    val id = repository.addSymptom(aliceUid, fatigue())
+    awaitServerAck()
+    val carolUid = EmulatorTestData.createUser("symptom-editor")
+    EmulatorTestData.replaceRawDocument(
+        "users/$aliceUid/circle",
+        carolUid,
+        """{"firstName": {"stringValue": "Carol"},
+            "relationship": {"stringValue": "SISTER"},
+            "permissions": {"arrayValue": {"values": [{"stringValue": "SYMPTOMS"}]}},
+            "canAdd": {"arrayValue": {"values": [{"stringValue": "SYMPTOMS"}]}},
+            "canEditAndDelete": {"arrayValue": {"values": [{"stringValue": "SYMPTOMS"}]}},
+            "inviteCode": {"stringValue": "ABCDEFGHJK"}}""",
+    )
+    EmulatorTestData.signIn("symptom-editor")
+    val edited = fatigue().copy(id = id, intensity = 4, editedBy = carolUid, editedByName = "Carol")
+    repository.updateSymptom(aliceUid, edited)
+    awaitServerAck()
+    assertEquals(0, rejectedWrites.unseen.value)
+    assertSameContent(edited, observeOnce(id))
+
+    EmulatorTestData.signIn("alice")
+    repository.updateSymptom(aliceUid, fatigue().copy(id = id, intensity = 2))
+    awaitServerAck()
+    assertEquals(0, rejectedWrites.unseen.value)
+    val stored = observeOnce(id)!!
+    assertNull(stored.editedBy)
+    assertNull(stored.editedByName)
+    assertEquals(2, stored.intensity)
   }
 }
