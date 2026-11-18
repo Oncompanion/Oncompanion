@@ -41,21 +41,23 @@ class NotificationRepositoryFirestore(
 
   override fun observeRecent(uid: String): Flow<List<CircleNotification>> =
       SessionAccess.snapshots {
-        // Firestore's TTL can take a day to delete them: leave out the older ones here too
-        val since = Timestamp(clock().minus(CircleNotification.KEPT_FOR))
-        val registration =
-            notifications(uid)
-                .whereGreaterThan(FIELD_CREATED_AT, since)
-                .orderBy(FIELD_CREATED_AT, Query.Direction.DESCENDING)
-                .addSnapshotListener { snapshot, error ->
-                  if (error != null) {
-                    close(error)
-                  } else if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull(::toNotification))
-                  }
-                }
-        awaitClose { registration.remove() }
-      }
+            // Firestore's TTL can take a day to delete them: don't even read the older ones
+            val since = Timestamp(clock().minus(CircleNotification.KEPT_FOR))
+            val registration =
+                notifications(uid)
+                    .whereGreaterThan(FIELD_CREATED_AT, since)
+                    .orderBy(FIELD_CREATED_AT, Query.Direction.DESCENDING)
+                    .addSnapshotListener { snapshot, error ->
+                      if (error != null) {
+                        close(error)
+                      } else if (snapshot != null) {
+                        trySend(snapshot.documents.mapNotNull(::toNotification))
+                      }
+                    }
+            awaitClose { registration.remove() }
+          }
+          // The cutoff above is only read once: those that turn 7 days old while shown leave too
+          .keepRecent(clock)
 
   override suspend fun notify(recipientUid: String, notification: CircleNotification): Unit =
       SessionAccess.operation {

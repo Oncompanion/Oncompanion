@@ -5,8 +5,6 @@ package com.github.se.oncompanion.model.notification
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
@@ -42,18 +40,10 @@ class FakeNotificationRepository(private val clock: () -> Instant = Instant::now
     deliver(recipientUid, notification.copy(createdAt = clock(), seen = false))
   }
 
-  override fun observeRecent(uid: String): Flow<List<CircleNotification>> = flow {
-    val since = clock().minus(CircleNotification.KEPT_FOR)
-    emitAll(
-        store.map { all ->
-          all[uid]
-              .orEmpty()
-              .values
-              .filter { it.createdAt > since }
-              .sortedByDescending { it.createdAt }
-        }
-    )
-  }
+  override fun observeRecent(uid: String): Flow<List<CircleNotification>> =
+      store
+          .map { all -> all[uid].orEmpty().values.sortedByDescending { it.createdAt } }
+          .keepRecent(clock)
 
   override suspend fun markSeen(uid: String, ids: Collection<String>) {
     store.update { all ->
