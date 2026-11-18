@@ -589,3 +589,24 @@ Settings are independent of Firebase and uid: sign-out and account changes do no
 and local reads/writes work offline. This store contains no patient/session data and intentionally
 does not join SessionAccess cleanup. Notification settings will be account-specific work under
 #134, separate from this device store.
+
+### Appearance (#508)
+
+Settings now exposes only Appearance and its saved value. `SettingsViewModel` observes the same
+repository in both settings destinations; the shared repository keeps them synchronized.
+`AppearanceContent` uses selectable radio rows for Follow device, Light and Dark. Writes disable
+selection until complete; failures retain the last confirmed choice and allow another attempt.
+Read failures offer Retry. No patient record or appointment time changes.
+
+`AppAppearanceViewModel` observes device settings independently of the authenticated session.
+`MainActivity` keeps the existing splash until routing and the first appearance read are ready.
+A failed initial read releases startup using Follow device without overwriting saved preferences;
+IO failures are retried. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
+configuration and otherwise uses the existing explicit light/dark palettes. Updating that choice
+does not recreate navigation or discard screen state. The Google-branded button retains its
+prescribed colors but follows the same effective app appearance. System-bar icon contrast follows
+the app override. Android-owned permission dialogs and the initial OS splash retain OS behavior.
+
+Both destinations use theme colors, shapes, typography and spacing, and scroll at large text
+sizes and in landscape. Rotation tests recreate the Activity and restore content with the same
+ViewModel; startup tests also exercise the root Activity recreation.

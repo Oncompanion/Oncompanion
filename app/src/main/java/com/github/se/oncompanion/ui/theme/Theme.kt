@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.theme
@@ -8,6 +10,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.github.se.oncompanion.model.settings.AppearancePreference
 
 private val LightColorScheme =
     lightColorScheme(
@@ -90,7 +94,8 @@ private val DarkColorScheme =
 @Composable
 fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
   CompositionLocalProvider(
-      LocalLakeColors provides if (darkTheme) DarkLakeColors else LightLakeColors
+      LocalAppDarkTheme provides darkTheme,
+      LocalLakeColors provides if (darkTheme) DarkLakeColors else LightLakeColors,
   ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
@@ -99,4 +104,13 @@ fun OncompanionTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Compo
         content = content,
     )
   }
+}
+
+/** Effective app appearance, including explicit overrides, for branded controls. */
+internal val LocalAppDarkTheme = staticCompositionLocalOf<Boolean?> { null }
+
+/** Applies one persisted preference to the existing palettes without replacing screen state. */
+@Composable
+fun AppAppearanceTheme(preference: AppearancePreference, content: @Composable () -> Unit) {
+  OncompanionTheme(darkTheme = preference.usesDarkTheme(isSystemInDarkTheme()), content = content)
 }

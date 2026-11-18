@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
@@ -5,6 +6,9 @@ package com.github.se.oncompanion.ui.auth
 import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -32,6 +36,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.ui.assertSameColor
 import com.github.se.oncompanion.ui.colorAt
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -196,6 +201,27 @@ class GoogleSignInButtonTest {
         Color(0xFF131314),
         composeTestRule.onNodeWithTag(TAG).colorAt(280.dp, 28.dp),
     )
+  }
+
+  /** The app's explicit override controls branded button colors even when Android is dark. */
+  @Test
+  @Config(qualifiers = "night")
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun appAppearanceOverridesTheSystemForBothBrandedPalettes() {
+    var dark by mutableStateOf(false)
+    composeTestRule.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        GoogleSignInButton(onClick = {}, modifier = Modifier.testTag(TAG).width(300.dp))
+      }
+    }
+    for ((choice, expected) in listOf(false to Color(0xFFFFFFFF), true to Color(0xFF131314))) {
+      composeTestRule.runOnIdle { dark = choice }
+      assertSameColor(
+          "branded container",
+          expected,
+          composeTestRule.onNodeWithTag(TAG).colorAt(280.dp, 28.dp),
+      )
+    }
   }
 
   private companion object {

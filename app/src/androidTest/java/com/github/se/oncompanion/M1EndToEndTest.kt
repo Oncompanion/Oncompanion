@@ -12,7 +12,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -116,6 +115,13 @@ class M1EndToEndTest {
     openSettingsAndReturnToProfile()
     signOut()
     signInAgain(firstName = "Sam", nextAppointment = "Oncology check-up")
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_screen))
+    ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_appearance))
+    ui.waitFor(
+        hasTestTag(C.Tag.settings_appearance) and
+            (hasText(string(R.string.appearance_dark), substring = true) or
+                hasAnyDescendant(hasText(string(R.string.appearance_dark))))
+    )
   }
 
   @Test
@@ -337,13 +343,17 @@ class M1EndToEndTest {
   private fun openSettingsAndReturnToProfile() {
     captureSettings("settings-profile-entry.png")
     ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+    captureSettings("settings-appearance-category.png")
     ui.open(C.Tag.settings_appearance, hasTestTag(C.Tag.appearance_dark))
     ui.tag(C.Tag.appearance_dark).reveal().performClick()
     ui.tag(C.Tag.appearance_dark).assertIsSelected()
     captureSettings("settings-appearance-dark.png")
     ui.open(C.Tag.settings_back, hasTestTag(C.Tag.settings_appearance))
-    ui.tag(C.Tag.settings_appearance)
-        .assert(hasAnyDescendant(hasText(string(R.string.appearance_dark))))
+    ui.waitFor(
+        hasTestTag(C.Tag.settings_appearance) and
+            (hasText(string(R.string.appearance_dark), substring = true) or
+                hasAnyDescendant(hasText(string(R.string.appearance_dark))))
+    )
     captureSettings("settings-foundation.png")
     ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
   }

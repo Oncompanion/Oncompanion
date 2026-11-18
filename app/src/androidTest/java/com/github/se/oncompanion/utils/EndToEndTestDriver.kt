@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.utils
 
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -17,13 +18,18 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.test.espresso.Espresso
 import com.github.se.oncompanion.AppHostActivity
+import com.github.se.oncompanion.model.settings.AppearancePreference
+import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.navigation.AppNavHost
-import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceViewModel
 
 /**
  * Shared screen interactions for emulator journeys, with consistent waits and failure diagnostics.
@@ -43,8 +49,11 @@ internal class EndToEndTestDriver(private val compose: AndroidComposeTestRule<*,
    */
   fun startApp(credentials: GoogleCredentialProvider, navController: NavHostController? = null) {
     compose.runOnUiThread {
+      SettingsRepositoryProvider.install(compose.activity.applicationContext)
       AppHostActivity.content.value = {
-        OncompanionTheme {
+        val appearanceModel: AppAppearanceViewModel = viewModel()
+        val appearance by appearanceModel.uiState.collectAsStateWithLifecycle()
+        AppAppearanceTheme(appearance.appearance ?: AppearancePreference.FOLLOW_DEVICE) {
           AppNavHost(credentialProvider = credentials, navController = navController)
         }
       }

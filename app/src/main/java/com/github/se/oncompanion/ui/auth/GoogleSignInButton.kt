@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.auth
@@ -22,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
+import com.github.se.oncompanion.ui.theme.LocalAppDarkTheme
 import com.github.se.oncompanion.ui.theme.full
 
 /**
@@ -35,7 +38,7 @@ fun GoogleSignInButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = LocalAppDarkTheme.current ?: isSystemInDarkTheme(),
 ) {
   val colors = if (darkTheme) GoogleButtonColors.Dark else GoogleButtonColors.Light
   OutlinedButton(

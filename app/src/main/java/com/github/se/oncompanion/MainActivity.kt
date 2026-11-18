@@ -5,12 +5,15 @@ package com.github.se.oncompanion
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -22,17 +25,21 @@ import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsPreferences
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.model.session.PreferencesCleanupJournal
+import com.github.se.oncompanion.model.settings.AppearancePreference
 import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.StartViewModel
-import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceViewModel
+import com.github.se.oncompanion.ui.theme.usesDarkTheme
 
 /** Installs session recovery before authenticated navigation or Firestore operations start. */
 class MainActivity : ComponentActivity() {
 
   private val startViewModel: StartViewModel by viewModels()
+  private val appearanceViewModel: AppAppearanceViewModel by viewModels()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Android's splash screen stays until we know where to start (sign-in, onboarding or Overview)
@@ -54,13 +61,29 @@ class MainActivity : ComponentActivity() {
     super.onCreate(if (restore) savedInstanceState else null)
     // Install the shared search adapter before fields capture it; blank configuration stays manual.
     HospitalRepositoryProvider.configureAtStartup(getString(R.string.hospital_proxy_endpoint))
-    splashScreen.setKeepOnScreenCondition { startViewModel.startRoute.value == null }
+    splashScreen.setKeepOnScreenCondition {
+      startViewModel.startRoute.value == null ||
+          appearanceViewModel.uiState.value.appearance == null
+    }
     // Transparent status and navigation bars: the app's background shows behind them, instead of
     // the old XML theme's purple status bar. Screens use Scaffold, which keeps content clear of
     // them.
     enableEdgeToEdge()
     setContent {
-      OncompanionTheme {
+      val appearanceState by appearanceViewModel.uiState.collectAsStateWithLifecycle()
+      val choice = appearanceState.appearance ?: AppearancePreference.FOLLOW_DEVICE
+      val darkTheme = choice.usesDarkTheme(isSystemInDarkTheme())
+      SideEffect {
+        val style =
+            SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+            ) {
+              darkTheme
+            }
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+      }
+      AppAppearanceTheme(choice) {
         Surface(
             modifier = Modifier.fillMaxSize().testTag(C.Tag.main_screen_container),
             color = MaterialTheme.colorScheme.background,
