@@ -1,13 +1,17 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.prescription
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -18,6 +22,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -25,6 +30,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
@@ -51,6 +57,8 @@ import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import java.io.File
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -62,6 +70,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(AndroidJUnit4::class)
 class PrescriptionFormScreenTest {
@@ -123,63 +132,70 @@ class PrescriptionFormScreenTest {
    * Shows PrescriptionFormContent like the real screen does: typing updates the state. A caregiver
    * adds for [caregiverOf].
    */
-  private fun setContent(state: PrescriptionFormUiState, caregiverOf: String? = null) {
+  private fun setContent(
+      state: PrescriptionFormUiState,
+      caregiverOf: String? = null,
+      themed: Boolean = false,
+  ) {
     uiState = state
     composeTestRule.setContent {
-      PrescriptionFormContent(
-          uiState = uiState,
-          onClose = { events += "close" },
-          onPrescribedByChange = {
-            events += "prescribedBy=$it"
-            uiState = uiState.copy(draft = uiState.draft.copy(prescribedBy = it))
-          },
-          onPrescribedOnChange = { events += "prescribedOn=$it" },
-          onMedicationNameChange = { name ->
-            events += "name=$name"
-            editOpenMedication { it.copy(name = name) }
-            uiState =
-                uiState.copy(
-                    nameTouched =
-                        uiState.nameTouched.mapIndexed { position, touched ->
-                          touched || position == uiState.openMedication
-                        }
-                )
-          },
-          onDosageChange = { dosage ->
-            events += "dosage=$dosage"
-            editOpenMedication { it.copy(dosage = dosage) }
-          },
-          onFrequencyChange = { frequency ->
-            events += "frequency=$frequency"
-            editOpenMedication { it.copy(frequency = frequency) }
-          },
-          onStartDateChange = { events += "startDate=$it" },
-          onDurationChange = { duration ->
-            events += "duration=$duration"
-            editOpenMedication { it.copy(durationDays = duration.toIntOrNull()) }
-          },
-          onAddMedication = { events += "add" },
-          onOpenMedication = { events += "open=$it" },
-          onRemoveMedication = { events += "remove=$it" },
-          onSave = { events += "save" },
-          onErrorShown = {
-            events += "errorShown"
-            uiState = uiState.copy(error = null)
-          },
-          onRetry = { events += "retry" },
-          onKeepEditing = { events += "keepEditing" },
-          onSaveAnyway = { events += "saveAnyway" },
-          onReject = {
-            events += "reject"
-            uiState = uiState.copy(isConfirmingRejection = true)
-          },
-          onConfirmRejection = { events += "confirmRejection" },
-          onCancelRejection = {
-            events += "cancelRejection"
-            uiState = uiState.copy(isConfirmingRejection = false)
-          },
-          caregiverOf = caregiverOf,
-      )
+      val content: @Composable () -> Unit = {
+        PrescriptionFormContent(
+            uiState = uiState,
+            onClose = { events += "close" },
+            onPrescribedByChange = {
+              events += "prescribedBy=$it"
+              uiState = uiState.copy(draft = uiState.draft.copy(prescribedBy = it))
+            },
+            onPrescribedOnChange = { events += "prescribedOn=$it" },
+            onMedicationNameChange = { name ->
+              events += "name=$name"
+              editOpenMedication { it.copy(name = name) }
+              uiState =
+                  uiState.copy(
+                      nameTouched =
+                          uiState.nameTouched.mapIndexed { position, touched ->
+                            touched || position == uiState.openMedication
+                          }
+                  )
+            },
+            onDosageChange = { dosage ->
+              events += "dosage=$dosage"
+              editOpenMedication { it.copy(dosage = dosage) }
+            },
+            onFrequencyChange = { frequency ->
+              events += "frequency=$frequency"
+              editOpenMedication { it.copy(frequency = frequency) }
+            },
+            onStartDateChange = { events += "startDate=$it" },
+            onDurationChange = { duration ->
+              events += "duration=$duration"
+              editOpenMedication { it.copy(durationDays = duration.toIntOrNull()) }
+            },
+            onAddMedication = { events += "add" },
+            onOpenMedication = { events += "open=$it" },
+            onRemoveMedication = { events += "remove=$it" },
+            onSave = { events += "save" },
+            onErrorShown = {
+              events += "errorShown"
+              uiState = uiState.copy(error = null)
+            },
+            onRetry = { events += "retry" },
+            onKeepEditing = { events += "keepEditing" },
+            onSaveAnyway = { events += "saveAnyway" },
+            onReject = {
+              events += "reject"
+              uiState = uiState.copy(isConfirmingRejection = true)
+            },
+            onConfirmRejection = { events += "confirmRejection" },
+            onCancelRejection = {
+              events += "cancelRejection"
+              uiState = uiState.copy(isConfirmingRejection = false)
+            },
+            caregiverOf = caregiverOf,
+        )
+      }
+      if (themed) OncompanionTheme { content() } else content()
     }
   }
 
@@ -1352,5 +1368,115 @@ class PrescriptionFormScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.prescription_already_saved_dialog).assertIsDisplayed()
     assertEquals(listOf(savedBefore), medications.prescriptionsOf("patient-1"))
+  }
+
+  // ---------- A caregiver corrects an existing prescription (US-46) ----------
+
+  private val caregiverEditing = filled.copy(isEditing = true, pendingAddedByName = "Marc")
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun caregiverEdit_usesPatientTitleAndSave_withoutPatientConfirmationActions() {
+    setContent(caregiverEditing, caregiverOf = "Anne", themed = true)
+    screenshot("caregiver-prescription-edit")
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_form_edit_title_for, "Anne"))
+        .assertIsDisplayed()
+    node(C.Tag.added_by)
+        .assertTextEquals(context.getString(R.string.added_by_not_confirmed, "Marc"))
+    node(C.Tag.prescription_confirm_notice).assertDoesNotExist()
+    node(C.Tag.prescription_form_reject_button).assertDoesNotExist()
+    node(C.Tag.prescription_form_save_button)
+        .assertTextContains(string(R.string.prescription_form_save))
+        .assertIsEnabled()
+        .performClick()
+    assertTrue("save" in events)
+    assertFalse("reject" in events)
+  }
+
+  @Test
+  fun caregiverEdit_confirmedPrescriptionHasNoPendingNotice() {
+    setContent(caregiverEditing.copy(pendingAddedByName = null), caregiverOf = "Anne")
+    node(C.Tag.added_by).assertDoesNotExist()
+    node(C.Tag.prescription_confirm_notice).assertDoesNotExist()
+    node(C.Tag.prescription_form_reject_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverEdit_noPermissionShowsFeedback_withoutFieldsOrSave() {
+    setContent(
+        caregiverEditing.copy(load = PrescriptionFormLoad.NOT_ALLOWED, canChange = false),
+        caregiverOf = "Anne",
+    )
+    node(C.Tag.prescription_form_not_allowed).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_not_allowed_title))
+        .assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(string(R.string.prescription_form_not_allowed_hint))
+        .assertIsDisplayed()
+    node(C.Tag.prescription_form_medication_name_field).assertDoesNotExist()
+    node(C.Tag.prescription_form_save_button).assertDoesNotExist()
+    node(C.Tag.prescription_form_close_button).assertIsDisplayed().performClick()
+    assertTrue("close" in events)
+  }
+
+  @Test
+  fun caregiverEdit_loadingErrorAndMissingStates_doNotOfferSave() {
+    setContent(caregiverEditing.copy(load = PrescriptionFormLoad.LOADING), caregiverOf = "Anne")
+    node(C.Tag.prescription_form_loading).assertIsDisplayed()
+    node(C.Tag.prescription_form_save_button).assertDoesNotExist()
+    uiState = caregiverEditing.copy(load = PrescriptionFormLoad.FAILED)
+    node(C.Tag.prescription_form_load_error).assertIsDisplayed()
+    node(C.Tag.prescription_form_retry_button).performClick()
+    assertTrue("retry" in events)
+    uiState = caregiverEditing.copy(load = PrescriptionFormLoad.NOT_FOUND)
+    node(C.Tag.prescription_form_not_found).assertIsDisplayed()
+    node(C.Tag.prescription_form_save_button).assertDoesNotExist()
+  }
+
+  @Test
+  fun caregiverEdit_keyboardOpen_keepsFieldAndSaveVisible() {
+    setContent(caregiverEditing, caregiverOf = "Anne")
+    val keyboardHeight = 600
+    val duration = node(C.Tag.prescription_form_duration_field)
+    duration.performScrollTo().requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+    duration.performScrollTo().assertIsFullyVisible()
+    duration.assertIsAboveKeyboard(keyboardHeight)
+    node(C.Tag.prescription_form_save_button).assertIsFullyVisible()
+    node(C.Tag.prescription_form_save_button).assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  @Test
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun caregiverEdit_landscapeKeyboardOpen_fieldTitleCloseAndSaveRemainReachable() {
+    setContent(caregiverEditing, caregiverOf = "Anne")
+    val keyboardHeight = 500
+    val duration = node(C.Tag.prescription_form_duration_field)
+    duration.performScrollTo().requestFocus()
+    composeTestRule.showKeyboard(keyboardHeight)
+    duration.performScrollTo().assertIsFullyVisible()
+    duration.assertIsAboveKeyboard(keyboardHeight)
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.prescription_form_edit_title_for, "Anne"))
+        .performScrollTo()
+        .assertIsFullyVisible()
+    node(C.Tag.prescription_form_close_button).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.prescription_form_save_button).performScrollTo().assertIsFullyVisible()
+    node(C.Tag.prescription_form_save_button).assertIsAboveKeyboard(keyboardHeight)
+  }
+
+  /** Captures the rendered behavior-test state for review, using the application's theme. */
+  private fun screenshot(name: String) {
+    val file = File("build/outputs/screenshots/$name.png")
+    requireNotNull(file.parentFile).mkdirs()
+    file.outputStream().use {
+      composeTestRule
+          .onRoot()
+          .captureToImage()
+          .asAndroidBitmap()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
   }
 }

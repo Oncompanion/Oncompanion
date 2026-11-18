@@ -527,7 +527,14 @@ private fun SessionNavHost(
       ) { entry ->
         val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel(prescriptionId = prescriptionId) },
+            viewModel =
+                viewModel {
+                  PrescriptionFormViewModel(
+                      prescriptionId = prescriptionId,
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
+            caregiverOf = chosenPatient?.firstName,
             // A second tap while the form is already leaving is dropped, so Back happens once
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the detail, which shows the correction

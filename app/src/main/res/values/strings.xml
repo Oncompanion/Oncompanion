@@ -584,6 +584,13 @@
     <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
     <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
 
+    <!-- Caregiver prescription edits (US-46) -->
+    <string name="prescription_form_edit_title_for">Edit %1$s\'s prescription</string>
+    <string name="prescription_delete_title_for">Delete %1$s\'s prescription?</string>
+    <string name="prescription_delete_message_for">It will be removed from %1$s\'s prescriptions with all its medications. You can\'t undo this.</string>
+    <string name="prescription_form_not_allowed_title">This prescription can\'t be edited</string>
+    <string name="prescription_form_not_allowed_hint">You don\'t currently have permission to edit this patient\'s prescriptions.</string>
+
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
     <string name="prescription_scan_close">Close</string>
