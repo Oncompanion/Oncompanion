@@ -1,6 +1,8 @@
 # Co-authored-by: ChatGPT <noreply@openai.com>
+# Co-authored-by: ChatGPT <noreply@openai.com>
 # Co-authored-by: Claude Code <noreply@anthropic.com>
 [versions]
+datastore = "1.1.7"
 agp = "9.3.0"
 kotlin = "2.3.0"
 coreKtx = "1.19.0"
@@ -29,6 +31,7 @@ mlkitTextRecognition = "16.0.1"
 exifinterface = "1.4.2"
 
 [libraries]
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
