@@ -151,23 +151,7 @@ class M2EndToEndTest {
    */
   @Test
   fun patientAndCaregiver_shareLogAndRevokeSymptoms() {
-    ui.startApp(credentials)
-    signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
-    openSymptoms()
-    logSymptom("FATIGUE", patientNotes)
-    ui.open(C.Tag.symptom_back_button, patientGreeting())
-    inviteCaregiver()
-    ui.open(C.Tag.care_circle_back_button, patientGreeting())
-    signOutThroughProfile()
-
-    credentials.select(caregiver)
-    signInAndOnboard(
-        caregiver,
-        C.Tag.onboarding_role_caregiver,
-        hasTestTag(C.Tag.join_circle_screen),
-    )
-    assertNotEquals("Each person must have their own account", patient.uid, caregiver.uid)
-    joinCareCircle()
+    shareSymptomsWithTheCaregiver()
     openSymptoms()
     assertSymptom("FATIGUE", patientNotes)
     assertReadOnly(patientNotes)
@@ -254,23 +238,8 @@ class M2EndToEndTest {
    */
   @Test
   fun patientLetsTheCaregiverEditAndDeleteSymptoms_thenTakesItBack() {
-    ui.startApp(credentials)
-    signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
-    openSymptoms()
-    logSymptom("FATIGUE", patientNotes)
-    ui.open(C.Tag.symptom_back_button, patientGreeting())
-    inviteCaregiver()
-    ui.open(C.Tag.care_circle_back_button, patientGreeting())
-    signOutThroughProfile()
-
-    // The caregiver joins and logs an entry, which they can't change yet
-    credentials.select(caregiver)
-    signInAndOnboard(
-        caregiver,
-        C.Tag.onboarding_role_caregiver,
-        hasTestTag(C.Tag.join_circle_screen),
-    )
-    joinCareCircle()
+    shareSymptomsWithTheCaregiver()
+    // The caregiver logs an entry, which they can't change yet
     openSymptoms()
     logSymptom("NAUSEA", caregiverNotes)
     assertReadOnly(caregiverNotes)
@@ -527,6 +496,30 @@ class M2EndToEndTest {
   private fun returnToOverviewFromPrescription() {
     ui.open(C.Tag.prescription_detail_back_button, hasTestTag(C.Tag.prescriptions_list))
     ui.open(C.Tag.prescriptions_back_button, hasTestTag(C.Tag.overview_shortcut_profile))
+  }
+
+  /**
+   * The start of both symptom journeys: the patient logs an entry and invites the caregiver, who
+   * signs up and joins, up to their Overview.
+   */
+  private fun shareSymptomsWithTheCaregiver() {
+    ui.startApp(credentials)
+    signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
+    openSymptoms()
+    logSymptom("FATIGUE", patientNotes)
+    ui.open(C.Tag.symptom_back_button, patientGreeting())
+    inviteCaregiver()
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    signOutThroughProfile()
+
+    credentials.select(caregiver)
+    signInAndOnboard(
+        caregiver,
+        C.Tag.onboarding_role_caregiver,
+        hasTestTag(C.Tag.join_circle_screen),
+    )
+    assertNotEquals("Each person must have their own account", patient.uid, caregiver.uid)
+    joinCareCircle()
   }
 
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
