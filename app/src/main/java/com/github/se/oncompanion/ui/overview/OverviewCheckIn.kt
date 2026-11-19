@@ -71,7 +71,7 @@ internal fun CheckInDock(
       shape = shape,
       color = MaterialTheme.colorScheme.surfaceContainerLowest,
   ) {
-    Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
       Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -103,7 +103,7 @@ private fun JournalLink(onOpenJournal: () -> Unit) {
           .padding(start = Spacing.xs)
           .testTag(C.Tag.overview_journal_link),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(2.dp),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
   ) {
     Text(
         stringResource(R.string.overview_journal_link),
@@ -180,9 +180,9 @@ private fun SymptomTile(
       contentColor = MaterialTheme.colorScheme.onSurface,
   ) {
     Column(
-        Modifier.padding(horizontal = TILE_PADDING, vertical = 6.dp),
+        Modifier.padding(horizontal = TILE_PADDING, vertical = TILE_PADDING),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterVertically),
     ) {
       Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp))
       Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
@@ -195,8 +195,8 @@ private val HEART_SIZE = 20.dp
 
 /** The Figma's tile: 80 dp tall at least (it grows with a large font), 8 dp apart. */
 private val TILE_HEIGHT = 80.dp
-private val TILE_SPACING = 8.dp
-private val TILE_PADDING = 4.dp
+private val TILE_SPACING = Spacing.sm
+private val TILE_PADDING = Spacing.xs
 
 /** From this width (a phone held sideways), the six tiles fit in one row. */
 private val WIDE = 600.dp
