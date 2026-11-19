@@ -9,6 +9,7 @@ import java.time.ZoneId
 /**
  * A display occurrence derived from an owning feature; never a separate stored record.
  *
+ * @property dosage a medication's dosage (e.g. "8 mg"), if recorded; `null` for other entries
  * @property addedBy the uid of the caregiver who added it for the patient (US-41), or `null`
  * @property addedByName who added it, shown as "Added by Sam"
  * @property isConfirmed false for a medication of a prescription a caregiver added that the patient
@@ -20,6 +21,7 @@ data class PlanningItem(
     val title: String,
     val subtitle: String? = null,
     val frequency: String? = null,
+    val dosage: String? = null,
     val addedBy: String? = null,
     val addedByName: String? = null,
     val isConfirmed: Boolean = true,

@@ -115,6 +115,11 @@ object C {
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
     const val overview_next_up = "overview_next_up"
+    const val overview_next_up_planning_link = "overview_next_up_planning_link"
+    const val overview_medications = "overview_medications"
+    const val overview_planning_link = "overview_planning_link"
+    const val overview_more_medications = "overview_more_medications"
+    const val overview_nothing_planned = "overview_nothing_planned"
     const val overview_check_in = "overview_check_in"
     const val overview_check_in_more = "overview_check_in_more"
     const val overview_journal_link = "overview_journal_link"
@@ -255,6 +260,8 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    fun overviewMedication(key: String) = "overview_medication_$key"
 
     /** A check-in tile on the Overview, by its symptom type's name. */
     fun overviewCheckIn(type: String) = "overview_check_in_$type"

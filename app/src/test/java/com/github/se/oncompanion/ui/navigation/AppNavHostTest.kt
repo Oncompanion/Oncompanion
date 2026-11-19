@@ -102,6 +102,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -240,7 +241,7 @@ class AppNavHostTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
     // The default ViewModel works without Firebase: a greeting and the empty day
     composeTestRule.onNodeWithTag(C.Tag.overview_greeting).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.sign_in_screen).assertDoesNotExist()
     composeTestRule.runOnIdle {
       assertEquals(Screen.OVERVIEW, NavigationActions(navController).currentRoute())
@@ -1571,15 +1572,53 @@ class AppNavHostTest {
   }
 
   @Test
-  fun overviewPlanningLinksOpenRealCalendar() {
+  fun overviewEmptyDayOpensRealCalendar() {
     setNavHost(Route.OVERVIEW)
-    listOf(C.Tag.overview_no_appointment, C.Tag.overview_see_planning).forEach { tag ->
-      composeTestRule.onNodeWithTag(tag).performScrollTo().performClick()
-      composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.overview_nothing_planned).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.planning_week).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
+  }
+
+  @Test
+  fun overviewLinks_openPlanningOnToday_evenAfterBrowsingAnotherWeek() {
+    // Three medications today, so the card shows "1 more" under the first two
+    val medications =
+        FakePlanningRepository().apply {
+          items.value =
+              listOf("Ondansetron", "Dexamethasone", "Paracetamol").map {
+                PlanningItem(
+                    PlanningSource.Medication("rx", it),
+                    PlanningTiming.DateOnly(LocalDate.now()),
+                    it,
+                )
+              }
+        }
+    setNavHost(Route.OVERVIEW, medications, authRepository = signedInPatient())
+
+    for (link in listOf(C.Tag.overview_more_medications, C.Tag.overview_planning_link)) {
+      // Browse next week from the Planning tab, then come back to the Overview
+      composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).performClick()
+      val today = planningHeading()
+      composeTestRule.onNodeWithTag(C.Tag.planning_next).performClick()
+      composeTestRule.runOnIdle { assertNotEquals(today, planningHeading()) }
+      composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
+
+      composeTestRule.onNodeWithTag(link).performScrollTo().performClick()
+
       composeTestRule.onNodeWithTag(Tab.PLANNING.testTag).assertIsSelected()
-      composeTestRule.runOnIdle { NavigationActions(navController).goBack() }
+      composeTestRule.runOnIdle { assertEquals(link, today, planningHeading()) }
+      composeTestRule.onNodeWithTag(Tab.OVERVIEW.testTag).performClick()
     }
   }
+
+  /** The day Planning shows, as its heading reads it. */
+  private fun planningHeading() =
+      composeTestRule
+          .onNodeWithTag(C.Tag.planning_heading)
+          .fetchSemanticsNode()
+          .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+          .single()
+          .text
 
   @Test
   fun planningAgendaKeepsScrollAndSingleObservationAcrossTabs() {

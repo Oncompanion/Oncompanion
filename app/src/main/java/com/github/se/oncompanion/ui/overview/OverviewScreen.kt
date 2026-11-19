@@ -168,8 +168,8 @@ fun OverviewScreen(
   OverviewContent(
       uiState = uiState,
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
-      // Planning is a tab: switch to it like the bottom bar does
-      onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
+      // Planning is a tab; the Overview's links open it on today, not on the last day seen there
+      onOpenPlanning = { navigationActions.navigateToPlanningOn(uiState.now.toLocalDate()) },
       onOpenAppointment = onOpenAppointment,
       onOpenEvent = onOpenEvent,
       onLogSymptom = { navigationActions.navigateTo(Screen.symptomAdd(it)) },
@@ -271,8 +271,6 @@ fun OverviewContent(
                   uiState.now.toLocalDate(),
                   onOpenPlanning,
                   onOpenAppointment,
-                  // Only the patient adds appointments
-                  canAdd = false,
                   modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
               )
               TodaySection(uiState.todayEntries, onOpenPlanning)

@@ -55,6 +55,7 @@ class MedicationPlanningSource(private val medications: MedicationRepository) : 
           timing = PlanningTiming.DateOnly(java.time.LocalDate.ofEpochDay(epochDay)),
           title = name,
           frequency = frequency,
+          dosage = dosage,
           addedBy = prescription.addedBy,
           addedByName = prescription.addedByName,
           isConfirmed = prescription.isConfirmed,
