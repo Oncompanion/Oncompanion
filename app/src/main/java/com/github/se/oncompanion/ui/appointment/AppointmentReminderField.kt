@@ -59,12 +59,15 @@ internal fun AppointmentReminderField(
   if (open && enabled) {
     LakeDialog(
         title = stringResource(R.string.appointment_reminder),
-        message = "",
         confirmLabel = stringResource(R.string.appointment_cancel),
         cancelLabel = null,
         onConfirm = { open = false },
         onCancel = { open = false },
-        tags = DialogTags(C.Tag.appointment_reminder_dialog, C.Tag.appointment_reminder_cancel, ""),
+        tags =
+            DialogTags(
+                dialog = C.Tag.appointment_reminder_dialog,
+                confirm = C.Tag.appointment_reminder_cancel,
+            ),
     ) {
       // The shared dialog scrolls its content without hiding Cancel in landscape.
       Column(

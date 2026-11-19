@@ -29,11 +29,11 @@ import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.theme.Spacing
 
-/** The test tags of a [LakeDialog], declared by each feature in `C.kt`. */
+/** Test tags declared in `C.kt`; [cancel] can be omitted when no tag is needed for that action. */
 class DialogTags(
     val dialog: String,
     val confirm: String,
-    val cancel: String,
+    val cancel: String? = null,
     val error: String = "",
 )
 
@@ -48,14 +48,15 @@ class DialogTags(
  * @param isDestructive makes [confirmLabel] red, for an action that can't be undone
  * @param focusCancel puts the focus on [cancelLabel] first, when it is the safer choice (e.g.
  *   staying signed in with changes not yet saved online)
- * @param content shown instead of an empty message, or under [message], scrolling with it, e.g. a
- *   "Don't show this again" checkbox
+ * @param message optional explanation; null shows only the supplied content
+ * @param content shown without a message, or under [message], scrolling with it, e.g. a "Don't show
+ *   this again" checkbox
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LakeDialog(
     title: String,
-    message: String,
+    message: String? = null,
     confirmLabel: String,
     cancelLabel: String?,
     onConfirm: () -> Unit,
@@ -91,7 +92,7 @@ fun LakeDialog(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-          if (message.isNotEmpty())
+          if (message != null)
               Text(
                   message,
                   style = MaterialTheme.typography.bodyMedium,
@@ -120,7 +121,10 @@ fun LakeDialog(
                     onClick = onCancel,
                     style = LakeButtonStyle.Text,
                     enabled = !isWorking,
-                    modifier = Modifier.testTag(tags.cancel).focusRequester(cancelFocus),
+                    modifier =
+                        (tags.cancel?.let { Modifier.testTag(it) } ?: Modifier).focusRequester(
+                            cancelFocus
+                        ),
                 )
               } else Spacer(Modifier)
             },

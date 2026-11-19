@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.common
@@ -107,7 +108,7 @@ class DeleteConfirmationDialogTest {
     setContent()
 
     composeTestRule.onNodeWithTag(TAGS.confirm).assertIsEnabled().performClick()
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsEnabled().performClick()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertIsEnabled().performClick()
 
     assertEquals(1, confirms)
     assertEquals(1, cancels)
@@ -128,7 +129,7 @@ class DeleteConfirmationDialogTest {
     setContent(isDeleting = true)
 
     composeTestRule.onNodeWithTag(TAGS.confirm).assertIsNotEnabled().performClick()
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsNotEnabled().performClick()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertIsNotEnabled().performClick()
 
     assertEquals(0, confirms)
     assertEquals(0, cancels)
@@ -182,8 +183,9 @@ class DeleteConfirmationDialogTest {
     setContent()
 
     composeTestRule.onNodeWithTag(TAGS.confirm).assertHeightIsEqualTo(56.dp)
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertHeightIsEqualTo(56.dp)
-    val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertHeightIsEqualTo(56.dp)
+    val cancel =
+        composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).getUnclippedBoundsInRoot()
     val confirm = composeTestRule.onNodeWithTag(TAGS.confirm).getUnclippedBoundsInRoot()
     assertEquals(cancel.top, confirm.top)
     assertEquals(cancel.right, confirm.left)
@@ -194,7 +196,8 @@ class DeleteConfirmationDialogTest {
     setContent(isDeleting = true)
 
     val spinner = composeTestRule.onNodeWithTag(C.Tag.dialog_progress).getUnclippedBoundsInRoot()
-    val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
+    val cancel =
+        composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).getUnclippedBoundsInRoot()
     assertEquals(cancel.left, spinner.right)
     assertStyle("Delete", typography.buttonLabel, primaryText)
   }
@@ -206,7 +209,8 @@ class DeleteConfirmationDialogTest {
     setContent(confirmLabel = "Delete it for good", cancelLabel = "Keep this item")
 
     val confirm = composeTestRule.onNodeWithTag(TAGS.confirm).getUnclippedBoundsInRoot()
-    val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
+    val cancel =
+        composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).getUnclippedBoundsInRoot()
     assertEquals(confirm.bottom, cancel.top)
     assertEquals(confirm.right, cancel.right)
   }
@@ -219,7 +223,8 @@ class DeleteConfirmationDialogTest {
 
     val dialog = composeTestRule.onNodeWithTag(TAGS.dialog).getUnclippedBoundsInRoot()
     val spinner = composeTestRule.onNodeWithTag(C.Tag.dialog_progress).getUnclippedBoundsInRoot()
-    val cancel = composeTestRule.onNodeWithTag(TAGS.cancel).getUnclippedBoundsInRoot()
+    val cancel =
+        composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).getUnclippedBoundsInRoot()
     assertTrue(spinner.left >= dialog.left)
     assertEquals(cancel.left, spinner.right)
     assertTrue(spinner.top >= cancel.top && spinner.bottom <= cancel.bottom)
@@ -232,7 +237,7 @@ class DeleteConfirmationDialogTest {
     setContent(hasError = true, message = "You can't undo this. ".repeat(6))
 
     composeTestRule.onNodeWithTag(TAGS.confirm).assertIsFullyVisible()
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsFullyVisible()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertIsFullyVisible()
   }
 
   private companion object {

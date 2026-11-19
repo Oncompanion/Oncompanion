@@ -230,18 +230,8 @@ private fun AppointmentFields(
       leadingContent = { Icon(painterResource(R.drawable.ic_schedule), null) },
   )
   ListItem(
-      headlineContent = {
-        Text(
-            stringResource(appointment.reminder.labelResource()),
-            style = MaterialTheme.typography.titleMedium,
-        )
-      },
-      supportingContent = {
-        Text(
-            stringResource(R.string.appointment_reminder),
-            style = MaterialTheme.typography.bodySmall,
-        )
-      },
+      headlineContent = { Text(stringResource(appointment.reminder.labelResource())) },
+      supportingContent = { Text(stringResource(R.string.appointment_reminder)) },
       leadingContent = { Icon(painterResource(R.drawable.ic_schedule), null) },
       modifier = Modifier.testTag(C.Tag.appointment_reminder_detail),
   )

@@ -26,6 +26,8 @@ import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
+import com.github.se.oncompanion.ui.textLayout
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.*
 import java.util.Locale
 import kotlinx.coroutines.test.runTest
@@ -61,6 +63,32 @@ class AppointmentDetailScreenTest {
           .onNodeWithTag(C.Tag.appointment_reminder_detail)
           .performScrollTo()
           .assertTextContains(label)
+    }
+  }
+
+  /** Reminder and location inherit the same standard headline/supporting text hierarchy. */
+  @Test
+  fun reminderTypographyMatchesTheOtherDetailRows() {
+    var dark by mutableStateOf(false)
+    compose.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        AppointmentDetailContent(
+            AppointmentDetailUiState.Loaded(appointment.copy(reminder = AppointmentReminder.NONE)),
+            {},
+            {},
+        )
+      }
+    }
+    for (theme in listOf(false, true)) {
+      compose.runOnIdle { dark = theme }
+      for ((reminder, reference) in listOf("No reminder" to "Room 3", "Remind me" to "Location")) {
+        val actual =
+            compose.onNodeWithText(reminder, useUnmergedTree = true).textLayout().layoutInput.style
+        val expected =
+            compose.onNodeWithText(reference, useUnmergedTree = true).textLayout().layoutInput.style
+        assertEquals(expected.fontSize, actual.fontSize)
+        assertEquals(expected.fontWeight, actual.fontWeight)
+      }
     }
   }
 
