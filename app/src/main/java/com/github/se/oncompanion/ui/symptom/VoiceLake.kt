@@ -59,6 +59,8 @@ private const val SUN_X = 262f
 private const val SUN_Y = 156f
 private const val SUN_SIZE = 64f
 private const val HALO_SIZE = 132f
+private const val MIDDLE_HALO_SIZE = 108f
+private const val FIRST_HALO_SIZE = 84f
 
 /** How far below its place the sun is, hidden behind the Salève and the water, or settled. */
 private const val HIDDEN_DROP = 90f
@@ -135,11 +137,19 @@ internal fun VoiceLake(
         }
 
     // Halos, from the widest: flat white paper, more see-through the further out
-    Halo(at(HALO_SIZE) { drop }, size = 64f + (HALO_SIZE - 64f) * outer, alpha = 0.22f * outer)
-    Halo(at(HALO_SIZE) { drop }, size = 64f + (108f - 64f) * inner, alpha = 0.32f * inner)
     Halo(
         at(HALO_SIZE) { drop },
-        size = (84f + 2f * inner) * breath,
+        size = SUN_SIZE + (HALO_SIZE - SUN_SIZE) * outer,
+        alpha = 0.22f * outer,
+    )
+    Halo(
+        at(HALO_SIZE) { drop },
+        size = SUN_SIZE + (MIDDLE_HALO_SIZE - SUN_SIZE) * inner,
+        alpha = 0.32f * inner,
+    )
+    Halo(
+        at(HALO_SIZE) { drop },
+        size = (FIRST_HALO_SIZE + 2f * inner) * breath,
         alpha = 0.45f * firstHalo,
     )
     Image(painterResource(R.drawable.voice_sun), null, at(SUN_SIZE) { drop })
