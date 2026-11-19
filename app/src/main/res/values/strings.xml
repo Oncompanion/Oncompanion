@@ -190,6 +190,29 @@
     <string name="symptom_week_day_intensity">%1$s, %2$s</string>
     <string name="symptom_week_day_no_intensity">%1$s, logged without an intensity</string>
     <string name="symptom_week_day_nothing">%1$s, nothing logged</string>
+    <!-- Logging a symptom by voice (US-44) -->
+    <string name="symptom_voice_speak_instead">Speak instead</string>
+    <string name="symptom_voice_drafted">Filled in from what you said. Check it before saving.</string>
+    <string name="symptom_voice_title">Speak your symptoms</string>
+    <string name="symptom_voice_close">Back to the form</string>
+    <string name="symptom_voice_listening">Listening…</string>
+    <string name="symptom_voice_finishing">Filling in your form…</string>
+    <string name="symptom_voice_hint">Say what you feel, how bad it is, and when.</string>
+    <string name="symptom_voice_heard">Here\'s what we heard</string>
+    <string name="symptom_voice_what_you_said">What you said</string>
+    <!-- What the patient said, between quotes -->
+    <string name="symptom_voice_transcript">“%1$s”</string>
+    <string name="symptom_voice_picked_up">We picked up</string>
+    <!-- An intensity picked up from what was said, e.g. "5/10" -->
+    <string name="symptom_voice_intensity">%1$d/10</string>
+    <string name="symptom_voice_done">Done</string>
+    <string name="symptom_voice_start_over">Start over</string>
+    <string name="symptom_voice_type_instead">Type instead</string>
+    <string name="symptom_voice_why_title">Speak instead of typing</string>
+    <string name="symptom_voice_why_message">The app listens only while this screen is open, and keeps the words, never the recording. Your phone will ask you to allow the microphone.</string>
+    <string name="symptom_voice_allow">Allow microphone</string>
+    <string name="symptom_voice_failed_title">Voice didn\'t work</string>
+    <string name="symptom_voice_failed_message">You can type your symptoms instead.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>
