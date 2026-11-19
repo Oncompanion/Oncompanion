@@ -45,6 +45,7 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
+import com.github.se.oncompanion.ui.common.EditedBy
 import com.github.se.oncompanion.ui.common.LakeFilterChip
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.LakeTopAppBar
@@ -174,16 +175,21 @@ fun SymptomDetailContent(
                   )
                 },
             ) {
-              EntryDetail(entry, zone, uiState.addedByName)
+              EntryDetail(entry, zone, uiState.addedByName, uiState.editedByName)
             }
       }
     }
   }
 
   if (uiState.isDeleteDialogShown) {
+    // A caregiver deletes the patient's entry: the dialog says whose it is (US-46)
     DeleteConfirmationDialog(
-        title = stringResource(R.string.symptom_delete_title),
-        message = stringResource(R.string.symptom_delete_message),
+        title =
+            caregiverOf?.let { stringResource(R.string.symptom_delete_title_for, it) }
+                ?: stringResource(R.string.symptom_delete_title),
+        message =
+            caregiverOf?.let { stringResource(R.string.symptom_delete_message_for, it) }
+                ?: stringResource(R.string.symptom_delete_message),
         error = stringResource(R.string.symptom_delete_error),
         confirmLabel = stringResource(R.string.symptom_delete_confirm),
         cancelLabel = stringResource(R.string.symptom_delete_cancel),
@@ -201,7 +207,12 @@ fun SymptomDetailContent(
  * who logged it. The symptoms are listed in full, since the title shows only the first line.
  */
 @Composable
-private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?) {
+private fun EntryDetail(
+    entry: SymptomEntry,
+    zone: ZoneId,
+    addedByName: String?,
+    editedByName: String?,
+) {
   Column(
       modifier =
           Modifier.fillMaxWidth()
@@ -228,8 +239,14 @@ private fun EntryDetail(entry: SymptomEntry, zone: ZoneId, addedByName: String?)
         )
       }
     }
-    // A symptom a caregiver logged for the patient says who did
-    addedByName?.let { AddedBy(it) }
+    // A symptom a caregiver logged for the patient says who did, and who last edited it (US-46),
+    // close together
+    if (addedByName != null || editedByName != null) {
+      Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        addedByName?.let { AddedBy(it) }
+        editedByName?.let { EditedBy(it) }
+      }
+    }
   }
 }
 

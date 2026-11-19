@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.update
  * - [observeSymptoms] emits the user's entries newest `occurredAt` first, then every change.
  * - [observeSymptom] emits the entry (or null), then every change.
  * - [updateSymptom] requires a non-blank ID and [SymptomEntry.isValid] at `clock()`, replaces the
- *   entry keeping its `createdAt`, and does nothing if it doesn't exist.
+ *   entry keeping its `createdAt` and who added it, and does nothing if it doesn't exist.
  * - [deleteSymptom] removes the entry, and does nothing if it doesn't exist.
  *
  * Test hooks: [observeError] and [writeError] simulate failures, [serverRejectsWrites] and
@@ -101,8 +101,15 @@ class FakeSymptomRepository(
     server.saving(store.value)
     store.update { current ->
       val stored = current[uid]?.get(entry.id) ?: return@update current
-      current +
-          (uid to current[uid].orEmpty() + (entry.id to entry.copy(createdAt = stored.createdAt)))
+      // Like Firestore: who added it stays, the editor is the new one's
+      val updated =
+          entry.copy(
+              createdAt = stored.createdAt,
+              addedBy = stored.addedBy,
+              addedByName = stored.addedByName,
+              editedByName = entry.editedByName.takeIf { entry.editedBy != null },
+          )
+      current + (uid to current[uid].orEmpty() + (entry.id to updated))
     }
   }
 

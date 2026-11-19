@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.medication
@@ -111,6 +112,9 @@ class FakeMedicationRepository(
   override suspend fun addPrescription(uid: String, prescription: Prescription) {
     writeError?.let { throw it }
     require(prescription.isValid()) { "Invalid prescription: $prescription" }
+    require(prescription.editedBy == null && prescription.editedByName == null) {
+      "A new prescription cannot have an editor"
+    }
     server.saving(store.value)
     put(uid, prescription.copy(createdAt = clock()))
   }
@@ -120,7 +124,14 @@ class FakeMedicationRepository(
     require(prescription.isValid()) { "Invalid prescription: $prescription" }
     val existing = store.value[uid]?.get(prescription.id) ?: return
     server.saving(store.value)
-    put(uid, prescription.copy(createdAt = existing.createdAt))
+    put(
+        uid,
+        prescription.copy(
+            createdAt = existing.createdAt,
+            addedBy = existing.addedBy,
+            addedByName = existing.addedByName,
+        ),
+    )
   }
 
   override suspend fun deletePrescription(uid: String, id: String) {

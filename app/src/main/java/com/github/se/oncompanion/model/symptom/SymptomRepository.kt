@@ -35,9 +35,11 @@ interface SymptomRepository {
 
   /**
    * Replaces the symptom [SymptomEntry.id] of [uid] with [entry], keeping when it was first logged
-   * ([SymptomEntry.createdAt] is ignored). Like [addSymptom], returns as soon as the change is
-   * saved on the device (also offline). Does nothing if the symptom doesn't exist (e.g. it was
-   * deleted on another device): an edit never brings a deleted symptom back.
+   * ([SymptomEntry.createdAt] is ignored) and who logged it. Its `editedBy` signs a caregiver's
+   * edit (US-46); without it, the edit is the patient's and no caregiver shows as the last editor.
+   * Like [addSymptom], returns as soon as the change is saved on the device (also offline). Does
+   * nothing if the symptom doesn't exist (e.g. it was deleted on another device): an edit never
+   * brings a deleted symptom back.
    *
    * @throws IllegalArgumentException if [SymptomEntry.id] is blank or the entry is not
    *   [SymptomEntry.isValid]

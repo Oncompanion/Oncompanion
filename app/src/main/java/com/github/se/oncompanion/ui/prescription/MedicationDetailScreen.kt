@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
 
@@ -22,10 +23,6 @@ import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val medicationDate = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /** Collects the live medication detail and exposes navigation through callbacks only. */
 @Composable
@@ -150,7 +147,7 @@ private fun MedicationFields(state: MedicationDetailUiState.Loaded) {
       ?.takeIf { it.isNotBlank() }
       ?.let { MedicationField(it, R.string.prescription_form_frequency) }
   MedicationField(
-      medication.startDate.format(medicationDate),
+      medication.startDate.format(prescriptionDateFormatter),
       R.string.prescription_form_start_date,
   )
   medication.durationDays?.let {
@@ -163,7 +160,7 @@ private fun MedicationFields(state: MedicationDetailUiState.Loaded) {
       ?.takeIf { it.isNotBlank() }
       ?.let { MedicationField(it, R.string.prescription_detail_prescribed_by) }
   MedicationField(
-      prescription.prescribedOn.format(medicationDate),
+      prescription.prescribedOn.format(prescriptionDateFormatter),
       R.string.medication_detail_prescription_date,
   )
 }

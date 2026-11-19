@@ -19,10 +19,6 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.DialogTags
 import com.github.se.oncompanion.ui.common.LakeDialog
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
  * Asks before saving a prescription that is the same as [saved] (Figma "US-39 / Save – Same
@@ -37,7 +33,7 @@ internal fun AlreadySavedDialog(
     onSaveAnyway: () -> Unit,
     caregiverOf: String? = null,
 ) {
-  val date = saved.prescribedOn.format(dateFormatter)
+  val date = saved.prescribedOn.format(prescriptionDateFormatter)
   val count = saved.medications.size
   // Whose prescription it is: the doctor's name, else the patient's for a caregiver
   val message =
@@ -69,7 +65,7 @@ internal fun AlreadySavedDialog(
  */
 @Composable
 internal fun RenewalNotice(previous: Prescription, caregiverOf: String? = null) {
-  val date = previous.prescribedOn.format(dateFormatter)
+  val date = previous.prescribedOn.format(prescriptionDateFormatter)
   Surface(
       color = MaterialTheme.colorScheme.secondaryContainer,
       contentColor = MaterialTheme.colorScheme.onSecondaryContainer,

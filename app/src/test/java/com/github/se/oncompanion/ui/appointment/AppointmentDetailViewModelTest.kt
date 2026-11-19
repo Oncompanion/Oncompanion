@@ -461,6 +461,37 @@ class AppointmentDetailViewModelTest {
       }
 
   @Test
+  fun switchTurnedOffThenOnAgain_whileTheDialogIsOpen_doesntReopenIt() =
+      runTest(dispatcher) {
+        // Asking to confirm, or after a failed deletion
+        for (fails in listOf(false, true)) {
+          repository.seed("patient", appointment)
+          val followed = allowedCaregiver()
+          val vm = viewModelOf(followed)
+          advanceUntilIdle()
+          repository.writeError = if (fails) IllegalStateException("enqueue failed") else null
+          vm.requestDelete()
+          if (fails) vm.confirmDelete()
+          advanceUntilIdle()
+          assertTrue("fails=$fails", vm.uiState.value.isDeleteDialogShown)
+
+          followed.shares(CarePermission.PLANNING, canAdd = setOf(CarePermission.PLANNING))
+          advanceUntilIdle()
+          assertEquals("fails=$fails", DeletePhase.IDLE, vm.uiState.value.delete)
+          followed.shares(
+              CarePermission.PLANNING,
+              canAdd = setOf(CarePermission.PLANNING),
+              canEditAndDelete = setOf(CarePermission.PLANNING),
+          )
+          advanceUntilIdle()
+
+          assertTrue("fails=$fails", vm.uiState.value.canDelete)
+          assertFalse("fails=$fails", vm.uiState.value.isDeleteDialogShown)
+          repository.writeError = null
+        }
+      }
+
+  @Test
   fun caregiverWithoutTheSwitch_orSignedOut_cantDelete() =
       runTest(dispatcher) {
         repository.seed("patient", appointment)

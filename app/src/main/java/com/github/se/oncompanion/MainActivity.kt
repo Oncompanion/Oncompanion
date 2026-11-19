@@ -22,6 +22,7 @@ import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsPreferences
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.model.session.PreferencesCleanupJournal
+import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
         !journal.pending &&
             runCatching { AuthRepositoryProvider.repository.currentUser != null }
                 .getOrDefault(false)
+    SettingsRepositoryProvider.install(applicationContext)
     super.onCreate(if (restore) savedInstanceState else null)
     // Install the shared search adapter before fields capture it; blank configuration stays manual.
     HospitalRepositoryProvider.configureAtStartup(getString(R.string.hospital_proxy_endpoint))

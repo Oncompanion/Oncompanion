@@ -38,6 +38,9 @@ enum class SymptomType {
  * @property addedBy the uid of the caregiver who logged it for the patient (US-22), or `null` when
  *   the patient did
  * @property addedByName that caregiver's first name, shown as "Added by Sam"
+ * @property editedBy the uid of the caregiver who last edited it for the patient (US-46), or `null`
+ *   when nobody did or the patient edited it last
+ * @property editedByName that caregiver's first name, shown as "Edited by Sam"
  */
 data class SymptomEntry(
     val id: String = "",
@@ -48,6 +51,8 @@ data class SymptomEntry(
     val createdAt: Instant? = null,
     val addedBy: String? = null,
     val addedByName: String? = null,
+    val editedBy: String? = null,
+    val editedByName: String? = null,
 ) {
   /**
    * Whether the entry satisfies the same constraints as the Firestore security rules at [now]. A
@@ -64,7 +69,10 @@ data class SymptomEntry(
           (SymptomType.OTHER !in types || !notes.isNullOrBlank()) &&
           // A caregiver's entry says who added it
           (addedBy == null ||
-              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
+              (!addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH)) &&
+          // So does one a caregiver edited
+          (editedBy == null ||
+              (!editedByName.isNullOrBlank() && editedByName.length <= MAX_ADDED_BY_NAME_LENGTH))
 
   companion object {
     /** Keep in sync with `firestore.rules`. */

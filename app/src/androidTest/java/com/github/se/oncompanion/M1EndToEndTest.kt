@@ -6,18 +6,23 @@ package com.github.se.oncompanion
 
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
@@ -27,6 +32,7 @@ import com.github.se.oncompanion.utils.EmulatorGoogleSignIn
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -98,6 +104,7 @@ class M1EndToEndTest {
     deleteSymptom()
     seeProfileAndAddHospital(firstName = "Sam", hospital = "HUG Geneva")
     checkProfileLandscape()
+    openSettingsAndReturnToProfile()
     signOut()
     signInAgain(firstName = "Sam", nextAppointment = "Oncology check-up")
   }
@@ -108,6 +115,79 @@ class M1EndToEndTest {
 
     signInAndOnboard(firstName = "Sam")
     inviteToCareCircle(firstName = "Julie")
+  }
+
+  /** Every editable Profile field stays saved after visiting Settings and returning. */
+  @Test
+  fun editedProfile_survivesSettingsRoundTrip() {
+    ui.startApp(signIn)
+    signInAndOnboard(firstName = "Sam")
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_edit))
+    ui.open(C.Tag.profile_edit, hasTestTag(C.Tag.edit_profile_first_name))
+    val fields =
+        listOf(
+            C.Tag.edit_profile_first_name to "Jamie",
+            C.Tag.edit_profile_family_name to "Taylor",
+            C.Tag.cancer_type_field to "Example type",
+            C.Tag.hospital_field to "Example hospital",
+        )
+    for ((tag, value) in fields) ui.tag(tag).reveal().replaceText(value)
+    ui.open(C.Tag.edit_profile_save, hasTestTag(C.Tag.profile_screen))
+    ui.waitFor(hasTestTag(C.Tag.profile_name) and hasText("Jamie Taylor"))
+    ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+
+    // Check both the displayed profile and a fresh edit destination's persisted values.
+    for ((tag, value) in
+        listOf(
+            C.Tag.profile_first_name to "Jamie",
+            C.Tag.profile_family_name to "Taylor",
+            C.Tag.profile_cancer_type to "Example type",
+            C.Tag.profile_hospital to "Example hospital",
+        )) {
+      ui.waitFor(hasTestTag(tag) and hasAnyDescendant(hasText(value))).reveal().assertIsDisplayed()
+    }
+    ui.open(C.Tag.profile_edit, hasTestTag(C.Tag.edit_profile_first_name))
+    for ((tag, value) in fields) ui.tag(tag).reveal().assertTextContains(value)
+  }
+
+  /** Settings survives a real rotation; toolbar and Android Back retain the same Profile. */
+  @Test
+  fun settingsRotation_backReturnsToTheSameProfile() {
+    ui.startApp(signIn)
+    signInAndOnboard(firstName = "Sam")
+    ui.open(C.Tag.overview_shortcut_profile, hasTestTag(C.Tag.profile_edit))
+    ui.tag(C.Tag.profile_settings).reveal().fullyVisible()
+    captureSettings("settings-profile-portrait.png")
+    try {
+      for (systemBack in listOf(false, true)) {
+        rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+        ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+        ui.tag(C.Tag.settings_empty).reveal().assertIsDisplayed()
+        captureSettings("settings-portrait.png")
+        rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, Configuration.ORIENTATION_LANDSCAPE)
+        ui.tag(C.Tag.settings_screen).assertIsDisplayed()
+        ui.tag(C.Tag.settings_empty).reveal().fullyVisible()
+        ui.tag(C.Tag.settings_back).reveal().fullyVisible()
+        captureSettings("settings-landscape.png")
+        if (systemBack) {
+          compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+          ui.waitFor(hasTestTag(C.Tag.profile_screen))
+        } else {
+          ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+        }
+        ui.waitFor(hasTestTag(C.Tag.profile_name) and hasText("Sam")).reveal().assertIsDisplayed()
+        ui.waitFor(
+                hasTestTag(C.Tag.profile_email) and hasAnyDescendant(hasText("m1-$run@example.com"))
+            )
+            .reveal()
+            .assertIsDisplayed()
+        ui.tag(C.Tag.profile_settings).reveal().fullyVisible()
+        captureSettings("settings-profile-landscape.png")
+      }
+    } finally {
+      rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, Configuration.ORIENTATION_PORTRAIT)
+    }
   }
 
   // ---- steps ----
@@ -315,6 +395,25 @@ class M1EndToEndTest {
         hasTestTag(C.Tag.profile_hospital) and
             (hasText(hospital, substring = true) or hasAnyDescendant(hasText(hospital)))
     )
+  }
+
+  /** Settings is reachable from the real patient Profile and Back retains that profile. */
+  private fun openSettingsAndReturnToProfile() {
+    captureSettings("settings-profile-entry.png")
+    ui.open(C.Tag.profile_settings, hasTestTag(C.Tag.settings_screen))
+    ui.tag(C.Tag.settings_empty).reveal().assertIsDisplayed()
+    captureSettings("settings-foundation.png")
+    ui.open(C.Tag.settings_back, hasTestTag(C.Tag.profile_screen))
+  }
+
+  private fun captureSettings(name: String) {
+    File(compose.activity.cacheDir, name).outputStream().use {
+      compose
+          .onRoot()
+          .captureToImage()
+          .asAndroidBitmap()
+          .compress(Bitmap.CompressFormat.PNG, 100, it)
+    }
   }
 
   /**
