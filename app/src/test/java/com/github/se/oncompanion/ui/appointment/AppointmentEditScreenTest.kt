@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -157,6 +158,7 @@ class AppointmentEditScreenTest {
   fun editingAbovePortraitKeyboard() {
     compose.setContent { EditContent(draft()) }
     compose.showKeyboard(700)
+    compose.onNodeWithTag(C.Tag.appointment_reminder).performScrollTo().assertIsAboveKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().assertIsAboveKeyboard(700)
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsAboveKeyboard(700)
   }
@@ -167,6 +169,7 @@ class AppointmentEditScreenTest {
   fun editingAboveLandscapeKeyboard() {
     compose.setContent { EditContent(draft()) }
     compose.showKeyboard(280)
+    compose.onNodeWithTag(C.Tag.appointment_reminder).performScrollTo().assertIsAboveKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_location).performScrollTo().assertIsAboveKeyboard(280)
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsAboveKeyboard(280)
   }

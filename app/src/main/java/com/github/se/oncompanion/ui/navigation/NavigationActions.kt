@@ -171,6 +171,7 @@ object Screen {
 
   // Route.SETTINGS
   const val SETTINGS = "settings_home"
+  const val APPEARANCE = "appearance"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"

@@ -2,7 +2,10 @@
 
 package com.github.se.oncompanion.ui.symptom
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -50,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -70,6 +74,8 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.ClickableReadOnlyField
 import com.github.se.oncompanion.ui.common.DayPickerDialog
+import com.github.se.oncompanion.ui.common.LakeBanner
+import com.github.se.oncompanion.ui.common.LakeBannerTone
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeFilterChip
@@ -81,6 +87,8 @@ import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.TimePickerDialog
+import com.github.se.oncompanion.ui.common.appSettingsIntent
+import com.github.se.oncompanion.ui.common.hasPermission
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.LocalDate
@@ -130,6 +138,23 @@ fun AddSymptomScreen(
     caregiverOf: String? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+
+  // Android's microphone dialog, after the app said why; its answer goes to the view model
+  val microphone =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        viewModel.onMicrophoneAnswer(it)
+      }
+  // Back from the phone's settings with the microphone allowed: listen right away
+  LifecycleResumeEffect(uiState.voice) {
+    if (
+        uiState.voice == VoiceUiState.MicrophoneRefused &&
+            context.hasPermission(Manifest.permission.RECORD_AUDIO)
+    ) {
+      viewModel.onMicrophoneAllowedInSettings()
+    }
+    onPauseOrDispose {}
+  }
 
   // Leaves the screen once the symptom is saved
   val currentOnSaved by rememberUpdatedState(onSaved)
@@ -147,9 +172,27 @@ fun AddSymptomScreen(
     onPauseOrDispose { ticker.cancel() }
   }
 
+  // Dictating replaces the form until the patient is done or goes back to it
+  val voice = uiState.voice
+  if (voice != null) {
+    BackHandler(onBack = viewModel::cancelVoice)
+    VoiceSymptomContent(
+        voice = voice,
+        today = uiState.now.toLocalDate(),
+        onClose = viewModel::cancelVoice,
+        onAllowMicrophone = { microphone.launch(Manifest.permission.RECORD_AUDIO) },
+        onOpenSettings = { context.startActivity(appSettingsIntent(context)) },
+        onDone = viewModel::onDone,
+        onStartOver = viewModel::restartListening,
+        modifier = modifier,
+    )
+    return
+  }
+
   AddSymptomContent(
       uiState = uiState,
       onBack = onBack,
+      onSpeak = { viewModel.onSpeak(context.hasPermission(Manifest.permission.RECORD_AUDIO)) },
       onToggleType = viewModel::toggleType,
       onIntensityChange = viewModel::onIntensityChange,
       onClearIntensity = viewModel::clearIntensity,
@@ -168,6 +211,7 @@ fun AddSymptomScreen(
  * Stateless content of the add symptom screen, so each state can be tested without a ViewModel.
  *
  * @param onErrorShown called once the error snackbar is gone
+ * @param onSpeak dictates the symptom instead (US-44), offered when the phone can listen
  * @param onRetry loads the symptom to edit again after an error
  * @param caregiverOf in caregiver mode, the first name of the patient whose journal gets the
  *   symptom, said in the title so the caregiver knows where it goes
@@ -186,6 +230,7 @@ fun AddSymptomContent(
     onSave: () -> Unit,
     onErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
+    onSpeak: () -> Unit = {},
     onRetry: () -> Unit = {},
     caregiverOf: String? = null,
 ) {
@@ -218,7 +263,7 @@ fun AddSymptomContent(
       snackbarHost = { LakeSnackbarHost(snackbarHostState) },
       // Save stays at the bottom of the screen while the fields scroll
       bottomBar = {
-        if (!scrollsEverything && uiState.isFormShown) FormSaveButton(uiState, onSave)
+        if (!scrollsEverything && uiState.isFormShown) FormButtons(uiState, onSpeak, onSave)
       },
   ) { innerPadding ->
     // When editing, the symptom is loaded before the form can show it
@@ -257,6 +302,7 @@ fun AddSymptomContent(
               onDateChange = onDateChange,
               onTimeChange = onTimeChange,
               onNotesChange = onNotesChange,
+              onSpeak = onSpeak,
               scrollsEverything = scrollsEverything,
               caregiverOf = caregiverOf,
               onBack = onBack,
@@ -320,6 +366,30 @@ private fun FormTopBar(
   )
 }
 
+/**
+ * "Speak instead" when the phone can listen, above the button that saves the symptom, so both are
+ * in reach of the thumb (Figma: Voice logging).
+ */
+@Composable
+private fun FormButtons(uiState: AddSymptomUiState, onSpeak: () -> Unit, onSave: () -> Unit) {
+  Column {
+    if (uiState.canDictate) {
+      LakeButton(
+          text = stringResource(R.string.symptom_voice_speak_instead),
+          onClick = onSpeak,
+          style = LakeButtonStyle.Tonal,
+          enabled = uiState.save == SavePhase.EDITING,
+          icon = painterResource(R.drawable.ic_mic),
+          modifier =
+              Modifier.fillMaxWidth()
+                  .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md)
+                  .testTag(C.Tag.symptom_add_speak),
+      )
+    }
+    FormSaveButton(uiState, onSave)
+  }
+}
+
 /** The button that saves the symptom, worded for logging or for editing. */
 @Composable
 private fun FormSaveButton(uiState: AddSymptomUiState, onSave: () -> Unit) {
@@ -349,6 +419,7 @@ private fun SymptomFields(
     onDateChange: (LocalDate) -> Unit,
     onTimeChange: (LocalTime) -> Unit,
     onNotesChange: (String) -> Unit,
+    onSpeak: () -> Unit,
     scrollsEverything: Boolean,
     caregiverOf: String?,
     onBack: () -> Unit,
@@ -363,6 +434,14 @@ private fun SymptomFields(
         modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
+      // Filled from what the patient said: they check it before saving (drafted content)
+      if (uiState.isDrafted) {
+        LakeBanner(
+            message = stringResource(R.string.symptom_voice_drafted),
+            tone = LakeBannerTone.Waiting,
+            modifier = Modifier.testTag(C.Tag.symptom_add_drafted),
+        )
+      }
       FormGroup(R.string.symptom_add_types) { TypeChips(uiState.types, onToggleType) }
       FormGroup(R.string.symptom_add_intensity) {
         IntensitySlider(uiState.intensity, onIntensityChange, onClearIntensity)
@@ -370,7 +449,7 @@ private fun SymptomFields(
       FormGroup(R.string.symptom_add_when) { WhenField(uiState, onDateChange, onTimeChange) }
       FormGroup(R.string.symptom_add_notes_title) { NotesField(uiState, onNotesChange) }
     }
-    if (scrollsEverything) FormSaveButton(uiState, onSave)
+    if (scrollsEverything) FormButtons(uiState, onSpeak, onSave)
   }
 }
 

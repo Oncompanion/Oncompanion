@@ -15,7 +15,7 @@ Every diagram names its four layers and gives each one colour: screens and ViewM
 1. **A write works offline.** A screen writes through its repository to Firestore's cache on the phone, so the change shows at once, and the cache *syncs when online*. If the server's rules refuse a write, Firestore undoes it on the phone and the repository reports it to `RejectedWrites`; the app-wide snackbar *shows refused writes* to the user (see "Rejected writes" under Offline mode).
 2. **A caregiver only sees what is shared.** A screen showing a section of a patient's data reads it through `ObserveCareSection` (Planning and the Overview through `ObserveCarePlanning`), which asks `ResolveSectionAccess`; that uses `ResolveCareCircleAccess` and the care circle to check *is the section shared?*, then reads the data by the patient's uid. `firestore.rules` check the same on the server.
 
-The overview also shows the large planned areas (voice logging, reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
+The overview also shows the large planned areas (reminders, a caregiver writing for the patient); each feature diagram draws the planned parts of its feature, and the reminders epic has its own diagram.
 
 To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excalidraw.com) (Menu → Open), make your changes, then save it back to the same file and export it with *Export image → SVG* (keep "Embed scene" off) to overwrite its `.svg`. Coding agents edit the `.excalidraw` JSON directly instead (see [AGENTS.md](../AGENTS.md)) and regenerate the `.svg` files with `npm ci && npm run export` in `scripts/diagrams` (Node 20 or later), which gives the same result as excalidraw.com. Commit both files in the same PR as the code change, and give a planned box its layer's colour once it is built.
 
@@ -301,6 +301,24 @@ notification delivery are separate follow-ups to #489 and US-16.
 
 Deploy the updated Firestore rules before distributing a client that writes `reminder`: the
 previous field allowlist rejects it. No live rules deployment is part of this data-layer change.
+
+### Appointment reminder controls (#489)
+
+The shared Add/Edit form exposes `AppointmentFormUiState.reminder`, defaulting to `ONE_HOUR`.
+The read-only **Remind me** field opens a single-choice `LakeDialog`; selecting an option changes
+only the draft, while Cancel, Back and outside dismissal keep the previous choice. The dialog
+scrolls on short windows. Its open state uses `rememberSaveable`; the chosen draft stays in the
+ViewModel across activity recreation. Loaded appointments prefill the choice, and a reminder-only
+edit counts as a dirty draft so later snapshots cannot replace it. Account changes reset it with
+the rest of the private draft.
+
+Detail displays the saved value after date/time and before location, including **No reminder**.
+The same form and wording apply to patients and authorized caregivers. Saving records the choice
+locally, including offline; it never asks for Android notification permission or claims delivery.
+Scheduling and permission handling remain #452/#453.
+
+Approved implementation reference: [M2 reminder-choice proposal](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion?node-id=1818-5693).
+
 
 ## Appointment details (issue #205)
 
@@ -609,3 +627,28 @@ Settings are independent of Firebase and uid: sign-out and account changes do no
 and local reads/writes work offline. This store contains no patient/session data and intentionally
 does not join SessionAccess cleanup. Notification settings will be account-specific work under
 #134, separate from this device store.
+
+### Appearance (#508)
+
+Settings now exposes only Appearance and its saved value. `SettingsViewModel` observes the same
+repository in both settings destinations; the shared repository keeps them synchronized.
+`AppearanceContent` uses selectable rows with a trailing checkmark for Follow device, Light and Dark. Writes disable
+selection until complete without shifting the list with a save spinner; failures retain the last confirmed choice and allow another attempt.
+Read failures offer Retry. No patient record or appointment time changes.
+
+`AppAppearanceViewModel` observes device settings independently of the authenticated session.
+`MainActivity` keeps the existing splash until routing and the first appearance read are ready.
+A failed initial read releases startup using Follow device without overwriting saved preferences;
+IO failures are retried; failures after a successful read preserve the last resolved appearance. `AppAppearanceTheme` resolves Follow device from Compose's system-dark
+configuration before applying the override and otherwise uses the existing explicit light/dark
+palettes. A ContextThemeWrapper supplies matching Android night resources while retaining Activity
+access for scanning and sign-in. Distinct empty light/dark overlays keep Compose vector-cache
+entries separate, so changing appearance redraws existing illustrations without replacing screen state. Updating that choice
+does not recreate navigation or discard screen state. The Google-branded button retains its
+prescribed colors but follows the same effective app appearance. MainActivity and emulator journeys share AppAppearanceRoot, which collects the preference,
+resolves the effective theme once and applies the root surface and system bars. System-bar icon
+contrast follows the app override; navigation bars retain AndroidX default contrast scrims on API 28. Android-owned permission dialogs and the initial OS splash retain OS behavior.
+
+Both destinations use theme colors, shapes, typography and spacing, and scroll at large text
+sizes and in landscape. Rotation tests recreate the Activity and restore content with the same
+ViewModel; startup tests also exercise the root Activity recreation.

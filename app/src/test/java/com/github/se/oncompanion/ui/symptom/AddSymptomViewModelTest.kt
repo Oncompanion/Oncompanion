@@ -1057,6 +1057,43 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun allowedInTheSettings_listensOnlyWhileTheMicrophoneIsShownOff() =
+      runTest(dispatcher) {
+        // Refused, then allowed in the phone's settings: listens right away
+        val refused = viewModel()
+        refused.onSpeak(hasMicrophone = false)
+        refused.onMicrophoneAnswer(granted = false)
+        refused.onMicrophoneAllowedInSettings()
+        advanceUntilIdle()
+        assertTrue(refused.state.voice is VoiceUiState.Listening)
+        assertTrue(speech.isListening)
+        refused.cancelVoice()
+
+        // Never asked, or back to the form: nothing starts
+        val notRefused: List<Pair<String, () -> AddSymptomViewModel>> =
+            listOf(
+                "form" to { viewModel() },
+                "explaining" to { viewModel().also { it.onSpeak(hasMicrophone = false) } },
+                "cancelled" to
+                    {
+                      viewModel().also {
+                        it.onSpeak(hasMicrophone = false)
+                        it.onMicrophoneAnswer(granted = false)
+                        it.cancelVoice()
+                      }
+                    },
+            )
+        for ((how, form) in notRefused) {
+          val viewModel = form()
+          val before = viewModel.state.voice
+          viewModel.onMicrophoneAllowedInSettings()
+          advanceUntilIdle()
+          assertEquals(how, before, viewModel.state.voice)
+          assertFalse(how, speech.isListening)
+        }
+      }
+
+  @Test
   fun listening_showsTheWordsAsTheyAreSaid_thenWhatWasPickedUp() =
       runTest(dispatcher) {
         val viewModel = listening()
@@ -1075,6 +1112,25 @@ class AddSymptomViewModelTest {
         assertEquals(7, heard.draft.intensity)
         // Nothing reaches the form before the patient uses it
         assertEquals(emptyList<SymptomType>(), viewModel.state.types)
+      }
+
+  @Test
+  fun listening_showsHowLoudThePatientIs_acrossNewWords() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+
+        hear(SpeechEvent.Level(0.7f))
+        assertEquals(0.7f, (viewModel.state.voice as VoiceUiState.Listening).level)
+        // New words don't reset it
+        hear(SpeechEvent.PartialText("I feel sick"))
+        assertEquals(0.7f, (viewModel.state.voice as VoiceUiState.Listening).level)
+        hear(SpeechEvent.Level(0.2f))
+        assertEquals(0.2f, (viewModel.state.voice as VoiceUiState.Listening).level)
+
+        // Once heard, the level no longer changes anything
+        hear(SpeechEvent.FinalText("I feel sick"))
+        hear(SpeechEvent.Level(0.9f))
+        assertTrue(viewModel.state.voice is VoiceUiState.Heard)
       }
 
   @Test
@@ -1233,6 +1289,35 @@ class AddSymptomViewModelTest {
           assertEquals(case.transcript, case.time, state.time)
           assertEquals(case.transcript, case.notes, state.notes)
         }
+      }
+
+  @Test
+  fun dictatingWhileEditing_keepsWhatWasSaved_andAddsWhatWasSaid() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        val said = "nausea 7 out of 10 today at 3 pm"
+        heard(said, viewModel)
+
+        viewModel.onDone()
+        // The saved symptom, intensity, day and time stay; the new symptom and the words are added
+        val state = viewModel.state
+        assertTrue(state.isDrafted)
+        assertEquals(listOf(SymptomType.FATIGUE, SymptomType.NAUSEA), state.types)
+        assertEquals(4, state.intensity)
+        assertEquals(today.minusDays(1), state.date)
+        assertEquals(LocalTime.of(9, 12, 37, 500_000_000), state.time)
+        assertEquals("After lunch\n$said", state.notes)
+        // Nothing changes in the journal until the patient saves
+        advanceUntilIdle()
+        assertEquals(logged, savedEntry())
+
+        viewModel.save()
+        advanceUntilIdle()
+        val saved = savedEntry()
+        assertEquals(listOf(SymptomType.FATIGUE, SymptomType.NAUSEA), saved.types)
+        assertEquals(logged.occurredAt, saved.occurredAt)
+        assertEquals("After lunch\n$said", saved.notes)
       }
 
   @Test

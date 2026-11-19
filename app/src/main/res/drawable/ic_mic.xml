@@ -1,0 +1,18 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The Figma's "Icon/mic" (Brand & Theme), exported as is: tinted by the Icon that shows it -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M15,6C15,4.343 13.657,3 12,3C10.343,3 9,4.343 9,6V11C9,12.657 10.343,14 12,14C13.657,14 15,12.657 15,11V6Z"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black" />
+    <path
+        android:pathData="M5,11C5,12.857 5.738,14.637 7.05,15.95C8.363,17.263 10.144,18 12,18M12,18C13.857,18 15.637,17.263 16.95,15.95C18.263,14.637 19,12.857 19,11M12,18V21"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

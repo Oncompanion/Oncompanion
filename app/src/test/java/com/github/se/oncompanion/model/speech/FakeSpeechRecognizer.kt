@@ -41,7 +41,7 @@ class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
       emitAll(
           events.receiveAsFlow().transformWhile {
             emit(it)
-            it is SpeechEvent.Listening || it is SpeechEvent.PartialText
+            it is SpeechEvent.Listening || it is SpeechEvent.PartialText || it is SpeechEvent.Level
           }
       )
     } finally {

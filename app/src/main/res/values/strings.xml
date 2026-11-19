@@ -208,6 +208,39 @@
     <string name="symptom_week_day_intensity">%1$s, %2$s</string>
     <string name="symptom_week_day_no_intensity">%1$s, logged without an intensity</string>
     <string name="symptom_week_day_nothing">%1$s, nothing logged</string>
+    <!-- Logging a symptom by voice (US-44) -->
+    <string name="symptom_voice_speak_instead">Speak instead</string>
+    <string name="symptom_voice_drafted">Filled in from what you said. Check it before saving.</string>
+    <string name="symptom_voice_title">Speak your symptoms</string>
+    <string name="symptom_voice_close">Back to the form</string>
+    <string name="symptom_voice_listening">Listening…</string>
+    <string name="symptom_voice_finishing">Filling in your form…</string>
+    <string name="symptom_voice_hint">Say what you feel, how bad it is, and when.</string>
+    <string name="symptom_voice_heard">Here\'s what we heard</string>
+    <string name="symptom_voice_what_you_said">What you said</string>
+    <!-- What the patient said, between quotes -->
+    <string name="symptom_voice_transcript">“%1$s”</string>
+    <string name="symptom_voice_picked_up">We picked up</string>
+    <!-- An intensity picked up from what was said, e.g. "5/10" -->
+    <string name="symptom_voice_intensity">%1$d/10</string>
+    <string name="symptom_voice_done">Done</string>
+    <string name="symptom_voice_start_over">Start over</string>
+    <string name="symptom_voice_try_again">Try again</string>
+    <string name="symptom_voice_type_instead">Type instead</string>
+    <string name="symptom_voice_why_title">Speak instead of typing</string>
+    <string name="symptom_voice_why_message">The app listens only while this screen is open, and keeps the words, never the recording. Your phone will ask you to allow the microphone.</string>
+    <string name="symptom_voice_allow">Allow microphone</string>
+    <string name="symptom_voice_refused_title">The microphone is off for oncompanion</string>
+    <string name="symptom_voice_refused_message">Allow it in your phone\'s settings to speak your symptoms. You can always type instead.</string>
+    <string name="symptom_voice_open_settings">Open settings</string>
+    <string name="symptom_voice_no_speech_title">We didn\'t hear anything</string>
+    <string name="symptom_voice_no_speech_message">Try again a little closer to the phone, or type instead.</string>
+    <string name="symptom_voice_offline_title">Voice needs a connection</string>
+    <string name="symptom_voice_offline_message">Your phone can only understand this language online. Try again once you\'re connected, or type instead.</string>
+    <string name="symptom_voice_unavailable_title">Voice isn\'t available on this phone</string>
+    <string name="symptom_voice_unavailable_message">You can type your symptoms instead.</string>
+    <string name="symptom_voice_failed_title">Voice didn\'t work</string>
+    <string name="symptom_voice_failed_message">Try again, or type instead.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>
@@ -713,6 +746,13 @@
     <!-- Appointment form -->
     <string name="appointment_add">Add appointment</string>
     <string name="appointment_back">Back</string>
+    <string name="appointment_reminder">Remind me</string>
+    <string name="appointment_reminder_pick">Choose a reminder</string>
+    <string name="appointment_reminder_none">No reminder</string>
+    <string name="appointment_reminder_fifteen_minutes">15 minutes before</string>
+    <string name="appointment_reminder_one_hour">1 hour before</string>
+    <string name="appointment_reminder_three_hours">3 hours before</string>
+    <string name="appointment_reminder_one_day">1 day before</string>
     <string name="appointment_title">Title</string>
     <string name="appointment_date">Date</string>
     <string name="appointment_time">Time</string>
@@ -773,8 +813,19 @@
     <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
     <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
     <!-- Settings -->
+    <string name="settings_intro">Make oncompanion work for you.</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_read_error">Couldn\'t read your preferences.</string>
+    <string name="settings_save_error">Couldn\'t save your choice. Try again.</string>
+    <string name="settings_retry">Retry</string>
+    <string name="appearance_intro">Choose what feels comfortable to read.</string>
+    <string name="appearance_device">Follow device</string>
+    <string name="appearance_light">Light</string>
+    <string name="appearance_dark">Dark</string>
+    <string name="appearance_device_hint">Use your phone\'s light or dark mode</string>
+    <string name="appearance_phone_scope">Appearance is saved on this phone.</string>
+    <string name="appearance_persistence">Changes apply immediately across the app and are saved on this phone.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
-    <string name="settings_empty">Your preferences will appear here as they become available.</string>
     <string name="settings_profile_summary">Appearance, language and more</string>
 </resources>

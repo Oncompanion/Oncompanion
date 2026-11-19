@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.common
@@ -12,10 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -86,7 +89,7 @@ class LakeDialogTest {
 
     composeTestRule.onNodeWithTag(C.Tag.dialog_progress).assertIsDisplayed()
     composeTestRule.onNodeWithTag(TAGS.confirm).assertIsNotEnabled()
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertIsNotEnabled()
   }
 
   // E.g. "Stay signed in" when signing out would discard changes not yet saved online
@@ -94,7 +97,7 @@ class LakeDialogTest {
   fun focusCancel_putsTheFocusOnCancelFirst() {
     setContent(focusCancel = true)
 
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertIsFocused()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertIsFocused()
   }
 
   // E.g. a tip to acknowledge, with a checkbox under its message
@@ -119,7 +122,7 @@ class LakeDialogTest {
       }
     }
 
-    composeTestRule.onNodeWithTag(TAGS.cancel).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(requireNotNull(TAGS.cancel)).assertDoesNotExist()
     val message =
         composeTestRule.onNodeWithText("A photo taken sideways is read less well.").bounds()
     val content = composeTestRule.onNodeWithTag("content").bounds()
@@ -131,6 +134,33 @@ class LakeDialogTest {
 
     composeTestRule.onNodeWithTag(TAGS.confirm).performClick()
     assertEquals(1, confirmed)
+  }
+
+  /** A content-only dialog needs neither an empty message nor a placeholder cancel tag. */
+  @Test
+  fun omittedMessageAndCancelTagKeepContentAndActionsUsable() {
+    var cancelled = 0
+    var confirmed = 0
+    composeTestRule.setContent {
+      OncompanionTheme {
+        LakeDialog(
+            title = "Choose a reminder",
+            confirmLabel = "Choose",
+            cancelLabel = "Back",
+            onConfirm = { confirmed++ },
+            onCancel = { cancelled++ },
+            tags = DialogTags(dialog = "dialog", confirm = "confirm"),
+        ) {
+          Text("Reminder choices", Modifier.testTag("content"))
+        }
+      }
+    }
+    composeTestRule.onNodeWithTag("content").assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("", useUnmergedTree = true).assertCountEquals(0)
+    composeTestRule.onNodeWithTag("confirm").performClick()
+    composeTestRule.onNodeWithText("Back").performClick()
+    assertEquals(1, confirmed)
+    assertEquals(1, cancelled)
   }
 
   private fun SemanticsNodeInteraction.bounds() = fetchSemanticsNode().boundsInRoot

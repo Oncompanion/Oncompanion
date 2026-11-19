@@ -3,12 +3,18 @@
 package com.github.se.oncompanion.model.speech
 
 /**
- * What happens while the app listens, in order: [Listening], any number of [PartialText], then
- * exactly one [FinalText] or [Failed], after which nothing more is sent.
+ * What happens while the app listens, in order: [Listening], any number of [PartialText] and
+ * [Level], then exactly one [FinalText] or [Failed], after which nothing more is sent.
  */
 sealed interface SpeechEvent {
   /** The microphone is open: the user can start speaking. */
   data object Listening : SpeechEvent
+
+  /**
+   * How loud the user is right now, from 0 (silence) to 1, about ten times a second while
+   * listening, so the screen can show it is hearing them. Only this number: never the sound itself.
+   */
+  data class Level(val level: Float) : SpeechEvent
 
   /** What has been understood so far, while the user is still speaking. Never blank. */
   data class PartialText(val text: String) : SpeechEvent

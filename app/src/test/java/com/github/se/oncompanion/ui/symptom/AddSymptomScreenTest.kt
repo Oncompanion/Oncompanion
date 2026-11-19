@@ -114,6 +114,7 @@ class AddSymptomScreenTest {
             uiState = uiState.copy(error = null)
           },
           onRetry = { events += "retry" },
+          onSpeak = { events += "speak" },
       )
     }
   }
@@ -700,6 +701,34 @@ class AddSymptomScreenTest {
     retry.performClick()
 
     assertEquals(listOf("retry"), events)
+  }
+
+  // ----- Logging by voice (US-44) -----
+
+  @Test
+  fun speakInstead_isOffered_onlyWhenThePhoneCanListen() {
+    setContent(empty)
+    for (canDictate in listOf(true, false)) {
+      uiState = empty.copy(canDictate = canDictate)
+      composeTestRule.waitForIdle()
+      if (canDictate) {
+        node(C.Tag.symptom_add_speak).performClick()
+        assertEquals(listOf("speak"), events)
+      } else {
+        node(C.Tag.symptom_add_speak).assertDoesNotExist()
+      }
+    }
+  }
+
+  @Test
+  fun aFormFilledByVoice_asksToCheckIt() {
+    setContent(filled.copy(canDictate = true))
+    node(C.Tag.symptom_add_drafted).assertDoesNotExist()
+
+    uiState = filled.copy(canDictate = true, isDrafted = true)
+
+    node(C.Tag.symptom_add_drafted).assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.symptom_voice_drafted)).assertIsDisplayed()
   }
 
   // ----- Screen with its ViewModel -----

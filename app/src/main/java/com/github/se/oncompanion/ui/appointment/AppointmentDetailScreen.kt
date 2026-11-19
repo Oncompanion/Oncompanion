@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -74,7 +75,8 @@ fun AppointmentDetailScreen(
 }
 
 /**
- * Figma entry details adapted to recorded fields, without inferred end times or reminders.
+ * Figma entry details adapted to recorded fields, with the saved reminder choice, without inferring
+ * an end time.
  *
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  */
@@ -226,6 +228,12 @@ private fun AppointmentFields(
       headlineContent = { Text(dateTime) },
       supportingContent = { Text(stringResource(R.string.appointment_date_time)) },
       leadingContent = { Icon(painterResource(R.drawable.ic_schedule), null) },
+  )
+  ListItem(
+      headlineContent = { Text(stringResource(appointment.reminder.labelResource())) },
+      supportingContent = { Text(stringResource(R.string.appointment_reminder)) },
+      leadingContent = { Icon(painterResource(R.drawable.ic_schedule), null) },
+      modifier = Modifier.testTag(C.Tag.appointment_reminder_detail),
   )
   appointment.location
       ?.takeIf { it.isNotBlank() }

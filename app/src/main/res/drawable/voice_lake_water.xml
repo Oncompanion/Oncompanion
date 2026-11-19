@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The far water of the voice lake, tinted with the time of day's lake colour (VoiceLake.kt) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="195dp"
+    android:height="135dp"
+    android:viewportWidth="390"
+    android:viewportHeight="270">
+    <path
+        android:fillColor="@android:color/black"
+        android:pathData="M0,212H390V270H0Z" />
+</vector>

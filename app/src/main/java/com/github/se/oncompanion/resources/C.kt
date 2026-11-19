@@ -40,6 +40,14 @@ object C {
 
     const val appointment_form_feedback = "appointment_form_feedback"
     const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_reminder = "appointment_reminder"
+    const val appointment_reminder_detail = "appointment_reminder_detail"
+    const val appointment_reminder_dialog = "appointment_reminder_dialog"
+    const val appointment_reminder_cancel = "appointment_reminder_cancel"
+
+    /** One accessible radio option in the appointment reminder picker. */
+    fun appointmentReminder(choice: String) = "appointment_reminder_$choice"
+
     const val appointment_form_retry = "appointment_form_retry"
 
     // Hospital field
@@ -209,12 +217,34 @@ object C {
     const val symptom_edit_not_found = "symptom_edit_not_found"
     const val symptom_detail_edit = "symptom_detail_edit"
     const val symptom_detail_symptoms = "symptom_detail_symptoms"
+    const val symptom_add_speak = "symptom_add_speak"
+    const val symptom_add_drafted = "symptom_add_drafted"
+    const val symptom_voice_screen = "symptom_voice_screen"
+    const val symptom_voice_close = "symptom_voice_close"
+    const val symptom_voice_lake = "symptom_voice_lake"
+    const val symptom_voice_headline = "symptom_voice_headline"
+    const val symptom_voice_transcript = "symptom_voice_transcript"
+    const val symptom_voice_picked_up = "symptom_voice_picked_up"
+    const val symptom_voice_done = "symptom_voice_done"
+    const val symptom_voice_start_over = "symptom_voice_start_over"
+    const val symptom_voice_try_again = "symptom_voice_try_again"
+    const val symptom_voice_type_instead = "symptom_voice_type_instead"
+    const val symptom_voice_allow = "symptom_voice_allow"
+    const val symptom_voice_open_settings = "symptom_voice_open_settings"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Settings
+    const val settings_appearance = "settings_appearance"
+    const val settings_retry = "settings_retry"
+    const val settings_loading = "settings_loading"
+    const val settings_save_error = "settings_save_error"
+    const val appearance_screen = "appearance_screen"
+    const val appearance_device = "appearance_device"
+    const val appearance_light = "appearance_light"
+    const val appearance_dark = "appearance_dark"
+    const val appearance_selected = "appearance_selected"
     const val settings_screen = "settings_screen"
     const val settings_back = "settings_back"
-    const val settings_empty = "settings_empty"
     const val profile_settings = "profile_settings"
 
     // Profile
