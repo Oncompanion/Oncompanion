@@ -495,7 +495,6 @@
     <string name="prescription_form_edit_title">Edit prescription</string>
     <string name="prescription_form_not_found_title">This prescription no longer exists</string>
     <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
-    <string name="prescription_form_not_signed_in_title">You\'re signed out</string>
     <string name="prescription_form_not_signed_in_hint">Sign in again to edit your prescription.</string>
     <string name="prescription_form_load_error_title">Couldn\'t open this prescription</string>
     <string name="prescription_form_load_error_hint">Something went wrong. Please try again.</string>
@@ -583,6 +582,22 @@
     <string name="prescription_reject_cancel">Cancel</string>
     <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
     <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
+    <!-- #277: the list and the detail when nothing can be read, so retrying can't help -->
+    <string name="prescriptions_signed_out_title">You\'re signed out</string>
+    <string name="prescriptions_signed_out_hint">Sign in again to see your prescriptions.</string>
+    <!-- #277: a caregiver the patient removed from their circle, e.g. "You can\'t see Anne\'s prescriptions anymore" -->
+    <string name="prescriptions_no_access_title_for">You can\'t see %1$s\'s prescriptions anymore</string>
+    <string name="prescriptions_no_access_hint_for">You\'re no longer in %1$s\'s care circle.</string>
+    <!-- #490: the same, in the instant after the app forgot the patient\'s name -->
+    <string name="prescriptions_no_access_title_unnamed">You can\'t see these prescriptions anymore</string>
+    <string name="prescriptions_no_access_hint_unnamed">You\'re no longer in this care circle.</string>
+
+    <!-- Caregiver prescription edits (US-46) -->
+    <string name="prescription_form_edit_title_for">Edit %1$s\'s prescription</string>
+    <string name="prescription_delete_title_for">Delete %1$s\'s prescription?</string>
+    <string name="prescription_delete_message_for">It will be removed from %1$s\'s prescriptions with all its medications. You can\'t undo this.</string>
+    <string name="prescription_form_not_allowed_title">This prescription can\'t be edited</string>
+    <string name="prescription_form_not_allowed_hint">You don\'t currently have permission to edit this patient\'s prescriptions.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -739,4 +754,9 @@
     <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
     <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
     <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_empty">Your preferences will appear here as they become available.</string>
+    <string name="settings_profile_summary">Appearance, language and more</string>
 </resources>

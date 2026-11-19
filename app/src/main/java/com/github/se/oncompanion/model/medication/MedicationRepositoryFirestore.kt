@@ -86,6 +86,9 @@ class MedicationRepositoryFirestore(
   override suspend fun addPrescription(uid: String, prescription: Prescription): Unit =
       SessionAccess.operation {
         require(prescription.isValid()) { "Invalid prescription" }
+        require(prescription.editedBy == null && prescription.editedByName == null) {
+          "A new prescription cannot have an editor"
+        }
         prescriptions(uid)
             .document(prescription.id)
             .set(
@@ -104,7 +107,12 @@ class MedicationRepositoryFirestore(
         // prescription doesn't exist. The list of medications is replaced as a whole.
         prescriptions(uid)
             .document(prescription.id)
-            .update(prescriptionFields(prescription))
+            .update(
+                // A caregiver must not overwrite a patient decision made since the cached read.
+                (if (prescription.editedBy == null) prescriptionFields(prescription)
+                else prescriptionFields(prescription) - FIELD_CONFIRMATION) +
+                    editorFields(prescription)
+            )
             .reportServerRejection(prescription.id)
       }
 
@@ -123,6 +131,7 @@ class MedicationRepositoryFirestore(
                 rejectedPrescriptions(uid).document(prescription.id),
                 prescriptionFields(rejected) +
                     attributionFields(rejected) +
+                    (if (rejected.editedBy == null) emptyMap() else editorFields(rejected)) +
                     (FIELD_CREATED_AT to FieldValue.serverTimestamp()),
             )
             .commit()
@@ -214,6 +223,13 @@ class MedicationRepositoryFirestore(
               FIELD_ADDED_BY_NAME to prescription.addedByName,
           )
 
+  /** The caregiver who edited last, or removal of their signature after a patient edit. */
+  private fun editorFields(prescription: Prescription): Map<String, Any?> =
+      mapOf(
+          FIELD_EDITED_BY to (prescription.editedBy ?: FieldValue.delete()),
+          FIELD_EDITED_BY_NAME to (prescription.editedByName ?: FieldValue.delete()),
+      )
+
   /** One entry of the list of medications; its prescription is the document it is stored in. */
   private fun medicationFields(medication: Medication): Map<String, Any?> =
       mapOf(
@@ -246,6 +262,8 @@ class MedicationRepositoryFirestore(
               createdAt = doc.getTimestamp(FIELD_CREATED_AT)?.let(Timestamp::toInstant),
               addedBy = doc.getString(FIELD_ADDED_BY),
               addedByName = doc.getString(FIELD_ADDED_BY_NAME),
+              editedBy = doc.getString(FIELD_EDITED_BY),
+              editedByName = doc.getString(FIELD_EDITED_BY_NAME),
               // Saved before US-43: the patient's own, so confirmed
               confirmation =
                   doc.getString(FIELD_CONFIRMATION)?.let(PrescriptionConfirmation::valueOf)
@@ -294,6 +312,8 @@ class MedicationRepositoryFirestore(
     const val FIELD_ADDED_BY = "addedBy"
     const val FIELD_ADDED_BY_NAME = "addedByName"
     const val FIELD_CONFIRMATION = "confirmation"
+    const val FIELD_EDITED_BY = "editedBy"
+    const val FIELD_EDITED_BY_NAME = "editedByName"
     /** The medications of the prescription, in the order they were saved. */
     const val FIELD_MEDICATIONS = "medications"
 

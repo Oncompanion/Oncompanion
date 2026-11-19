@@ -292,6 +292,7 @@ class EditProfileScreenTest {
               onEdit = { actions.navigateTo(Screen.EDIT_PROFILE) },
               onSignedOut = {},
               viewModel = viewModel { ProfileViewModel(auth, profiles) },
+              onSettings = {},
           )
         }
         composable(Screen.EDIT_PROFILE) {

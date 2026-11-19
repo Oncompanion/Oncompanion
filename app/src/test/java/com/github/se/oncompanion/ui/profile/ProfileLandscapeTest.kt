@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.profile
@@ -46,13 +47,46 @@ class ProfileLandscapeTest {
   @Config(qualifiers = SMALL_LANDSCAPE_PHONE)
   fun smallLandscapeReclaimsToolbarAndActionSpace() = checkScrollableProfile()
 
+  /** Settings remains reachable alongside the existing actions at the largest text size. */
+  @Test
+  fun settingsAt200PercentIsFullyReachable() {
+    var opens = 0
+    compose.setContent {
+      OncompanionTheme {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalDensity provides
+                androidx.compose.ui.unit.Density(
+                    androidx.compose.ui.platform.LocalDensity.current.density,
+                    2f,
+                )
+        ) {
+          ProfileContent(loaded, {}, {}, {}, {}, {}, {}, onSettings = { opens++ })
+        }
+      }
+    }
+    compose.onNodeWithTag(C.Tag.profile_settings).performScrollTo().assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.profile_settings).performClick()
+    assertEquals(1, opens)
+    compose.onNodeWithTag(C.Tag.profile_edit).performScrollTo().assertIsFullyVisible()
+    compose.onNodeWithTag(C.Tag.profile_sign_out).performScrollTo().assertIsFullyVisible()
+  }
+
   private fun checkScrollableProfile() {
     var edits = 0
     var signOuts = 0
     var backs = 0
     compose.setContent {
       OncompanionTheme {
-        ProfileContent(loaded, { backs++ }, {}, { signOuts++ }, {}, {}, { edits++ })
+        ProfileContent(
+            loaded,
+            { backs++ },
+            {},
+            { signOuts++ },
+            {},
+            {},
+            { edits++ },
+            onSettings = {},
+        )
       }
     }
     compose.onNodeWithTag(C.Tag.profile_cancer_type).performScrollTo().assertIsFullyVisible()
@@ -80,7 +114,9 @@ class ProfileLandscapeTest {
   @Test
   fun compactProfileRestoresScrollPosition() {
     val restoration = StateRestorationTester(compose)
-    restoration.setContent { OncompanionTheme { ProfileContent(loaded, {}, {}, {}, {}, {}, {}) } }
+    restoration.setContent {
+      OncompanionTheme { ProfileContent(loaded, {}, {}, {}, {}, {}, {}, onSettings = {}) }
+    }
     compose.onNodeWithTag(C.Tag.profile_sign_out).performScrollTo().assertIsFullyVisible()
     restoration.emulateSavedInstanceStateRestore()
     compose.onNodeWithTag(C.Tag.profile_sign_out).assertIsFullyVisible()
@@ -94,7 +130,9 @@ class ProfileLandscapeTest {
     var current: ProfileUiState by mutableStateOf(loaded)
     var retries = 0
     compose.setContent {
-      OncompanionTheme { ProfileContent(current, {}, { retries++ }, {}, {}, {}, {}) }
+      OncompanionTheme {
+        ProfileContent(current, {}, { retries++ }, {}, {}, {}, {}, onSettings = {})
+      }
     }
     for ((value, tag) in
         listOf(
@@ -131,7 +169,9 @@ class ProfileLandscapeTest {
     var cancels = 0
     var confirms = 0
     compose.setContent {
-      OncompanionTheme { ProfileContent(current, {}, {}, {}, { cancels++ }, { confirms++ }, {}) }
+      OncompanionTheme {
+        ProfileContent(current, {}, {}, {}, { cancels++ }, { confirms++ }, {}, onSettings = {})
+      }
     }
     for (pending in listOf(false, true)) {
       compose.runOnIdle {

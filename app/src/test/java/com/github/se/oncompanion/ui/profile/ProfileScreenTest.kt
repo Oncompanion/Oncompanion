@@ -71,6 +71,7 @@ class ProfileScreenTest {
           onSignOut = {},
           onCancelSignOut = {},
           onConfirmSignOut = {},
+          onSettings = {},
       )
     }
   }
@@ -118,7 +119,9 @@ class ProfileScreenTest {
   @Config(qualifiers = LANDSCAPE_PHONE)
   fun errorState_retryIsFullyVisibleInLandscape() {
     composeTestRule.setContent {
-      OncompanionTheme { ProfileContent(ProfileUiState.Error, {}, {}, {}, {}, {}, {}) }
+      OncompanionTheme {
+        ProfileContent(ProfileUiState.Error, {}, {}, {}, {}, {}, {}, onSettings = {})
+      }
     }
 
     composeTestRule
@@ -207,7 +210,13 @@ class ProfileScreenTest {
     val viewModel = ProfileViewModel(ProfileScreenAuthRepository(user), profiles)
 
     composeTestRule.setContent {
-      ProfileScreen(onBack = {}, onEdit = {}, onSignedOut = {}, viewModel = viewModel)
+      ProfileScreen(
+          onBack = {},
+          onEdit = {},
+          onSignedOut = {},
+          viewModel = viewModel,
+          onSettings = {},
+      )
     }
 
     composeTestRule.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
@@ -267,6 +276,7 @@ class ProfileScreenTest {
           onSignOut = {},
           onCancelSignOut = {},
           onConfirmSignOut = {},
+          onSettings = {},
       )
     }
     composeTestRule.onNodeWithTag(C.Tag.profile_edit).performClick()
@@ -286,6 +296,7 @@ class ProfileScreenTest {
           {},
           {},
           {},
+          onSettings = {},
       )
     }
     composeTestRule.onNodeWithTag(C.Tag.profile_hospital).performScrollTo().assertIsDisplayed()

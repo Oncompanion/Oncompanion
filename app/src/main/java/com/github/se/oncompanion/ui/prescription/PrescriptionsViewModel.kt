@@ -44,11 +44,9 @@ import kotlinx.coroutines.launch
  *
  * @property today the current date, which decides what counts as "This month"
  * @property prescriptions the saved prescriptions, most recently prescribed first
- * @property isLoading true until the prescriptions arrive
- * @property hasError true if they couldn't be loaded (or nobody is signed in)
+ * @property load where reading them is at: [prescriptions] only counts once they are shown
  * @property canAdd whether a prescription can be added: only to the user's own, once it is known to
  *   be theirs
- * @property isNotShared in caregiver mode, the patient doesn't share their prescriptions
  * @property caregiverUid in caregiver mode, the signed-in caregiver: only the prescriptions they
  *   added are grouped, with whether the patient accepted or rejected them. Null for the patient,
  *   who sees every caregiver's grouped while they wait.
@@ -57,10 +55,8 @@ import kotlinx.coroutines.launch
 data class PrescriptionsUiState(
     val today: LocalDate,
     val prescriptions: List<Prescription> = emptyList(),
-    val isLoading: Boolean = true,
-    val hasError: Boolean = false,
+    val load: PrescriptionsLoad = PrescriptionsLoad.LOADING,
     val canAdd: Boolean = false,
-    val isNotShared: Boolean = false,
     val caregiverUid: String? = null,
     val seen: Set<String> = emptySet(),
 ) {
@@ -177,7 +173,7 @@ class PrescriptionsViewModel(
   /** Starts (or, after an error, restarts) observing the prescriptions. */
   fun load() {
     observation?.cancel()
-    _uiState.update { it.copy(isLoading = true, hasError = false) }
+    _uiState.update { it.copy(load = PrescriptionsLoad.LOADING) }
     observation = viewModelScope.launch {
       observeSection(CarePermission.PRESCRIPTIONS, patientUid) { ownerUid ->
             // A rejected prescription is gone for everyone (US-43)
@@ -234,14 +230,15 @@ class PrescriptionsViewModel(
       when (section) {
         // Whose prescriptions they are is known before the list: adding doesn't wait for it
         is CareSection.Loading ->
-            withoutPrescriptions(isLoading = true).copy(canAdd = section.canAdd)
+            withoutPrescriptions(PrescriptionsLoad.LOADING).copy(canAdd = section.canAdd)
         // Nobody signed in, or no longer in the patient's circle: nothing can be read
-        CareSection.NoAccess -> withoutPrescriptions(hasError = true)
-        CareSection.NotShared -> withoutPrescriptions(isNotShared = true)
+        CareSection.NoAccess -> withoutPrescriptions(noAccessLoad(authRepository))
+        CareSection.NotShared -> withoutPrescriptions(PrescriptionsLoad.NOT_SHARED)
         // A patient can still add one if their list fails; a caregiver can't
-        is CareSection.Failed -> withoutPrescriptions(hasError = true).copy(canAdd = section.canAdd)
+        is CareSection.Failed ->
+            withoutPrescriptions(PrescriptionsLoad.FAILED).copy(canAdd = section.canAdd)
         is CareSection.Shown ->
-            withoutPrescriptions()
+            withoutPrescriptions(PrescriptionsLoad.SHOWN)
                 .copy(
                     prescriptions = section.data,
                     canAdd = section.canAdd,
@@ -250,19 +247,9 @@ class PrescriptionsViewModel(
                 )
       }
 
-  /** No prescriptions and nothing to add, for one of the reasons given. */
-  private fun PrescriptionsUiState.withoutPrescriptions(
-      isLoading: Boolean = false,
-      hasError: Boolean = false,
-      isNotShared: Boolean = false,
-  ) =
-      copy(
-          prescriptions = emptyList(),
-          isLoading = isLoading,
-          hasError = hasError,
-          isNotShared = isNotShared,
-          canAdd = false,
-      )
+  /** No prescriptions and nothing to add, with [load]. */
+  private fun PrescriptionsUiState.withoutPrescriptions(load: PrescriptionsLoad) =
+      copy(prescriptions = emptyList(), load = load, canAdd = false)
 
   /**
    * Keeps the current date right, so "This month" stays right while the list is open: updates it

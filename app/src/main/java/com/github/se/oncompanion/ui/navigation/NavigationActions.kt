@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -26,6 +28,7 @@ object Route {
   const val PRESCRIPTIONS = "prescriptions"
   const val CARE_CIRCLE = "care_circle"
   const val PROFILE = "profile"
+  const val SETTINGS = "settings"
 }
 
 /** Individual screens, grouped by the [Route] they belong to. */
@@ -154,6 +157,9 @@ object Screen {
 
   /** Set on the [CARE_CIRCLE_MEMBER] back stack entry once its member was edited, to say so. */
   const val CARE_CIRCLE_MEMBER_UPDATED = "memberUpdated"
+
+  // Route.SETTINGS
+  const val SETTINGS = "settings_home"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"
