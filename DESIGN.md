@@ -324,7 +324,7 @@ Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0D
 
 ## Elevation & Depth
 
-Flat by default. One soft shadow, **Elevation 1** (0 1 2 at 6% + 0 6 18 at 8%), only on the card that overlaps the header, on floating buttons and on the voice microphone.
+Flat by default. One soft shadow, **Elevation 1** (0 1 2 at 6% + 0 6 18 at 8%), only on the card that overlaps the header and on floating buttons.
 
 ## Shapes
 
@@ -395,7 +395,7 @@ Camera, microphone and notifications are asked for when first needed. When refus
 The same screens, read-only by default. The Overview title is "Alex's care ▾" (tap to switch person). No edit or delete actions; the add action shows only in a section where the patient allows it (e.g. logging a symptom), and what a caregiver adds is marked "Added by" with their name. A section the patient doesn't share says so ("Alex doesn't share Planning with you"), never an empty screen.
 
 ### Voice
-"Speak instead" at the top of Log symptoms opens *Speak your symptoms*: the microphone floats on the Paper lake with ripples while listening, the words appear as they are said, and what was picked up shows as dawn chips. Done returns to the form, filled and marked to check.
+"Speak instead" at the top of Log symptoms opens *Speak your symptoms*: the sun above the Salève (the moon at dusk) is the microphone, and its halos open with the voice while listening; the words appear as they are said, and what was picked up shows as dawn chips. Done returns to the form, filled and marked to check.
 
 ### Reminders
 Android notifications with the ribbon icon: what and when ("Oncology check-up at 09:30", "In 1 hour · HUG"). Caregiver reminders start with the patient's name. Reminders never advise and never say whether a dose was taken. Each category (appointments, events, medications) has a switch in Profile.

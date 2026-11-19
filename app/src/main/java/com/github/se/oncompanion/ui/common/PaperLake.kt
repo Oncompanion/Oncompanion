@@ -208,7 +208,7 @@ private fun Modifier.sceneHeight(): Modifier = layout { measurable, constraints 
 }
 
 /** The theme's sky and lake colours at [time]. */
-private fun LakeColors.horizonAt(time: LocalTime): Horizon =
+internal fun LakeColors.horizonAt(time: LocalTime): Horizon =
     when (timeOfDayAt(time)) {
       TimeOfDay.DAWN -> dawn
       TimeOfDay.DAY -> day

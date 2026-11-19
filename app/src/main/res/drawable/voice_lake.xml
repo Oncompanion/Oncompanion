@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- The lake of "Speak your symptoms", exported from the Figma (Voice logging): the Salève and the
+     Jet d'eau, drawn in front of the sun (VoiceLake.kt) so it can rise from behind the Salève. The
+     sky and the far water are painted in the colours of the time of day, then the front layer is
+     drawn on top. Its horizon sits lower than the other lakes', so the sun has sky to rise into. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="195dp"
+    android:height="135dp"
+    android:viewportWidth="390"
+    android:viewportHeight="270">
+    <group android:translateY="166">
+        <path
+            android:fillColor="#C3B5E0"
+            android:pathData="M0,42L40,30L84,36L130,24L172,34L220,14L262,28L304,0L344,18L390,6V48H0V42Z" />
+    </group>
+    <group android:translateY="200">
+        <path
+            android:fillColor="#A99BD0"
+            android:pathData="M0,14L60,4L120,10L180,0L240,12L300,2L390,8V18H0V14Z" />
+    </group>
+    <group
+        android:translateX="198"
+        android:translateY="156">
+        <path
+            android:fillColor="#FBF8F4"
+            android:pathData="M0,60C0.4,40 1,18 2.5,0C6.5,3 10.5,10 13,20C9.5,14 6.5,10 4.6,8.5C4.4,28 4.6,46 5,60H0Z" />
+    </group>
+</vector>

@@ -119,10 +119,13 @@ class AndroidSpeechRecognizer(
             }
           }
 
-          // Sound levels and the raw audio aren't used: the app keeps nothing of the recording
-          override fun onBeginningOfSpeech() = Unit
+          // Only how loud it is, to show the app hears the user; never the sound itself
+          override fun onRmsChanged(rmsdB: Float) {
+            trySend(SpeechEvent.Level(levelOf(rmsdB)))
+          }
 
-          override fun onRmsChanged(rmsdB: Float) = Unit
+          // The raw audio isn't used: the app keeps nothing of the recording
+          override fun onBeginningOfSpeech() = Unit
 
           override fun onBufferReceived(buffer: ByteArray?) = Unit
 
@@ -169,6 +172,16 @@ internal fun recognizerIntent(language: SpeechLanguage, packageName: String): In
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, PAUSE_MILLIS)
       }
     }
+
+/**
+ * How loud [rmsdB] is, from 0 to 1. Android's recognizers report roughly -2 dB (silence) to 10 dB
+ * (speaking up close); anything outside is clamped.
+ */
+internal fun levelOf(rmsdB: Float): Float =
+    ((rmsdB - QUIET_DB) / (LOUD_DB - QUIET_DB)).coerceIn(0f, 1f)
+
+private const val QUIET_DB = -2f
+private const val LOUD_DB = 10f
 
 /**
  * How long the patient can stay silent before listening ends. An `Int`, although Android documents
