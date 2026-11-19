@@ -218,12 +218,22 @@
     <string name="symptom_voice_intensity">%1$d/10</string>
     <string name="symptom_voice_done">Done</string>
     <string name="symptom_voice_start_over">Start over</string>
+    <string name="symptom_voice_try_again">Try again</string>
     <string name="symptom_voice_type_instead">Type instead</string>
     <string name="symptom_voice_why_title">Speak instead of typing</string>
     <string name="symptom_voice_why_message">The app listens only while this screen is open, and keeps the words, never the recording. Your phone will ask you to allow the microphone.</string>
     <string name="symptom_voice_allow">Allow microphone</string>
+    <string name="symptom_voice_refused_title">The microphone is off for oncompanion</string>
+    <string name="symptom_voice_refused_message">Allow it in your phone\'s settings to speak your symptoms. You can always type instead.</string>
+    <string name="symptom_voice_open_settings">Open settings</string>
+    <string name="symptom_voice_no_speech_title">We didn\'t hear anything</string>
+    <string name="symptom_voice_no_speech_message">Try again a little closer to the phone, or type instead.</string>
+    <string name="symptom_voice_offline_title">Voice needs a connection</string>
+    <string name="symptom_voice_offline_message">Your phone can only understand this language online. Try again once you\'re connected, or type instead.</string>
+    <string name="symptom_voice_unavailable_title">Voice isn\'t available on this phone</string>
+    <string name="symptom_voice_unavailable_message">You can type your symptoms instead.</string>
     <string name="symptom_voice_failed_title">Voice didn\'t work</string>
-    <string name="symptom_voice_failed_message">You can type your symptoms instead.</string>
+    <string name="symptom_voice_failed_message">Try again, or type instead.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>

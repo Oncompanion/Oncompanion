@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.symptom
 
 import android.Manifest
 import android.app.Application
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
@@ -152,6 +154,28 @@ class VoiceSymptomScreenTest {
 
     node(C.Tag.symptom_add_speak).assertIsDisplayed()
     assertFalse(speech.isListening)
+  }
+
+  @Test
+  fun refusedMicrophone_opensTheSettings_andListensOnceAllowedThere() {
+    microphone(allowed = false)
+    showScreen()
+    speak()
+    compose.runOnIdle { viewModel.onMicrophoneAnswer(granted = false) }
+    node(C.Tag.symptom_voice_headline)
+        .assertTextEquals(string(R.string.symptom_voice_refused_title))
+
+    node(C.Tag.symptom_voice_open_settings).performClick()
+    val settings = shadowOf(compose.activity).nextStartedActivity
+    assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, settings.action)
+
+    // Allowed in the settings, then back in the app
+    microphone(allowed = true)
+    compose.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+    compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+    compose.waitForIdle()
+    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+    assertTrue(speech.isListening)
   }
 
   @Test

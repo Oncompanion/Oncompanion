@@ -364,6 +364,16 @@ class AddSymptomViewModel(
     else _uiState.update { it.copy(voice = VoiceUiState.MicrophoneRefused) }
   }
 
+  /**
+   * The patient allowed the microphone in the phone's settings after refusing it: listens right
+   * away. Only while the form still says the microphone is off, so it never starts listening after
+   * they left dictating.
+   */
+  fun onMicrophoneAllowedInSettings() {
+    val state = _uiState.value
+    if (state.voice == VoiceUiState.MicrophoneRefused && state.canStartDictating) startListening()
+  }
+
   /** Drops what was heard and listens again. */
   fun restartListening() {
     startListening()

@@ -1057,6 +1057,43 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun allowedInTheSettings_listensOnlyWhileTheMicrophoneIsShownOff() =
+      runTest(dispatcher) {
+        // Refused, then allowed in the phone's settings: listens right away
+        val refused = viewModel()
+        refused.onSpeak(hasMicrophone = false)
+        refused.onMicrophoneAnswer(granted = false)
+        refused.onMicrophoneAllowedInSettings()
+        advanceUntilIdle()
+        assertTrue(refused.state.voice is VoiceUiState.Listening)
+        assertTrue(speech.isListening)
+        refused.cancelVoice()
+
+        // Never asked, or back to the form: nothing starts
+        val notRefused: List<Pair<String, () -> AddSymptomViewModel>> =
+            listOf(
+                "form" to { viewModel() },
+                "explaining" to { viewModel().also { it.onSpeak(hasMicrophone = false) } },
+                "cancelled" to
+                    {
+                      viewModel().also {
+                        it.onSpeak(hasMicrophone = false)
+                        it.onMicrophoneAnswer(granted = false)
+                        it.cancelVoice()
+                      }
+                    },
+            )
+        for ((how, form) in notRefused) {
+          val viewModel = form()
+          val before = viewModel.state.voice
+          viewModel.onMicrophoneAllowedInSettings()
+          advanceUntilIdle()
+          assertEquals(how, before, viewModel.state.voice)
+          assertFalse(how, speech.isListening)
+        }
+      }
+
+  @Test
   fun listening_showsTheWordsAsTheyAreSaid_thenWhatWasPickedUp() =
       runTest(dispatcher) {
         val viewModel = listening()

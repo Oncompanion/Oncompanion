@@ -87,6 +87,7 @@ import com.github.se.oncompanion.ui.common.PickerTestTags
 import com.github.se.oncompanion.ui.common.SaveButton
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.TimePickerDialog
+import com.github.se.oncompanion.ui.common.appSettingsIntent
 import com.github.se.oncompanion.ui.common.hasPermission
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.theme.Spacing
@@ -144,6 +145,16 @@ fun AddSymptomScreen(
       rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         viewModel.onMicrophoneAnswer(it)
       }
+  // Back from the phone's settings with the microphone allowed: listen right away
+  LifecycleResumeEffect(uiState.voice) {
+    if (
+        uiState.voice == VoiceUiState.MicrophoneRefused &&
+            context.hasPermission(Manifest.permission.RECORD_AUDIO)
+    ) {
+      viewModel.onMicrophoneAllowedInSettings()
+    }
+    onPauseOrDispose {}
+  }
 
   // Leaves the screen once the symptom is saved
   val currentOnSaved by rememberUpdatedState(onSaved)
@@ -170,6 +181,7 @@ fun AddSymptomScreen(
         today = uiState.now.toLocalDate(),
         onClose = viewModel::cancelVoice,
         onAllowMicrophone = { microphone.launch(Manifest.permission.RECORD_AUDIO) },
+        onOpenSettings = { context.startActivity(appSettingsIntent(context)) },
         onDone = viewModel::onDone,
         onStartOver = viewModel::restartListening,
         modifier = modifier,

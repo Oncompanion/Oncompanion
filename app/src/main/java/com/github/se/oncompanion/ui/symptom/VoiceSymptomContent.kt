@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.symptom.SymptomDraft
+import com.github.se.oncompanion.model.speech.SpeechError
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
@@ -55,6 +56,7 @@ private const val LAKE_RATIO = 390f / 270f
  * @param today the day it is, for when a symptom was felt ("Yesterday · 21:00")
  * @param onClose goes back to the form without what was said (close, Type instead, system Back)
  * @param onAllowMicrophone asks Android for the microphone, after the app said why
+ * @param onOpenSettings opens this app's page in the phone's settings, to allow the microphone
  * @param onDone fills the form with what was heard
  * @param onStartOver drops what was heard and listens again
  */
@@ -64,6 +66,7 @@ fun VoiceSymptomContent(
     today: LocalDate,
     onClose: () -> Unit,
     onAllowMicrophone: () -> Unit,
+    onOpenSettings: () -> Unit,
     onDone: () -> Unit,
     onStartOver: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,7 +90,7 @@ fun VoiceSymptomContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
           VoiceMessage(voice, today)
-          VoiceActions(voice, onClose, onAllowMicrophone, onDone, onStartOver)
+          VoiceActions(voice, onClose, onAllowMicrophone, onOpenSettings, onDone, onStartOver)
         }
       }
     } else {
@@ -118,7 +121,7 @@ fun VoiceSymptomContent(
                     bottom = Spacing.xl,
                 )
         ) {
-          VoiceActions(voice, onClose, onAllowMicrophone, onDone, onStartOver)
+          VoiceActions(voice, onClose, onAllowMicrophone, onOpenSettings, onDone, onStartOver)
         }
       }
     }
@@ -165,12 +168,54 @@ private fun VoiceUiState.message(): Message? =
     when (this) {
       VoiceUiState.ExplainingMicrophone ->
           Message(R.string.symptom_voice_why_title, R.string.symptom_voice_why_message)
-      // Until each one has its own message, the microphone off and every failure say the same
-      VoiceUiState.MicrophoneRefused,
+      VoiceUiState.MicrophoneRefused ->
+          Message(R.string.symptom_voice_refused_title, R.string.symptom_voice_refused_message)
       is VoiceUiState.Failed ->
-          Message(R.string.symptom_voice_failed_title, R.string.symptom_voice_failed_message)
+          when (error.kind()) {
+            FailureKind.NOTHING_HEARD ->
+                Message(
+                    R.string.symptom_voice_no_speech_title,
+                    R.string.symptom_voice_no_speech_message,
+                )
+            FailureKind.FAILED ->
+                Message(R.string.symptom_voice_failed_title, R.string.symptom_voice_failed_message)
+            FailureKind.OFFLINE ->
+                Message(
+                    R.string.symptom_voice_offline_title,
+                    R.string.symptom_voice_offline_message,
+                )
+            FailureKind.UNAVAILABLE ->
+                Message(
+                    R.string.symptom_voice_unavailable_title,
+                    R.string.symptom_voice_unavailable_message,
+                )
+          }
       is VoiceUiState.Listening,
       is VoiceUiState.Heard -> null
+    }
+
+/** What a failure leaves the patient to do, which decides its message and buttons. */
+private enum class FailureKind {
+  /** Nothing was heard: try again. */
+  NOTHING_HEARD,
+  /** The recognizer failed, though the patient may have spoken: try again. */
+  FAILED,
+  /** The phone needs a connection for this language: try again once connected. */
+  OFFLINE,
+  /** The phone can't listen here: typing is the only way. */
+  UNAVAILABLE,
+}
+
+private fun SpeechError.kind(): FailureKind =
+    when (this) {
+      SpeechError.NEEDS_CONNECTION -> FailureKind.OFFLINE
+      SpeechError.LANGUAGE_UNAVAILABLE,
+      SpeechError.UNAVAILABLE -> FailureKind.UNAVAILABLE
+      SpeechError.NO_SPEECH -> FailureKind.NOTHING_HEARD
+      // A refused microphone has its own state; listed so every error has a message
+      SpeechError.NO_PERMISSION,
+      SpeechError.BUSY,
+      SpeechError.FAILED -> FailureKind.FAILED
     }
 
 /** The headline, then what was said and picked up, or a message. */
@@ -294,6 +339,7 @@ private fun VoiceActions(
     voice: VoiceUiState,
     onClose: () -> Unit,
     onAllowMicrophone: () -> Unit,
+    onOpenSettings: () -> Unit,
     onDone: () -> Unit,
     onStartOver: () -> Unit,
 ) {
@@ -310,6 +356,12 @@ private fun VoiceActions(
               C.Tag.symptom_voice_allow,
               onAllowMicrophone,
           )
+      VoiceUiState.MicrophoneRefused ->
+          Main(
+              stringResource(R.string.symptom_voice_open_settings),
+              C.Tag.symptom_voice_open_settings,
+              onOpenSettings,
+          )
       is VoiceUiState.Listening ->
           LakeButton(
               text = stringResource(R.string.symptom_voice_done),
@@ -319,12 +371,17 @@ private fun VoiceActions(
           )
       is VoiceUiState.Heard ->
           Main(stringResource(R.string.symptom_voice_done), C.Tag.symptom_voice_done, onDone)
-      // Typing is their main action, below
-      VoiceUiState.MicrophoneRefused,
-      is VoiceUiState.Failed -> Unit
+      is VoiceUiState.Failed ->
+          if (voice.error.kind() != FailureKind.UNAVAILABLE) {
+            Main(
+                stringResource(R.string.symptom_voice_try_again),
+                C.Tag.symptom_voice_try_again,
+                onStartOver,
+            )
+          }
     }
     // Typing is always a way out; it is the main action when the phone can't listen
-    val onlyTyping = voice is VoiceUiState.Failed || voice == VoiceUiState.MicrophoneRefused
+    val onlyTyping = voice is VoiceUiState.Failed && voice.error.kind() == FailureKind.UNAVAILABLE
     if (voice is VoiceUiState.Heard) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Quiet(
