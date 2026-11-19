@@ -62,6 +62,7 @@ data class AppointmentFormUiState(
     val location: String = "",
     val type: AppointmentType = AppointmentType.OTHER,
     val notes: String = "",
+    val reminder: AppointmentReminder = AppointmentReminder.ONE_HOUR,
     val titleTouched: Boolean = false,
     val chosenOffset: ZoneOffset? = null,
     val save: SavePhase = SavePhase.EDITING,
@@ -221,6 +222,7 @@ class AppointmentFormViewModel(
               location = saved.location.orEmpty(),
               type = saved.type,
               notes = saved.notes.orEmpty(),
+              reminder = saved.reminder,
               chosenOffset = local.offset,
               isEditing = true,
           )
@@ -232,7 +234,8 @@ class AppointmentFormViewModel(
           instant == saved.scheduledAt &&
           type == saved.type &&
           location == saved.location.orEmpty() &&
-          notes == saved.notes.orEmpty()
+          notes == saved.notes.orEmpty() &&
+          reminder == saved.reminder
 
   /** Keeps title input, marking a missing name after the patient edits it. */
   fun onTitleChange(value: String) = edit { it.copy(title = value, titleTouched = true) }
@@ -252,6 +255,9 @@ class AppointmentFormViewModel(
 
   /** Records the category selected by the patient. */
   fun onTypeChange(value: AppointmentType) = edit { it.copy(type = value) }
+
+  /** Records the single reminder choice without requesting notification permission. */
+  fun onReminderChange(value: AppointmentReminder) = edit { it.copy(reminder = value) }
 
   /** Keeps optional patient notes without rewriting their content. */
   fun onNotesChange(value: String) = edit { it.copy(notes = value) }
@@ -303,7 +309,7 @@ class AppointmentFormViewModel(
       Appointment(
           id = original?.id.orEmpty(),
           createdAt = original?.createdAt,
-          reminder = original?.reminder ?: AppointmentReminder.ONE_HOUR,
+          reminder = reminder,
           title = title.trim(),
           scheduledAt = requireNotNull(instant),
           type = type,

@@ -302,6 +302,24 @@ notification delivery are separate follow-ups to #489 and US-16.
 Deploy the updated Firestore rules before distributing a client that writes `reminder`: the
 previous field allowlist rejects it. No live rules deployment is part of this data-layer change.
 
+### Appointment reminder controls (#489)
+
+The shared Add/Edit form exposes `AppointmentFormUiState.reminder`, defaulting to `ONE_HOUR`.
+The read-only **Remind me** field opens a single-choice `LakeDialog`; selecting an option changes
+only the draft, while Cancel, Back and outside dismissal keep the previous choice. The dialog
+scrolls on short windows. Its open state uses `rememberSaveable`; the chosen draft stays in the
+ViewModel across activity recreation. Loaded appointments prefill the choice, and a reminder-only
+edit counts as a dirty draft so later snapshots cannot replace it. Account changes reset it with
+the rest of the private draft.
+
+Detail displays the saved value after date/time and before location, including **No reminder**.
+The same form and wording apply to patients and authorized caregivers. Saving records the choice
+locally, including offline; it never asks for Android notification permission or claims delivery.
+Scheduling and permission handling remain #452/#453.
+
+Approved implementation reference: [M2 reminder-choice proposal](https://www.figma.com/design/LoQ2CmgkxNQhODegJmo7wd/OnCompanion?node-id=1818-5693).
+
+
 ## Appointment details (issue #205)
 
 `AppointmentDetailScreen` collects one `AppointmentDetailUiState`; its stateless Content follows

@@ -25,6 +25,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -316,6 +317,9 @@ class M1EndToEndTest {
     ui.tag(C.Tag.appointment_time).performClick()
     ui.tag(C.Tag.appointment_confirm).performClick()
     ui.tag(C.Tag.appointment_location).reveal().typeText("HUG, oncology")
+    ui.open(C.Tag.appointment_reminder, hasTestTag(C.Tag.appointment_reminder_dialog))
+    ui.tag(C.Tag.appointmentReminder("ONE_DAY")).performScrollTo().performClick()
+    ui.tag(C.Tag.appointment_reminder).assertTextContains("1 day before")
     // Saving returns to the calendar, on the appointment's day
     ui.open(
         C.Tag.appointment_save,

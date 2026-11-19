@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -25,6 +26,8 @@ import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.DeletePhase
+import com.github.se.oncompanion.ui.textLayout
+import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.*
 import java.util.Locale
 import kotlinx.coroutines.test.runTest
@@ -36,6 +39,59 @@ import org.robolectric.annotation.Config
 /** Checks every detail state and the live Screen boundary without Firebase. */
 @RunWith(AndroidJUnit4::class)
 class AppointmentDetailScreenTest {
+  /** The saved choice is shown even when it explicitly disables this appointment's reminder. */
+  @Test
+  fun displaysEverySavedReminderChoice() {
+    var choice by mutableStateOf(AppointmentReminder.ONE_HOUR)
+    compose.setContent {
+      AppointmentDetailContent(
+          AppointmentDetailUiState.Loaded(appointment.copy(reminder = choice)),
+          {},
+          {},
+      )
+    }
+    for ((value, label) in
+        listOf(
+            AppointmentReminder.NONE to "No reminder",
+            AppointmentReminder.FIFTEEN_MINUTES to "15 minutes before",
+            AppointmentReminder.ONE_HOUR to "1 hour before",
+            AppointmentReminder.THREE_HOURS to "3 hours before",
+            AppointmentReminder.ONE_DAY to "1 day before",
+        )) {
+      compose.runOnIdle { choice = value }
+      compose
+          .onNodeWithTag(C.Tag.appointment_reminder_detail)
+          .performScrollTo()
+          .assertTextContains(label)
+    }
+  }
+
+  /** Reminder and location inherit the same standard headline/supporting text hierarchy. */
+  @Test
+  fun reminderTypographyMatchesTheOtherDetailRows() {
+    var dark by mutableStateOf(false)
+    compose.setContent {
+      OncompanionTheme(darkTheme = dark) {
+        AppointmentDetailContent(
+            AppointmentDetailUiState.Loaded(appointment.copy(reminder = AppointmentReminder.NONE)),
+            {},
+            {},
+        )
+      }
+    }
+    for (theme in listOf(false, true)) {
+      compose.runOnIdle { dark = theme }
+      for ((reminder, reference) in listOf("No reminder" to "Room 3", "Remind me" to "Location")) {
+        val actual =
+            compose.onNodeWithText(reminder, useUnmergedTree = true).textLayout().layoutInput.style
+        val expected =
+            compose.onNodeWithText(reference, useUnmergedTree = true).textLayout().layoutInput.style
+        assertEquals(expected.fontSize, actual.fontSize)
+        assertEquals(expected.fontWeight, actual.fontWeight)
+      }
+    }
+  }
+
   @get:Rule val compose = createComposeRule()
   private val appointment =
       Appointment(
@@ -57,7 +113,7 @@ class AppointmentDetailScreenTest {
     compose.onNodeWithText("Consultation").assertIsDisplayed()
     compose.onNodeWithText("Room 3").assertIsDisplayed()
     compose.onNodeWithText("Bring documents").assertIsDisplayed()
-    compose.onNodeWithText("Reminder").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_reminder_detail).assertTextContains("1 hour before")
     compose.runOnIdle {
       state =
           AppointmentDetailUiState.Loaded(

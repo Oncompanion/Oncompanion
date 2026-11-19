@@ -40,6 +40,14 @@ object C {
 
     const val appointment_form_feedback = "appointment_form_feedback"
     const val appointment_form_loading = "appointment_form_loading"
+    const val appointment_reminder = "appointment_reminder"
+    const val appointment_reminder_detail = "appointment_reminder_detail"
+    const val appointment_reminder_dialog = "appointment_reminder_dialog"
+    const val appointment_reminder_cancel = "appointment_reminder_cancel"
+
+    /** One accessible radio option in the appointment reminder picker. */
+    fun appointmentReminder(choice: String) = "appointment_reminder_$choice"
+
     const val appointment_form_retry = "appointment_form_retry"
 
     // Hospital field

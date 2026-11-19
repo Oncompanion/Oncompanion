@@ -1,9 +1,12 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.appointment
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
@@ -112,11 +115,30 @@ class AppointmentEditTest {
         .performScrollTo()
         .assertTextContains("Bring appointment documents")
     compose.onNodeWithTag(C.Tag.appointment_title).performScrollTo()
+    ui.open(C.Tag.appointment_reminder, hasTestTag(C.Tag.appointment_reminder_dialog))
+    capture("appointment-reminder-picker.png", C.Tag.appointment_reminder_dialog)
+    compose.activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    compose.waitUntil(10_000) {
+      compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+    ui.waitFor(hasTestTag(C.Tag.appointment_reminder_dialog)).assertIsDisplayed()
+    capture("appointment-reminder-picker-landscape.png", C.Tag.appointment_reminder_dialog)
+    androidx.test.espresso.Espresso.pressBack()
+    compose.onNodeWithTag(C.Tag.appointment_reminder_dialog).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.appointment_reminder).assertTextContains("1 hour before")
+    compose.activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    compose.waitUntil(10_000) {
+      compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    }
+    ui.open(C.Tag.appointment_reminder, hasTestTag(C.Tag.appointment_reminder_dialog))
+    compose.onNodeWithTag(C.Tag.appointmentReminder("NONE")).performClick()
+    compose.onNodeWithTag(C.Tag.appointment_reminder).assertTextContains("No reminder")
     capture("appointment-edit-form.png")
     compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
     ui.typeText(compose.onNodeWithTag(C.Tag.appointment_title), "Updated oncology follow-up")
     ui.open(C.Tag.appointment_save, hasTestTag(C.Tag.appointment_detail_screen)).assertIsDisplayed()
     ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.appointment_reminder_detail).assertTextContains("No reminder")
     capture("appointment-edit-saved.png")
     ui.open(C.Tag.appointment_back, hasTestTag(C.Tag.planning_screen))
     ui.waitFor(hasText("Updated oncology follow-up")).assertIsDisplayed()
@@ -132,22 +154,23 @@ class AppointmentEditTest {
         val local = collection.get(Source.CACHE).await().documents.single()
         assertEquals(original.second.id, local.id)
         assertEquals("Updated oncology follow-up", local.getString("title"))
+        assertEquals("NONE", local.getString("reminder"))
         db.enableNetwork().await()
         db.waitForPendingWrites().await()
         val saved = collection.get(Source.SERVER).await().documents.single()
         assertEquals(original.second.id, saved.id)
         assertEquals("Updated oncology follow-up", saved.getString("title"))
+        assertEquals("NONE", saved.getString("reminder"))
         assertEquals(original.second.getTimestamp("createdAt"), saved.getTimestamp("createdAt"))
         assertEquals(original.second.getTimestamp("scheduledAt"), saved.getTimestamp("scheduledAt"))
       }
     }
   }
 
-  private fun capture(name: String) {
+  private fun capture(name: String, tag: String? = null) {
     val context = ApplicationProvider.getApplicationContext<Context>()
     File(context.cacheDir, name).outputStream().use {
-      compose
-          .onRoot()
+      (if (tag == null) compose.onRoot() else compose.onNodeWithTag(tag))
           .captureToImage()
           .asAndroidBitmap()
           .compress(Bitmap.CompressFormat.PNG, 100, it)

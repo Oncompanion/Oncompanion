@@ -739,6 +739,13 @@
     <!-- Appointment form -->
     <string name="appointment_add">Add appointment</string>
     <string name="appointment_back">Back</string>
+    <string name="appointment_reminder">Remind me</string>
+    <string name="appointment_reminder_pick">Choose a reminder</string>
+    <string name="appointment_reminder_none">No reminder</string>
+    <string name="appointment_reminder_fifteen_minutes">15 minutes before</string>
+    <string name="appointment_reminder_one_hour">1 hour before</string>
+    <string name="appointment_reminder_three_hours">3 hours before</string>
+    <string name="appointment_reminder_one_day">1 day before</string>
     <string name="appointment_title">Title</string>
     <string name="appointment_date">Date</string>
     <string name="appointment_time">Time</string>
