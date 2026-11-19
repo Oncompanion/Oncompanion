@@ -209,8 +209,10 @@ object C {
     const val symptom_voice_picked_up = "symptom_voice_picked_up"
     const val symptom_voice_done = "symptom_voice_done"
     const val symptom_voice_start_over = "symptom_voice_start_over"
+    const val symptom_voice_try_again = "symptom_voice_try_again"
     const val symptom_voice_type_instead = "symptom_voice_type_instead"
     const val symptom_voice_allow = "symptom_voice_allow"
+    const val symptom_voice_open_settings = "symptom_voice_open_settings"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Profile

@@ -49,7 +49,7 @@ class VoiceSymptomContentTest {
           notes = said,
       )
 
-  /** What the screen reported, in order: `close`, `allow`, `done`, `startOver`. */
+  /** What the screen reported, in order: `close`, `allow`, `settings`, `done`, `startOver`. */
   private val events = mutableListOf<String>()
   private var voice by mutableStateOf<VoiceUiState>(VoiceUiState.Listening())
 
@@ -61,6 +61,7 @@ class VoiceSymptomContentTest {
           today = today,
           onClose = { events += "close" },
           onAllowMicrophone = { events += "allow" },
+          onOpenSettings = { events += "settings" },
           onDone = { events += "done" },
           onStartOver = { events += "startOver" },
       )
@@ -89,6 +90,12 @@ class VoiceSymptomContentTest {
               mapOf(C.Tag.symptom_voice_allow to "allow", typeInstead),
           ),
           Case(
+              VoiceUiState.MicrophoneRefused,
+              R.string.symptom_voice_refused_title,
+              R.string.symptom_voice_refused_message,
+              mapOf(C.Tag.symptom_voice_open_settings to "settings", typeInstead),
+          ),
+          Case(
               VoiceUiState.Listening(),
               R.string.symptom_voice_listening,
               R.string.symptom_voice_hint,
@@ -104,17 +111,36 @@ class VoiceSymptomContentTest {
                   typeInstead,
               ),
           ),
-          // The microphone off and every failure: for now, typing is the way on
+          // Nothing heard, a busy or failing recognizer: try again
           Case(
-              VoiceUiState.MicrophoneRefused,
-              R.string.symptom_voice_failed_title,
-              R.string.symptom_voice_failed_message,
+              VoiceUiState.Failed(SpeechError.NO_SPEECH),
+              R.string.symptom_voice_no_speech_title,
+              R.string.symptom_voice_no_speech_message,
+              mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
+          ),
+          Case(
+              VoiceUiState.Failed(SpeechError.BUSY),
+              R.string.symptom_voice_no_speech_title,
+              R.string.symptom_voice_no_speech_message,
+              mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
+          ),
+          Case(
+              VoiceUiState.Failed(SpeechError.NEEDS_CONNECTION),
+              R.string.symptom_voice_offline_title,
+              R.string.symptom_voice_offline_message,
+              mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
+          ),
+          // The phone can't listen here: typing is all that's left
+          Case(
+              VoiceUiState.Failed(SpeechError.LANGUAGE_UNAVAILABLE),
+              R.string.symptom_voice_unavailable_title,
+              R.string.symptom_voice_unavailable_message,
               mapOf(typeInstead),
           ),
           Case(
-              VoiceUiState.Failed(SpeechError.NO_SPEECH),
-              R.string.symptom_voice_failed_title,
-              R.string.symptom_voice_failed_message,
+              VoiceUiState.Failed(SpeechError.UNAVAILABLE),
+              R.string.symptom_voice_unavailable_title,
+              R.string.symptom_voice_unavailable_message,
               mapOf(typeInstead),
           ),
       )
@@ -122,8 +148,10 @@ class VoiceSymptomContentTest {
   private val allButtons =
       listOf(
           C.Tag.symptom_voice_allow,
+          C.Tag.symptom_voice_open_settings,
           C.Tag.symptom_voice_done,
           C.Tag.symptom_voice_start_over,
+          C.Tag.symptom_voice_try_again,
           C.Tag.symptom_voice_type_instead,
       )
 
