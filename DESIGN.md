@@ -335,6 +335,9 @@ Small 8 (thumbnails), Medium 12 (fields, chips, snackbars), Large 20 (cards, lis
 ### Paper lake
 Flat cut paper in the Horizon colours: sky, the Salève, the Jet d'eau, the sun or moon, and three bands of water. Three sizes: the header (at least 210 dp), the band behind top app bars (100 dp) and the Sign in scene. The sky follows the time of day. Static when the system's Remove animations setting is on.
 
+### Voice lake
+The lake of *Speak your symptoms*, its horizon 36 dp lower than the other lakes' so the sun has sky to rise into. The sun (the moon at dusk) is the microphone: a 64 dp disc with the mic cut out of it in lake teal, behind the Salève. Flat white halos around it, more see-through the further out, open with the patient's voice. Held sideways, the lake takes the left half of the screen.
+
 ### Empty lake
 A round medallion of the same lake with one small boat, for empty states (nothing planned, no prescriptions, no one in the circle).
 
@@ -395,7 +398,14 @@ Camera, microphone and notifications are asked for when first needed. When refus
 The same screens, read-only by default. The Overview title is "Alex's care ▾" (tap to switch person). No edit or delete actions; the add action shows only in a section where the patient allows it (e.g. logging a symptom), and what a caregiver adds is marked "Added by" with their name. A section the patient doesn't share says so ("Alex doesn't share Planning with you"), never an empty screen.
 
 ### Voice
-"Speak instead" at the top of Log symptoms opens *Speak your symptoms*: the sun above the Salève (the moon at dusk) is the microphone, and its halos open with the voice while listening; the words appear as they are said, and what was picked up shows as dawn chips. Done returns to the form, filled and marked to check.
+"Speak instead" (tonal, above Save) on Log symptoms opens *Speak your symptoms* on the Voice lake. The words appear as they are said, and what was picked up shows as dawn chips. Done returns to the form, filled where it was still empty and marked to check (*Filled in from what you said*); Type instead goes back to it without them. The first time, the screen says why it needs the microphone before Android asks (*Speak instead of typing*).
+
+The sun says what is happening:
+- **Listening**: it rises from behind the Salève (600 ms, decelerate), then one halo breathes (±6 %, 2.4 s) while waiting for words. When the patient speaks, up to three halos (86, 108, 132 dp) open with how loud they are, on a soft spring, the outer one a little later: the light swells and settles, never snaps. Only the level of the voice is used, never the sound.
+- **Done**: the halos fold in and the sun settles 20 dp lower (500 ms) while the form is filled.
+- **Stopped on a pause** (*Here's what we heard*): one still halo, with Done, Start over and Type instead.
+- **Microphone off, nothing heard, needs a connection, not available**: no sun, an empty sky over calm water. Try again brings the sun back up.
+- **Remove animations on**: no breathing; every change is immediate.
 
 ### Reminders
 Android notifications with the ribbon icon: what and when ("Oncology check-up at 09:30", "In 1 hour · HUG"). Caregiver reminders start with the patient's name. Reminders never advise and never say whether a dose was taken. Each category (appointments, events, medications) has a switch in Profile.

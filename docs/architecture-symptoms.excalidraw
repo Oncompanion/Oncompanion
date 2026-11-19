@@ -260,76 +260,6 @@
       "autoResize": true
     },
     {
-      "id": "voice",
-      "type": "rectangle",
-      "x": 1290,
-      "y": 20,
-      "width": 240,
-      "height": 100,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dashed",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 3
-      },
-      "seed": 1006443828,
-      "version": 1,
-      "versionNonce": 823534632,
-      "isDeleted": false,
-      "boundElements": [
-        {
-          "type": "text",
-          "id": "voice_t"
-        }
-      ],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false
-    },
-    {
-      "id": "voice_t",
-      "type": "text",
-      "x": 1306.05,
-      "y": 47.5,
-      "width": 207.9,
-      "height": 45.0,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": null,
-      "seed": 2019766389,
-      "version": 1,
-      "versionNonce": 2045921457,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "text": "Listening view (US-44)\n(planned)",
-      "originalText": "Listening view (US-44)\n(planned)",
-      "fontSize": 18,
-      "fontFamily": 2,
-      "textAlign": "center",
-      "verticalAlign": "middle",
-      "containerId": "voice",
-      "lineHeight": 1.25,
-      "autoResize": true
-    },
-    {
       "id": "access",
       "type": "rectangle",
       "x": 480,
@@ -1441,58 +1371,6 @@
       },
       "endBinding": {
         "elementId": "speech",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "voice_add",
-      "type": "arrow",
-      "x": 1290,
-      "y": 70.0,
-      "width": 300,
-      "height": 0.0,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 1834559885,
-      "version": 1,
-      "versionNonce": 1783258840,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -300,
-          0.0
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "voice",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "add",
         "focus": 0,
         "gap": 4
       }

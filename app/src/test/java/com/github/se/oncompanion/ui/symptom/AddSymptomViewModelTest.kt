@@ -1255,6 +1255,35 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun dictatingWhileEditing_keepsWhatWasSaved_andAddsWhatWasSaid() =
+      runTest(dispatcher) {
+        val viewModel = editing()
+        advanceUntilIdle()
+        val said = "nausea 7 out of 10 today at 3 pm"
+        heard(said, viewModel)
+
+        viewModel.onDone()
+        // The saved symptom, intensity, day and time stay; the new symptom and the words are added
+        val state = viewModel.state
+        assertTrue(state.isDrafted)
+        assertEquals(listOf(SymptomType.FATIGUE, SymptomType.NAUSEA), state.types)
+        assertEquals(4, state.intensity)
+        assertEquals(today.minusDays(1), state.date)
+        assertEquals(LocalTime.of(9, 12, 37, 500_000_000), state.time)
+        assertEquals("After lunch\n$said", state.notes)
+        // Nothing changes in the journal until the patient saves
+        advanceUntilIdle()
+        assertEquals(logged, savedEntry())
+
+        viewModel.save()
+        advanceUntilIdle()
+        val saved = savedEntry()
+        assertEquals(listOf(SymptomType.FATIGUE, SymptomType.NAUSEA), saved.types)
+        assertEquals(logged.occurredAt, saved.occurredAt)
+        assertEquals("After lunch\n$said", saved.notes)
+      }
+
+  @Test
   fun aDictatedSymptom_isSavedOnlyWhenThePatientSaves() =
       runTest(dispatcher) {
         val viewModel = heard("headache 7 out of 10 yesterday at 9 am")
