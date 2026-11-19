@@ -160,6 +160,7 @@ class HospitalProfileTest {
               onSignedOut = {},
               onEdit = { editing = true },
               viewModel = profile,
+              onSettings = {},
           )
         }
       }

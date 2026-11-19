@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -204,6 +206,12 @@ object C {
     const val symptom_detail_symptoms = "symptom_detail_symptoms"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
+    // Settings
+    const val settings_screen = "settings_screen"
+    const val settings_back = "settings_back"
+    const val settings_empty = "settings_empty"
+    const val profile_settings = "profile_settings"
+
     // Profile
     const val profile_edit = "profile_edit"
     const val edit_profile_screen = "edit_profile_screen"
@@ -478,10 +486,14 @@ object C {
     const val prescription_reject_dialog = "prescription_reject_dialog"
     const val prescription_reject_confirm = "prescription_reject_confirm"
     const val prescription_reject_cancel = "prescription_reject_cancel"
+    const val prescriptions_no_access = "prescriptions_no_access"
+    const val prescription_detail_no_access = "prescription_detail_no_access"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
+
+    const val prescription_form_not_allowed = "prescription_form_not_allowed"
 
     // Medication detail (US-35)
     const val medication_detail_screen = "medication_detail_screen"

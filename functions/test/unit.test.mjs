@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { queryFromUrl } from "../lib/validation.js";
@@ -764,7 +765,7 @@ test("HTTP 503 Retry-After has a sanitized minimum and preserves longer hints", 
   }
 });
 
-test("TTL configuration covers only cache and quota expiry, never the global lock", async () => {
+test("TTL configuration covers only cache, quota and notification expiry, never the global lock", async () => {
   const { readFile } = await import("node:fs/promises");
   const config = JSON.parse(
     await readFile(new URL("../../firebase.json", import.meta.url)),
@@ -773,14 +774,17 @@ test("TTL configuration covers only cache and quota expiry, never the global loc
   const indexes = JSON.parse(
     await readFile(new URL("../../firestore.indexes.json", import.meta.url)),
   );
+  // Exactly these three: never the global lock (hospitalSearchControl), see OPERATIONS.md
   assert.deepEqual(
     indexes.fieldOverrides,
-    ["hospitalSearchCache", "hospitalSearchQuota"].map((collectionGroup) => ({
-      collectionGroup,
-      fieldPath: "expiresAt",
-      ttl: true,
-      indexes: [],
-    })),
+    ["hospitalSearchCache", "hospitalSearchQuota", "notifications"].map(
+      (collectionGroup) => ({
+        collectionGroup,
+        fieldPath: "expiresAt",
+        ttl: true,
+        indexes: [],
+      }),
+    ),
   );
 });
 

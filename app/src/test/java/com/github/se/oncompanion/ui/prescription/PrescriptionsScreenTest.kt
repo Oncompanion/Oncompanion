@@ -24,6 +24,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -42,6 +43,7 @@ import com.github.se.oncompanion.model.medication.Prescription
 import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
+import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
@@ -99,7 +101,7 @@ class PrescriptionsScreenTest {
 
   /** The patient's own list: they can add to it. */
   private val loading = PrescriptionsUiState(today = today, canAdd = true)
-  private val loaded = loading.copy(isLoading = false)
+  private val loaded = loading.copy(load = PrescriptionsLoad.SHOWN)
 
   /** Two prescriptions of this month, one of the month before. */
   private val filled = loaded.copy(prescriptions = listOf(chemo, fever, nausea))
@@ -147,7 +149,7 @@ class PrescriptionsScreenTest {
   fun everyState_showsTheScreenItsTitleAndBothButtons() {
     var adds = 0
     var scans = 0
-    val states = listOf(loading, loaded.copy(hasError = true), loaded, filled)
+    val states = listOf(loading, loaded.copy(load = PrescriptionsLoad.FAILED), loaded, filled)
     var state by mutableStateOf(states.first())
     composeTestRule.setContent {
       PrescriptionsContent(
@@ -241,9 +243,11 @@ class PrescriptionsScreenTest {
       )
     }
 
-    listOf(loaded, loaded.copy(hasError = true)).forEach { next ->
+    listOf(loaded, loaded.copy(load = PrescriptionsLoad.FAILED)).forEach { next ->
       composeTestRule.runOnIdle { state = next }
-      val block = if (next.hasError) C.Tag.prescriptions_error else C.Tag.prescriptions_empty
+      val block =
+          if (next.load == PrescriptionsLoad.FAILED) C.Tag.prescriptions_error
+          else C.Tag.prescriptions_empty
       // The lowest text or button of the block
       val lowest =
           composeTestRule
@@ -300,7 +304,7 @@ class PrescriptionsScreenTest {
   @Test
   fun error_showsRetry_whichCallsBack() {
     var retries = 0
-    setContent(loaded.copy(hasError = true), onRetry = { retries++ })
+    setContent(loaded.copy(load = PrescriptionsLoad.FAILED), onRetry = { retries++ })
 
     composeTestRule.onNodeWithTag(C.Tag.prescriptions_error).assertIsDisplayed()
     assertTextInside(
@@ -318,7 +322,9 @@ class PrescriptionsScreenTest {
   @Config(qualifiers = LANDSCAPE_PHONE)
   fun error_retryIsFullyVisibleInLandscape() {
     composeTestRule.setContent {
-      OncompanionTheme { PrescriptionsContent(loaded.copy(hasError = true), {}, {}, {}, {}, {}) }
+      OncompanionTheme {
+        PrescriptionsContent(loaded.copy(load = PrescriptionsLoad.FAILED), {}, {}, {}, {}, {})
+      }
     }
 
     composeTestRule
@@ -328,9 +334,31 @@ class PrescriptionsScreenTest {
   }
 
   @Test
+  @Config(qualifiers = SMALL_LANDSCAPE_PHONE, fontScale = 2f)
+  fun error_retryCanBeReached_onASmallPhoneSidewaysWithTheLargestFont() {
+    // Taller than the screen there: the message scrolls so Retry can still be tapped (#490)
+    setContent(loaded.copy(load = PrescriptionsLoad.FAILED))
+    composeTestRule
+        .onNodeWithTag(C.Tag.prescriptions_retry_button)
+        .performScrollTo()
+        .assertIsFullyVisible()
+  }
+
+  @Test
+  fun error_spansTheWholeWidth_soItWrapsLikeOnTheOtherPrescriptionScreens() {
+    // The message state brings its own side padding: nothing is added around it (#490)
+    setContent(loaded.copy(load = PrescriptionsLoad.FAILED))
+    val screen = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+    val message =
+        composeTestRule.onNodeWithTag(C.Tag.prescriptions_error).fetchSemanticsNode().boundsInRoot
+    assertEquals(screen.left, message.left)
+    assertEquals(screen.right, message.right)
+  }
+
+  @Test
   fun error_neverBlamesTheConnection() {
     // Offline, Firestore serves its cache: an error is not a connection problem
-    setContent(loaded.copy(hasError = true))
+    setContent(loaded.copy(load = PrescriptionsLoad.FAILED))
 
     composeTestRule
         .onNode(
@@ -342,7 +370,82 @@ class PrescriptionsScreenTest {
         .assertDoesNotExist()
   }
 
-  // ----- The list -----
+  @Test
+  fun noAccess_saysWhy_evenAfterTheCaregiverLeft() {
+    var state by mutableStateOf(loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false))
+    var caregiverOf: String? by mutableStateOf(null)
+    composeTestRule.setContent {
+      PrescriptionsContent(
+          uiState = state,
+          onBack = {},
+          onAdd = {},
+          onScan = {},
+          onRetry = {},
+          onOpen = {},
+          caregiverOf = caregiverOf,
+      )
+    }
+    // Signed out, patient or caregiver: "You're signed out", even while the patient's name is
+    // still known. Signed in but no longer in the circle (a caregiver): "no longer in the care
+    // circle", named or not, since leave() clears the name before Whose care? (#490)
+    val anne = "Anne"
+    val cases =
+        listOf(
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NOT_SIGNED_IN, canAdd = false),
+                null as String?,
+                signedOut,
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NOT_SIGNED_IN, canAdd = false),
+                anne,
+                signedOut,
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false),
+                anne,
+                removedFrom(anne),
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NO_ACCESS, canAdd = false),
+                null,
+                removedUnnamed,
+            ),
+            Triple(
+                loaded.copy(load = PrescriptionsLoad.NOT_SHARED, canAdd = false),
+                null,
+                removedUnnamed,
+            ),
+        )
+    for ((shown, patient, texts) in cases) {
+      composeTestRule.runOnIdle {
+        state = shown
+        caregiverOf = patient
+      }
+      assertTextInside(texts.first, C.Tag.prescriptions_no_access)
+      assertTextInside(texts.second, C.Tag.prescriptions_no_access)
+      // Never a title with no name, never a Retry that can't work
+      composeTestRule.onNodeWithTag(C.Tag.not_shared).assertDoesNotExist()
+      composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).assertDoesNotExist()
+      composeTestRule
+          .onNode(hasText(" doesn't", substring = true), useUnmergedTree = true)
+          .assertDoesNotExist()
+    }
+  }
+
+  private val signedOut
+    get() =
+        context.getString(R.string.prescriptions_signed_out_title) to
+            context.getString(R.string.prescriptions_signed_out_hint)
+
+  private val removedUnnamed
+    get() =
+        context.getString(R.string.prescriptions_no_access_title_unnamed) to
+            context.getString(R.string.prescriptions_no_access_hint_unnamed)
+
+  private fun removedFrom(patient: String) =
+      context.getString(R.string.prescriptions_no_access_title_for, patient) to
+          context.getString(R.string.prescriptions_no_access_hint_for, patient)
 
   @Test
   fun filled_showsEachPrescription_withItsMedicationNamesPrescriberAndDate() {
@@ -561,6 +664,18 @@ class PrescriptionsScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.prescriptionsItem("chemo")).assertIsDisplayed()
   }
 
+  @Test
+  fun screen_signedOut_saysSo_insteadOfAnError() {
+    val repository = FakeMedicationRepository().apply { seed("alice", chemo) }
+    val viewModel = PrescriptionsViewModel(FakeAuthRepository(), repository)
+    composeTestRule.setContent {
+      PrescriptionsScreen(viewModel = viewModel, onBack = {}, onAdd = {}, onScan = {}, onOpen = {})
+    }
+
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_no_access).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.prescriptions_retry_button).assertDoesNotExist()
+  }
+
   // ----- Waiting for the patient (US-43) -----
 
   @Test
@@ -730,7 +845,7 @@ class PrescriptionsScreenTest {
 
   @Test
   fun caregiver_prescriptionsNotShared_saysSo_insteadOfAnEmptyList() {
-    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+    setCaregiverContent(loaded.copy(load = PrescriptionsLoad.NOT_SHARED, canAdd = false))
 
     composeTestRule.onNodeWithText("Anne doesn't share Prescriptions with you").assertIsDisplayed()
   }
@@ -738,7 +853,7 @@ class PrescriptionsScreenTest {
   @Test
   @Config(qualifiers = LANDSCAPE_PHONE)
   fun caregiver_prescriptionsNotShared_isFullyVisibleInLandscape() {
-    setCaregiverContent(loaded.copy(isNotShared = true, canAdd = false))
+    setCaregiverContent(loaded.copy(load = PrescriptionsLoad.NOT_SHARED, canAdd = false))
 
     composeTestRule.onNodeWithTag(C.Tag.not_shared).assertIsFullyVisible()
   }
@@ -750,7 +865,8 @@ class PrescriptionsScreenTest {
         listOf(
             filled.copy(canAdd = false) to null,
             loaded.copy(canAdd = false) to "When Anne saves a prescription, it will appear here.",
-            loaded.copy(hasError = true, canAdd = false) to "Couldn't load Anne's prescriptions",
+            loaded.copy(load = PrescriptionsLoad.FAILED, canAdd = false) to
+                "Couldn't load Anne's prescriptions",
         )
     var state by mutableStateOf(cases.first().first)
     composeTestRule.setContent {

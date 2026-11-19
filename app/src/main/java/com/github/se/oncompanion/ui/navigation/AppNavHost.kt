@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -82,6 +84,7 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.settings.SettingsScreen
 import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
 import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
@@ -546,7 +549,14 @@ private fun SessionNavHost(
       ) { entry ->
         val prescriptionId = entry.arguments?.getString(Screen.PRESCRIPTION_ID).orEmpty()
         PrescriptionFormScreen(
-            viewModel = viewModel { PrescriptionFormViewModel(prescriptionId = prescriptionId) },
+            viewModel =
+                viewModel {
+                  PrescriptionFormViewModel(
+                      prescriptionId = prescriptionId,
+                      patientUid = chosenPatient?.uid,
+                  )
+                },
+            caregiverOf = chosenPatient?.firstName,
             // A second tap while the form is already leaving is dropped, so Back happens once
             onClose = dropUnlessResumed { navigationActions.goBack() },
             // Saving returns to the detail, which shows the correction
@@ -683,11 +693,15 @@ private fun SessionNavHost(
         )
       }
     }
+    navigation(startDestination = Screen.SETTINGS, route = Route.SETTINGS) {
+      composable(Screen.SETTINGS) { SettingsScreen(onBack = navigationActions::goBack) }
+    }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) {
         ProfileScreen(
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
+            onSettings = { navigationActions.navigateTo(Route.SETTINGS) },
             onSignedOut = signOut,
             viewModel = viewModel { ProfileViewModel() },
             credentialProvider = credentialProvider,
