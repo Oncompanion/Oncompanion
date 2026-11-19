@@ -132,6 +132,7 @@ class OverviewViewModelTest {
                           "active",
                           "p",
                           "Active medication",
+                          dosage = "8 mg",
                           frequency = "As recorded",
                           startDate = today,
                           durationDays = 2,
@@ -160,6 +161,11 @@ class OverviewViewModelTest {
       assertNull(entry.time)
       assertNull(entry.status)
       assertNull(vm.uiState.value.nextAppointment)
+      // The patient's card names it with its dosage
+      assertEquals(
+          listOf(TodayMedication(entry.key, "Active medication 8 mg", "As recorded")),
+          vm.uiState.value.todayMedications,
+      )
     } finally {
       Dispatchers.resetMain()
     }
@@ -370,6 +376,98 @@ class OverviewViewModelTest {
     assertEquals(
         listOf(TodayItemKind.MEDICATION, TodayItemKind.APPOINTMENT, TodayItemKind.EVENT),
         entries.map { it.kind },
+    )
+  }
+
+  // ----- Patient's day (Overview UX Refactor) -----
+
+  @Test
+  fun nextUp_isTodaysNextEventOrAppointment_elseTheNextAppointment() {
+    val today = now.toLocalDate()
+    val tomorrow = today.plusDays(1)
+    listOf(
+            // Today's next one, an event or an appointment, before any later appointment
+            listOf(appointment("later", now.plusDays(1)), event("yoga", now.withHour(10))) to
+                "yoga",
+            listOf(event("yoga", now.withHour(12)), appointment("blood", now.withHour(11))) to
+                "blood",
+            // One that has started, even this minute, isn't next any more
+            listOf(appointment("started", now.withHour(8)), event("walk", now.withHour(12))) to
+                "walk",
+            listOf(
+                event("now", now),
+                appointment("past", now.withHour(8)),
+                appointment("later", now.plusDays(1)),
+            ) to "later",
+            // Nothing more today: the next appointment, even weeks away, but not a later event
+            listOf(
+                event("tomorrow", tomorrow.atTime(10, 0)),
+                appointment("check-up", now.plusWeeks(3)),
+            ) to "check-up",
+            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to null,
+        )
+        .forEach { (items, expected) ->
+          val vm = viewModel(planning = planning(*items.toTypedArray()))
+          assertEquals(items.toString(), expected, vm.uiState.value.nextUp?.id)
+        }
+  }
+
+  @Test
+  fun nextUp_saysWhatItIs_whenAndWhere_andMovesOnOnceItStarts() {
+    val clock = TestClock(now)
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    event("yoga", now.withHour(10)),
+                    appointment("check-up", now.plusDays(2), place = "HUG"),
+                ),
+            clock = clock,
+        )
+    assertEquals(
+        NextUp(TodayItemKind.EVENT, "yoga", "Event yoga", now.withHour(10), "Place yoga"),
+        vm.uiState.value.nextUp,
+    )
+
+    clock.time = now.withHour(10).plusMinutes(1)
+    vm.refreshNow()
+
+    assertEquals(
+        NextUp(
+            TodayItemKind.APPOINTMENT,
+            "check-up",
+            "Appointment check-up",
+            now.plusDays(2),
+            "HUG",
+        ),
+        vm.uiState.value.nextUp,
+    )
+  }
+
+  @Test
+  fun todayMedications_areTodaysOnly_withTheirDosage_frequency_andWhoAddedThem() {
+    val vm =
+        viewModel(
+            planning =
+                planning(
+                    medication("a", frequency = "Twice a day").copy(dosage = "8 mg"),
+                    // Blank fields show nothing rather than an empty chip or a trailing space
+                    medication("b", frequency = " ").copy(dosage = " "),
+                    medication("c").copy(addedByName = "Sam", isConfirmed = false),
+                    medication("tomorrow", date = now.toLocalDate().plusDays(1)),
+                    event("yoga", now.withHour(10)),
+                )
+        )
+
+    assertEquals(
+        listOf(
+            Triple("Medication a 8 mg", "Twice a day", null),
+            Triple("Medication b", null, null),
+            Triple("Medication c", null, "Sam"),
+        ),
+        vm.uiState.value.todayMedications.map {
+          Triple(it.name, it.frequency, it.notConfirmedAddedBy)
+        },
     )
   }
 

@@ -1097,8 +1097,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Voice journal\n(planned)",
-      "originalText": "Voice journal\n(planned)",
+      "text": "Voice logging\n(planned)",
+      "originalText": "Voice logging\n(planned)",
       "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
@@ -1454,76 +1454,6 @@
       "textAlign": "center",
       "verticalAlign": "middle",
       "containerId": "meds",
-      "lineHeight": 1.25,
-      "autoResize": true
-    },
-    {
-      "id": "logsymptom",
-      "type": "rectangle",
-      "x": 2550,
-      "y": 250,
-      "width": 220,
-      "height": 96,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dashed",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 3
-      },
-      "seed": 1110738537,
-      "version": 1,
-      "versionNonce": 358955404,
-      "isDeleted": false,
-      "boundElements": [
-        {
-          "type": "text",
-          "id": "logsymptom_t"
-        }
-      ],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false
-    },
-    {
-      "id": "logsymptom_t",
-      "type": "text",
-      "x": 2613.25,
-      "y": 276.75,
-      "width": 93.50000000000001,
-      "height": 42.5,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": null,
-      "seed": 649160953,
-      "version": 1,
-      "versionNonce": 1332568574,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "text": "LogSymptom\n(planned)",
-      "originalText": "LogSymptom\n(planned)",
-      "fontSize": 17,
-      "fontFamily": 2,
-      "textAlign": "center",
-      "verticalAlign": "middle",
-      "containerId": "logsymptom",
       "lineHeight": 1.25,
       "autoResize": true
     },
@@ -4392,12 +4322,12 @@
       }
     },
     {
-      "id": "voice_log",
+      "id": "voice_speech",
       "type": "arrow",
       "x": 2660.0,
       "y": 156,
       "width": 0.0,
-      "height": 94,
+      "height": 284,
       "angle": 0,
       "strokeColor": "#868e96",
       "backgroundColor": "transparent",
@@ -4426,7 +4356,7 @@
         ],
         [
           0.0,
-          94
+          284
         ]
       ],
       "lastCommittedPoint": null,
@@ -4434,58 +4364,6 @@
       "endArrowhead": "arrow",
       "startBinding": {
         "elementId": "voice_ui",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "logsymptom",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "log_speech",
-      "type": "arrow",
-      "x": 2660.0,
-      "y": 346,
-      "width": 0.0,
-      "height": 94,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 1615192702,
-      "version": 1,
-      "versionNonce": 2107364828,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0.0,
-          94
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "logsymptom",
         "focus": 0,
         "gap": 4
       },

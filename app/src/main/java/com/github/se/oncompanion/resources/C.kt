@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -120,6 +122,15 @@ object C {
     const val overview_today_empty = "overview_today_empty"
     const val overview_shortcuts = "overview_shortcuts"
     const val overview_whose_care = "overview_whose_care"
+    const val overview_next_up = "overview_next_up"
+    const val overview_next_up_planning_link = "overview_next_up_planning_link"
+    const val overview_medications = "overview_medications"
+    const val overview_planning_link = "overview_planning_link"
+    const val overview_more_medications = "overview_more_medications"
+    const val overview_nothing_planned = "overview_nothing_planned"
+    const val overview_check_in = "overview_check_in"
+    const val overview_check_in_more = "overview_check_in_more"
+    const val overview_journal_link = "overview_journal_link"
     const val overview_prescriptions_badge = "overview_prescriptions_badge"
 
     const val bottom_navigation_bar = "bottom_navigation_bar"
@@ -208,6 +219,12 @@ object C {
     const val symptom_detail_symptoms = "symptom_detail_symptoms"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
+    // Settings
+    const val settings_screen = "settings_screen"
+    const val settings_back = "settings_back"
+    const val settings_empty = "settings_empty"
+    const val profile_settings = "profile_settings"
+
     // Profile
     const val profile_edit = "profile_edit"
     const val edit_profile_screen = "edit_profile_screen"
@@ -251,6 +268,11 @@ object C {
     const val cancer_type_suggestion = "cancer_type_suggestion"
 
     fun overviewTodayItem(itemId: String) = "overview_today_item_$itemId"
+
+    fun overviewMedication(key: String) = "overview_medication_$key"
+
+    /** A check-in tile on the Overview, by its symptom type's name. */
+    fun overviewCheckIn(type: String) = "overview_check_in_$type"
 
     fun symptomJournalItem(symptomId: String) = "symptom_journal_item_$symptomId"
 
@@ -479,10 +501,14 @@ object C {
     const val prescription_reject_dialog = "prescription_reject_dialog"
     const val prescription_reject_confirm = "prescription_reject_confirm"
     const val prescription_reject_cancel = "prescription_reject_cancel"
+    const val prescriptions_no_access = "prescriptions_no_access"
+    const val prescription_detail_no_access = "prescription_detail_no_access"
 
     /** One medication of the prescription detail. */
     fun prescriptionDetailMedication(medicationId: String) =
         "prescription_detail_medication_$medicationId"
+
+    const val prescription_form_not_allowed = "prescription_form_not_allowed"
 
     // Medication detail (US-35)
     const val medication_detail_screen = "medication_detail_screen"

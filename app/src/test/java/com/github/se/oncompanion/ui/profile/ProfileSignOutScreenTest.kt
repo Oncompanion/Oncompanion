@@ -55,6 +55,7 @@ class ProfileSignOutScreenTest {
             state.value = loaded
           },
           onConfirmSignOut = { confirms++ },
+          onSettings = {},
       )
     }
     node(C.Tag.profile_sign_out).assertIsDisplayed().performClick()
@@ -88,6 +89,7 @@ class ProfileSignOutScreenTest {
           onSignOut = {},
           onCancelSignOut = { cancels++ },
           onConfirmSignOut = {},
+          onSettings = {},
       )
     }
     node(C.Tag.profile_sign_out_error).assertIsDisplayed()
@@ -116,6 +118,7 @@ class ProfileSignOutScreenTest {
           onSignOut = {},
           onCancelSignOut = {},
           onConfirmSignOut = {},
+          onSettings = {},
       )
     }
     node(C.Tag.profile_sign_out).assertDoesNotExist()
@@ -144,6 +147,7 @@ class ProfileSignOutScreenTest {
           onSignedOut = { fail("Must stay signed in") },
           viewModel = vm,
           credentialProvider = FakeGoogleCredentialProvider(),
+          onSettings = {},
       )
     }
     node(C.Tag.profile_sign_out).performClick()
@@ -182,6 +186,7 @@ class ProfileSignOutScreenTest {
           onSignedOut = { completions++ },
           viewModel = vm,
           credentialProvider = provider,
+          onSettings = {},
       )
     }
     node(C.Tag.profile_sign_out).performClick()
@@ -219,6 +224,7 @@ class ProfileSignOutScreenTest {
           onSignOut = {},
           onCancelSignOut = { stays++ },
           onConfirmSignOut = { discards++ },
+          onSettings = {},
       )
     }
     compose.onNodeWithText("Stay signed in").assertIsDisplayed()

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.planning
@@ -92,6 +93,7 @@ class LandscapeRotationTest {
               {},
               viewModel = vm,
               credentialProvider = FakeGoogleCredentialProvider(),
+              onSettings = {},
           )
         }
       }

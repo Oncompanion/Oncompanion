@@ -212,7 +212,8 @@ class AppointmentDetailViewModel(
             section.data?.let {
               AppointmentDetailUiState.Loaded(
                   it,
-                  delete.afterRead(exists = true),
+                  // Closed for good when the patient no longer lets the caregiver delete it
+                  delete.afterRead(deletable = section.canEditEntries),
                   isOwn = false,
                   canChange = section.canEditEntries,
               )
@@ -265,7 +266,7 @@ class AppointmentDetailViewModel(
             appointment?.let {
               AppointmentDetailUiState.Loaded(
                   it,
-                  state.value.delete.afterRead(exists = true),
+                  state.value.delete.afterRead(deletable = true),
                   addedByName = addedByName(it.addedBy, it.addedByName, names),
                   editedByName = addedByName(it.editedBy, it.editedByName, names),
               )

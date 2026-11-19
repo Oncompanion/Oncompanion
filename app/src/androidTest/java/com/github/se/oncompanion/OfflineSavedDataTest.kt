@@ -71,7 +71,9 @@ class OfflineSavedDataTest {
   @Test
   fun profileScreenShowsTheSavedProfileOffline() {
     compose.setContent {
-      OncompanionTheme { ProfileScreen(onBack = {}, onSignedOut = {}, onEdit = {}) }
+      OncompanionTheme {
+        ProfileScreen(onBack = {}, onSignedOut = {}, onEdit = {}, onSettings = {})
+      }
     }
 
     // The tag is on the field's container; the value is a child text

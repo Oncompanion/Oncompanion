@@ -6,9 +6,16 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.carecircle.CaregiverName
+import com.github.se.oncompanion.domain.symptom.SymptomDraft
+import com.github.se.oncompanion.domain.symptom.parseSpokenSymptom
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.speech.SpeechError
+import com.github.se.oncompanion.model.speech.SpeechEvent
+import com.github.se.oncompanion.model.speech.SpeechLanguage
+import com.github.se.oncompanion.model.speech.SpeechRecognizer
+import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -24,7 +31,9 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,6 +79,9 @@ data class EditedSymptom(val entry: SymptomEntry, val date: LocalDate, val time:
  * @property isLoading the symptom to edit is loading
  * @property hasLoadError the symptom to edit couldn't be loaded (or nobody is signed in)
  * @property isNotFound the symptom to edit doesn't exist (e.g. deleted on another device)
+ * @property canDictate the phone has a speech recognizer, so the symptom can be dictated
+ * @property voice where dictating is, shown instead of the form; `null` while the form shows
+ * @property isDrafted the form was filled from what the patient said, so they should check it
  */
 data class AddSymptomUiState(
     val now: LocalDateTime,
@@ -86,6 +98,9 @@ data class AddSymptomUiState(
     val isLoading: Boolean = false,
     val hasLoadError: Boolean = false,
     val isNotFound: Boolean = false,
+    val canDictate: Boolean = false,
+    val voice: VoiceUiState? = null,
+    val isDrafted: Boolean = false,
 ) {
   /** The fields are shown: always when logging, once the symptom is loaded when editing. */
   val isFormShown: Boolean
@@ -141,12 +156,19 @@ data class AddSymptomUiState(
  *
  * In caregiver mode (US-22), it logs the symptom in the journal of [patientUid], signed with the
  * caregiver's uid and first name; the rules only accept it if the patient lets them add symptoms.
+ * It edits one of the patient's the same way, signed as its last editor, if the patient lets them
+ * edit and delete symptoms (US-46).
  *
  * @param clock the current time, and the time zone the day and time are chosen in
  * @param symptomId the symptom to edit, or `null` to log a new one
- * @param patientUid in caregiver mode, the patient whose journal gets the symptom; null for the
- *   user's own
+ * @param patientUid in caregiver mode, the patient whose journal gets the new or edited symptom;
+ *   null for the user's own
  * @param profileRepository the caregiver's profile, for the first name the symptom is signed with
+ * @param speechRecognizer listens when the symptom is dictated (US-44)
+ * @param locale the phone's language: a symptom is dictated in French on a French phone, in English
+ *   otherwise
+ * @param picked a symptom already ticked when logging a new one (a check-in tile on the Overview);
+ *   the user can still untick it. Ignored when editing
  */
 class AddSymptomViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -155,6 +177,9 @@ class AddSymptomViewModel(
     private val symptomId: String? = null,
     private val patientUid: String? = null,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    private val speechRecognizer: SpeechRecognizer = SpeechRecognizerProvider.recognizer,
+    private val locale: Locale = Locale.getDefault(),
+    picked: SymptomType? = null,
 ) : ViewModel() {
 
   /** The first name a caregiver's symptom is signed with. */
@@ -162,7 +187,12 @@ class AddSymptomViewModel(
 
   private val _uiState =
       MutableStateFlow(
-          AddSymptomUiState(now = LocalDateTime.now(clock), isEditing = symptomId != null)
+          AddSymptomUiState(
+              now = LocalDateTime.now(clock),
+              types = listOfNotNull(picked.takeIf { symptomId == null }),
+              isEditing = symptomId != null,
+              canDictate = speechRecognizer.isAvailable(),
+          )
       )
   val uiState: StateFlow<AddSymptomUiState> = _uiState.asStateFlow()
 
@@ -187,7 +217,8 @@ class AddSymptomViewModel(
       // Null when the symptom no longer exists (e.g. deleted on another device)
       val entry: SymptomEntry? =
           try {
-            symptomRepository.observeSymptom(uid, id).first()
+            // A caregiver edits the patient's symptom
+            symptomRepository.observeSymptom(patientUid ?: uid, id).first()
           } catch (e: CancellationException) {
             throw e
           } catch (e: Exception) {
@@ -293,20 +324,11 @@ class AddSymptomViewModel(
     _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
     viewModelScope.launch {
       try {
-        if (symptomId != null) symptomRepository.updateSymptom(uid, entry)
-        else if (patientUid == null) symptomRepository.addSymptom(uid, entry)
-        // A caregiver's symptom goes in the patient's journal, signed with who added it
-        else {
-          val signed = entry.copy(addedBy = uid, addedByName = caregiverName(uid))
-          // Reading the name can take a while: the account may have changed meanwhile
-          currentCoroutineContext().ensureActive()
-          if (authRepository.signedInUid(TAG) != uid) {
-            _uiState.update {
-              it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
-            }
-            return@launch
+        if (!store(uid, entry)) {
+          _uiState.update {
+            it.copy(save = SavePhase.EDITING, error = AddSymptomError.NOT_SIGNED_IN)
           }
-          symptomRepository.addSymptom(patientUid, signed)
+          return@launch
         }
         _uiState.update { it.copy(save = SavePhase.SAVED) }
       } catch (e: CancellationException) {
@@ -316,6 +338,149 @@ class AddSymptomViewModel(
         _uiState.update { it.copy(save = SavePhase.EDITING, error = AddSymptomError.SAVE_FAILED) }
       }
     }
+  }
+
+  /** The session listening to the patient, if one is running. */
+  private var listening: Job? = null
+
+  /**
+   * The patient wants to dictate the symptom. Without the microphone ([hasMicrophone] false), the
+   * app first says why it needs it; the screen then asks Android and calls [onMicrophoneAnswer].
+   */
+  fun onSpeak(hasMicrophone: Boolean) {
+    if (!_uiState.value.canStartDictating) return
+    if (hasMicrophone) startListening()
+    else _uiState.update { it.copy(voice = VoiceUiState.ExplainingMicrophone) }
+  }
+
+  /**
+   * Android's answer when asked for the microphone: listens if [granted]. An answer that comes
+   * after the patient left dictating (cancelled, or the app was restarted meanwhile) is ignored.
+   */
+  fun onMicrophoneAnswer(granted: Boolean) {
+    val state = _uiState.value
+    if (state.voice != VoiceUiState.ExplainingMicrophone || !state.canStartDictating) return
+    if (granted) startListening()
+    else _uiState.update { it.copy(voice = VoiceUiState.MicrophoneRefused) }
+  }
+
+  /** Drops what was heard and listens again. */
+  fun restartListening() {
+    startListening()
+  }
+
+  /** Back to the form without using what was said; it is dropped. */
+  fun cancelVoice() {
+    listening?.cancel()
+    listening = null
+    _uiState.update { it.copy(voice = null) }
+  }
+
+  /**
+   * The patient is done: fills the form with what was heard, for them to check before saving. While
+   * listening, it stops first and fills the form once the phone has the whole text. Only fields
+   * still empty are filled: nothing they already entered is replaced.
+   */
+  fun onDone() {
+    when (val voice = _uiState.value.voice) {
+      is VoiceUiState.Heard -> useDraft(voice.draft)
+      is VoiceUiState.Listening ->
+          if (!voice.isFinishing) {
+            _uiState.update { it.copy(voice = voice.copy(isFinishing = true)) }
+            speechRecognizer.stop()
+          }
+      else -> Unit
+    }
+  }
+
+  /** Fills the form with [draft] and goes back to it. */
+  private fun useDraft(draft: SymptomDraft) {
+    edit { it.filledFrom(draft).copy(voice = null, isDrafted = true).withFutureCheck() }
+  }
+
+  /** Listens to the patient in the phone's language, replacing any session already running. */
+  private fun startListening() {
+    listening?.cancel()
+    _uiState.update { it.copy(voice = VoiceUiState.Listening()) }
+    val language = SpeechLanguage.of(locale)
+    listening = viewModelScope.launch {
+      speechRecognizer.listen(language).collect { event ->
+        voiceAfter(event, language)?.let(::show)
+      }
+    }
+  }
+
+  /**
+   * Shows [next], unless the patient already tapped Done: then the whole text goes straight into
+   * the form, and text still coming keeps Done tapped.
+   */
+  private fun show(next: VoiceUiState) {
+    val finishing = (_uiState.value.voice as? VoiceUiState.Listening)?.isFinishing == true
+    when {
+      finishing && next is VoiceUiState.Heard -> useDraft(next.draft)
+      finishing && next is VoiceUiState.Listening ->
+          _uiState.update { it.copy(voice = next.copy(isFinishing = true)) }
+      else -> _uiState.update { it.copy(voice = next) }
+    }
+  }
+
+  /** What dictating shows after [event], or `null` if it doesn't change. */
+  private fun voiceAfter(event: SpeechEvent, language: SpeechLanguage): VoiceUiState? =
+      when (event) {
+        SpeechEvent.Listening -> null
+        is SpeechEvent.PartialText ->
+            VoiceUiState.Listening(event.text, draftOf(event.text, language))
+        is SpeechEvent.FinalText -> VoiceUiState.Heard(event.text, draftOf(event.text, language))
+        is SpeechEvent.Failed ->
+            if (event.error == SpeechError.NO_PERMISSION) VoiceUiState.MicrophoneRefused
+            else VoiceUiState.Failed(event.error)
+      }
+
+  /** The form drafted from [text], parsed in the language it was heard in, not the phone's. */
+  private fun draftOf(text: String, language: SpeechLanguage): SymptomDraft =
+      parseSpokenSymptom(text, Locale.forLanguageTag(language.tag), ZonedDateTime.now(clock))
+
+  /**
+   * The form with [draft] in the fields still empty: its symptoms after those picked, its intensity
+   * if none is set, its day and time if the symptom is still "now", and the transcript after the
+   * notes.
+   */
+  private fun AddSymptomUiState.filledFrom(draft: SymptomDraft): AddSymptomUiState {
+    val saysWhen = isNow && (draft.date != null || draft.time != null)
+    return copy(
+        types = types + (draft.types - types.toSet()),
+        intensity = intensity ?: draft.intensity,
+        // A time said without a day is today, as when the patient picks only a time
+        date = if (saysWhen) draft.date ?: LocalDate.now(clock) else date,
+        time = if (saysWhen) draft.time else time,
+        notes =
+            listOf(notes.trimEnd(), draft.notes)
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
+                .take(SymptomEntry.MAX_NOTES_LENGTH),
+    )
+  }
+
+  /**
+   * Logs or updates [entry] in the journal it belongs to. A caregiver's goes in the patient's
+   * journal, signed with who added or edited it. Returns false, saving nothing, if the account
+   * changed while the caregiver's name was read.
+   */
+  private suspend fun store(uid: String, entry: SymptomEntry): Boolean {
+    val owner = patientUid ?: uid
+    val signed =
+        if (patientUid == null) entry
+        else {
+          val name = caregiverName(uid)
+          // Reading the name can take a while: the account may have changed meanwhile
+          currentCoroutineContext().ensureActive()
+          if (authRepository.signedInUid(TAG) != uid) return false
+          if (symptomId != null) entry.copy(editedBy = uid, editedByName = name)
+          else entry.copy(addedBy = uid, addedByName = name)
+        }
+    if (symptomId != null) symptomRepository.updateSymptom(owner, signed)
+    else symptomRepository.addSymptom(owner, signed)
+    return true
   }
 
   /** The error has been shown. */
@@ -333,6 +498,10 @@ class AddSymptomViewModel(
       if (state.save != SavePhase.EDITING || !state.isFormShown) state else transform(state)
     }
   }
+
+  /** The phone can dictate and the form can still change: not saving, and loaded when editing. */
+  private val AddSymptomUiState.canStartDictating: Boolean
+    get() = canDictate && save == SavePhase.EDITING && isFormShown
 
   private fun AddSymptomUiState.withFutureCheck(): AddSymptomUiState {
     val now = ZonedDateTime.now(clock)

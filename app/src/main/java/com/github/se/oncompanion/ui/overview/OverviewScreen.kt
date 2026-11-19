@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -119,9 +120,15 @@ enum class OverviewShortcut(
   ),
 }
 
-/** The tiles under "How do you feel today?", in display order. */
+/** The caregiver's tiles under "How do you feel today?", in display order. */
 private val tileShortcuts =
     listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
+
+/**
+ * The patient's tiles under the check-in, which already opens the symptoms. They go once the
+ * Overview UX Refactor gives Prescriptions and the care circle their own way in.
+ */
+private val patientTileShortcuts = tileShortcuts - OverviewShortcut.SYMPTOMS
 
 /** "Saturday 3 October", as in the mockup. The app's UI is in English. */
 private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
@@ -146,6 +153,7 @@ fun OverviewScreen(
     onOpenAppointment: (String) -> Unit = {
       navigationActions.navigateTo(Screen.appointmentDetail(it))
     },
+    onOpenEvent: (String) -> Unit = { navigationActions.navigateTo(Screen.eventDetail(it)) },
     caregiverOf: String? = null,
     onSwitchPatient: () -> Unit = {},
 ) {
@@ -160,9 +168,11 @@ fun OverviewScreen(
   OverviewContent(
       uiState = uiState,
       onShortcutClick = { shortcut -> navigationActions.navigateTo(shortcut.route) },
-      // Planning is a tab: switch to it like the bottom bar does
-      onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
+      // Planning is a tab; the Overview's links open it on today, not on the last day seen there
+      onOpenPlanning = { navigationActions.navigateToPlanningOn(uiState.now.toLocalDate()) },
       onOpenAppointment = onOpenAppointment,
+      onOpenEvent = onOpenEvent,
+      onLogSymptom = { navigationActions.navigateTo(Screen.symptomAdd(it)) },
       onRetry = viewModel::loadDay,
       modifier = modifier,
       caregiverOf = caregiverOf,
@@ -185,6 +195,9 @@ fun OverviewScreen(
  *
  * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
  * @param onOpenAppointment opens the recorded appointment directly
+ * @param onOpenEvent opens the event shown in the patient's "Next up"
+ * @param onLogSymptom opens the symptom form from the patient's check-in, with that symptom picked
+ *   or empty for `null`
  * @param onRetry reloads the day after an error
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
@@ -198,6 +211,8 @@ fun OverviewContent(
     onOpenAppointment: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenEvent: (String) -> Unit = {},
+    onLogSymptom: (SymptomType?) -> Unit = {},
     caregiverOf: String? = null,
     onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
@@ -241,27 +256,50 @@ fun OverviewContent(
             // show
             uiState.isNotShared && caregiverOf != null ->
                 NotSharedMessage(caregiverOf, CarePermission.PLANNING)
+            // The patient's day follows the Overview UX Refactor; the caregiver's comes later
+            caregiverOf == null ->
+                PatientDay(
+                    uiState,
+                    onOpenPlanning,
+                    onOpenAppointment,
+                    onOpenEvent,
+                    modifier = if (overlaps) Modifier.overlapLayout() else Modifier,
+                )
             else -> {
               NextAppointmentCard(
                   uiState.nextAppointment,
                   uiState.now.toLocalDate(),
                   onOpenPlanning,
                   onOpenAppointment,
-                  canAdd = caregiverOf == null,
                   modifier = if (overlaps) Modifier.overlapHeader() else Modifier,
               )
               TodaySection(uiState.todayEntries, onOpenPlanning)
             }
           }
-          // The shortcuts stay available whatever happens to the day's data. A caregiver only gets
-          // the sections the patient shares, never the care circle, which only the patient manages
+          // The check-in and the shortcuts stay available whatever happens to the day's data. A
+          // caregiver only gets the sections the patient shares, never the care circle, which only
+          // the patient manages
+          if (caregiverOf == null) {
+            CheckInDock(
+                onLogSymptom = onLogSymptom,
+                onOpenJournal = { onShortcutClick(OverviewShortcut.SYMPTOMS) },
+            )
+          }
           val tiles =
-              if (caregiverOf == null) tileShortcuts
+              if (caregiverOf == null) patientTileShortcuts
               else
                   tileShortcuts.filter {
                     it.section != null && it.section in uiState.sharedSections
                   }
-          if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
+          if (tiles.isNotEmpty()) {
+            Shortcuts(
+                onShortcutClick,
+                tiles,
+                uiState.prescriptionsToConfirm,
+                // The patient's check-in already asks
+                withQuestion = caregiverOf != null,
+            )
+          }
         }
       }
       // Drawn last, so scrolled content passes under it rather than under the clock and icons
@@ -277,12 +315,14 @@ private val HEADER_OVERLAP = 42.dp
  * Moves the card up over the header's lower edge without leaving a gap under it, and raises it with
  * Elevation 1, the shadow DESIGN.md keeps for this card.
  */
-private fun Modifier.overlapHeader(): Modifier = layout { measurable, constraints ->
+private fun Modifier.overlapHeader(): Modifier = overlapLayout().elevation1(Shapes.large)
+
+/** Moves the card up over the header's lower edge without leaving a gap under it. */
+private fun Modifier.overlapLayout(): Modifier = layout { measurable, constraints ->
   val placeable = measurable.measure(constraints)
   val overlap = HEADER_OVERLAP.roundToPx()
   layout(placeable.width, placeable.height - overlap) { placeable.place(0, -overlap) }
 }
-    .elevation1(Shapes.large)
 
 /**
  * The greeting (or "Anne's care ▾" for a caregiver), today's date and the profile button, on the
@@ -418,22 +458,25 @@ private val tileSpacing = 12.dp
 private val tilePadding = 8.dp
 
 /**
- * "How do you feel today?" and one large tile per main section: three in a row, or one per row when
- * a label wouldn't fit in a third of the width (small screen or large font). Prescriptions shows a
- * badge with how many wait for the patient ([prescriptionsToConfirm], US-43).
+ * "How do you feel today?" ([withQuestion]) and one large tile per main section: three in a row, or
+ * one per row when a label wouldn't fit in a third of the width (small screen or large font).
+ * Prescriptions shows a badge with how many wait for the patient ([prescriptionsToConfirm], US-43).
  */
 @Composable
 private fun Shortcuts(
     onShortcutClick: (OverviewShortcut) -> Unit,
     tiles: List<OverviewShortcut>,
     prescriptionsToConfirm: Int = 0,
+    withQuestion: Boolean = true,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text(
-        text = stringResource(R.string.overview_subtitle),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    if (withQuestion) {
+      Text(
+          text = stringResource(R.string.overview_subtitle),
+          style = MaterialTheme.typography.bodyLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     BoxWithConstraints(Modifier.fillMaxWidth().testTag(C.Tag.overview_shortcuts)) {
       val labelStyle = MaterialTheme.typography.titleMedium
       val labels = tiles.map { stringResource(it.label) }

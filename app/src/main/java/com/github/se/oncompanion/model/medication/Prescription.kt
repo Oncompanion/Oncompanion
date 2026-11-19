@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.medication
@@ -17,6 +18,8 @@ import java.time.LocalDate
  * @property addedBy the uid of the caregiver who added it for the patient (US-43), or `null` when
  *   the patient did
  * @property addedByName that caregiver's first name, shown as "Added by Sam"
+ * @property editedBy the caregiver who last edited it, null when the patient edited it last
+ * @property editedByName that caregiver's first name, shown as "Edited by Sam"
  * @property confirmation whether the patient confirmed it; only a caregiver's can wait for it
  */
 data class Prescription(
@@ -28,6 +31,8 @@ data class Prescription(
     val addedBy: String? = null,
     val addedByName: String? = null,
     val confirmation: PrescriptionConfirmation = PrescriptionConfirmation.CONFIRMED,
+    val editedBy: String? = null,
+    val editedByName: String? = null,
 ) {
   /** Whether the patient confirmed it: theirs always are, a caregiver's once they confirm it. */
   val isConfirmed: Boolean
@@ -46,7 +51,13 @@ data class Prescription(
           medications.distinctBy { it.id }.size == medications.size &&
           // A caregiver's prescription says who added it; the patient's is confirmed
           (if (addedBy == null) isConfirmed
-          else !addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH)
+          else !addedByName.isNullOrBlank() && addedByName.length <= MAX_ADDED_BY_NAME_LENGTH) &&
+          // An edit is signed with both parts, or neither when the patient edited last.
+          (if (editedBy == null) editedByName == null
+          else
+              editedBy.isNotBlank() &&
+                  !editedByName.isNullOrBlank() &&
+                  editedByName.length <= MAX_ADDED_BY_NAME_LENGTH)
 
   companion object {
     /** Keep in sync with `firestore.rules`. */

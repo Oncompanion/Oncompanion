@@ -73,12 +73,22 @@
     <string name="overview_today_at">Today, %1$s</string>
     <string name="overview_tomorrow_at">Tomorrow, %1$s</string>
     <string name="overview_no_appointment">No upcoming appointment</string>
-    <string name="overview_no_appointment_hint">Add your next appointment in Planning to see it here.</string>
     <string name="overview_open_planning">Open Planning</string>
     <string name="overview_today">Today</string>
     <string name="overview_see_planning">See planning</string>
     <string name="overview_nothing_today">Nothing planned today</string>
     <string name="overview_nothing_today_hint">Medications, appointments and events of the day will appear here.</string>
+    <string name="overview_nothing_else_today">Nothing else today</string>
+    <string name="overview_nothing_else_today_hint">Today\'s plan is in Planning.</string>
+    <string name="overview_next_up">Next up</string>
+    <string name="overview_with_place">%1$s · %2$s</string>
+    <string name="overview_today_medications">Today\'s medications</string>
+    <string name="overview_today_medications_count">Today\'s medications · %1$d</string>
+    <plurals name="overview_more_medications">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
+    <string name="overview_planning_link">Planning</string>
     <string name="overview_next">Next</string>
     <string name="overview_now">Now</string>
     <string name="overview_no_set_time">No set time</string>
@@ -87,6 +97,9 @@
     <string name="overview_error_hint">Your shortcuts still work. Please try again.</string>
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
+    <string name="overview_check_in_title">How do you feel?</string>
+    <string name="overview_check_in_more">More…</string>
+    <string name="overview_journal_link">Journal</string>
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
@@ -493,7 +506,6 @@
     <string name="prescription_form_edit_title">Edit prescription</string>
     <string name="prescription_form_not_found_title">This prescription no longer exists</string>
     <string name="prescription_form_not_found_hint">It may have been deleted on another device.</string>
-    <string name="prescription_form_not_signed_in_title">You\'re signed out</string>
     <string name="prescription_form_not_signed_in_hint">Sign in again to edit your prescription.</string>
     <string name="prescription_form_load_error_title">Couldn\'t open this prescription</string>
     <string name="prescription_form_load_error_hint">Something went wrong. Please try again.</string>
@@ -581,6 +593,22 @@
     <string name="prescription_reject_cancel">Cancel</string>
     <string name="prescription_form_error_reject_failed">Couldn\'t reject this prescription. Please try again.</string>
     <string name="prescription_form_already_confirmed">This prescription was already confirmed, so it can\'t be rejected any more.</string>
+    <!-- #277: the list and the detail when nothing can be read, so retrying can't help -->
+    <string name="prescriptions_signed_out_title">You\'re signed out</string>
+    <string name="prescriptions_signed_out_hint">Sign in again to see your prescriptions.</string>
+    <!-- #277: a caregiver the patient removed from their circle, e.g. "You can\'t see Anne\'s prescriptions anymore" -->
+    <string name="prescriptions_no_access_title_for">You can\'t see %1$s\'s prescriptions anymore</string>
+    <string name="prescriptions_no_access_hint_for">You\'re no longer in %1$s\'s care circle.</string>
+    <!-- #490: the same, in the instant after the app forgot the patient\'s name -->
+    <string name="prescriptions_no_access_title_unnamed">You can\'t see these prescriptions anymore</string>
+    <string name="prescriptions_no_access_hint_unnamed">You\'re no longer in this care circle.</string>
+
+    <!-- Caregiver prescription edits (US-46) -->
+    <string name="prescription_form_edit_title_for">Edit %1$s\'s prescription</string>
+    <string name="prescription_delete_title_for">Delete %1$s\'s prescription?</string>
+    <string name="prescription_delete_message_for">It will be removed from %1$s\'s prescriptions with all its medications. You can\'t undo this.</string>
+    <string name="prescription_form_not_allowed_title">This prescription can\'t be edited</string>
+    <string name="prescription_form_not_allowed_hint">You don\'t currently have permission to edit this patient\'s prescriptions.</string>
 
     <!-- Prescription scan (US-10) -->
     <string name="prescription_scan_title">Scan prescription</string>
@@ -740,4 +768,13 @@
     <string name="appointment_edit_for">Edit %1$s\'s appointment</string>
     <string name="appointment_delete_title_for">Delete %1$s\'s appointment?</string>
     <string name="appointment_delete_message_for">It will be removed from %1$s\'s planning. You can\'t undo this.</string>
+    <!-- A caregiver edits or deletes the patient's symptom, e.g. "Delete Anne's entry?" -->
+    <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
+    <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
+    <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_empty">Your preferences will appear here as they become available.</string>
+    <string name="settings_profile_summary">Appearance, language and more</string>
 </resources>

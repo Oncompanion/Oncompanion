@@ -194,7 +194,7 @@ class AppointmentNavigationTest {
         ),
     )
     show(Route.OVERVIEW)
-    compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    compose.onNodeWithTag(C.Tag.overview_next_up).performClick()
     compose.onNodeWithTag(C.Tag.appointment_detail_screen).assertIsDisplayed()
     compose.onNodeWithText("Overview visit").assertIsDisplayed()
     compose.runOnIdle {
@@ -274,7 +274,7 @@ class AppointmentNavigationTest {
     compose.onNodeWithTag(C.Tag.planning_heading).assertTextContains(PlanningDates.format(day))
     compose.onNodeWithText("Updated visit").assertIsDisplayed()
     compose.runOnIdle { NavigationActions(nav).navigateToTab(Route.OVERVIEW) }
-    compose.onNodeWithTag(C.Tag.overview_next_appointment).assertTextContains("Updated visit")
+    compose.onNodeWithTag(C.Tag.overview_next_up).assertTextContains("Updated visit")
     assertEquals("edit-visit", repository.appointments("uid-patient").single().id)
   }
 
@@ -292,7 +292,7 @@ class AppointmentNavigationTest {
         ),
     )
     show(Route.OVERVIEW)
-    compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    compose.onNodeWithTag(C.Tag.overview_next_up).performClick()
     compose.onNodeWithTag(C.Tag.appointment_detail_edit_button).performClick()
     compose.onNodeWithTag(C.Tag.appointment_title).performTextClearance()
     compose.onNodeWithTag(C.Tag.appointment_save).performScrollTo().assertIsNotEnabled()
@@ -510,7 +510,7 @@ class AppointmentNavigationTest {
         Appointment("second", "Second visit", time.plusSeconds(3600), AppointmentType.OTHER),
     )
     show(Route.OVERVIEW)
-    compose.onNodeWithTag(C.Tag.overview_next_appointment).performClick()
+    compose.onNodeWithTag(C.Tag.overview_next_up).performClick()
     compose.onNodeWithTag(C.Tag.appointment_detail_delete_button).performClick()
     compose.onNodeWithTag(C.Tag.appointment_delete_confirm).performClick()
     compose.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()

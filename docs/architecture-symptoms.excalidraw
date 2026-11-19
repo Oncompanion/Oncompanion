@@ -249,8 +249,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "AddSymptomScreen\n(+ ViewModel)\nlog and edit",
-      "originalText": "AddSymptomScreen\n(+ ViewModel)\nlog and edit",
+      "text": "AddSymptomScreen\n(+ ViewModel)\nlog, edit, dictate",
+      "originalText": "AddSymptomScreen\n(+ ViewModel)\nlog, edit, dictate",
       "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
@@ -319,8 +319,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Voice journal (US-44)\n(planned)",
-      "originalText": "Voice journal (US-44)\n(planned)",
+      "text": "Listening view (US-44)\n(planned)",
+      "originalText": "Listening view (US-44)\n(planned)",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
@@ -400,85 +400,11 @@
       "autoResize": true
     },
     {
-      "id": "log",
+      "id": "parse",
       "type": "rectangle",
       "x": 1290,
       "y": 200,
       "width": 240,
-      "height": 100,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dashed",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 3
-      },
-      "seed": 1674765457,
-      "version": 1,
-      "versionNonce": 65054740,
-      "isDeleted": false,
-      "boundElements": [
-        {
-          "type": "text",
-          "id": "log_t"
-        },
-        {
-          "type": "arrow",
-          "id": "log_parse"
-        }
-      ],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false
-    },
-    {
-      "id": "log_t",
-      "type": "text",
-      "x": 1279.1,
-      "y": 218.125,
-      "width": 261.8,
-      "height": 63.75,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": null,
-      "seed": 275012946,
-      "version": 1,
-      "versionNonce": 684617509,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "text": "LogSymptom: transcript\n→ form draft, offline (#365)\n(planned)",
-      "originalText": "LogSymptom: transcript\n→ form draft, offline (#365)\n(planned)",
-      "fontSize": 17,
-      "fontFamily": 2,
-      "textAlign": "center",
-      "verticalAlign": "middle",
-      "containerId": "log",
-      "lineHeight": 1.25,
-      "autoResize": true
-    },
-    {
-      "id": "parse",
-      "type": "rectangle",
-      "x": 1050,
-      "y": 200,
-      "width": 210,
       "height": 100,
       "angle": 0,
       "strokeColor": "#f08c00",
@@ -501,10 +427,6 @@
         {
           "type": "text",
           "id": "parse_t"
-        },
-        {
-          "type": "arrow",
-          "id": "log_parse"
         }
       ],
       "updated": 1794000000000,
@@ -514,9 +436,9 @@
     {
       "id": "parse_t",
       "type": "text",
-      "x": 1060,
+      "x": 1300,
       "y": 216.25,
-      "width": 190,
+      "width": 220,
       "height": 67.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -546,58 +468,6 @@
       "containerId": "parse",
       "lineHeight": 1.25,
       "autoResize": true
-    },
-    {
-      "id": "log_parse",
-      "type": "arrow",
-      "x": 1290,
-      "y": 250,
-      "width": 30,
-      "height": 0,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 559012237,
-      "version": 1,
-      "versionNonce": 90213377,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -30,
-          0
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "log",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "parse",
-        "focus": 0,
-        "gap": 4
-      }
     },
     {
       "id": "auth",
@@ -1472,6 +1342,110 @@
       }
     },
     {
+      "id": "add_parse",
+      "type": "arrow",
+      "x": 990,
+      "y": 100,
+      "width": 300,
+      "height": 130,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 764348789,
+      "version": 1,
+      "versionNonce": 441257927,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          300,
+          130
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "add",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "parse",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "add_speech",
+      "type": "arrow",
+      "x": 990,
+      "y": 115,
+      "width": 300,
+      "height": 280,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1747967563,
+      "version": 1,
+      "versionNonce": 23945472,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          300,
+          280
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "add",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "speech",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
       "id": "voice_add",
       "type": "arrow",
       "x": 1290,
@@ -1519,110 +1493,6 @@
       },
       "endBinding": {
         "elementId": "add",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "voice_log",
-      "type": "arrow",
-      "x": 1410.0,
-      "y": 120,
-      "width": 0.0,
-      "height": 80,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 510745612,
-      "version": 1,
-      "versionNonce": 189794880,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0.0,
-          80
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "voice",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "log",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "log_speech",
-      "type": "arrow",
-      "x": 1410.0,
-      "y": 300,
-      "width": 0.0,
-      "height": 80,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 193016890,
-      "version": 1,
-      "versionNonce": 1622659116,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0.0,
-          80
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "log",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "speech",
         "focus": 0,
         "gap": 4
       }
@@ -2217,7 +2087,7 @@
       "x": 20,
       "y": 700,
       "width": 1534,
-      "height": 67.5,
+      "height": 112.5,
       "angle": 0,
       "strokeColor": "#495057",
       "backgroundColor": "transparent",
@@ -2237,8 +2107,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "AddSymptomScreen also reads AuthRepository (who signs the entry). A caregiver adds a symptom only if the patient allows it (canAdd, US-22);\nediting and deleting for the patient come with #341. The voice journal fills the same form, which the patient confirms before saving.\nThe \"This week\" card of the journal is summed up from the entries it already loads (weekSummaryOf): no extra query.",
-      "originalText": "AddSymptomScreen also reads AuthRepository (who signs the entry). A caregiver adds a symptom only if the patient allows it (canAdd, US-22);\nediting and deleting for the patient come with #341. The voice journal fills the same form, which the patient confirms before saving.\nThe \"This week\" card of the journal is summed up from the entries it already loads (weekSummaryOf): no extra query.",
+      "text": "AddSymptomScreen also reads AuthRepository (who signs the entry). A caregiver adds a symptom only if the patient allows it (canAdd, US-22),\nand edits or deletes one, signed as its editor, only if they allow that too (canEditAndDelete, US-46).\nA dictated symptom is drafted by parseSpokenSymptom into the same form, which the patient confirms before saving.\nThe \"This week\" card of the journal is summed up from the entries it already loads (weekSummaryOf): no extra query.\nThe Overview's check-in opens AddSymptomScreen with a symptom picked (Screen.symptomAdd(type), Overview UX Refactor).",
+      "originalText": "AddSymptomScreen also reads AuthRepository (who signs the entry). A caregiver adds a symptom only if the patient allows it (canAdd, US-22),\nand edits or deletes one, signed as its editor, only if they allow that too (canEditAndDelete, US-46).\nA dictated symptom is drafted by parseSpokenSymptom into the same form, which the patient confirms before saving.\nThe \"This week\" card of the journal is summed up from the entries it already loads (weekSummaryOf): no extra query.\nThe Overview's check-in opens AddSymptomScreen with a symptom picked (Screen.symptomAdd(type), Overview UX Refactor).",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "left",

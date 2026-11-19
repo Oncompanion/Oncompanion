@@ -1,4 +1,5 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion
 
@@ -11,12 +12,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isOff
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.navigation.compose.ComposeNavigator
@@ -25,6 +28,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.domain.auth.SignOutState
 import com.github.se.oncompanion.model.carecircle.CareCircleInvite
+import com.github.se.oncompanion.model.medication.Medication
+import com.github.se.oncompanion.model.medication.MedicationRepositoryFirestore
+import com.github.se.oncompanion.model.medication.Prescription
+import com.github.se.oncompanion.model.medication.PrescriptionConfirmation
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.GoogleCredentialProvider
 import com.github.se.oncompanion.ui.navigation.Route
@@ -33,10 +40,13 @@ import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.EndToEndTestDriver
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.Source
+import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -141,7 +151,7 @@ class M2EndToEndTest {
   fun patientAndCaregiver_shareLogAndRevokeSymptoms() {
     ui.startApp(credentials)
     signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
-    openSymptoms()
+    openSymptoms(asPatient = true)
     logSymptom("FATIGUE", patientNotes)
     ui.open(C.Tag.symptom_back_button, patientGreeting())
     inviteCaregiver()
@@ -156,7 +166,7 @@ class M2EndToEndTest {
     )
     assertNotEquals("Each person must have their own account", patient.uid, caregiver.uid)
     joinCareCircle()
-    openSymptoms()
+    openSymptoms(asPatient = false)
     assertSymptom("FATIGUE", patientNotes)
     assertReadOnly(patientNotes)
     ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
@@ -169,7 +179,7 @@ class M2EndToEndTest {
     // Sign-out clears local data: an existing circle must be found again through Whose care.
     ui.open(C.Tag.google_sign_in_button, caregiverTitle())
     assertEquals(caregiver.uid, FirebaseEmulator.auth.currentUser?.uid)
-    openSymptoms()
+    openSymptoms(asPatient = false)
     assertSymptom("FATIGUE", patientNotes)
     assertSymptom("NAUSEA", caregiverNotes)
     assertReadOnly(patientNotes)
@@ -180,7 +190,7 @@ class M2EndToEndTest {
     credentials.select(patient)
     ui.open(C.Tag.google_sign_in_button, patientGreeting())
     assertEquals(patient.uid, FirebaseEmulator.auth.currentUser?.uid)
-    openSymptoms()
+    openSymptoms(asPatient = true)
     assertSymptom("FATIGUE", patientNotes)
     val addedBy = compose.activity.getString(R.string.symptom_added_by, circleName)
     val caregiverRow = symptomRow(caregiverNotes)
@@ -235,13 +245,222 @@ class M2EndToEndTest {
     compose.onNodeWithTag(C.Tag.symptom_journal_add).assertDoesNotExist()
   }
 
+  /**
+   * Caregiver edits target the patient, keep confirmation pending and delete only after consent.
+   */
+  @Test
+  fun caregiver_editsAndDeletesThePatientsPrescription() {
+    ui.startApp(credentials)
+    signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
+    inviteCaregiver(addPrescriptions = true)
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    signOutThroughProfile()
+    credentials.select(caregiver)
+    signInAndOnboard(
+        caregiver,
+        C.Tag.onboarding_role_caregiver,
+        hasTestTag(C.Tag.join_circle_screen),
+    )
+    joinCareCircle()
+    val patientUid = checkNotNull(patient.uid)
+    val caregiverUid = checkNotNull(caregiver.uid)
+    val prescriptionId = "m2-prescription-$run"
+    val confirmedId = "m2-confirmed-$run"
+    // Edit/delete permission is granted only after the invitation has been accepted.
+    signOutThroughProfile()
+    credentials.select(patient)
+    ui.open(C.Tag.google_sign_in_button, patientGreeting())
+    assertAcceptedMember()
+    ui.open(C.Tag.careCircleMember(caregiverUid), hasTestTag(C.Tag.care_circle_member_details))
+    val edit = C.Tag.careCircleFormCanEditAndDelete("PRESCRIPTIONS")
+    ui.open(C.Tag.care_circle_member_edit_button, hasTestTag(edit))
+        .reveal()
+        .assertIsOff()
+        .performClick()
+    ui.tag(edit).assertIsOn()
+    ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_member_details))
+    ui.open(C.Tag.care_circle_member_back_button, hasTestTag(C.Tag.care_circle_member_list))
+    ui.open(C.Tag.care_circle_back_button, patientGreeting())
+    runBlocking {
+      MedicationRepositoryFirestore(FirebaseEmulator.firestore)
+          .addPrescription(patientUid, prescriptionFixture(confirmedId))
+      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
+    }
+    signOutThroughProfile()
+    credentials.select(caregiver)
+    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
+    // Seed a pending prescription; edits, account switches and deletion use real screens.
+    runBlocking {
+      val repository = MedicationRepositoryFirestore(FirebaseEmulator.firestore)
+      repository.addPrescription(patientUid, prescriptionFixture(prescriptionId, caregiverUid))
+      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
+    }
+    ui.open(C.Tag.overview_shortcut_prescriptions, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptionsItem(prescriptionId), hasTestTag(C.Tag.prescription_detail_content))
+    ui.waitFor(
+        hasTestTag(C.Tag.added_by) and
+            hasText(compose.activity.getString(R.string.added_by_not_confirmed, "Julie"))
+    )
+    ui.open(
+            C.Tag.prescription_detail_edit_button,
+            hasTestTag(C.Tag.prescription_form_prescribed_by_field),
+        )
+        .replaceText("Dr Updated")
+    // Editing a pending entry never exposes the patient's Confirm or Reject actions.
+    compose.onNodeWithTag(C.Tag.prescription_form_reject_button).assertDoesNotExist()
+    compose
+        .onNodeWithText(compose.activity.getString(R.string.prescription_confirm_save))
+        .assertDoesNotExist()
+    ui.tag(C.Tag.prescription_form_save_button)
+        .assertTextEquals(compose.activity.getString(R.string.prescription_form_save))
+    ui.open(C.Tag.prescription_form_save_button, hasTestTag(C.Tag.prescription_detail_content))
+    ui.waitFor(hasText("Dr Updated")).assertIsDisplayed()
+    ui.waitFor(
+            hasTestTag(C.Tag.edited_by) and
+                hasText(compose.activity.getString(R.string.edited_by, "Julie"))
+        )
+        .assertIsDisplayed()
+    ui.waitFor(
+        hasTestTag(C.Tag.added_by) and
+            hasText(compose.activity.getString(R.string.added_by_not_confirmed, "Julie"))
+    )
+    runBlocking {
+      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
+      val stored =
+          FirebaseEmulator.firestore
+              .collection("users")
+              .document(patientUid)
+              .collection("prescriptions")
+              .document(prescriptionId)
+              .get(Source.SERVER)
+              .await()
+      assertEquals("Dr Updated", stored.getString("prescribedBy"))
+      assertEquals("PENDING", stored.getString("confirmation"))
+      assertEquals(caregiverUid, stored.getString("editedBy"))
+      assertEquals(caregiverUid, stored.getString("addedBy"))
+      assertTrue(
+          FirebaseEmulator.firestore
+              .collection("users")
+              .document(caregiverUid)
+              .collection("prescriptions")
+              .get(Source.SERVER)
+              .await()
+              .isEmpty
+      )
+    }
+    // A confirmed entry opens its detail for the patient; pending entries open the review form.
+    ui.open(C.Tag.prescription_detail_back_button, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptionsItem(confirmedId), hasTestTag(C.Tag.prescription_detail_content))
+    ui.open(
+            C.Tag.prescription_detail_edit_button,
+            hasTestTag(C.Tag.prescription_form_prescribed_by_field),
+        )
+        .replaceText("Dr Confirmed Updated")
+    ui.open(C.Tag.prescription_form_save_button, hasTestTag(C.Tag.prescription_detail_content))
+    ui.waitFor(hasText("Dr Confirmed Updated")).assertIsDisplayed()
+    runBlocking {
+      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
+      val stored =
+          FirebaseEmulator.firestore
+              .collection("users")
+              .document(patientUid)
+              .collection("prescriptions")
+              .document(confirmedId)
+              .get(Source.SERVER)
+              .await()
+      assertEquals("CONFIRMED", stored.getString("confirmation"))
+      assertEquals(caregiverUid, stored.getString("editedBy"))
+    }
+    // The patient sees their private contact name for the caregiver who edited the entry.
+    returnToOverviewFromPrescription()
+    signOutThroughProfile()
+    credentials.select(patient)
+    ui.open(C.Tag.google_sign_in_button, patientGreeting())
+    ui.open(C.Tag.overview_shortcut_prescriptions, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptionsItem(confirmedId), hasTestTag(C.Tag.prescription_detail_content))
+    ui.waitFor(
+            hasTestTag(C.Tag.edited_by) and
+                hasText(compose.activity.getString(R.string.edited_by, circleName)),
+            unmerged = true,
+        )
+        .reveal()
+        .assertIsDisplayed()
+    ui.waitFor(hasText("Dr Confirmed Updated")).assertIsDisplayed()
+    ui.open(C.Tag.prescription_detail_back_button, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptionsItem(prescriptionId), hasTestTag(C.Tag.prescription_confirm_notice))
+    ui.waitFor(hasText("Dr Updated")).assertIsDisplayed()
+    ui.open(C.Tag.prescription_form_close_button, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptions_back_button, patientGreeting())
+    signOutThroughProfile()
+    credentials.select(caregiver)
+    ui.open(C.Tag.google_sign_in_button, caregiverTitle())
+    ui.open(C.Tag.overview_shortcut_prescriptions, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptionsItem(prescriptionId), hasTestTag(C.Tag.prescription_detail_content))
+    ui.open(C.Tag.prescription_detail_delete_button, hasTestTag(C.Tag.prescription_delete_dialog))
+    ui.waitFor(
+        hasText(
+            compose.activity.getString(R.string.prescription_delete_title_for, patient.firstName)
+        )
+    )
+    ui.open(C.Tag.prescription_delete_cancel, hasTestTag(C.Tag.prescription_detail_content))
+    ui.waitFor(hasText("Dr Updated")).assertIsDisplayed()
+    ui.open(C.Tag.prescription_detail_delete_button, hasTestTag(C.Tag.prescription_delete_dialog))
+    ui.open(C.Tag.prescription_delete_confirm, hasTestTag(C.Tag.prescriptions_list))
+    ui.waitFor(hasTestTag(C.Tag.prescriptionsItem(prescriptionId)), gone = true)
+    ui.waitFor(hasTestTag(C.Tag.prescriptionsItem(confirmedId))).assertIsDisplayed()
+    runBlocking {
+      withTimeout(10_000) { FirebaseEmulator.firestore.waitForPendingWrites().await() }
+      assertFalse(
+          FirebaseEmulator.firestore
+              .collection("users")
+              .document(patientUid)
+              .collection("prescriptions")
+              .document(prescriptionId)
+              .get(Source.SERVER)
+              .await()
+              .exists()
+      )
+    }
+  }
+
+  /** Fictional data covers both pending caregiver additions and confirmed patient prescriptions. */
+  private fun prescriptionFixture(id: String, addedBy: String? = null) =
+      Prescription(
+          id = id,
+          prescribedBy = "Dr Martin",
+          prescribedOn = LocalDate.now(),
+          medications =
+              listOf(
+                  Medication(
+                      id = "$id-medication",
+                      prescriptionId = id,
+                      name = "Fictional medication",
+                      startDate = LocalDate.now(),
+                  )
+              ),
+          addedBy = addedBy,
+          addedByName = addedBy?.let { caregiver.firstName },
+          confirmation =
+              if (addedBy == null) PrescriptionConfirmation.CONFIRMED
+              else PrescriptionConfirmation.PENDING,
+      )
+
+  private fun returnToOverviewFromPrescription() {
+    ui.open(C.Tag.prescription_detail_back_button, hasTestTag(C.Tag.prescriptions_list))
+    ui.open(C.Tag.prescriptions_back_button, hasTestTag(C.Tag.overview_shortcut_profile))
+  }
+
   private fun signInAndOnboard(account: Account, roleTag: String, destination: SemanticsMatcher) {
     ui.signInAndOnboard(account.firstName, roleTag, destination)
     checkNotNull(account.uid) { "The new account wasn't recorded" }
   }
 
-  private fun openSymptoms() =
-      ui.open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
+  /** The patient opens the journal from the check-in's "Journal ›", a caregiver from its tile. */
+  private fun openSymptoms(asPatient: Boolean) =
+      ui.open(
+          if (asPatient) C.Tag.overview_journal_link else C.Tag.overview_shortcut_symptoms,
+          hasTestTag(C.Tag.symptom_journal_add),
+      )
 
   private fun logSymptom(type: String, notes: String) {
     ui.open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType(type))).performClick()
@@ -294,7 +513,7 @@ class M2EndToEndTest {
     )
   }
 
-  private fun inviteCaregiver() {
+  private fun inviteCaregiver(addPrescriptions: Boolean = false) {
     ui.open(C.Tag.overview_shortcut_care_circle, hasTestTag(C.Tag.care_circle_empty_add_button))
     ui.open(C.Tag.care_circle_empty_add_button, hasTestTag(C.Tag.care_circle_form_first_name))
         .replaceText(circleName)
@@ -313,6 +532,10 @@ class M2EndToEndTest {
     // Keep one shared shortcut after revocation, proving permissions finished loading at sign-in.
     ui.tag(C.Tag.careCircleFormPermission("PRESCRIPTIONS")).reveal().assertIsOff().performClick()
     ui.tag(C.Tag.careCircleFormPermission("PRESCRIPTIONS")).assertIsOn()
+    if (addPrescriptions) {
+      ui.tag(C.Tag.careCircleFormCanAdd("PRESCRIPTIONS")).reveal().assertIsOff().performClick()
+      ui.tag(C.Tag.careCircleFormCanAdd("PRESCRIPTIONS")).assertIsOn()
+    }
     ui.open(C.Tag.care_circle_form_save_button, hasTestTag(C.Tag.care_circle_invite_code))
     val displayed =
         ui.tag(C.Tag.care_circle_invite_code)

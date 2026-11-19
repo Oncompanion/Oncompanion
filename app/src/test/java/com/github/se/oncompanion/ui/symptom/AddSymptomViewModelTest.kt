@@ -2,8 +2,15 @@
 
 package com.github.se.oncompanion.ui.symptom
 
+import androidx.lifecycle.ViewModelStore
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.RejectedWrites
+import com.github.se.oncompanion.model.speech.FakeSpeechRecognizer
+import com.github.se.oncompanion.model.speech.SpeechError
+import com.github.se.oncompanion.model.speech.SpeechEvent
+import com.github.se.oncompanion.model.speech.SpeechLanguage
+import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
 import com.github.se.oncompanion.model.symptom.FakeSymptomRepository
 import com.github.se.oncompanion.model.symptom.SymptomEntry
 import com.github.se.oncompanion.model.symptom.SymptomRepositoryProvider
@@ -21,6 +28,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,6 +36,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -71,6 +80,9 @@ class AddSymptomViewModelTest {
 
   private lateinit var auth: FakeAuthRepository
 
+  /** The phone's speech recognizer, which the test speaks through. */
+  private val speech = FakeSpeechRecognizer()
+
   @Before
   fun setUp() {
     Dispatchers.setMain(dispatcher)
@@ -83,7 +95,8 @@ class AddSymptomViewModelTest {
     Dispatchers.resetMain()
   }
 
-  private fun viewModel() = AddSymptomViewModel(auth, repository, clock)
+  private fun viewModel(locale: Locale = Locale.ENGLISH) =
+      AddSymptomViewModel(auth, repository, clock, speechRecognizer = speech, locale = locale)
 
   private val AddSymptomViewModel.state
     get() = uiState.value
@@ -118,6 +131,26 @@ class AddSymptomViewModelTest {
     viewModel.toggleType(SymptomType.FATIGUE)
     assertEquals(emptyList<SymptomType>(), viewModel.state.types)
     assertFalse(viewModel.state.canSave)
+  }
+
+  @Test
+  fun aPickedSymptom_startsTicked_andCanBeJoinedOrUnticked() {
+    // A check-in tile on the Overview opens the form with its symptom picked
+    val viewModel =
+        AddSymptomViewModel(
+            auth,
+            repository,
+            clock,
+            speechRecognizer = speech,
+            picked = SymptomType.FEVER,
+        )
+    assertEquals(listOf(SymptomType.FEVER), viewModel.state.types)
+    assertTrue(viewModel.state.canSave)
+
+    viewModel.toggleType(SymptomType.PAIN)
+    viewModel.toggleType(SymptomType.FEVER)
+    assertEquals(listOf(SymptomType.PAIN), viewModel.state.types)
+    assertTrue(repository.symptoms(uid).isEmpty())
   }
 
   @Test
@@ -471,6 +504,7 @@ class AddSymptomViewModelTest {
                 now = today.atTime(14, 0),
                 types = listOf(SymptomType.FATIGUE),
                 save = SavePhase.SAVED,
+                canDictate = true,
             ),
             viewModel.state,
         )
@@ -485,6 +519,7 @@ class AddSymptomViewModelTest {
         try {
           AuthRepositoryProvider.repository = auth
           SymptomRepositoryProvider.repository = repository
+          SpeechRecognizerProvider.recognizer = speech
 
           // Only the clock is passed: the repositories come from the providers
           val viewModel = AddSymptomViewModel(clock = clock)
@@ -496,6 +531,7 @@ class AddSymptomViewModelTest {
         } finally {
           AuthRepositoryProvider.repository = previousAuth
           SymptomRepositoryProvider.repository = previousSymptoms
+          SpeechRecognizerProvider.reset()
         }
       }
 
@@ -515,7 +551,13 @@ class AddSymptomViewModelTest {
   /** A ViewModel editing [entry], which is stored for [uid]. */
   private fun editing(entry: SymptomEntry = logged): AddSymptomViewModel {
     repository.seed(uid, entry)
-    return AddSymptomViewModel(auth, repository, clock, symptomId = entry.id)
+    return AddSymptomViewModel(
+        auth,
+        repository,
+        clock,
+        symptomId = entry.id,
+        speechRecognizer = speech,
+    )
   }
 
   @Test
@@ -541,9 +583,35 @@ class AddSymptomViewModelTest {
       }
 
   @Test
+  fun editing_ignoresAPickedSymptom() =
+      runTest(dispatcher) {
+        repository.seed(uid, logged)
+        val viewModel =
+            AddSymptomViewModel(
+                auth,
+                repository,
+                clock,
+                symptomId = logged.id,
+                speechRecognizer = speech,
+                picked = SymptomType.PAIN,
+            )
+        advanceUntilIdle()
+
+        assertEquals(listOf(SymptomType.FATIGUE), viewModel.state.types)
+        assertFalse(viewModel.state.hasChanges)
+      }
+
+  @Test
   fun editing_aSymptomThatNoLongerExists_isNotFound() =
       runTest(dispatcher) {
-        val viewModel = AddSymptomViewModel(auth, repository, clock, symptomId = "missing")
+        val viewModel =
+            AddSymptomViewModel(
+                auth,
+                repository,
+                clock,
+                symptomId = "missing",
+                speechRecognizer = speech,
+            )
         advanceUntilIdle()
 
         assertTrue(viewModel.state.isNotFound)
@@ -824,6 +892,7 @@ class AddSymptomViewModelTest {
           clock,
           patientUid = "patient",
           profileRepository = profiles,
+          speechRecognizer = speech,
       )
 
   @Test
@@ -900,5 +969,454 @@ class AddSymptomViewModelTest {
 
         assertNull(savedEntry().addedBy)
         assertNull(savedEntry().addedByName)
+      }
+
+  // ----- Dictating a symptom (US-44) -----
+
+  /** A form listening to the patient, who has allowed the microphone. */
+  private fun TestScope.listening(viewModel: AddSymptomViewModel = viewModel()) = viewModel.also {
+    it.onSpeak(hasMicrophone = true)
+    advanceUntilIdle()
+  }
+
+  /** The phone hears [events] in the session being listened to. */
+  private fun TestScope.hear(vararg events: SpeechEvent) {
+    speech.send(*events)
+    advanceUntilIdle()
+  }
+
+  /** A form that has heard [transcript], ready to use it. */
+  private fun TestScope.heard(transcript: String, viewModel: AddSymptomViewModel = viewModel()) =
+      listening(viewModel).also { hear(SpeechEvent.FinalText(transcript)) }
+
+  @Test
+  fun dictating_isOfferedOnlyOnPhonesWithASpeechRecognizer() =
+      runTest(dispatcher) {
+        for (available in listOf(true, false)) {
+          speech.available = available
+          val viewModel = viewModel()
+
+          assertEquals(available, viewModel.state.canDictate)
+          viewModel.onSpeak(hasMicrophone = true)
+          advanceUntilIdle()
+          assertEquals(available, viewModel.state.voice != null)
+          viewModel.cancelVoice()
+        }
+      }
+
+  @Test
+  fun withoutTheMicrophone_theAppExplainsBeforeAndroidAsks() =
+      runTest(dispatcher) {
+        val allowing = viewModel()
+        allowing.onSpeak(hasMicrophone = false)
+        advanceUntilIdle()
+        assertEquals(VoiceUiState.ExplainingMicrophone, allowing.state.voice)
+        assertFalse(speech.isListening)
+
+        // Allowed in Android's dialog: listening starts
+        allowing.onMicrophoneAnswer(granted = true)
+        advanceUntilIdle()
+        assertEquals(VoiceUiState.Listening(), allowing.state.voice)
+        assertTrue(speech.isListening)
+        allowing.cancelVoice()
+
+        // Refused: the screen explains how to allow it
+        val refusing = viewModel()
+        refusing.onSpeak(hasMicrophone = false)
+        refusing.onMicrophoneAnswer(granted = false)
+        advanceUntilIdle()
+        assertEquals(VoiceUiState.MicrophoneRefused, refusing.state.voice)
+        assertFalse(speech.isListening)
+      }
+
+  @Test
+  fun androidsAnswer_afterThePatientLeftDictating_isIgnored() =
+      runTest(dispatcher) {
+        // Cancelled while Android asked, or a new form after the app was restarted meanwhile
+        val leftDictating: List<Pair<String, () -> AddSymptomViewModel>> =
+            listOf(
+                "cancelled" to
+                    {
+                      viewModel().also {
+                        it.onSpeak(hasMicrophone = false)
+                        it.cancelVoice()
+                      }
+                    },
+                "restarted" to { viewModel() },
+            )
+        for ((how, form) in leftDictating) {
+          for (granted in listOf(true, false)) {
+            val viewModel = form()
+            viewModel.onMicrophoneAnswer(granted)
+            advanceUntilIdle()
+
+            assertNull("$how, granted=$granted", viewModel.state.voice)
+            assertEquals("$how, granted=$granted", emptyList<SpeechLanguage>(), speech.languages)
+          }
+        }
+      }
+
+  @Test
+  fun listening_showsTheWordsAsTheyAreSaid_thenWhatWasPickedUp() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        assertEquals(listOf(SpeechLanguage.ENGLISH), speech.languages)
+
+        // What is picked up shows while the patient speaks
+        hear(SpeechEvent.Listening, SpeechEvent.PartialText("I feel sick"))
+        val listening = viewModel.state.voice as VoiceUiState.Listening
+        assertEquals("I feel sick", listening.text)
+        assertEquals(listOf(SymptomType.NAUSEA), listening.draft.types)
+
+        hear(SpeechEvent.FinalText("I feel sick 7/10"))
+        val heard = viewModel.state.voice as VoiceUiState.Heard
+        assertEquals("I feel sick 7/10", heard.transcript)
+        assertEquals(listOf(SymptomType.NAUSEA), heard.draft.types)
+        assertEquals(7, heard.draft.intensity)
+        // Nothing reaches the form before the patient uses it
+        assertEquals(emptyList<SymptomType>(), viewModel.state.types)
+      }
+
+  @Test
+  fun done_whileListening_stopsThenFillsTheFormWithTheWholeText() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        hear(SpeechEvent.PartialText("I feel"))
+
+        viewModel.onDone()
+        assertEquals(1, speech.stops)
+        assertTrue((viewModel.state.voice as VoiceUiState.Listening).isFinishing)
+        // A second tap doesn't stop again, and text still coming keeps Done tapped
+        viewModel.onDone()
+        hear(SpeechEvent.PartialText("I feel sick"))
+        assertEquals(1, speech.stops)
+        assertTrue((viewModel.state.voice as VoiceUiState.Listening).isFinishing)
+
+        hear(SpeechEvent.FinalText("I feel sick 7/10"))
+        assertNull(viewModel.state.voice)
+        assertTrue(viewModel.state.isDrafted)
+        assertEquals(listOf(SymptomType.NAUSEA), viewModel.state.types)
+        assertEquals(7, viewModel.state.intensity)
+      }
+
+  @Test
+  fun done_withNothingUnderstood_saysSo() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+
+        viewModel.onDone()
+        hear(SpeechEvent.Failed(SpeechError.NO_SPEECH))
+
+        assertEquals(VoiceUiState.Failed(SpeechError.NO_SPEECH), viewModel.state.voice)
+        assertFalse(viewModel.state.isDrafted)
+      }
+
+  @Test
+  fun cancel_andStartOver_controlTheSession() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        hear(SpeechEvent.FinalText("I feel sick"))
+        assertTrue(viewModel.state.voice is VoiceUiState.Heard)
+
+        // Start over drops what was heard and listens again
+        viewModel.restartListening()
+        advanceUntilIdle()
+        assertEquals(VoiceUiState.Listening(), viewModel.state.voice)
+        assertEquals(2, speech.languages.size)
+        hear(SpeechEvent.PartialText("my head"))
+
+        // Cancel stops listening and goes back to the empty form
+        viewModel.cancelVoice()
+        advanceUntilIdle()
+        assertNull(viewModel.state.voice)
+        assertFalse(speech.isListening)
+        assertEquals(emptyList<SymptomType>(), viewModel.state.types)
+        assertFalse(viewModel.state.isDrafted)
+      }
+
+  @Test
+  fun startingOver_whileListening_endsTheFirstSession() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        hear(SpeechEvent.PartialText("my head"))
+
+        // Even after Done: starting over listens afresh
+        viewModel.onDone()
+        viewModel.restartListening()
+        advanceUntilIdle()
+        hear(SpeechEvent.PartialText("I feel"))
+
+        val listening = viewModel.state.voice as VoiceUiState.Listening
+        assertEquals("I feel", listening.text)
+        assertFalse(listening.isFinishing)
+        assertEquals(2, speech.languages.size)
+      }
+
+  @Test
+  fun aFailedListening_saysWhy_andARefusedMicrophoneSaysHowToAllowIt() =
+      runTest(dispatcher) {
+        val cases =
+            SpeechError.entries.associateWith {
+              if (it == SpeechError.NO_PERMISSION) VoiceUiState.MicrophoneRefused
+              else VoiceUiState.Failed(it)
+            }
+        for ((error, expected) in cases) {
+          val viewModel = listening()
+          hear(SpeechEvent.Failed(error))
+          assertEquals(error.name, expected, viewModel.state.voice)
+        }
+      }
+
+  /** What a form shows after using [transcript], from a form that [before] filled. */
+  private data class DraftCase(
+      val transcript: String,
+      val before: (AddSymptomViewModel) -> Unit = {},
+      val types: List<SymptomType>,
+      val intensity: Int? = null,
+      val date: LocalDate? = null,
+      val time: LocalTime? = null,
+      val notes: String = transcript,
+  )
+
+  @Test
+  fun usingWhatWasHeard_fillsOnlyTheFieldsStillEmpty() =
+      runTest(dispatcher) {
+        val yesterday = today.minusDays(1)
+        val cases =
+            listOf(
+                // Everything understood
+                DraftCase(
+                    "headache 7 out of 10 yesterday at 9 am",
+                    types = listOf(SymptomType.HEADACHE),
+                    intensity = 7,
+                    date = yesterday,
+                    time = LocalTime.of(9, 0),
+                ),
+                // Only some fields understood: the rest stays empty
+                DraftCase("I feel sick", types = listOf(SymptomType.NAUSEA)),
+                // A time without a day is today, as when it is picked in the form
+                DraftCase(
+                    "headache at 9 am",
+                    types = listOf(SymptomType.HEADACHE),
+                    date = today,
+                    time = LocalTime.of(9, 0),
+                ),
+                // Nothing understood: only the notes keep what was said
+                DraftCase("hello there", types = emptyList()),
+                // What the patient entered is kept; new symptoms come after theirs
+                DraftCase(
+                    "nausea and headache 7 out of 10 yesterday at 9 am",
+                    before = {
+                      it.toggleType(SymptomType.HEADACHE)
+                      it.onIntensityChange(3)
+                      it.onTimeChange(LocalTime.of(11, 0))
+                      it.onNotesChange("After lunch  ")
+                    },
+                    types = listOf(SymptomType.HEADACHE, SymptomType.NAUSEA),
+                    intensity = 3,
+                    date = today,
+                    time = LocalTime.of(11, 0),
+                    notes = "After lunch\nnausea and headache 7 out of 10 yesterday at 9 am",
+                ),
+            )
+        for (case in cases) {
+          val viewModel = viewModel().also(case.before)
+          heard(case.transcript, viewModel)
+
+          viewModel.onDone()
+          val state = viewModel.state
+          assertNull(case.transcript, state.voice)
+          assertTrue(case.transcript, state.isDrafted)
+          assertEquals(case.transcript, case.types, state.types)
+          assertEquals(case.transcript, case.intensity, state.intensity)
+          assertEquals(case.transcript, case.date, state.date)
+          assertEquals(case.transcript, case.time, state.time)
+          assertEquals(case.transcript, case.notes, state.notes)
+        }
+      }
+
+  @Test
+  fun aDictatedSymptom_isSavedOnlyWhenThePatientSaves() =
+      runTest(dispatcher) {
+        val viewModel = heard("headache 7 out of 10 yesterday at 9 am")
+        viewModel.onDone()
+        advanceUntilIdle()
+        assertEquals(emptyList<SymptomEntry>(), repository.symptoms(uid))
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = savedEntry()
+        assertEquals(listOf(SymptomType.HEADACHE), saved.types)
+        assertEquals(7, saved.intensity)
+        assertEquals(at(today.minusDays(1), 9, 0), saved.occurredAt)
+        assertEquals("headache 7 out of 10 yesterday at 9 am", saved.notes)
+      }
+
+  @Test
+  fun aFrenchPhone_listensAndUnderstandsInFrench() =
+      runTest(dispatcher) {
+        val viewModel = heard("j'ai mal dormi cette nuit", viewModel(Locale.FRANCE))
+
+        assertEquals(listOf(SpeechLanguage.FRENCH), speech.languages)
+        viewModel.onDone()
+        assertEquals(listOf(SymptomType.SLEEP_PROBLEMS), viewModel.state.types)
+      }
+
+  @Test
+  fun dictating_isIgnoredWhileSaving() =
+      runTest(dispatcher) {
+        val viewModel = heard("I feel sick 7/10")
+        viewModel.toggleType(SymptomType.PAIN)
+        viewModel.save()
+
+        // Saving: the form no longer changes
+        viewModel.onDone()
+        viewModel.onSpeak(hasMicrophone = true)
+        assertEquals(listOf(SymptomType.PAIN), viewModel.state.types)
+        assertNull(viewModel.state.intensity)
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        assertEquals(1, speech.languages.size)
+      }
+
+  @Test
+  fun leavingTheForm_stopsListening_andDropsWhatWasSaid() =
+      runTest(dispatcher) {
+        val store = ViewModelStore()
+        val viewModel = listening().also { store.put("form", it) }
+        hear(SpeechEvent.PartialText("I feel sick"))
+        assertTrue(speech.isListening)
+
+        store.clear()
+        advanceUntilIdle()
+
+        assertFalse(speech.isListening)
+        assertEquals(emptyList<SymptomEntry>(), repository.symptoms(uid))
+        assertEquals(emptyList<SymptomType>(), viewModel.state.types)
+      }
+
+  // ----- A caregiver the patient lets edit and delete (US-46) -----
+
+  /** The signed-in caregiver Sam, editing [entry] in "patient"'s journal. */
+  private fun caregiverEditing(
+      entry: SymptomEntry = logged,
+      symptoms: FakeSymptomRepository = repository,
+  ): AddSymptomViewModel {
+    symptoms.seed("patient", entry)
+    return AddSymptomViewModel(
+        auth,
+        symptoms,
+        clock,
+        symptomId = entry.id,
+        patientUid = "patient",
+        profileRepository =
+            FakeUserProfileRepository().apply {
+              seed(UserProfile(uid, Role.CAREGIVER, firstName = "Sam"))
+            },
+        speechRecognizer = speech,
+    )
+  }
+
+  @Test
+  fun caregiver_editsThePatientsSymptom_signedAsEditor_keepingWhoAddedIt() =
+      runTest(dispatcher) {
+        val viewModel = caregiverEditing(logged.copy(addedBy = "bob", addedByName = "Bob"))
+        advanceUntilIdle()
+        assertEquals(logged.types, viewModel.state.types)
+
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        assertTrue(repository.symptoms(uid).isEmpty())
+        val saved = repository.symptoms("patient").single()
+        assertEquals(6, saved.intensity)
+        assertEquals(uid, saved.editedBy)
+        assertEquals("Sam", saved.editedByName)
+        assertEquals("bob", saved.addedBy)
+        assertEquals("Bob", saved.addedByName)
+      }
+
+  @Test
+  fun patientEdit_removesTheCaregiversName() =
+      runTest(dispatcher) {
+        val viewModel = editing(logged.copy(editedBy = "bob", editedByName = "Bob"))
+        advanceUntilIdle()
+
+        viewModel.onIntensityChange(2)
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.symptoms(uid).single()
+        assertEquals(2, saved.intensity)
+        assertNull(saved.editedBy)
+        assertNull(saved.editedByName)
+      }
+
+  /** Access taken away before an offline edit synchronizes: the server undoes it, and says so. */
+  @Test
+  fun caregiverEditRejectedByTheServer_isUndoneAndReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val symptoms = FakeSymptomRepository(clock = { current }, rejectedWrites = rejectedWrites)
+        symptoms.serverRejectsWrites = true
+        val viewModel = caregiverEditing(symptoms = symptoms)
+        advanceUntilIdle()
+
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        symptoms.rejectPendingWrites()
+
+        assertEquals(listOf(logged), symptoms.symptoms("patient"))
+        assertEquals(1, rejectedWrites.unseen.value)
+      }
+
+  /**
+   * The patient and the caregiver edit the same symptom: the form saves the whole entry it showed,
+   * so the last save wins, as with the patient's own edits on two phones. Merging field by field
+   * would need the server, which an offline save can't wait for.
+   */
+  @Test
+  fun bothEditTheSameSymptom_theLastSaveWins() =
+      runTest(dispatcher) {
+        val viewModel = caregiverEditing()
+        advanceUntilIdle()
+
+        // The patient changes the intensity after the caregiver opened the form
+        repository.updateSymptom("patient", logged.copy(intensity = 8))
+        viewModel.onNotesChange("Slept badly")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.symptoms("patient").single()
+        assertEquals("Slept badly", saved.notes)
+        assertEquals(logged.intensity, saved.intensity)
+        assertEquals(uid, saved.editedBy)
+      }
+
+  /** The patient deletes the symptom while the caregiver edits it: the save can't bring it back. */
+  @Test
+  fun symptomDeletedWhileTheCaregiverEditsIt_staysDeleted_andTheRejectionIsReported() =
+      runTest(dispatcher) {
+        val rejectedWrites = RejectedWrites()
+        val symptoms = FakeSymptomRepository(clock = { current }, rejectedWrites = rejectedWrites)
+        val viewModel = caregiverEditing(symptoms = symptoms)
+        advanceUntilIdle()
+        symptoms.deleteSymptom("patient", logged.id)
+
+        // Saved on the phone, then refused by the server, which no longer has the symptom
+        symptoms.serverRejectsWrites = true
+        viewModel.onIntensityChange(6)
+        viewModel.save()
+        advanceUntilIdle()
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        symptoms.rejectPendingWrites()
+
+        assertTrue(symptoms.symptoms("patient").isEmpty())
+        assertEquals(1, rejectedWrites.unseen.value)
       }
 }
