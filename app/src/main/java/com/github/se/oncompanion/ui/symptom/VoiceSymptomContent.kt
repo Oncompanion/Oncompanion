@@ -172,11 +172,13 @@ private fun VoiceUiState.message(): Message? =
           Message(R.string.symptom_voice_refused_title, R.string.symptom_voice_refused_message)
       is VoiceUiState.Failed ->
           when (error.kind()) {
-            FailureKind.TRY_AGAIN ->
+            FailureKind.NOTHING_HEARD ->
                 Message(
                     R.string.symptom_voice_no_speech_title,
                     R.string.symptom_voice_no_speech_message,
                 )
+            FailureKind.FAILED ->
+                Message(R.string.symptom_voice_failed_title, R.string.symptom_voice_failed_message)
             FailureKind.OFFLINE ->
                 Message(
                     R.string.symptom_voice_offline_title,
@@ -194,8 +196,10 @@ private fun VoiceUiState.message(): Message? =
 
 /** What a failure leaves the patient to do, which decides its message and buttons. */
 private enum class FailureKind {
-  /** Nothing was heard, or the recognizer failed: try again. */
-  TRY_AGAIN,
+  /** Nothing was heard: try again. */
+  NOTHING_HEARD,
+  /** The recognizer failed, though the patient may have spoken: try again. */
+  FAILED,
   /** The phone needs a connection for this language: try again once connected. */
   OFFLINE,
   /** The phone can't listen here: typing is the only way. */
@@ -207,11 +211,11 @@ private fun SpeechError.kind(): FailureKind =
       SpeechError.NEEDS_CONNECTION -> FailureKind.OFFLINE
       SpeechError.LANGUAGE_UNAVAILABLE,
       SpeechError.UNAVAILABLE -> FailureKind.UNAVAILABLE
+      SpeechError.NO_SPEECH -> FailureKind.NOTHING_HEARD
       // A refused microphone has its own state; listed so every error has a message
       SpeechError.NO_PERMISSION,
-      SpeechError.NO_SPEECH,
       SpeechError.BUSY,
-      SpeechError.FAILED -> FailureKind.TRY_AGAIN
+      SpeechError.FAILED -> FailureKind.FAILED
     }
 
 /** The headline, then what was said and picked up, or a message. */

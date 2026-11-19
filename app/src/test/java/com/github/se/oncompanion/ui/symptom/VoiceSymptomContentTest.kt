@@ -111,17 +111,24 @@ class VoiceSymptomContentTest {
                   typeInstead,
               ),
           ),
-          // Nothing heard, a busy or failing recognizer: try again
+          // Nothing heard: try again
           Case(
               VoiceUiState.Failed(SpeechError.NO_SPEECH),
               R.string.symptom_voice_no_speech_title,
               R.string.symptom_voice_no_speech_message,
               mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
           ),
+          // A busy or failing recognizer, though the patient may have spoken: try again
           Case(
               VoiceUiState.Failed(SpeechError.BUSY),
-              R.string.symptom_voice_no_speech_title,
-              R.string.symptom_voice_no_speech_message,
+              R.string.symptom_voice_failed_title,
+              R.string.symptom_voice_failed_message,
+              mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
+          ),
+          Case(
+              VoiceUiState.Failed(SpeechError.FAILED),
+              R.string.symptom_voice_failed_title,
+              R.string.symptom_voice_failed_message,
               mapOf(C.Tag.symptom_voice_try_again to "startOver", typeInstead),
           ),
           Case(

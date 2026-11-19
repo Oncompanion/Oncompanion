@@ -221,6 +221,8 @@
     <string name="symptom_voice_offline_message">Your phone can only understand this language online. Try again once you\'re connected, or type instead.</string>
     <string name="symptom_voice_unavailable_title">Voice isn\'t available on this phone</string>
     <string name="symptom_voice_unavailable_message">You can type your symptoms instead.</string>
+    <string name="symptom_voice_failed_title">Voice didn\'t work</string>
+    <string name="symptom_voice_failed_message">Try again, or type instead.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>
