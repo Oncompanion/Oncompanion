@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
@@ -27,6 +28,22 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class CaregiverAppointmentSecurityRulesTest {
+
+  /** Reminder choices use the existing caregiver add/edit grants, never a separate permission. */
+  @Test
+  fun reminderChoicesRequireExistingCaregiverPermissions(): Unit = runBlocking {
+    shareWithCarol(listOf("PLANNING"), listOf("PLANNING"), listOf("PLANNING"))
+    val existing = alicesAppointment()
+    for (choice in listOf("NONE", "FIFTEEN_MINUTES", "ONE_HOUR", "THREE_HOURS", "ONE_DAY")) {
+      allowed(planning(aliceUid).document().set(carolsAppointment("reminder" to choice)))
+      allowed(existing.update(carolsEdit("reminder" to choice)))
+    }
+    denied(existing.update(carolsEdit("reminder" to "TWO_HOURS")))
+    shareWithCarol(listOf("PLANNING"), listOf("PLANNING"))
+    denied(existing.update(carolsEdit("reminder" to "NONE")))
+    shareWithCarol(listOf("PLANNING"), emptyList())
+    denied(planning(aliceUid).document().set(carolsAppointment("reminder" to "NONE")))
+  }
 
   private val db
     get() = FirebaseEmulator.firestore

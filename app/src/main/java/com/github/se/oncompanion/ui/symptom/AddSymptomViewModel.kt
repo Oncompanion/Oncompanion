@@ -167,6 +167,8 @@ data class AddSymptomUiState(
  * @param speechRecognizer listens when the symptom is dictated (US-44)
  * @param locale the phone's language: a symptom is dictated in French on a French phone, in English
  *   otherwise
+ * @param picked a symptom already ticked when logging a new one (a check-in tile on the Overview);
+ *   the user can still untick it. Ignored when editing
  */
 class AddSymptomViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
@@ -177,6 +179,7 @@ class AddSymptomViewModel(
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
     private val speechRecognizer: SpeechRecognizer = SpeechRecognizerProvider.recognizer,
     private val locale: Locale = Locale.getDefault(),
+    picked: SymptomType? = null,
 ) : ViewModel() {
 
   /** The first name a caregiver's symptom is signed with. */
@@ -186,6 +189,7 @@ class AddSymptomViewModel(
       MutableStateFlow(
           AddSymptomUiState(
               now = LocalDateTime.now(clock),
+              types = listOfNotNull(picked.takeIf { symptomId == null }),
               isEditing = symptomId != null,
               canDictate = speechRecognizer.isAvailable(),
           )
