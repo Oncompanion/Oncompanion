@@ -147,6 +147,10 @@
         {
           "type": "text",
           "id": "overview_t"
+        },
+        {
+          "type": "arrow",
+          "id": "overview_notif"
         }
       ],
       "updated": 1794000000000,
@@ -179,8 +183,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "OverviewScreen (+ ViewModel)\nnext up, today, shortcuts",
-      "originalText": "OverviewScreen (+ ViewModel)\nnext up, today, shortcuts",
+      "text": "OverviewScreen (+ ViewModel)\nnext up, today's medications, check-in, shortcuts",
+      "originalText": "OverviewScreen (+ ViewModel)\nnext up, today's medications, check-in, shortcuts",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
@@ -459,8 +463,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "ObservePlanning merges the shared sources:\nAppointmentPlanningSource · MedicationPlanningSource\nEventPlanningSource (optional) · SectionPlanningSource",
-      "originalText": "ObservePlanning merges the shared sources:\nAppointmentPlanningSource · MedicationPlanningSource\nEventPlanningSource (optional) · SectionPlanningSource",
+      "text": "ObservePlanning merges the shared sources:\nAppointmentPlanningSource \u00b7 MedicationPlanningSource\nEventPlanningSource (optional) \u00b7 SectionPlanningSource",
+      "originalText": "ObservePlanning merges the shared sources:\nAppointmentPlanningSource \u00b7 MedicationPlanningSource\nEventPlanningSource (optional) \u00b7 SectionPlanningSource",
       "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
@@ -707,6 +711,48 @@
         {
           "type": "text",
           "id": "medications_t"
+        }
+      ],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "notifications",
+      "type": "rectangle",
+      "x": 750,
+      "y": 380,
+      "width": 240,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#d3f9d8",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 471100001,
+      "version": 1,
+      "versionNonce": 471100002,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "notifications_t"
+        },
+        {
+          "type": "arrow",
+          "id": "overview_notif"
+        },
+        {
+          "type": "arrow",
+          "id": "notifications_fs"
         }
       ],
       "updated": 1794000000000,
@@ -987,6 +1033,10 @@
         {
           "type": "text",
           "id": "firestore_t"
+        },
+        {
+          "type": "arrow",
+          "id": "notifications_fs"
         }
       ],
       "updated": 1794000000000,
@@ -996,9 +1046,9 @@
     {
       "id": "firestore_t",
       "type": "text",
-      "x": 987.9,
+      "x": 925.0,
       "y": 587.5,
-      "width": 574.2,
+      "width": 700.0,
       "height": 45.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1019,8 +1069,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Cloud Firestore\nappointments · prescriptions · events · eventRegistrations",
-      "originalText": "Cloud Firestore\nappointments · prescriptions · events · eventRegistrations",
+      "text": "Cloud Firestore\nappointments \u00b7 prescriptions \u00b7 events \u00b7 eventRegistrations \u00b7 notifications",
+      "originalText": "Cloud Firestore\nappointments \u00b7 prescriptions \u00b7 events \u00b7 eventRegistrations \u00b7 notifications",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
@@ -2243,7 +2293,7 @@
       "x": 20,
       "y": 700,
       "width": 2074,
-      "height": 100,
+      "height": 125,
       "angle": 0,
       "strokeColor": "#495057",
       "backgroundColor": "transparent",
@@ -2263,13 +2313,157 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nEvents are optional: if they can't be read, appointments and medications still show. A caregiver gets medications and events only if the patient also shares Prescriptions and Events.\nAppointment rows and the Overview's next appointment open AppointmentDetailScreen, event rows and its next event open EventDetailScreen; Back returns to the origin.\nUS-35: Planning → MedicationDetailScreen → PrescriptionDetailScreen; Back keeps the selected day.",
-      "originalText": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nEvents are optional: if they can't be read, appointments and medications still show. A caregiver gets medications and events only if the patient also shares Prescriptions and Events.\nAppointment rows and the Overview's next appointment open AppointmentDetailScreen, event rows and its next event open EventDetailScreen; Back returns to the origin.\nUS-35: Planning → MedicationDetailScreen → PrescriptionDetailScreen; Back keeps the selected day.",
+      "text": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nEvents are optional: if they can't be read, appointments and medications still show. A caregiver gets medications and events only if the patient also shares Prescriptions and Events.\nAppointment rows and the Overview's next appointment open AppointmentDetailScreen, event rows and its next event open EventDetailScreen; Back returns to the origin.\nUS-35: Planning \u2192 MedicationDetailScreen \u2192 PrescriptionDetailScreen; Back keeps the selected day.\nUS-50: the Overview's \"Your circle\" sheet (#457, planned) reads NotificationRepository; the caregiver's phone writes them right after the prescription (#458).",
+      "originalText": "Planning and Overview share appointments, medications and the events the patient confirmed through ObservePlanning.\nEvents are optional: if they can't be read, appointments and medications still show. A caregiver gets medications and events only if the patient also shares Prescriptions and Events.\nAppointment rows and the Overview's next appointment open AppointmentDetailScreen, event rows and its next event open EventDetailScreen; Back returns to the origin.\nUS-35: Planning \u2192 MedicationDetailScreen \u2192 PrescriptionDetailScreen; Back keeps the selected day.\nUS-50: the Overview's \"Your circle\" sheet (#457, planned) reads NotificationRepository; the caregiver's phone writes them right after the prescription (#458).",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "left",
       "verticalAlign": "middle",
       "containerId": null,
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "notifications_fs",
+      "type": "arrow",
+      "x": 870.0,
+      "y": 480,
+      "width": 0.0,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 471100005,
+      "version": 1,
+      "versionNonce": 471100006,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.0,
+          80
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "notifications",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "firestore",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "overview_notif",
+      "type": "arrow",
+      "x": 720.0,
+      "y": 120,
+      "width": 40.0,
+      "height": 260,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 471100007,
+      "version": 1,
+      "versionNonce": 471100008,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          230
+        ],
+        [
+          40,
+          260
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "overview",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "notifications",
+        "focus": 0,
+        "gap": 4
+      }
+    },
+    {
+      "id": "notifications_t",
+      "type": "text",
+      "x": 760,
+      "y": 407.5,
+      "width": 220,
+      "height": 45.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 471100003,
+      "version": 1,
+      "versionNonce": 471100004,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "text": "Notification\nRepository",
+      "originalText": "Notification\nRepository",
+      "fontSize": 18,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "notifications",
       "lineHeight": 1.25,
       "autoResize": true
     }

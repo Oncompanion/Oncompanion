@@ -1,7 +1,9 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
 
+import com.github.se.oncompanion.domain.carecircle.FollowedPatient
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
@@ -10,6 +12,7 @@ import com.github.se.oncompanion.domain.medication.scan.ScannedField
 import com.github.se.oncompanion.domain.medication.scan.ScannedPrescription
 import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
@@ -44,7 +47,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -2199,11 +2201,211 @@ class PrescriptionFormViewModelTest {
         }
       }
 
+  // ---------- A caregiver edits with the patient's permission (US-46) ----------
+
+  private fun caregiverEditForm(
+      access: FollowedPatient,
+      profiles: UserProfileRepository = access.profiles,
+  ) =
+      PrescriptionFormViewModel(
+          access.auth,
+          medications,
+          clock = clock,
+          prescriptionId = saved.id,
+          patientUid = "patient",
+          profileRepository = profiles,
+          resolveSection = access.sectionAccess,
+      )
+
+  private fun editablePatient() =
+      FollowedPatient(
+          CarePermission.PRESCRIPTIONS,
+          canAdd = setOf(CarePermission.PRESCRIPTIONS),
+          canEditAndDelete = setOf(CarePermission.PRESCRIPTIONS),
+      )
+
   @Test
-  fun caregiver_cantCorrectASavedPrescription() {
-    assertThrows(IllegalArgumentException::class.java) {
-      PrescriptionFormViewModel(auth, medications, prescriptionId = "presc-1", patientUid = patient)
+  fun caregiverEditSavesInPatientCollectionSignedWithoutChangingConfirmation() = runTest {
+    for (confirmation in
+        listOf(PrescriptionConfirmation.PENDING, PrescriptionConfirmation.CONFIRMED)) {
+      val access = editablePatient()
+      val original =
+          saved.copy(addedBy = "original", addedByName = "Original", confirmation = confirmation)
+      fakeMedications.seed("patient", original)
+      val viewModel = caregiverEditForm(access)
+      advanceUntilIdle()
+
+      assertTrue(viewModel.state.canSave)
+      assertFalse(viewModel.state.isToConfirm)
+      assertEquals(
+          "Original".takeIf { confirmation == PrescriptionConfirmation.PENDING },
+          viewModel.state.pendingAddedByName,
+      )
+      viewModel.requestRejection()
+      viewModel.reject()
+      assertFalse(viewModel.state.isConfirmingRejection)
+      viewModel.onPrescribedByChange("Dr. Rossi")
+      viewModel.save()
+      advanceUntilIdle()
+
+      val changed = fakeMedications.prescriptionsOf("patient").single()
+      assertEquals("Dr. Rossi", changed.prescribedBy)
+      assertEquals(confirmation, changed.confirmation)
+      assertEquals(original.addedBy, changed.addedBy)
+      assertEquals(original.medications, changed.medications)
+      assertEquals("caregiver", changed.editedBy)
+      assertEquals("Sam", changed.editedByName)
+      assertTrue(fakeMedications.prescriptionsOf("caregiver").isEmpty())
+      assertEquals(SavePhase.SAVED, viewModel.state.save)
     }
+  }
+
+  @Test
+  fun caregiverCannotEditWithoutSwitchOrAfterAccessIsRemoved() = runTest {
+    val access = editablePatient()
+    fakeMedications.seed("patient", saved)
+    val viewModel = caregiverEditForm(access)
+    advanceUntilIdle()
+    viewModel.onPrescribedByChange("Private unsaved value")
+
+    access.shares(CarePermission.PRESCRIPTIONS, canAdd = setOf(CarePermission.PRESCRIPTIONS))
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.NOT_ALLOWED, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+    assertFalse(viewModel.state.canChange)
+    assertEquals("", viewModel.state.draft.prescribedBy)
+    viewModel.onPrescribedByChange("Must be ignored")
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(saved, fakeMedications.prescriptionsOf("patient").single())
+    assertEquals("", viewModel.state.draft.prescribedBy)
+
+    // Restoring permission reloads the saved record, never the discarded draft.
+    access.shares(
+        CarePermission.PRESCRIPTIONS,
+        canAdd = setOf(CarePermission.PRESCRIPTIONS),
+        canEditAndDelete = setOf(CarePermission.PRESCRIPTIONS),
+    )
+    advanceUntilIdle()
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+    access.removesTheCaregiver()
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.NOT_ALLOWED, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+  }
+
+  @Test
+  fun caregiverAuthObservationFailureHidesThePatientsDraft() = runTest {
+    val access = editablePatient()
+    fakeMedications.seed("patient", saved)
+    access.auth.observeError = IOException("authentication unavailable")
+
+    val viewModel = caregiverEditForm(access)
+    advanceUntilIdle()
+
+    assertEquals(PrescriptionFormLoad.FAILED, viewModel.state.load)
+    assertFalse(viewModel.state.canChange)
+    assertFalse(viewModel.state.canSave)
+    assertEquals("", viewModel.state.draft.prescribedBy)
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(saved, fakeMedications.prescriptionsOf("patient").single())
+  }
+
+  @Test
+  fun caregiverReadFailureClearsDraftAndRetryReloadsSavedPrescription() = runTest {
+    val access = editablePatient()
+    fakeMedications.seed("patient", saved)
+    val viewModel = caregiverEditForm(access)
+    advanceUntilIdle()
+    viewModel.onPrescribedByChange("Private unsaved value")
+
+    fakeMedications.failRunningReads(IOException("denied"))
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.FAILED, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+    assertEquals("", viewModel.state.draft.prescribedBy)
+    viewModel.load()
+    advanceUntilIdle()
+    assertEquals(saved.toDraft(), viewModel.state.draft)
+  }
+
+  @Test
+  fun caregiverLosingPermissionWhileNameIsReadCannotEnqueueAnEdit() = runTest {
+    val access = editablePatient()
+    fakeMedications.seed("patient", saved)
+    caregiverProfiles.gate = CompletableDeferred()
+    val viewModel = caregiverEditForm(access, caregiverProfiles)
+    advanceUntilIdle()
+    viewModel.onPrescribedByChange("Dr. Rossi")
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(SavePhase.SAVING, viewModel.state.save)
+
+    access.shares(CarePermission.PRESCRIPTIONS)
+    advanceUntilIdle()
+    caregiverProfiles.gate!!.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(saved, fakeMedications.prescriptionsOf("patient").single())
+    assertEquals(PrescriptionFormLoad.NOT_ALLOWED, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+  }
+
+  @Test
+  fun caregiverAccountChangeWhileWriteWaitsClearsDraftAndSuppressesCompletion() = runTest {
+    for (signOut in listOf(true, false)) {
+      val access = editablePatient()
+      fakeMedications.seed("patient", saved)
+      medications.gate = CompletableDeferred()
+      val viewModel = caregiverEditForm(access)
+      advanceUntilIdle()
+      viewModel.onPrescribedByChange("Dr. Rossi")
+      viewModel.save()
+      advanceUntilIdle()
+      if (signOut) access.auth.signOut() else access.auth.signInWithGoogle("another-caregiver")
+      advanceUntilIdle()
+      medications.gate!!.complete(Unit)
+      advanceUntilIdle()
+
+      assertEquals(saved, fakeMedications.prescriptionsOf("patient").single())
+      assertEquals(PrescriptionFormLoad.NOT_SIGNED_IN, viewModel.state.load)
+      assertEquals("", viewModel.state.draft.prescribedBy)
+      assertEquals(SavePhase.EDITING, viewModel.state.save)
+      assertFalse(viewModel.state.canSave)
+    }
+  }
+
+  @Test
+  fun caregiverSaveFailureKeepsDraftAndCanRetry() = runTest {
+    val access = editablePatient()
+    fakeMedications.seed("patient", saved)
+    val viewModel = caregiverEditForm(access)
+    advanceUntilIdle()
+    viewModel.onPrescribedByChange("Dr. Rossi")
+    fakeMedications.writeError = IOException("disk full")
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormError.SAVE_FAILED, viewModel.state.error)
+    assertEquals("Dr. Rossi", viewModel.state.draft.prescribedBy)
+    assertTrue(viewModel.state.canSave)
+    fakeMedications.writeError = null
+    viewModel.save()
+    advanceUntilIdle()
+    assertEquals(SavePhase.SAVED, viewModel.state.save)
+  }
+
+  @Test
+  fun caregiverEditingMissingPrescriptionCannotSaveOrConfirm() = runTest {
+    val viewModel = caregiverEditForm(editablePatient())
+    advanceUntilIdle()
+    assertEquals(PrescriptionFormLoad.NOT_FOUND, viewModel.state.load)
+    assertFalse(viewModel.state.canSave)
+    viewModel.requestRejection()
+    viewModel.reject()
+    viewModel.save()
+    advanceUntilIdle()
+    assertTrue(fakeMedications.prescriptionsOf("patient").isEmpty())
   }
 
   private companion object {

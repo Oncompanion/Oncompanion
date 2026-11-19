@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
@@ -10,6 +11,12 @@ import org.junit.Test
 
 /** Checks appointment validity against the agreed storage constraints. */
 class AppointmentTest {
+  /** A new appointment uses the agreed one-hour reminder default. */
+  @Test
+  fun reminderDefaultsToOneHour() {
+    assertEquals(AppointmentReminder.ONE_HOUR, appointment.reminder)
+  }
+
   private val appointment =
       Appointment(
           title = "Oncology consultation",

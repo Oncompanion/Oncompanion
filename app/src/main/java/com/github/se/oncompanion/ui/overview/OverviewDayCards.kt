@@ -57,7 +57,6 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
  * Planning.
  *
  * @param modifier e.g. to overlap the header's lower edge
- * @param canAdd whether to suggest adding an appointment; a caregiver can't
  */
 @Composable
 internal fun NextAppointmentCard(
@@ -66,7 +65,6 @@ internal fun NextAppointmentCard(
     onOpenPlanning: () -> Unit,
     onOpenAppointment: (String) -> Unit,
     modifier: Modifier = Modifier,
-    canAdd: Boolean = true,
 ) {
   val colors = MaterialTheme.colorScheme
   Surface(
@@ -103,12 +101,6 @@ internal fun NextAppointmentCard(
             style = MaterialTheme.typography.titleLarge,
             color = colors.onSurface,
         )
-        if (canAdd) {
-          Text(
-              text = stringResource(R.string.overview_no_appointment_hint),
-              style = MaterialTheme.typography.bodyMedium,
-          )
-        }
         Text(
             text = stringResource(R.string.overview_open_planning),
             style = MaterialTheme.typography.buttonLabel,

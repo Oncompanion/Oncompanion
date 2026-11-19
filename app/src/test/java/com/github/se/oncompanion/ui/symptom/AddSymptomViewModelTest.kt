@@ -134,6 +134,26 @@ class AddSymptomViewModelTest {
   }
 
   @Test
+  fun aPickedSymptom_startsTicked_andCanBeJoinedOrUnticked() {
+    // A check-in tile on the Overview opens the form with its symptom picked
+    val viewModel =
+        AddSymptomViewModel(
+            auth,
+            repository,
+            clock,
+            speechRecognizer = speech,
+            picked = SymptomType.FEVER,
+        )
+    assertEquals(listOf(SymptomType.FEVER), viewModel.state.types)
+    assertTrue(viewModel.state.canSave)
+
+    viewModel.toggleType(SymptomType.PAIN)
+    viewModel.toggleType(SymptomType.FEVER)
+    assertEquals(listOf(SymptomType.PAIN), viewModel.state.types)
+    assertTrue(repository.symptoms(uid).isEmpty())
+  }
+
+  @Test
   fun severalSymptoms_keepTheOrderTheyWerePicked() {
     val viewModel = viewModel()
 
@@ -560,6 +580,25 @@ class AddSymptomViewModelTest {
         assertFalse(state.isNow)
         assertFalse(state.hasChanges)
         assertFalse(state.canSave)
+      }
+
+  @Test
+  fun editing_ignoresAPickedSymptom() =
+      runTest(dispatcher) {
+        repository.seed(uid, logged)
+        val viewModel =
+            AddSymptomViewModel(
+                auth,
+                repository,
+                clock,
+                symptomId = logged.id,
+                speechRecognizer = speech,
+                picked = SymptomType.PAIN,
+            )
+        advanceUntilIdle()
+
+        assertEquals(listOf(SymptomType.FATIGUE), viewModel.state.types)
+        assertFalse(viewModel.state.hasChanges)
       }
 
   @Test

@@ -8,12 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.se.oncompanion.domain.auth.SignOutProvider
@@ -22,16 +17,18 @@ import com.github.se.oncompanion.model.hospital.HospitalRepositoryProvider
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsPreferences
 import com.github.se.oncompanion.model.medication.SeenPrescriptionsProvider
 import com.github.se.oncompanion.model.session.PreferencesCleanupJournal
+import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.model.speech.SpeechRecognizerProvider
-import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.navigation.AppNavHost
 import com.github.se.oncompanion.ui.navigation.StartViewModel
-import com.github.se.oncompanion.ui.theme.OncompanionTheme
+import com.github.se.oncompanion.ui.theme.AppAppearanceRoot
+import com.github.se.oncompanion.ui.theme.AppAppearanceViewModel
 
 /** Installs session recovery before authenticated navigation or Firestore operations start. */
 class MainActivity : ComponentActivity() {
 
   private val startViewModel: StartViewModel by viewModels()
+  private val appearanceViewModel: AppAppearanceViewModel by viewModels()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Android's splash screen stays until we know where to start (sign-in, onboarding or Overview)
@@ -49,23 +46,21 @@ class MainActivity : ComponentActivity() {
         !journal.pending &&
             runCatching { AuthRepositoryProvider.repository.currentUser != null }
                 .getOrDefault(false)
+    SettingsRepositoryProvider.install(applicationContext)
     super.onCreate(if (restore) savedInstanceState else null)
     // Install the shared search adapter before fields capture it; blank configuration stays manual.
     HospitalRepositoryProvider.configureAtStartup(getString(R.string.hospital_proxy_endpoint))
-    splashScreen.setKeepOnScreenCondition { startViewModel.startRoute.value == null }
-    // Transparent status and navigation bars: the app's background shows behind them, instead of
-    // the old XML theme's purple status bar. Screens use Scaffold, which keeps content clear of
-    // them.
+    splashScreen.setKeepOnScreenCondition {
+      startViewModel.startRoute.value == null ||
+          appearanceViewModel.uiState.value.appearance == null
+    }
+    // Start edge-to-edge layout; the shared appearance root sets icon contrast and keeps the
+    // default navigation-bar scrims. Screens use Scaffold to keep controls clear of the bars.
     enableEdgeToEdge()
     setContent {
-      OncompanionTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize().testTag(C.Tag.main_screen_container),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-          val startRoute by startViewModel.startRoute.collectAsStateWithLifecycle()
-          startRoute?.let { AppNavHost(startRoute = it) }
-        }
+      AppAppearanceRoot(this, appearanceViewModel) {
+        val startRoute by startViewModel.startRoute.collectAsStateWithLifecycle()
+        startRoute?.let { AppNavHost(startRoute = it) }
       }
     }
   }

@@ -80,3 +80,11 @@ val Typography.cardTitle: TextStyle
 /** The detail under a card's title ("10:00 · Wellness center"): Figma Regular 15/20. */
 val Typography.cardDetail: TextStyle
   get() = bodyMedium.copy(lineHeight = 20.sp)
+
+/** An item listed on a card of the Overview's day ("Ondansetron 8 mg"): Figma SemiBold 17/20. */
+val Typography.cardItem: TextStyle
+  get() = titleMedium.copy(lineHeight = 20.sp)
+
+/** The chip under a card's item ("Once a day"): Figma Medium 14/17. */
+val Typography.cardChip: TextStyle
+  get() = labelLarge.copy(fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 17.sp)

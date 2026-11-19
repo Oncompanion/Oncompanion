@@ -7,6 +7,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -72,6 +73,16 @@ class AndroidSpeechRecognizer(
     val recognizer = AndroidRecognizer.createSpeechRecognizer(appContext)
     listening = recognizer
     stopRequested = false
+    // What was heard in the segments already finished, when the recognizer cuts at each pause
+    val heard = mutableListOf<String>()
+    fun soFar(current: String? = null) = (heard + listOfNotNull(current)).joinToString(" ")
+    fun finish(text: String) {
+      trySend(
+          if (text.isBlank()) SpeechEvent.Failed(SpeechError.NO_SPEECH)
+          else SpeechEvent.FinalText(text)
+      )
+      close()
+    }
     recognizer.setRecognitionListener(
         object : RecognitionListener {
           override fun onReadyForSpeech(params: Bundle?) {
@@ -79,17 +90,20 @@ class AndroidSpeechRecognizer(
           }
 
           override fun onPartialResults(partialResults: Bundle?) {
-            bestText(partialResults)?.let { trySend(SpeechEvent.PartialText(it)) }
+            bestText(partialResults)?.let { trySend(SpeechEvent.PartialText(soFar(it))) }
           }
 
-          override fun onResults(results: Bundle?) {
-            val text = bestText(results)
-            trySend(
-                if (text == null) SpeechEvent.Failed(SpeechError.NO_SPEECH)
-                else SpeechEvent.FinalText(text)
-            )
-            close()
+          // Android 13+: one sentence is over, the session goes on after the pause
+          override fun onSegmentResults(segmentResults: Bundle) {
+            bestText(segmentResults)?.let {
+              heard += it
+              trySend(SpeechEvent.PartialText(soFar()))
+            }
           }
+
+          override fun onEndOfSegmentedSession() = finish(soFar())
+
+          override fun onResults(results: Bundle?) = finish(soFar(bestText(results)))
 
           override fun onError(error: Int) {
             // Some phones answer a stop before any speech with a client error: the user stopped
@@ -97,8 +111,12 @@ class AndroidSpeechRecognizer(
             val reason =
                 if (error == AndroidRecognizer.ERROR_CLIENT && stopRequested) SpeechError.NO_SPEECH
                 else speechErrorOf(error)
-            trySend(SpeechEvent.Failed(reason))
-            close()
+            // Silence after some sentences only ends the session: keep what was heard
+            if (reason == SpeechError.NO_SPEECH && heard.isNotEmpty()) finish(soFar())
+            else {
+              trySend(SpeechEvent.Failed(reason))
+              close()
+            }
           }
 
           // Only how loud it is, to show the app hears the user; never the sound itself
@@ -140,6 +158,19 @@ internal fun recognizerIntent(language: SpeechLanguage, packageName: String): In
       putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
       putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+      // Android 13+: let the patient pause to think, and end only after a few seconds of
+      // silence; each sentence comes as its own segment. Older phones end at the first pause.
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        putExtra(
+            RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+            RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+        )
+        putExtra(
+            RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+            PAUSE_MILLIS,
+        )
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, PAUSE_MILLIS)
+      }
     }
 
 /**
@@ -151,6 +182,12 @@ internal fun levelOf(rmsdB: Float): Float =
 
 private const val QUIET_DB = -2f
 private const val LOUD_DB = 10f
+
+/**
+ * How long the patient can stay silent before listening ends. An `Int`, although Android documents
+ * a `Long`: Google's recognizer reads an `Int` and ignores a `Long`.
+ */
+private const val PAUSE_MILLIS = 5_000
 
 /** The most likely text in Android's [results], without surrounding spaces; `null` if blank. */
 internal fun bestText(results: Bundle?): String? =

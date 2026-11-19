@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.model.appointment
@@ -9,6 +10,15 @@ enum class AppointmentType {
   TREATMENT,
   CONSULTATION,
   OTHER,
+}
+
+/** The single reminder timing shared by a patient and authorized caregivers. */
+enum class AppointmentReminder {
+  NONE,
+  FIFTEEN_MINUTES,
+  ONE_HOUR,
+  THREE_HOURS,
+  ONE_DAY,
 }
 
 /**
@@ -30,6 +40,7 @@ enum class AppointmentType {
  * @property editedBy the uid of the caregiver who last edited it for the patient (US-46), or `null`
  *   when nobody did or the patient edited it last
  * @property editedByName that caregiver's first name, shown as "Edited by Sam"
+ * @property reminder the appointment reminder choice; older records default to one hour
  */
 data class Appointment(
     val id: String = "",
@@ -43,6 +54,7 @@ data class Appointment(
     val addedByName: String? = null,
     val editedBy: String? = null,
     val editedByName: String? = null,
+    val reminder: AppointmentReminder = AppointmentReminder.ONE_HOUR,
 ) {
   /**
    * Whether the patient-entered fields fit the storage schema. The repository assigns [id] and

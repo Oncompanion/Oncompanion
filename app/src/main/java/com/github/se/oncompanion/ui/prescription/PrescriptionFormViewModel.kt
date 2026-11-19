@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.prescription
@@ -5,7 +6,11 @@ package com.github.se.oncompanion.ui.prescription
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.se.oncompanion.domain.carecircle.CareSection
 import com.github.se.oncompanion.domain.carecircle.CaregiverName
+import com.github.se.oncompanion.domain.carecircle.ObserveCareSection
+import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
+import com.github.se.oncompanion.domain.carecircle.ResolveSectionAccess
 import com.github.se.oncompanion.domain.medication.ManageMedicationSchedule
 import com.github.se.oncompanion.domain.medication.MedicationDraft
 import com.github.se.oncompanion.domain.medication.PrescriptionDraft
@@ -18,6 +23,7 @@ import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.signedInUid
+import com.github.se.oncompanion.model.carecircle.CarePermission
 import com.github.se.oncompanion.model.medication.Medication
 import com.github.se.oncompanion.model.medication.MedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
@@ -74,6 +80,8 @@ enum class PrescriptionFormLoad {
   NOT_SIGNED_IN,
   /** Reading the prescription failed. Not a connection problem: offline, the cache answers. */
   FAILED,
+  /** The patient does not allow this caregiver to edit prescriptions. */
+  NOT_ALLOWED,
 }
 
 /**
@@ -102,6 +110,9 @@ enum class PrescriptionFormLoad {
  *   (US-43): saving it confirms it, and it can be rejected instead
  * @property isConfirmingRejection the patient asked to reject it and hasn't confirmed or cancelled
  *   yet
+ * @property canChange whether editing and saving are currently authorized
+ * @property pendingAddedByName who added a pending prescription the caregiver is editing; this
+ *   keeps its status visible without offering patient-only Confirm or Reject
  * @property wasRejected the form is done because the patient rejected it: it no longer exists
  *   anywhere, not even its detail
  */
@@ -123,6 +134,8 @@ data class PrescriptionFormUiState(
     val isToConfirm: Boolean = false,
     val isConfirmingRejection: Boolean = false,
     val wasRejected: Boolean = false,
+    val canChange: Boolean = true,
+    val pendingAddedByName: String? = null,
 ) {
   /** Another medication can be added: the prescription isn't full. */
   val canAddMedication: Boolean
@@ -144,7 +157,11 @@ data class PrescriptionFormUiState(
    * being saved.
    */
   val canSave: Boolean
-    get() = load == PrescriptionFormLoad.READY && draft.isValid() && save == SavePhase.EDITING
+    get() =
+        canChange &&
+            load == PrescriptionFormLoad.READY &&
+            draft.isValid() &&
+            save == SavePhase.EDITING
 }
 
 /**
@@ -168,7 +185,8 @@ data class PrescriptionFormUiState(
  * @param patientUid in caregiver mode (US-43), the patient whose prescriptions get the new one;
  *   null for the user's own. It is saved waiting for the patient to confirm it, signed with the
  *   caregiver's first name, and the rules only accept it if the patient lets them add
- *   prescriptions. Only the patient corrects a saved prescription.
+ *   prescriptions. A saved one may be edited with the patient's edit permission, preserving its
+ *   confirmation status.
  * @param profileRepository the caregiver's profile, for the first name their prescription is signed
  *   with
  */
@@ -184,6 +202,8 @@ class PrescriptionFormViewModel(
     scan: ScannedPrescription? = null,
     private val patientUid: String? = null,
     profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    resolveSection: ResolveSectionAccess =
+        ResolveSectionAccess(ResolveCareCircleAccess(auth = authRepository), authRepository),
 ) : ViewModel() {
 
   /** The first name a caregiver's prescription is signed with. */
@@ -213,6 +233,13 @@ class PrescriptionFormViewModel(
   val uiState: StateFlow<PrescriptionFormUiState> = _uiState.asStateFlow()
 
   private var observation: Job? = null
+  private var saving: Job? = null
+  private val observeSection = ObserveCareSection(resolveSection)
+  private val caregiverEdit = patientUid != null && prescriptionId != null
+  private val editingActor = authRepository.currentUser?.uid
+  private val emptyDate = LocalDate.now(clock)
+  private var editSession = 0
+  private var editingAllowed = !caregiverEdit
 
   // The draft the form last started from: while the form still shows it, the user changed nothing
   private var shownDraft: PrescriptionDraft? = null
@@ -221,14 +248,29 @@ class PrescriptionFormViewModel(
   private var saved: List<Prescription> = emptyList()
 
   init {
-    require(patientUid == null || prescriptionId == null) {
-      "Only the patient corrects a saved prescription"
-    }
     // A saved prescription has to be read before the form can show it
     if (prescriptionId != null) {
       _uiState.update { it.copy(isEditing = true, load = PrescriptionFormLoad.LOADING) }
     } else observeSaved()
     load()
+    if (caregiverEdit) followEditingAccount()
+  }
+
+  /**
+   * Drops the patient's draft if the account changes or its authentication can no longer be read.
+   */
+  private fun followEditingAccount() {
+    viewModelScope.launch {
+      try {
+        authRepository.observeCurrentUser().collect {
+          if (it?.uid != editingActor) clearPatientEdit(PrescriptionFormLoad.NOT_SIGNED_IN)
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (_: Exception) {
+        clearPatientEdit(PrescriptionFormLoad.FAILED)
+      }
+    }
   }
 
   /**
@@ -278,6 +320,10 @@ class PrescriptionFormViewModel(
     if (_uiState.value.load == PrescriptionFormLoad.READY) return
     observation?.cancel()
     _uiState.update { it.copy(load = PrescriptionFormLoad.LOADING) }
+    if (caregiverEdit) {
+      followPatientEdit(id)
+      return
+    }
     val uid = authRepository.signedInUid(TAG)
     if (uid == null) {
       _uiState.update { it.copy(load = PrescriptionFormLoad.NOT_SIGNED_IN) }
@@ -294,6 +340,68 @@ class PrescriptionFormViewModel(
       }
     }
   }
+
+  /** Follows the shared edit permission and cached record through the existing section boundary. */
+  private fun followPatientEdit(id: String) {
+    observation = viewModelScope.launch {
+      observeSection(CarePermission.PRESCRIPTIONS, patientUid) { owner ->
+            medicationRepository.observePrescription(owner, id)
+          }
+          .collect(::showPatientEdit)
+    }
+  }
+
+  /** Applies the section result without retaining a draft after authorization is lost. */
+  private fun showPatientEdit(section: CareSection<Prescription?>) {
+    if (editingActor == null || authRepository.currentUser?.uid != editingActor) {
+      clearPatientEdit(PrescriptionFormLoad.NOT_SIGNED_IN)
+      return
+    }
+    when (section) {
+      is CareSection.Shown -> {
+        if (!section.canEditEntries) clearPatientEdit(PrescriptionFormLoad.NOT_ALLOWED)
+        else {
+          editingAllowed = true
+          _uiState.update { it.copy(canChange = true) }
+          show(section.data)
+        }
+      }
+      is CareSection.Loading -> {
+        if (!section.accessKnown) clearPatientEdit(PrescriptionFormLoad.LOADING)
+        else {
+          editingAllowed = false
+          editSession++
+          saving?.cancel()
+          _uiState.update { it.copy(canChange = false, save = SavePhase.EDITING) }
+        }
+      }
+      is CareSection.Failed -> clearPatientEdit(PrescriptionFormLoad.FAILED)
+      CareSection.NotShared,
+      CareSection.NoAccess -> clearPatientEdit(PrescriptionFormLoad.NOT_ALLOWED)
+    }
+  }
+
+  /**
+   * Access/session loss drops private drafts and cancels writes that have not yet been enqueued.
+   */
+  private fun clearPatientEdit(load: PrescriptionFormLoad) {
+    editingAllowed = false
+    editSession++
+    saving?.cancel()
+    shownDraft = null
+    _uiState.value =
+        PrescriptionFormUiState(
+            emptyDraft(emptyDate),
+            isEditing = true,
+            load = load,
+            canChange = false,
+        )
+  }
+
+  /** A save completion still belongs to the account and permission that started it. */
+  private fun isCurrentSave(uid: String, session: Int): Boolean =
+      authRepository.currentUser?.uid == uid &&
+          (!caregiverEdit || (uid == editingActor && editingAllowed && session == editSession))
 
   /**
    * Applies what is saved for the prescription to correct, `null` if it doesn't exist. Like every
@@ -322,13 +430,16 @@ class PrescriptionFormViewModel(
       return
     }
     val draft = saved.toDraft().cutToLimits()
-    val isToConfirm = saved.confirmation == PrescriptionConfirmation.PENDING
+    val isPending = saved.confirmation == PrescriptionConfirmation.PENDING
+    val isToConfirm = patientUid == null && isPending
+    val pendingAddedByName = saved.addedByName.takeIf { patientUid != null && isPending }
     // A form in use is left alone if the user changed it, and also if the same content arrives
     // again (e.g. the server confirmed it), which would close the medication they opened
     val ready = state.load == PrescriptionFormLoad.READY
     if (ready && (state.draft != shownDraft || draft == state.draft)) {
       // Confirmed on another device meanwhile: nothing left to reject
-      _uiState.value = state.copy(isToConfirm = isToConfirm)
+      _uiState.value =
+          state.copy(isToConfirm = isToConfirm, pendingAddedByName = pendingAddedByName)
       return
     }
     // Anything typed before a deletion or a failure is dropped: the form starts from what is saved
@@ -339,6 +450,7 @@ class PrescriptionFormViewModel(
             isEditing = true,
             error = state.error,
             isToConfirm = isToConfirm,
+            pendingAddedByName = pendingAddedByName,
         )
   }
 
@@ -526,29 +638,41 @@ class PrescriptionFormViewModel(
     }
     if (!confirmed && asksAboutTheSame(state.draft)) return
     _uiState.update { it.copy(save = SavePhase.SAVING, error = null) }
-    viewModelScope.launch {
-      try {
-        val stillExists = write(uid, state.draft)
-        _uiState.update {
-          // Deleted since the form was opened, or while saving (the repository then writes
-          // nothing): there is nothing left to correct
-          if (stillExists && it.load != PrescriptionFormLoad.NOT_FOUND) {
-            it.copy(save = SavePhase.SAVED)
-          } else it.copy(save = SavePhase.EDITING, load = PrescriptionFormLoad.NOT_FOUND)
-        }
-      } catch (e: CancellationException) {
-        throw e
-      } catch (_: NotSignedIn) {
-        _uiState.update {
-          it.copy(save = SavePhase.EDITING, error = PrescriptionFormError.NOT_SIGNED_IN)
-        }
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to save the prescription", e)
-        _uiState.update {
-          it.copy(save = SavePhase.EDITING, error = PrescriptionFormError.SAVE_FAILED)
-        }
-      }
+    val session = editSession
+    saving = viewModelScope.launch { saveDraft(uid, state.draft, session) }
+  }
+
+  /** Writes the submitted draft and reports its result only to the session that submitted it. */
+  private suspend fun saveDraft(uid: String, draft: PrescriptionDraft, session: Int) {
+    try {
+      if (!isCurrentSave(uid, session)) return
+      val stillExists = write(uid, draft, session)
+      if (!isCurrentSave(uid, session)) return
+      finishSaving(stillExists)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: NotSignedIn) {
+      if (caregiverEdit && !isCurrentSave(uid, session)) return
+      showSaveError(PrescriptionFormError.NOT_SIGNED_IN)
+    } catch (e: Exception) {
+      if (!isCurrentSave(uid, session)) return
+      Log.e(TAG, "Failed to save the prescription: ${e.javaClass.simpleName}")
+      showSaveError(PrescriptionFormError.SAVE_FAILED)
     }
+  }
+
+  /** A deletion observed during saving takes precedence over a successful local write. */
+  private fun finishSaving(stillExists: Boolean) {
+    _uiState.update {
+      if (stillExists && it.load != PrescriptionFormLoad.NOT_FOUND) {
+        it.copy(save = SavePhase.SAVED)
+      } else it.copy(save = SavePhase.EDITING, load = PrescriptionFormLoad.NOT_FOUND)
+    }
+  }
+
+  /** A local failure leaves the current draft available for correction or retry. */
+  private fun showSaveError(error: PrescriptionFormError) {
+    _uiState.update { it.copy(save = SavePhase.EDITING, error = error) }
   }
 
   /**
@@ -557,8 +681,20 @@ class PrescriptionFormViewModel(
    *
    * @return `false` if the prescription to correct no longer exists
    */
-  private suspend fun write(uid: String, draft: PrescriptionDraft): Boolean =
+  private suspend fun write(uid: String, draft: PrescriptionDraft, session: Int): Boolean =
       when {
+        caregiverEdit -> {
+          val name = caregiverName(uid)
+          currentCoroutineContext().ensureActive()
+          if (!isCurrentSave(uid, session)) throw NotSignedIn()
+          manageMedicationSchedule.update(
+              requireNotNull(patientUid),
+              requireNotNull(prescriptionId),
+              draft,
+              editedBy = uid,
+              editedByName = name,
+          )
+        }
         prescriptionId != null -> manageMedicationSchedule.update(uid, prescriptionId, draft)
         patientUid != null -> addForThePatient(patientUid, uid, draft)
         else -> {
@@ -606,6 +742,7 @@ class PrescriptionFormViewModel(
    * rejected before [reject].
    */
   fun requestRejection() {
+    if (patientUid != null) return
     _uiState.update {
       if (it.isToConfirm && it.load == PrescriptionFormLoad.READY && it.save == SavePhase.EDITING)
           it.copy(isConfirmingRejection = true)
@@ -625,6 +762,7 @@ class PrescriptionFormViewModel(
    * then shows what is saved, as it follows the prescription.
    */
   fun reject() {
+    if (patientUid != null) return
     val state = _uiState.value
     val id = prescriptionId
     if (!state.isConfirmingRejection || state.save != SavePhase.EDITING || id == null) return
@@ -681,7 +819,10 @@ class PrescriptionFormViewModel(
    */
   private fun edit(transform: (PrescriptionFormUiState) -> PrescriptionFormUiState) {
     _uiState.update { state ->
-      val locked = state.load != PrescriptionFormLoad.READY || state.save != SavePhase.EDITING
+      val locked =
+          !state.canChange ||
+              state.load != PrescriptionFormLoad.READY ||
+              state.save != SavePhase.EDITING
       if (locked) state else transform(state).withRenewal()
     }
   }

@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -7,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.carecircle.CaregiverName
 import com.github.se.oncompanion.model.appointment.Appointment
+import com.github.se.oncompanion.model.appointment.AppointmentReminder
 import com.github.se.oncompanion.model.appointment.AppointmentRepository
 import com.github.se.oncompanion.model.appointment.AppointmentRepositoryProvider
 import com.github.se.oncompanion.model.appointment.AppointmentType
@@ -301,6 +303,7 @@ class AppointmentFormViewModel(
       Appointment(
           id = original?.id.orEmpty(),
           createdAt = original?.createdAt,
+          reminder = original?.reminder ?: AppointmentReminder.ONE_HOUR,
           title = title.trim(),
           scheduledAt = requireNotNull(instant),
           type = type,

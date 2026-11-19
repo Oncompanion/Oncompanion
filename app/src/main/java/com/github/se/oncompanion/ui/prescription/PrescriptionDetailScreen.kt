@@ -1,8 +1,8 @@
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: ChatGPT <noreply@openai.com>
 
 package com.github.se.oncompanion.ui.prescription
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,11 +47,10 @@ import com.github.se.oncompanion.ui.common.DeletePhase
 import com.github.se.oncompanion.ui.common.DetailActionTags
 import com.github.se.oncompanion.ui.common.DetailActions
 import com.github.se.oncompanion.ui.common.DetailWithActions
-import com.github.se.oncompanion.ui.common.LakeButton
+import com.github.se.oncompanion.ui.common.EditedBy
+import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
 import com.github.se.oncompanion.ui.theme.Spacing
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private val actionTags =
     DetailActionTags(
@@ -66,9 +65,6 @@ private val deleteDialogTags =
         cancel = C.Tag.prescription_delete_cancel,
         error = C.Tag.prescription_delete_error,
     )
-
-/** "29 Sep 2026", as in the list and the form. The app's UI is in English. */
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
  * The detail of one saved prescription (US-11, Figma: "US-11 / Prescription detail"), opened from
@@ -151,62 +147,80 @@ fun PrescriptionDetailContent(
   ) { innerPadding ->
     Box(Modifier.fillMaxSize().padding(innerPadding)) {
       val prescription = uiState.prescription
-      when {
-        uiState.isLoading ->
+      when (uiState.load) {
+        PrescriptionsLoad.LOADING ->
             CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag(C.Tag.prescription_detail_loading)
             )
-        uiState.hasError ->
-            Message(
-                testTag = C.Tag.prescription_detail_error,
-                title = stringResource(R.string.prescription_detail_error_title),
-                hint = stringResource(R.string.prescription_detail_error_hint),
-            ) {
-              LakeButton(
-                  text = stringResource(R.string.prescription_detail_retry),
-                  onClick = onRetry,
-                  modifier = Modifier.testTag(C.Tag.prescription_detail_retry_button),
+        PrescriptionsLoad.FAILED ->
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_error)) {
+              LakeMessageState(
+                  title = stringResource(R.string.prescription_detail_error_title),
+                  message = stringResource(R.string.prescription_detail_error_hint),
+                  actionLabel = stringResource(R.string.prescription_detail_retry),
+                  onAction = onRetry,
+                  actionTestTag = C.Tag.prescription_detail_retry_button,
               )
             }
-        // The patient a caregiver follows doesn't share their prescriptions (anymore)
-        uiState.isNotShared && caregiverOf != null ->
-            NotSharedMessage(
-                caregiverOf,
-                CarePermission.PRESCRIPTIONS,
-                Modifier.align(Alignment.Center),
-            )
-        // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
-        prescription == null ->
-            Message(
-                testTag = C.Tag.prescription_detail_not_found,
-                title = stringResource(R.string.prescription_detail_not_found_title),
-                hint = stringResource(R.string.prescription_detail_not_found_hint),
-            )
-        // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
-        else ->
-            DetailWithActions(
-                showActions = uiState.canEdit,
-                contentTestTag = C.Tag.prescription_detail_content,
-                actions = {
-                  DetailActions(
-                      editLabel = stringResource(R.string.prescription_detail_edit),
-                      deleteLabel = stringResource(R.string.prescription_detail_delete),
-                      onEdit = onEdit,
-                      onDelete = onDelete,
-                      tags = actionTags,
-                  )
-                },
-            ) {
-              PrescriptionDetail(prescription)
+        PrescriptionsLoad.NOT_SIGNED_IN ->
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+              SignedOutMessage()
             }
+        PrescriptionsLoad.NO_ACCESS ->
+            MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+              NoAccessMessage(caregiverOf)
+            }
+        // The patient a caregiver follows doesn't share their prescriptions (anymore)
+        PrescriptionsLoad.NOT_SHARED ->
+            // Without the name, the caregiver was just removed and leaves for Whose care?
+            if (caregiverOf == null)
+                MessageArea(Modifier.testTag(C.Tag.prescription_detail_no_access)) {
+                  NoAccessMessage(caregiverOf = null)
+                }
+            else
+                NotSharedMessage(
+                    caregiverOf,
+                    CarePermission.PRESCRIPTIONS,
+                    Modifier.align(Alignment.Center),
+                )
+        PrescriptionsLoad.SHOWN ->
+            // No retry: the ViewModel keeps listening, so the prescription shows if it comes back
+            if (prescription == null)
+                MessageArea(Modifier.testTag(C.Tag.prescription_detail_not_found)) {
+                  LakeMessageState(
+                      title = stringResource(R.string.prescription_detail_not_found_title),
+                      message = stringResource(R.string.prescription_detail_not_found_hint),
+                  )
+                }
+            // Edit and Delete at the bottom, away from the back arrow, as in the Figma mockup
+            else
+                DetailWithActions(
+                    showActions = uiState.canEdit,
+                    contentTestTag = C.Tag.prescription_detail_content,
+                    actions = {
+                      DetailActions(
+                          editLabel = stringResource(R.string.prescription_detail_edit),
+                          deleteLabel = stringResource(R.string.prescription_detail_delete),
+                          onEdit = onEdit,
+                          onDelete = onDelete,
+                          tags = actionTags,
+                      )
+                    },
+                ) {
+                  PrescriptionDetail(prescription)
+                }
       }
     }
   }
 
   if (uiState.isDeleteDialogShown) {
     DeleteConfirmationDialog(
-        title = stringResource(R.string.prescription_delete_title),
-        message = stringResource(R.string.prescription_delete_message),
+        title =
+            if (caregiverOf == null) stringResource(R.string.prescription_delete_title)
+            else stringResource(R.string.prescription_delete_title_for, caregiverOf),
+        message =
+            if (caregiverOf == null) stringResource(R.string.prescription_delete_message)
+            else stringResource(R.string.prescription_delete_message_for, caregiverOf),
         error = stringResource(R.string.prescription_delete_error),
         confirmLabel = stringResource(R.string.prescription_delete_confirm),
         cancelLabel = stringResource(R.string.prescription_delete_cancel),
@@ -236,6 +250,8 @@ private fun PrescriptionDetail(prescription: Prescription) {
           isConfirmed = prescription.isConfirmed,
       )
     }
+    // The latest editor is independent from who first added the prescription.
+    prescription.editedByName?.let { EditedBy(it, Modifier.padding(horizontal = Spacing.lg)) }
     // The prescriber is optional: no row when the user didn't give one
     val prescribedBy = prescription.prescribedBy?.trim().orEmpty()
     if (prescribedBy.isNotEmpty()) {
@@ -247,7 +263,7 @@ private fun PrescriptionDetail(prescription: Prescription) {
       )
     }
     LabelledRow(
-        value = prescription.prescribedOn.format(dateFormatter),
+        value = prescription.prescribedOn.format(prescriptionDateFormatter),
         label = stringResource(R.string.prescription_detail_date),
         icon = painterResource(R.drawable.ic_schedule),
         testTag = C.Tag.prescription_detail_date,
@@ -295,7 +311,7 @@ private fun MedicationItem(medication: Medication) {
   val starts =
       stringResource(
           R.string.prescription_detail_starts,
-          medication.startDate.format(dateFormatter),
+          medication.startDate.format(prescriptionDateFormatter),
       )
   ListItem(
       headlineContent = { Text(medication.name) },
@@ -307,22 +323,4 @@ private fun MedicationItem(medication: Medication) {
       },
       modifier = Modifier.testTag(C.Tag.prescriptionDetailMedication(medication.id)),
   )
-}
-
-/** A centered message instead of the prescription, with an optional [action] under it. */
-@Composable
-private fun Message(
-    testTag: String,
-    title: String,
-    hint: String,
-    action: @Composable () -> Unit = {},
-) {
-  Column(
-      modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).testTag(testTag),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-  ) {
-    MessageTexts(title = title, hint = hint)
-    action()
-  }
 }

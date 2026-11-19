@@ -1,0 +1,20 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- "Icon/pill" from the Figma (outlined, 1.5 dp stroke), as drawn at 18 dp in the Overview's cards -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp"
+    android:height="18dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+    <path
+        android:pathData="M7.875,15.375L15.375,7.875C15.726,7.532 16.004,7.122 16.196,6.67C16.387,6.218 16.487,5.733 16.489,5.242C16.491,4.752 16.397,4.265 16.21,3.811C16.023,3.358 15.749,2.945 15.402,2.598C15.055,2.251 14.642,1.977 14.189,1.79C13.735,1.603 13.248,1.509 12.758,1.511C12.267,1.514 11.782,1.613 11.33,1.804C10.878,1.996 10.468,2.275 10.125,2.625L2.625,10.125C2.275,10.468 1.996,10.878 1.804,11.33C1.613,11.782 1.514,12.267 1.511,12.758C1.509,13.248 1.603,13.735 1.79,14.189C1.977,14.642 2.251,15.055 2.598,15.402C2.945,15.749 3.358,16.023 3.811,16.21C4.265,16.397 4.752,16.491 5.242,16.489C5.733,16.487 6.218,16.387 6.67,16.196C7.122,16.004 7.532,15.726 7.875,15.375Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M6.375,6.375L11.625,11.625"
+        android:strokeWidth="1.5"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

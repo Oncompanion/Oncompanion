@@ -85,10 +85,17 @@ service cloud.firestore {
     // it; the patient's own is always confirmed. Keep in sync with PrescriptionConfirmation.
     function isValidPrescription(data) {
       return data.keys().hasOnly(['prescribedBy', 'prescribedOn', 'createdAt', 'medications',
-                                  'addedBy', 'addedByName', 'confirmation'])
+                                  'addedBy', 'addedByName', 'confirmation', 'editedBy', 'editedByName'])
           && data.keys().hasAll(['prescribedOn', 'createdAt', 'medications'])
           && confirmationOf(data) in ['CONFIRMED', 'PENDING', 'REJECTED']
           && (data.get('addedBy', null) != null || confirmationOf(data) == 'CONFIRMED')
+          // Editor metadata is optional on old records and is always stored as a complete pair.
+          && (isNotEdited(data)
+              || (data.get('editedBy', null) is string
+                  && data.editedBy.size() > 0
+                  && data.get('editedByName', null) is string
+                  && data.editedByName.trim().size() > 0
+                  && data.editedByName.size() <= 50))
           && optionalString(data, 'prescribedBy', 100)
           && data.prescribedOn is timestamp
           && data.createdAt is timestamp
@@ -123,7 +130,10 @@ service cloud.firestore {
           && !existsAfter(path)
           && confirmationOf(get(path).data) == 'PENDING'
           && data.addedBy == get(path).data.addedBy
-          && data.addedByName == get(path).data.addedByName;
+          && data.addedByName == get(path).data.addedByName
+          // Rejection moves the last caregiver editor with the prescription, without forging it.
+          && data.get('editedBy', null) == get(path).data.get('editedBy', null)
+          && data.get('editedByName', null) == get(path).data.get('editedByName', null);
     }
 
     // Keep the limits in sync with SymptomEntry (MIN_INTENSITY, MAX_INTENSITY, MAX_NOTES_LENGTH,
@@ -167,13 +177,16 @@ service cloud.firestore {
     // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
     function isValidAppointment(data) {
       return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName', 'reminder'])
           && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
           && data.title is string
           && hasAppointmentTitleText(data.title)
           && data.title.size() <= 100
           && data.scheduledAt is timestamp
           && data.type in ['TREATMENT', 'CONSULTATION', 'OTHER']
+          // Legacy appointments have no choice; explicit values must match AppointmentReminder.
+          && (!('reminder' in data) || data.reminder in
+              ['NONE', 'FIFTEEN_MINUTES', 'ONE_HOUR', 'THREE_HOURS', 'ONE_DAY'])
           && optionalString(data, 'location', 200)
           && optionalString(data, 'notes', 1000)
           && data.createdAt is timestamp;
@@ -298,18 +311,23 @@ service cloud.firestore {
       // medications, in one document. There is no medications collection.
       match /prescriptions/{prescriptionId} {
         allow read: if canRead(uid, 'PRESCRIPTIONS');
-        allow delete: if isOwner(uid);
+        allow delete: if canEditIn(uid, 'PRESCRIPTIONS');
         // A caregiver the patient lets add prescriptions creates one waiting for the patient,
         // signed with their identity (US-43)
         allow create: if canAddTo(uid, 'PRESCRIPTIONS')
                       && isValidPrescription(request.resource.data)
                       && isValidAttribution(uid, request.resource.data)
+                      && isNotEdited(request.resource.data)
                       && (isOwner(uid) || confirmationOf(request.resource.data) == 'PENDING')
                       && request.resource.data.createdAt == request.time;
-        allow update: if isOwner(uid)
+        allow update: if canEditIn(uid, 'PRESCRIPTIONS')
                       && isValidPrescription(request.resource.data)
                       && keepsAttribution(request.resource.data, resource.data)
-                      && decidesConfirmation(request.resource.data, resource.data)
+                      && isValidEditor(uid, request.resource.data, resource.data)
+                      // A caregiver can correct the record, but only the patient confirms it.
+                      && (isOwner(uid)
+                          ? decidesConfirmation(request.resource.data, resource.data)
+                          : confirmationOf(request.resource.data) == confirmationOf(resource.data))
                       && request.resource.data.createdAt == resource.data.createdAt;
       }
 
@@ -437,6 +455,72 @@ service cloud.firestore {
                       && request.resource.data.patientFirstName
                              == get(invitePath(request.resource.data.inviteCode)).data.ownerFirstName;
         allow delete: if isOwner(patientUid);
+      }
+
+      // ---------- Notifications ----------
+      // /users/{uid}/notifications/{kind}_{itemId}: what the user's care circle did for them
+      // (US-50), e.g. a caregiver added a prescription for them to review. The caregiver's phone
+      // creates it right after the item, about their own item only, signed with their uid; it
+      // never holds the item's content. Its ID is the kind and the item, so it is sent once: only
+      // the owner changes it afterwards, to mark it seen. Nobody deletes it: Firestore does,
+      // through a TTL policy on `expiresAt` (firestore.indexes.json). Keep in sync with
+      // CircleNotification (MAX_ACTOR_NAME_LENGTH, KEPT_FOR).
+      match /notifications/{notificationId} {
+        function isValidNotification(data) {
+          return data.keys().hasOnly(['kind', 'itemId', 'actorUid', 'actorFirstName', 'createdAt',
+                                      'expiresAt', 'seen'])
+              && data.keys().hasAll(['kind', 'itemId', 'actorUid', 'actorFirstName', 'createdAt',
+                                     'expiresAt', 'seen'])
+              && data.kind == 'PRESCRIPTION_ADDED'
+              && data.itemId is string
+              && notificationId == data.kind + '_' + data.itemId
+              && data.actorUid == request.auth.uid
+              && data.actorFirstName is string
+              && data.actorFirstName.trim().size() > 0
+              && data.actorFirstName.size() <= 50
+              && data.createdAt == request.time
+              // The phone counts the 7 days from its own clock, maybe days before an offline
+              // write syncs: it may expire sooner, never later (1 day of margin for its clock)
+              && data.expiresAt is timestamp
+              && data.expiresAt <= request.time + duration.value(8, 'd')
+              && data.seen == false;
+        }
+        // The item is the caregiver's own prescription, still waiting for the patient. The phone
+        // saves the prescription first, and the server applies its writes in that order.
+        function isAboutOwnPendingPrescription(data) {
+          let path = /databases/$(database)/documents/users/$(uid)/prescriptions/$(data.itemId);
+          return exists(path)
+              && confirmationOf(get(path).data) == 'PENDING'
+              && get(path).data.get('addedBy', null) == request.auth.uid;
+        }
+        // Sent once, ever: its marker in notificationsSent doesn't exist yet, and is written in
+        // the same batch. The marker outlives the TTL, so a resend after it is refused too.
+        function isFirstSending() {
+          let marker = /databases/$(database)/documents/users/$(uid)/notificationsSent/$(notificationId);
+          return !exists(marker) && existsAfter(marker);
+        }
+        allow read: if isOwner(uid);
+        allow create: if signedIn()
+                      && !isOwner(uid)
+                      && canAddTo(uid, 'PRESCRIPTIONS')
+                      && isValidNotification(request.resource.data)
+                      && isAboutOwnPendingPrescription(request.resource.data)
+                      && isFirstSending();
+        allow update: if isOwner(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen'])
+                      && request.resource.data.seen == true;
+      }
+
+      // ---------- Notifications sent ----------
+      // /users/{uid}/notificationsSent/{kind}_{itemId}: an empty marker that the notification with
+      // the same ID was sent, so it is never sent twice, even after the TTL deleted it. Written
+      // only with that notification, by the caregiver who sends it; then nobody reads, changes or
+      // deletes it.
+      match /notificationsSent/{notificationId} {
+        allow create: if signedIn()
+                      && request.resource.data.keys().size() == 0
+                      && getAfter(/databases/$(database)/documents/users/$(uid)/notifications/$(notificationId))
+                             .data.actorUid == request.auth.uid;
       }
 
       // Everything personal (entries, records, reminders...) goes under the user, in a collection
