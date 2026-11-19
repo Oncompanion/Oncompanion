@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -46,6 +47,7 @@ import com.github.se.oncompanion.model.planning.FakePlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
@@ -230,11 +232,12 @@ class OverviewScreenTest {
   // ----- Each state -----
 
   @Test
-  fun loadingState_showsTheIndicator_andTheShortcuts() {
+  fun loadingState_showsTheIndicator_theCheckIn_andTheShortcuts() {
     setContent(OverviewUiState(now = morning))
     composeTestRule.onNodeWithTag(C.Tag.overview_loading).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.overview_next_appointment).assertDoesNotExist()
-    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.overview_check_in).assertExists()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertExists()
   }
 
   @Test
@@ -244,7 +247,8 @@ class OverviewScreenTest {
 
     composeTestRule.onNodeWithTag(C.Tag.overview_error).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.overview_retry).performClick()
-    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertExists()
+    composeTestRule.onNodeWithTag(C.Tag.overview_check_in).assertExists()
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).assertExists()
 
     composeTestRule.runOnIdle { assertEquals(1, retries) }
   }
@@ -416,22 +420,29 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun shortcutTiles_andProfileButton_openTheirSection() {
+  fun journalLink_shortcutTiles_andProfileButton_openTheirSection() {
     val navigationActions = setOverviewScreen()
 
-    listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
-        .forEach { shortcut ->
-          composeTestRule
-              .onNode(hasTestTag(shortcut.testTag) and hasText(context.getString(shortcut.label)))
-              .performScrollTo()
-              .assertHasClickAction()
-              .performClick()
-        }
+    // The check-in replaces the patient's Symptoms tile, and asks the question itself
+    composeTestRule.onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag).assertDoesNotExist()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.overview_subtitle))
+        .assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_journal_link).performScrollTo().performClick()
+    listOf(OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE).forEach { shortcut ->
+      composeTestRule
+          .onNode(hasTestTag(shortcut.testTag) and hasText(context.getString(shortcut.label)))
+          .performScrollTo()
+          .assertHasClickAction()
+          .performClick()
+    }
     composeTestRule
         .onNode(
             hasTestTag(OverviewShortcut.PROFILE.testTag) and
                 hasContentDescription(context.getString(R.string.profile_title))
         )
+        // The header scrolls with the day, which the check-in made longer
+        .performScrollTo()
         .performClick()
 
     composeTestRule.runOnIdle {
@@ -536,13 +547,11 @@ class OverviewScreenTest {
         .assertTextEquals(context.getString(R.string.overview_greeting_evening))
   }
 
+  /** The patient's tiles: the check-in replaced Symptoms. */
   private fun tileTops(): List<Float> =
-      listOf(
-              OverviewShortcut.SYMPTOMS,
-              OverviewShortcut.PRESCRIPTIONS,
-              OverviewShortcut.CARE_CIRCLE,
-          )
-          .map { composeTestRule.onNodeWithTag(it.testTag).fetchSemanticsNode().positionInRoot.y }
+      listOf(OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE).map {
+        composeTestRule.onNodeWithTag(it.testTag).fetchSemanticsNode().positionInRoot.y
+      }
 
   // Text needs real measurements, and a real phone width (Pixel 8a), to decide the tiles' layout
   @Test
@@ -570,7 +579,7 @@ class OverviewScreenTest {
       }
     }
     val tops = tileTops()
-    assertTrue("tiles should be one per row: $tops", tops[0] < tops[1] && tops[1] < tops[2])
+    assertTrue("tiles should be one per row: $tops", tops[0] < tops[1])
   }
 
   @Test
@@ -639,6 +648,7 @@ class OverviewScreenTest {
     composeTestRule.onNodeWithTag(C.Tag.overview_no_appointment).assertIsDisplayed()
     // The patient's cards of the Overview UX Refactor aren't the caregiver's yet
     composeTestRule.onNodeWithTag(C.Tag.overview_next_up).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.overview_check_in).assertDoesNotExist()
     composeTestRule
         .onNodeWithText(context.getString(R.string.overview_no_appointment_hint))
         .assertDoesNotExist()
@@ -759,10 +769,96 @@ class OverviewScreenTest {
   fun prescriptionsToConfirm_badgeSaysHowMany_toScreenReadersToo() {
     setContent(loaded.copy(prescriptionsToConfirm = 2))
 
+    composeTestRule.onNodeWithTag(OverviewShortcut.PRESCRIPTIONS.testTag).performScrollTo()
     composeTestRule
         .onNodeWithTag(C.Tag.overview_prescriptions_badge, useUnmergedTree = true)
         .assertIsDisplayed()
         .assertContentDescriptionEquals("2 prescriptions to confirm")
+  }
+
+  // ----- Check-in (Overview UX Refactor) -----
+
+  /** The check-in's symptoms, in the Figma's order; "More…" comes after them. */
+  private val checkInTypes =
+      listOf(
+          SymptomType.FATIGUE,
+          SymptomType.NAUSEA,
+          SymptomType.PAIN,
+          SymptomType.HEADACHE,
+          SymptomType.FEVER,
+      )
+
+  private val checkInTileTags =
+      checkInTypes.map { C.Tag.overviewCheckIn(it.name) } + C.Tag.overview_check_in_more
+
+  @Test
+  fun checkIn_eachTileOpensTheFormWithItsSymptom_andMoreOpensItEmpty() {
+    val navigationActions = setOverviewScreen()
+
+    assertTextInside(context.getString(R.string.overview_check_in_title), C.Tag.overview_check_in)
+    val labels = listOf("Fatigue", "Nausea", "Pain", "Headache", "Fever", "More…")
+    labels.zip(checkInTileTags).forEach { (label, tag) ->
+      composeTestRule
+          .onNode(hasTestTag(tag) and hasText(label))
+          .performScrollTo()
+          .assertHasClickAction()
+          .performClick()
+    }
+
+    composeTestRule.runOnIdle {
+      assertEquals(
+          (checkInTypes + null).map { Screen.symptomAdd(it) },
+          navigationActions.openedRoutes,
+      )
+    }
+  }
+
+  /** Where each tile's top is, all measured at the same scroll position. */
+  private fun checkInTileTops(): List<Float> {
+    composeTestRule.onNodeWithTag(C.Tag.overview_check_in).performScrollTo()
+    return checkInTileTags.map {
+      composeTestRule.onNodeWithTag(it).fetchSemanticsNode().positionInRoot.y
+    }
+  }
+
+  // The tiles' layout depends on the measured labels and the width
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = "w390dp-h874dp")
+  fun checkIn_hasTwoRowsOfThreeEqualTiles_andA48dpJournalLink_asInTheFigma() {
+    setContent(loaded)
+    val tops = checkInTileTops()
+    assertEquals(listOf(tops[0], tops[0], tops[0], tops[3], tops[3], tops[3]), tops)
+    assertTrue(tops[0] < tops[3])
+    val tiles = checkInTileTags.map { bounds(it) }
+    tiles.forEach {
+      assertTrue("tile at least 80 dp tall: $it", it.bottom - it.top >= 80.dp)
+      assertEquals((tiles[0].right - tiles[0].left).value, (it.right - it.left).value, 1f)
+    }
+    composeTestRule
+        .onNodeWithTag(C.Tag.overview_journal_link)
+        .assertHeightIsAtLeast(48.dp)
+        .assertWidthIsAtLeast(48.dp)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = LANDSCAPE_PHONE)
+  fun checkIn_fitsInOneRow_inLandscape() {
+    setContent(loaded)
+    assertEquals(1, checkInTileTops().distinct().size)
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  @Config(qualifiers = "w360dp-h640dp", fontScale = 2f)
+  fun checkIn_atTheLargestFont_hasAtMostTwoTilesPerRow_eachWhole() {
+    setContent(loaded)
+    val tops = checkInTileTops()
+    assertTrue("at most two tiles per row: $tops", tops.groupBy { it }.values.all { it.size <= 2 })
+    checkInTileTags.forEach {
+      composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible()
+    }
   }
 
   // ----- Look (Figma "US-23 / Overview – Dashboard") -----
@@ -864,6 +960,8 @@ class OverviewScreenTest {
     listOf(
             C.Tag.overview_next_up,
             C.Tag.overview_see_planning,
+            C.Tag.overview_journal_link,
+            *checkInTileTags.toTypedArray(),
             C.Tag.overview_shortcut_care_circle,
         )
         .forEach { composeTestRule.onNodeWithTag(it).performScrollTo().assertIsFullyVisible() }

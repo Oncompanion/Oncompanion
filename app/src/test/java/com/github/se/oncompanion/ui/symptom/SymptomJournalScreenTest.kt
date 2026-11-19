@@ -371,7 +371,7 @@ class SymptomJournalScreenTest {
 
     composeTestRule.runOnIdle {
       assertEquals(
-          listOf(Screen.symptomDetail("fatigue"), Screen.SYMPTOM_ADD),
+          listOf(Screen.symptomDetail("fatigue"), Screen.symptomAdd()),
           navigationActions.opened,
       )
       assertEquals(1, navigationActions.backCount)

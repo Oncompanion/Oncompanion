@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.model.carecircle.CarePermission
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.NotSharedMessage
@@ -119,9 +120,15 @@ enum class OverviewShortcut(
   ),
 }
 
-/** The tiles under "How do you feel today?", in display order. */
+/** The caregiver's tiles under "How do you feel today?", in display order. */
 private val tileShortcuts =
     listOf(OverviewShortcut.SYMPTOMS, OverviewShortcut.PRESCRIPTIONS, OverviewShortcut.CARE_CIRCLE)
+
+/**
+ * The patient's tiles under the check-in, which already opens the symptoms. They go once the
+ * Overview UX Refactor gives Prescriptions and the care circle their own way in.
+ */
+private val patientTileShortcuts = tileShortcuts - OverviewShortcut.SYMPTOMS
 
 /** "Saturday 3 October", as in the mockup. The app's UI is in English. */
 private val todayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
@@ -165,6 +172,7 @@ fun OverviewScreen(
       onOpenPlanning = { navigationActions.navigateToTab(Route.PLANNING) },
       onOpenAppointment = onOpenAppointment,
       onOpenEvent = onOpenEvent,
+      onLogSymptom = { navigationActions.navigateTo(Screen.symptomAdd(it)) },
       onRetry = viewModel::loadDay,
       modifier = modifier,
       caregiverOf = caregiverOf,
@@ -188,6 +196,8 @@ fun OverviewScreen(
  * @param onOpenPlanning opens Planning from an empty appointment card or "See planning"
  * @param onOpenAppointment opens the recorded appointment directly
  * @param onOpenEvent opens the event shown in the patient's "Next up"
+ * @param onLogSymptom opens the symptom form from the patient's check-in, with that symptom picked
+ *   or empty for `null`
  * @param onRetry reloads the day after an error
  * @param caregiverOf the first name of the patient a caregiver follows, `null` for a patient
  * @param onSwitchPatient opens "Whose care?", in caregiver mode
@@ -202,6 +212,7 @@ fun OverviewContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenEvent: (String) -> Unit = {},
+    onLogSymptom: (SymptomType?) -> Unit = {},
     caregiverOf: String? = null,
     onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
@@ -267,15 +278,30 @@ fun OverviewContent(
               TodaySection(uiState.todayEntries, onOpenPlanning)
             }
           }
-          // The shortcuts stay available whatever happens to the day's data. A caregiver only gets
-          // the sections the patient shares, never the care circle, which only the patient manages
+          // The check-in and the shortcuts stay available whatever happens to the day's data. A
+          // caregiver only gets the sections the patient shares, never the care circle, which only
+          // the patient manages
+          if (caregiverOf == null) {
+            CheckInDock(
+                onLogSymptom = onLogSymptom,
+                onOpenJournal = { onShortcutClick(OverviewShortcut.SYMPTOMS) },
+            )
+          }
           val tiles =
-              if (caregiverOf == null) tileShortcuts
+              if (caregiverOf == null) patientTileShortcuts
               else
                   tileShortcuts.filter {
                     it.section != null && it.section in uiState.sharedSections
                   }
-          if (tiles.isNotEmpty()) Shortcuts(onShortcutClick, tiles, uiState.prescriptionsToConfirm)
+          if (tiles.isNotEmpty()) {
+            Shortcuts(
+                onShortcutClick,
+                tiles,
+                uiState.prescriptionsToConfirm,
+                // The patient's check-in already asks
+                withQuestion = caregiverOf != null,
+            )
+          }
         }
       }
       // Drawn last, so scrolled content passes under it rather than under the clock and icons
@@ -434,22 +460,25 @@ private val tileSpacing = 12.dp
 private val tilePadding = 8.dp
 
 /**
- * "How do you feel today?" and one large tile per main section: three in a row, or one per row when
- * a label wouldn't fit in a third of the width (small screen or large font). Prescriptions shows a
- * badge with how many wait for the patient ([prescriptionsToConfirm], US-43).
+ * "How do you feel today?" ([withQuestion]) and one large tile per main section: three in a row, or
+ * one per row when a label wouldn't fit in a third of the width (small screen or large font).
+ * Prescriptions shows a badge with how many wait for the patient ([prescriptionsToConfirm], US-43).
  */
 @Composable
 private fun Shortcuts(
     onShortcutClick: (OverviewShortcut) -> Unit,
     tiles: List<OverviewShortcut>,
     prescriptionsToConfirm: Int = 0,
+    withQuestion: Boolean = true,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text(
-        text = stringResource(R.string.overview_subtitle),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    if (withQuestion) {
+      Text(
+          text = stringResource(R.string.overview_subtitle),
+          style = MaterialTheme.typography.bodyLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     BoxWithConstraints(Modifier.fillMaxWidth().testTag(C.Tag.overview_shortcuts)) {
       val labelStyle = MaterialTheme.typography.titleMedium
       val labels = tiles.map { stringResource(it.label) }

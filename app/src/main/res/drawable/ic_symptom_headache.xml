@@ -1,0 +1,14 @@
+<!-- Co-authored-by: Claude Code <noreply@anthropic.com> -->
+<!-- "Icon/symptom-headache" from the Figma (outlined, 24 dp): tinted by the Icon that shows it -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12 21C15.866 21 19 17.866 19 14C19 10.134 15.866 7 12 7C8.134 7 5 10.134 5 14C5 17.866 8.134 21 12 21Z M12 2V4.5 M6.5 3.5L7.7 5.5 M17.5 3.5L16.3 5.5"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
