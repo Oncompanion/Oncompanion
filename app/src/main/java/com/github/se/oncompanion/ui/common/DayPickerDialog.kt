@@ -2,7 +2,6 @@
 
 package com.github.se.oncompanion.ui.common
 
-import android.text.format.DateFormat
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,9 +14,7 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.github.se.oncompanion.R
@@ -25,7 +22,6 @@ import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /** The test tags of a picker dialog: the picker itself and its two buttons. */
 data class PickerTestTags(val picker: String, val confirm: String, val cancel: String)
@@ -56,14 +52,7 @@ fun DayPickerDialog(
           selectableDates = latestDate?.let(::selectableUpTo) ?: DatePickerDefaults.AllDates,
       )
   // The selected day above the calendar, e.g. "Fri, 30 Oct 2026" on a British phone
-  val locale = LocalConfiguration.current.locales[0]
-  val headlineFormatter =
-      remember(locale) {
-        DateTimeFormatter.ofPattern(
-            DateFormat.getBestDateTimePattern(locale, HEADLINE_SKELETON),
-            locale,
-        )
-      }
+  val headlineFormatter = rememberDayFormatter(HEADLINE_SKELETON)
   val colors =
       DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
   DatePickerDialog(
