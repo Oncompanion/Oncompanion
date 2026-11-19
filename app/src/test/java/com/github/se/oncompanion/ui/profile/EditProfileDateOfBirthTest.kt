@@ -11,16 +11,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.requestFocus
+import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.se.oncompanion.domain.auth.SignOut
 import com.github.se.oncompanion.model.auth.AuthUser
+import com.github.se.oncompanion.model.session.FakeCleanupJournal
+import com.github.se.oncompanion.model.session.FakeLocalSessionRepository
 import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
@@ -30,6 +36,7 @@ import com.github.se.oncompanion.ui.SMALL_LANDSCAPE_PHONE
 import com.github.se.oncompanion.ui.assertIsAboveKeyboard
 import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
+import com.github.se.oncompanion.ui.auth.FakeGoogleCredentialProvider
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.showKeyboard
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
@@ -279,5 +286,109 @@ class EditProfileDateOfBirthTest {
     node(C.Tag.edit_profile_date_of_birth_confirm).performClick()
     compose.runOnIdle { assertEquals(born, vm.uiState.value.dateOfBirth) }
     node(C.Tag.edit_profile_date_of_birth_picker).assertDoesNotExist()
+  }
+
+  /**
+   * A day tapped in the picker but not confirmed yet survives the phone being turned and the user
+   * switching to another app and back: OK then sets that day.
+   */
+  @Test
+  fun unconfirmedPickedDay_survivesRotationAndAppSwitch() {
+    val (vm, profiles) = model()
+    profiles.seed(UserProfile("uid-1", Role.PATIENT, "Alex", dateOfBirth = born))
+    val screen = @Composable { EditProfileScreen(onBack = {}, onSaved = {}, viewModel = vm) }
+    compose.setContent(screen)
+    compose.waitUntil(5000) { vm.uiState.value.status == EditProfileStatus.READY }
+
+    val interruptions =
+        listOf(
+            LocalDate.of(1968, 3, 14) to
+                {
+                  compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+                  compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+                },
+            LocalDate.of(1968, 3, 20) to
+                {
+                  compose.activityRule.scenario.recreate()
+                  compose.activity.setContent(content = screen)
+                },
+        )
+    for ((day, interrupt) in interruptions) {
+      // The picker opens on the saved month, March 1968
+      node(C.Tag.edit_profile_date_of_birth_pick).performScrollTo().performClick()
+      compose
+          .onNodeWithText("${day.dayOfMonth} March 1968", substring = true)
+          .performScrollTo()
+          .performClick()
+      // The tapped day is selected: the headline shows it
+      compose.onNodeWithText("${day.dayOfMonth} Mar 1968", substring = true).assertExists()
+      interrupt()
+      compose.onNodeWithText("${day.dayOfMonth} Mar 1968", substring = true).assertExists()
+      node(C.Tag.edit_profile_date_of_birth_picker).assertExists()
+      node(C.Tag.edit_profile_date_of_birth_confirm).performClick()
+      compose.runOnIdle { assertEquals(day, vm.uiState.value.dateOfBirth) }
+    }
+  }
+
+  /**
+   * A saved date of birth is still there after leaving the profile and coming back: Profile shows
+   * it, and Edit profile, opened again with a new ViewModel as navigation does, shows it in the
+   * field.
+   */
+  @Test
+  fun savedDate_isStillThereAfterLeavingAndComingBack() {
+    val auth = FakeAuthRepository { AuthUser("uid-1") }
+    runBlocking { auth.signInWithGoogle("token") }
+    val profiles =
+        FakeUserProfileRepository().apply { seed(UserProfile("uid-1", Role.PATIENT, "Alex")) }
+    val clock = Clock.fixed(Instant.parse("2026-11-01T10:00:00Z"), ZoneId.of("Europe/Zurich"))
+    val signOut =
+        SignOut(auth, FakeLocalSessionRepository()).apply { initialize(FakeCleanupJournal()) }
+    // Edit profile, then Profile, then Edit profile again, each with its own ViewModel (built
+    // outside the composition, as the screens' own viewModel { } factory would)
+    val firstEdit = EditProfileViewModel(auth, profiles, clock)
+    val profile = ProfileViewModel(auth, profiles, signOut)
+    val secondEdit = EditProfileViewModel(auth, profiles, clock)
+    var page by mutableStateOf(0)
+    compose.setContent {
+      when (page) {
+        0 -> EditProfileScreen(onBack = {}, onSaved = { page = 1 }, viewModel = firstEdit)
+        1 ->
+            ProfileScreen(
+                onBack = {},
+                onSignedOut = {},
+                onEdit = { page = 2 },
+                onSettings = {},
+                viewModel = profile,
+                credentialProvider = FakeGoogleCredentialProvider(),
+            )
+        else -> EditProfileScreen(onBack = {}, onSaved = {}, viewModel = secondEdit)
+      }
+    }
+
+    compose.waitUntil(5000) {
+      compose
+          .onAllNodes(hasTestTag(C.Tag.edit_profile_date_of_birth))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    field().performTextInput("12031968")
+    node(C.Tag.edit_profile_save).performScrollTo().performClick()
+    compose.waitUntil(5000) { page == 1 }
+
+    compose.waitUntil(5000) {
+      compose.onAllNodes(hasTestTag(C.Tag.profile_date_of_birth)).fetchSemanticsNodes().isNotEmpty()
+    }
+    node(C.Tag.profile_date_of_birth).performScrollTo()
+    compose.onNodeWithText("12 Mar 1968").assertExists()
+    node(C.Tag.profile_edit).performScrollTo().performClick()
+
+    compose.waitUntil(5000) {
+      compose
+          .onAllNodes(hasTestTag(C.Tag.edit_profile_date_of_birth))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    field().assertTextContains("12/03/1968")
   }
 }
