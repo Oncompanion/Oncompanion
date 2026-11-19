@@ -51,6 +51,7 @@ import com.github.se.oncompanion.ui.common.LakeTextField
 import com.github.se.oncompanion.ui.common.SavePhase
 import com.github.se.oncompanion.ui.common.isCompactHeight
 import com.github.se.oncompanion.ui.onboarding.CancerTypeField
+import java.time.LocalDate
 
 /** Owns no navigation controller: save and cancellation return through the host's callbacks. */
 @Composable
@@ -74,6 +75,8 @@ fun EditProfileScreen(
       onRetry = viewModel::retry,
       onFirstNameChange = viewModel::onFirstNameChange,
       onFamilyNameChange = viewModel::onFamilyNameChange,
+      onDateOfBirthChange = viewModel::onDateOfBirthChange,
+      onDateOfBirthTyped = viewModel::onDateOfBirthTyped,
       onCancerTypeChange = viewModel::onCancerTypeChange,
       onHospitalChange = viewModel::onHospitalChange,
       hospitalField = {
@@ -99,6 +102,8 @@ fun EditProfileContent(
     onRetry: () -> Unit,
     onFirstNameChange: (String) -> Unit,
     onFamilyNameChange: (String) -> Unit,
+    onDateOfBirthChange: (LocalDate?) -> Unit,
+    onDateOfBirthTyped: (String, LocalDate?) -> Unit,
     onCancerTypeChange: (String) -> Unit,
     onSave: () -> Unit,
     onHospitalChange: (String) -> Unit,
@@ -170,6 +175,14 @@ fun EditProfileContent(
                       imeAction = ImeAction.Next,
                   ),
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.edit_profile_family_name),
+          )
+          DateOfBirthField(
+              date = state.dateOfBirth,
+              typed = state.dateOfBirthTyped,
+              enabled = state.canEdit,
+              today = state.today,
+              onDateChange = onDateOfBirthChange,
+              onTyped = onDateOfBirthTyped,
           )
           CancerTypeField(
               value = state.cancerType,
