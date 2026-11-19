@@ -11,6 +11,8 @@ import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
+import com.github.se.oncompanion.model.settings.FakeSettingsRepository
+import com.github.se.oncompanion.model.settings.SettingsRepositoryProvider
 import com.github.se.oncompanion.model.user.*
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
@@ -27,17 +29,20 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SettingsNavigationTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+  private val originalSettings = SettingsRepositoryProvider.repository
   private val originalAuth = AuthRepositoryProvider.repository
   private val originalProfiles = UserProfileRepositoryProvider.repository
 
   @After
   fun restoreProviders() {
+    SettingsRepositoryProvider.repository = originalSettings
     AuthRepositoryProvider.repository = originalAuth
     UserProfileRepositoryProvider.repository = originalProfiles
   }
 
   @Test
   fun profileSettings_backReturnsToProfile() {
+    SettingsRepositoryProvider.repository = FakeSettingsRepository()
     val auth = FakeAuthRepository()
     val user = runBlocking { auth.signInWithGoogle("settings") }
     AuthRepositoryProvider.repository = auth
@@ -59,6 +64,16 @@ class SettingsNavigationTest {
     }
     compose.onNodeWithTag(C.Tag.profile_settings).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performClick()
+    compose.onNodeWithTag(C.Tag.appearance_screen).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.APPEARANCE, nav.currentDestination?.route) }
+    compose.onNodeWithTag(C.Tag.settings_back).performClick()
+    compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.settings_appearance).performClick()
+    compose.onNodeWithTag(C.Tag.appearance_screen).assertIsDisplayed()
+    compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    compose.onNodeWithTag(C.Tag.settings_screen).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(Screen.SETTINGS, nav.currentDestination?.route) }
     compose.onNodeWithTag(C.Tag.settings_back).performClick()
     compose.onNodeWithTag(C.Tag.profile_screen).assertIsDisplayed()
     compose.runOnIdle { assertEquals(Screen.PROFILE, nav.currentDestination?.route) }

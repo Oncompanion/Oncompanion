@@ -212,9 +212,17 @@ object C {
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Settings
+    const val settings_appearance = "settings_appearance"
+    const val settings_retry = "settings_retry"
+    const val settings_loading = "settings_loading"
+    const val settings_save_error = "settings_save_error"
+    const val appearance_screen = "appearance_screen"
+    const val appearance_device = "appearance_device"
+    const val appearance_light = "appearance_light"
+    const val appearance_dark = "appearance_dark"
+    const val appearance_selected = "appearance_selected"
     const val settings_screen = "settings_screen"
     const val settings_back = "settings_back"
-    const val settings_empty = "settings_empty"
     const val profile_settings = "profile_settings"
 
     // Profile

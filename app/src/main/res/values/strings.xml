@@ -766,8 +766,19 @@
     <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
     <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
     <!-- Settings -->
+    <string name="settings_intro">Make oncompanion work for you.</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_read_error">Couldn\'t read your preferences.</string>
+    <string name="settings_save_error">Couldn\'t save your choice. Try again.</string>
+    <string name="settings_retry">Retry</string>
+    <string name="appearance_intro">Choose what feels comfortable to read.</string>
+    <string name="appearance_device">Follow device</string>
+    <string name="appearance_light">Light</string>
+    <string name="appearance_dark">Dark</string>
+    <string name="appearance_device_hint">Use your phone\'s light or dark mode</string>
+    <string name="appearance_phone_scope">Appearance is saved on this phone.</string>
+    <string name="appearance_persistence">Changes apply immediately across the app and are saved on this phone.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
-    <string name="settings_empty">Your preferences will appear here as they become available.</string>
     <string name="settings_profile_summary">Appearance, language and more</string>
 </resources>

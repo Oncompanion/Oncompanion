@@ -8,7 +8,7 @@
       "type": "rectangle",
       "x": 20,
       "y": -2,
-      "width": 2020,
+      "width": 2400,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -37,7 +37,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 178,
-      "width": 2020,
+      "width": 2400,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -66,7 +66,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 358,
-      "width": 2020,
+      "width": 2400,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -95,7 +95,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 538,
-      "width": 2020,
+      "width": 2400,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -183,8 +183,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "SignInScreen \u00b7 RoleScreen \u00b7 InformationScreen \u00b7 ProfileScreen\nEditProfileScreen \u00b7 AccountCheckScreen (+ ViewModels)\nStartViewModel picks the first screen",
-      "originalText": "SignInScreen \u00b7 RoleScreen \u00b7 InformationScreen \u00b7 ProfileScreen\nEditProfileScreen \u00b7 AccountCheckScreen (+ ViewModels)\nStartViewModel picks the first screen",
+      "text": "SignInScreen · RoleScreen · InformationScreen · ProfileScreen\nEditProfileScreen · AccountCheckScreen (+ ViewModels)\nStartViewModel picks the first screen",
+      "originalText": "SignInScreen · RoleScreen · InformationScreen · ProfileScreen\nEditProfileScreen · AccountCheckScreen (+ ViewModels)\nStartViewModel picks the first screen",
       "fontSize": 17,
       "fontFamily": 2,
       "textAlign": "center",
@@ -883,8 +883,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "Cloud Firestore\n/users/{uid} \u00b7 /patients",
-      "originalText": "Cloud Firestore\n/users/{uid} \u00b7 /patients",
+      "text": "Cloud Firestore\n/users/{uid} · /patients",
+      "originalText": "Cloud Firestore\n/users/{uid} · /patients",
       "fontSize": 18,
       "fontFamily": 2,
       "textAlign": "center",
@@ -1696,7 +1696,7 @@
       "type": "text",
       "x": 36,
       "y": 46.75,
-      "width": 2020,
+      "width": 2400,
       "height": 25.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1732,7 +1732,7 @@
       "type": "text",
       "x": 36,
       "y": 75.75,
-      "width": 2020,
+      "width": 2400,
       "height": 17.5,
       "angle": 0,
       "strokeColor": "#495057",
@@ -1768,7 +1768,7 @@
       "type": "text",
       "x": 36,
       "y": 226.75,
-      "width": 2020,
+      "width": 2400,
       "height": 25.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1804,7 +1804,7 @@
       "type": "text",
       "x": 36,
       "y": 255.75,
-      "width": 2020,
+      "width": 2400,
       "height": 17.5,
       "angle": 0,
       "strokeColor": "#495057",
@@ -1840,7 +1840,7 @@
       "type": "text",
       "x": 36,
       "y": 398.0,
-      "width": 2020,
+      "width": 2400,
       "height": 25.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1876,7 +1876,7 @@
       "type": "text",
       "x": 36,
       "y": 427.0,
-      "width": 2020,
+      "width": 2400,
       "height": 35.0,
       "angle": 0,
       "strokeColor": "#495057",
@@ -1912,7 +1912,7 @@
       "type": "text",
       "x": 36,
       "y": 586.75,
-      "width": 2020,
+      "width": 2400,
       "height": 25.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -1948,7 +1948,7 @@
       "type": "text",
       "x": 36,
       "y": 615.75,
-      "width": 2020,
+      "width": 2400,
       "height": 17.5,
       "angle": 0,
       "strokeColor": "#495057",
@@ -2082,6 +2082,14 @@
         },
         {
           "id": "settings_persist",
+          "type": "arrow"
+        },
+        {
+          "id": "settings_observe",
+          "type": "arrow"
+        },
+        {
+          "id": "appearance_observe",
           "type": "arrow"
         }
       ],
@@ -2283,6 +2291,10 @@
         {
           "id": "profile_settings_navigation",
           "type": "arrow"
+        },
+        {
+          "id": "settings_observe",
+          "type": "arrow"
         }
       ],
       "updated": 1794000000000,
@@ -2315,8 +2327,8 @@
       "updated": 1794000000000,
       "link": null,
       "locked": false,
-      "text": "SettingsScreen\nProfile entry + Back",
-      "originalText": "SettingsScreen\nProfile entry + Back",
+      "text": "Settings · Appearance\n+ SettingsViewModel",
+      "originalText": "Settings · Appearance\n+ SettingsViewModel",
       "fontSize": 20,
       "fontFamily": 2,
       "textAlign": "center",
@@ -2381,6 +2393,184 @@
       },
       "endBinding": {
         "elementId": "settings_ui",
+        "focus": 0,
+        "gap": 1
+      }
+    },
+    {
+      "id": "appearance_root",
+      "type": "rectangle",
+      "x": 2100,
+      "y": 20,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#7048e8",
+      "backgroundColor": "#e5dbff",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "appearance_root_t",
+          "type": "text"
+        },
+        {
+          "id": "appearance_observe",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "appearance_root_t",
+      "type": "text",
+      "x": 2110,
+      "y": 45.0,
+      "width": 300,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "text": "AppAppearanceRoot\n+ AppAppearanceViewModel",
+      "originalText": "AppAppearanceRoot\n+ AppAppearanceViewModel",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "appearance_root",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "settings_observe",
+      "type": "arrow",
+      "x": 1880,
+      "y": 120,
+      "width": 0,
+      "height": 260,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 78027,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          260
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "settings_ui",
+        "focus": 0,
+        "gap": 1
+      },
+      "endBinding": {
+        "elementId": "settings_repo",
+        "focus": 0,
+        "gap": 1
+      }
+    },
+    {
+      "id": "appearance_observe",
+      "type": "arrow",
+      "x": 2260,
+      "y": 120,
+      "width": 220,
+      "height": 310,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 78027,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          310
+        ],
+        [
+          -220,
+          310
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "appearance_root",
+        "focus": 0,
+        "gap": 1
+      },
+      "endBinding": {
+        "elementId": "settings_repo",
         "focus": 0,
         "gap": 1
       }
