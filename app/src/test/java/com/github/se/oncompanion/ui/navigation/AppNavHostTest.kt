@@ -1124,9 +1124,13 @@ class AppNavHostTest {
     OverviewShortcut.entries.forEach { shortcut ->
       val section = featureDestinations.single { it.route == shortcut.route }
 
-      val button = composeTestRule.onNodeWithTag(shortcut.testTag)
-      // The profile button is in the top bar, which doesn't scroll
-      if (shortcut != OverviewShortcut.PROFILE) button.performScrollTo()
+      // The patient opens the journal from the check-in's "Journal ›"
+      val tag =
+          if (shortcut == OverviewShortcut.SYMPTOMS) C.Tag.overview_journal_link
+          else shortcut.testTag
+      val button = composeTestRule.onNodeWithTag(tag)
+      // The profile button is in the header, which scrolls with the day
+      button.performScrollTo()
       button.performClick()
       composeTestRule.onNodeWithTag(section.testTag).assertIsDisplayed()
       composeTestRule.runOnIdle {
@@ -1229,7 +1233,10 @@ class AppNavHostTest {
     setNavHost(Route.OVERVIEW, careCircleInviteRepository = invites, authRepository = auth)
 
     // Two taps from Overview (#74): the shortcut, then "Add a member" in the empty circle
-    composeTestRule.onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag).performClick()
+    composeTestRule
+        .onNodeWithTag(OverviewShortcut.CARE_CIRCLE.testTag)
+        .performScrollTo()
+        .performClick()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_empty).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_empty_add_button).performClick()
     composeTestRule.onNodeWithTag(C.Tag.care_circle_form_screen).assertIsDisplayed()
@@ -1538,10 +1545,7 @@ class AppNavHostTest {
     setNavHost(Route.OVERVIEW)
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertIsDisplayed()
 
-    composeTestRule
-        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
-        .performScrollTo()
-        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_journal_link).performScrollTo().performClick()
 
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.bottom_navigation_bar).assertDoesNotExist()
@@ -1610,12 +1614,27 @@ class AppNavHostTest {
   }
 
   @Test
-  fun symptomsShortcut_opensTheJournal_andBackReturnsToOverview() {
-    setNavHost(Route.OVERVIEW)
+  fun checkInTile_opensTheRealForm_withItsSymptomPicked_andCloseReturnsToOverview() {
+    setNavHost(Route.OVERVIEW, authRepository = signedInPatient())
     composeTestRule
-        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
+        .onNodeWithTag(C.Tag.overviewCheckIn(SymptomType.FEVER.name))
         .performScrollTo()
         .performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_screen).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.FEVER.name))
+        .performScrollTo()
+        .assertIsSelected()
+
+    composeTestRule.onNodeWithTag(C.Tag.symptom_add_close).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_screen).assertIsDisplayed()
+  }
+
+  @Test
+  fun journalLink_opensTheJournal_andBackReturnsToOverview() {
+    setNavHost(Route.OVERVIEW)
+    composeTestRule.onNodeWithTag(C.Tag.overview_journal_link).performScrollTo().performClick()
 
     // Without Firebase nobody is signed in: the journal shows its error state
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
@@ -1683,10 +1702,7 @@ class AppNavHostTest {
   }
 
   private fun openTheJournalFromOverview() {
-    composeTestRule
-        .onNodeWithTag(OverviewShortcut.SYMPTOMS.testTag)
-        .performScrollTo()
-        .performClick()
+    composeTestRule.onNodeWithTag(C.Tag.overview_journal_link).performScrollTo().performClick()
     composeTestRule.onNodeWithTag(C.Tag.symptoms_screen).assertIsDisplayed()
   }
 
@@ -1727,6 +1743,32 @@ class AppNavHostTest {
     Espresso.pressBack()
 
     assertTheDeletedSymptomStaysGone()
+  }
+
+  @Test
+  fun symptomAddRoute_picksTheGivenSymptom_andAnUnknownOneOpensItEmpty() {
+    setNavHost(Route.SYMPTOMS, authRepository = signedInPatient())
+
+    composeTestRule.runOnIdle { navController.navigate(Screen.symptomAdd(SymptomType.FEVER)) }
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.FEVER.name))
+        .performScrollTo()
+        .assertIsSelected()
+    composeTestRule
+        .onNodeWithTag(C.Tag.symptomAddType(SymptomType.PAIN.name))
+        .performScrollTo()
+        .assertIsNotSelected()
+
+    composeTestRule.runOnIdle {
+      navController.popBackStack()
+      navController.navigate("symptoms_add?type=SNEEZING")
+    }
+    SymptomType.entries.forEach {
+      composeTestRule
+          .onNodeWithTag(C.Tag.symptomAddType(it.name))
+          .performScrollTo()
+          .assertIsNotSelected()
+    }
   }
 
   @Test
@@ -2182,7 +2224,8 @@ class AppNavHostTest {
     assertEquals("overview", Route.OVERVIEW)
     assertEquals("prescriptions_add", Screen.PRESCRIPTION_ADD)
     assertEquals("prescriptions_scan", Screen.PRESCRIPTION_SCAN)
-    assertEquals("symptoms_add", Screen.SYMPTOM_ADD)
+    assertEquals("symptoms_add", Screen.symptomAdd())
+    assertEquals("symptoms_add?type=FEVER", Screen.symptomAdd(SymptomType.FEVER))
     assertEquals("sign_in", Screen.SIGN_IN)
     assertEquals("onboarding_role", Screen.ONBOARDING_ROLE)
     assertEquals("onboarding_information", Screen.ONBOARDING_INFORMATION)

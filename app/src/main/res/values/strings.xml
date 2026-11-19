@@ -89,6 +89,9 @@
     <string name="overview_error_hint">Your shortcuts still work. Please try again.</string>
     <string name="overview_retry">Retry</string>
     <string name="overview_subtitle">How do you feel today?</string>
+    <string name="overview_check_in_title">How do you feel?</string>
+    <string name="overview_check_in_more">More…</string>
+    <string name="overview_journal_link">Journal</string>
     <string name="overview_care_of">%1$s\'s care</string>
     <string name="overview_switch_patient">Choose whose care to follow</string>
     <string name="overview_error_hint_caregiver">Please try again.</string>
@@ -754,4 +757,9 @@
     <string name="symptom_edit_title_for">Edit %1$s\'s entry</string>
     <string name="symptom_delete_title_for">Delete %1$s\'s entry?</string>
     <string name="symptom_delete_message_for">It will be removed from %1$s\'s symptom journal. You can\'t undo this.</string>
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_empty">Your preferences will appear here as they become available.</string>
+    <string name="settings_profile_summary">Appearance, language and more</string>
 </resources>

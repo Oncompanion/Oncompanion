@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
@@ -21,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,6 +55,7 @@ import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.LakeMessageState
 import com.github.se.oncompanion.ui.common.isCompactHeight
+import com.github.se.oncompanion.ui.theme.Spacing
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -64,6 +68,7 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onSignedOut: () -> Unit,
     onEdit: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel { ProfileViewModel() },
     credentialProvider: GoogleCredentialProvider = rememberGoogleCredentialProvider(),
@@ -83,6 +88,7 @@ fun ProfileScreen(
         viewModel.confirmSignOut { credentialProvider.clearCredentialState(context) }
       },
       onEdit = onEdit,
+      onSettings = onSettings,
       modifier = modifier,
   )
 }
@@ -98,6 +104,7 @@ fun ProfileContent(
     onCancelSignOut: () -> Unit,
     onConfirmSignOut: () -> Unit,
     onEdit: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val confirmation = uiState as? ProfileUiState.ConfirmingSignOut
@@ -153,6 +160,7 @@ fun ProfileContent(
           is ProfileUiState.Loaded ->
               ProfileDetailsContent(
                   details = profile.details,
+                  onSettings = onSettings,
                   scrollable = !compact,
                   modifier = bodyModifier,
               )
@@ -210,6 +218,7 @@ private fun ProfileTopBar(
 @Composable
 private fun ProfileDetailsContent(
     details: ProfileDetails,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
     scrollable: Boolean = true,
 ) {
@@ -308,6 +317,27 @@ private fun ProfileDetailsContent(
             value = cancerType,
             testTag = C.Tag.profile_cancer_type,
         )
+      }
+    }
+    Surface(
+        onClick = onSettings,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.profile_settings),
+    ) {
+      Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text(
+              stringResource(R.string.settings_title),
+              style = MaterialTheme.typography.titleMedium,
+          )
+          Text(
+              stringResource(R.string.settings_profile_summary),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
       }
     }
   }

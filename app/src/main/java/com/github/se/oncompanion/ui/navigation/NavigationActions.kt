@@ -1,3 +1,5 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
+
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -5,6 +7,7 @@ package com.github.se.oncompanion.ui.navigation
 
 import android.net.Uri
 import androidx.navigation.NavHostController
+import com.github.se.oncompanion.model.symptom.SymptomType
 import java.time.LocalDate
 
 /**
@@ -26,6 +29,7 @@ object Route {
   const val PRESCRIPTIONS = "prescriptions"
   const val CARE_CIRCLE = "care_circle"
   const val PROFILE = "profile"
+  const val SETTINGS = "settings"
 }
 
 /** Individual screens, grouped by the [Route] they belong to. */
@@ -92,7 +96,13 @@ object Screen {
   /** The [SYMPTOM_DETAIL] screen of the symptom [symptomId]. */
   fun symptomDetail(symptomId: String) = "symptoms_detail/$symptomId"
 
-  const val SYMPTOM_ADD = "symptoms_add"
+  const val SYMPTOM_TYPE = "type"
+  const val SYMPTOM_ADD = "symptoms_add?type={$SYMPTOM_TYPE}"
+
+  /** The [SYMPTOM_ADD] screen, with [type] already picked if given (the Overview's check-in). */
+  fun symptomAdd(type: SymptomType? = null) =
+      if (type == null) "symptoms_add" else "symptoms_add?type=${type.name}"
+
   const val SYMPTOM_EDIT = "symptoms_edit/{$SYMPTOM_DETAIL_ID}"
 
   /** The [SYMPTOM_EDIT] screen of the symptom [symptomId]. */
@@ -154,6 +164,9 @@ object Screen {
 
   /** Set on the [CARE_CIRCLE_MEMBER] back stack entry once its member was edited, to say so. */
   const val CARE_CIRCLE_MEMBER_UPDATED = "memberUpdated"
+
+  // Route.SETTINGS
+  const val SETTINGS = "settings_home"
 
   // Route.PROFILE
   const val PROFILE = "profile_home"

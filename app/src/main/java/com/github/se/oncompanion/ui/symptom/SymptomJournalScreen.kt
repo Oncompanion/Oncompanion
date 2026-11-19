@@ -81,7 +81,7 @@ fun SymptomJournalScreen(
       uiState = uiState,
       onBack = navigationActions::goBack,
       onEntryClick = { id -> navigationActions.navigateTo(Screen.symptomDetail(id)) },
-      onAddClick = { navigationActions.navigateTo(Screen.SYMPTOM_ADD) },
+      onAddClick = { navigationActions.navigateTo(Screen.symptomAdd()) },
       onRetry = viewModel::load,
       modifier = modifier,
       caregiverOf = caregiverOf,

@@ -152,7 +152,7 @@ class M2EndToEndTest {
   @Test
   fun patientAndCaregiver_shareLogAndRevokeSymptoms() {
     shareSymptomsWithTheCaregiver()
-    openSymptoms()
+    openSymptoms(asPatient = false)
     assertSymptom("FATIGUE", patientNotes)
     assertReadOnly(patientNotes)
     ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
@@ -164,7 +164,7 @@ class M2EndToEndTest {
 
     // Sign-out clears local data: an existing circle must be found again through Whose care.
     signIn(caregiver, caregiverTitle())
-    openSymptoms()
+    openSymptoms(asPatient = false)
     assertSymptom("FATIGUE", patientNotes)
     assertSymptom("NAUSEA", caregiverNotes)
     assertReadOnly(patientNotes)
@@ -173,7 +173,7 @@ class M2EndToEndTest {
     signOutThroughProfile()
 
     signIn(patient, patientGreeting())
-    openSymptoms()
+    openSymptoms(asPatient = true)
     assertSymptom("FATIGUE", patientNotes)
     val addedBy = compose.activity.getString(R.string.symptom_added_by, circleName)
     val caregiverRow = symptomRow(caregiverNotes)
@@ -234,7 +234,7 @@ class M2EndToEndTest {
   fun patientLetsTheCaregiverEditAndDeleteSymptoms_thenTakesItBack() {
     shareSymptomsWithTheCaregiver()
     // The caregiver logs an entry, which they can't change yet
-    openSymptoms()
+    openSymptoms(asPatient = false)
     logSymptom("NAUSEA", caregiverNotes)
     assertReadOnly(caregiverNotes)
     ui.open(C.Tag.symptom_back_button, caregiverTitle())
@@ -248,7 +248,7 @@ class M2EndToEndTest {
     signOutThroughProfile()
 
     signIn(caregiver, caregiverTitle())
-    openSymptoms()
+    openSymptoms(asPatient = false)
     // The patient's own entry, so who edited it differs from who added it
     editNotes("FATIGUE", patientNotes, editedNotes)
     assertEditedByOwnName(editedNotes)
@@ -258,7 +258,7 @@ class M2EndToEndTest {
 
     // The patient sees the edit, signed with the name they gave the member, on their own entry
     signIn(patient, patientGreeting())
-    openSymptoms()
+    openSymptoms(asPatient = true)
     // Once the journal has loaded, the deleted entry is gone for the patient too
     assertSymptom("FATIGUE", editedNotes)
     ui.waitFor(symptomRow(caregiverNotes), gone = true)
@@ -281,7 +281,7 @@ class M2EndToEndTest {
 
     // A fresh session still sees and adds symptoms, but can no longer edit or delete them
     signIn(caregiver, caregiverTitle())
-    openSymptoms()
+    openSymptoms(asPatient = false)
     assertSymptom("FATIGUE", editedNotes)
     ui.tag(C.Tag.symptom_journal_add).assertIsDisplayed().assertIsEnabled()
     assertReadOnly(editedNotes)
@@ -499,7 +499,7 @@ class M2EndToEndTest {
   private fun shareSymptomsWithTheCaregiver() {
     ui.startApp(credentials)
     signInAndOnboard(patient, C.Tag.onboarding_role_patient, patientGreeting())
-    openSymptoms()
+    openSymptoms(asPatient = true)
     logSymptom("FATIGUE", patientNotes)
     ui.open(C.Tag.symptom_back_button, patientGreeting())
     inviteCaregiver()
@@ -521,8 +521,12 @@ class M2EndToEndTest {
     checkNotNull(account.uid) { "The new account wasn't recorded" }
   }
 
-  private fun openSymptoms() =
-      ui.open(C.Tag.overview_shortcut_symptoms, hasTestTag(C.Tag.symptom_journal_add))
+  /** The patient opens the journal from the check-in's "Journal ›", a caregiver from its tile. */
+  private fun openSymptoms(asPatient: Boolean) =
+      ui.open(
+          if (asPatient) C.Tag.overview_journal_link else C.Tag.overview_shortcut_symptoms,
+          hasTestTag(C.Tag.symptom_journal_add),
+      )
 
   private fun logSymptom(type: String, notes: String) {
     ui.open(C.Tag.symptom_journal_add, hasTestTag(C.Tag.symptomAddType(type))).performClick()

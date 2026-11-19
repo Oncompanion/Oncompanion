@@ -21,7 +21,7 @@ To edit a diagram, open its `.excalidraw` file on [excalidraw.com](https://excal
 
 ## Layers
 
-**UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes; the defaults come from one provider object per repository (`XRepositoryProvider.repository`), the only place that names an implementation. No Firebase or Android `Context` here. Overview, Planning and Events are the bottom-bar tabs. Overview shows what comes next from `ObservePlanning`: for the patient, "Next up" (today's next appointment or Ligue event, else the next appointment of a later day) above today's list (Overview UX Refactor); a caregiver still sees the next appointment and today's list until their own view is redone. It is read-only: symptoms are logged from the symptom tracker, not from Overview.
+**UI layer** (`ui/<feature>/`). Each screen is a stateless composable plus a ViewModel that exposes a `StateFlow<UiState>`. ViewModels take their repositories and use cases in the constructor, so tests pass fakes; the defaults come from one provider object per repository (`XRepositoryProvider.repository`), the only place that names an implementation. No Firebase or Android `Context` here. Overview, Planning and Events are the bottom-bar tabs. Overview shows what comes next from `ObservePlanning`: for the patient, "Next up" (today's next appointment or Ligue event, else the next appointment of a later day) above today's list, then the check-in, "How do you feel?", whose tiles open the symptom form with that symptom picked (`Screen.symptomAdd(type)`) and whose "Journal" opens the journal (Overview UX Refactor); a caregiver still sees the next appointment, today's list and the Symptoms shortcut until their own view is redone. Overview itself saves nothing: the symptom form does.
 
 **Domain layer** (`domain/<feature>/`, optional). One class per use case, usually with a single `operator fun invoke(...)`. Only add one when the logic combines several repositories or device services, or is worth unit-testing on its own. Plain reads and writes (directory, events, appointments list) go straight from the ViewModel to the repository.
 
@@ -287,6 +287,20 @@ Editing returns to the existing detail destination; its observation refreshes it
 to the originating screen/day. Only creation sends the saved-day result to Planning. Detail uses
 shared `DetailWithActions` and `DetailActions`: supported actions stay visible in normal windows
 and scroll after the content in compact windows. Edit mode reuses the form's keyboard handling.
+
+### Appointment reminder choices
+
+Appointments store one shared `reminder` enum name: `NONE`, `FIFTEEN_MINUTES`, `ONE_HOUR`,
+`THREE_HOURS`, or `ONE_DAY`. Missing legacy fields read as `ONE_HOUR`. Unknown choices (including
+ones introduced by a newer app) and explicit non-string or null values read as `NONE`: the
+appointment remains visible without enabling an unintended reminder. Other malformed appointment
+fields still follow the existing document validation. Patient and authorized caregiver writes use
+the same strict schema and existing permissions. Ordinary form edits preserve the
+stored choice. This data layer does not schedule or deliver notifications; form controls and
+notification delivery are separate follow-ups to #489 and US-16.
+
+Deploy the updated Firestore rules before distributing a client that writes `reminder`: the
+previous field allowlist rejects it. No live rules deployment is part of this data-layer change.
 
 ## Appointment details (issue #205)
 
@@ -575,3 +589,23 @@ The read-only page follows appointment details for M2: the standard Material too
 Paper lake toolbar and full Figma restyle. It shows recorded fields only, with no inferred intake
 times or unsaved Notes field. View prescription pushes the existing prescription detail, and Back
 pops to the medication and then the original Planning day and scroll position.
+
+## Device settings (#507)
+
+Profile opens the Settings nested graph and Back returns to the same Profile entry.
+Only implemented preference categories appear; the foundation shows a short empty state
+until Appearance (#508) is added. The Settings body scrolls at large text sizes and in landscape.
+
+`SettingsRepository` is the device-local contract, provided by `SettingsRepositoryProvider`.
+`SettingsRepositoryDataStore` persists `DeviceSettings` in one application-scoped Preferences
+DataStore (`device_settings`). Appearance defaults to `FOLLOW_DEVICE`; explicit Light and Dark
+values are groundwork for #508 and are not exposed by this PR. Unknown values fall back to the
+device default without deleting unrelated preferences. Read/write errors propagate to callers;
+no corrupt-file reset silently discards preferences.
+
+The Activity installs the application context before any settings consumer is created.
+The provider creates its store lazily and can be replaced with the shared fake in tests.
+Settings are independent of Firebase and uid: sign-out and account changes do not clear them,
+and local reads/writes work offline. This store contains no patient/session data and intentionally
+does not join SessionAccess cleanup. Notification settings will be account-specific work under
+#134, separate from this device store.

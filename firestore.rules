@@ -177,13 +177,16 @@ service cloud.firestore {
     // Keep the limits in sync with Appointment.MAX_TITLE_LENGTH/MAX_LOCATION_LENGTH/MAX_NOTES_LENGTH.
     function isValidAppointment(data) {
       return data.keys().hasOnly(['title', 'scheduledAt', 'type', 'location', 'notes', 'createdAt',
-                                  'addedBy', 'addedByName', 'editedBy', 'editedByName'])
+                                  'addedBy', 'addedByName', 'editedBy', 'editedByName', 'reminder'])
           && data.keys().hasAll(['title', 'scheduledAt', 'type', 'createdAt'])
           && data.title is string
           && hasAppointmentTitleText(data.title)
           && data.title.size() <= 100
           && data.scheduledAt is timestamp
           && data.type in ['TREATMENT', 'CONSULTATION', 'OTHER']
+          // Legacy appointments have no choice; explicit values must match AppointmentReminder.
+          && (!('reminder' in data) || data.reminder in
+              ['NONE', 'FIFTEEN_MINUTES', 'ONE_HOUR', 'THREE_HOURS', 'ONE_DAY'])
           && optionalString(data, 'location', 200)
           && optionalString(data, 'notes', 1000)
           && data.createdAt is timestamp;

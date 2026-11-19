@@ -1,3 +1,4 @@
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 
@@ -22,6 +23,21 @@ import org.junit.Assert.*
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppointmentEditViewModelTest {
+  /** Editing another field must preserve an existing timing, including an explicit opt-out. */
+  @Test
+  fun unrelatedEditsPreserveEveryReminderChoice() =
+      runTest(dispatcher) {
+        for (reminder in AppointmentReminder.entries) {
+          repository.seed("uid-patient", appointment.copy(reminder = reminder))
+          val vm = form()
+          advanceUntilIdle()
+          vm.onNotesChange("Corrected notes")
+          vm.save()
+          advanceUntilIdle()
+          assertEquals(reminder, repository.appointments("uid-patient").single().reminder)
+        }
+      }
+
   private val dispatcher = StandardTestDispatcher()
   private val repository = FakeAppointmentRepository()
   private val auth = FakeAuthRepository()

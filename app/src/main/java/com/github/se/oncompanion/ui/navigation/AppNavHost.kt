@@ -1,4 +1,6 @@
 // Co-authored-by: ChatGPT <noreply@openai.com>
+
+// Co-authored-by: ChatGPT <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
 // Co-authored-by: Codex <noreply@openai.com>
 
@@ -30,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.se.oncompanion.domain.auth.SignOutProvider
 import com.github.se.oncompanion.model.medication.scan.ScanPhotoStore
+import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailScreen
 import com.github.se.oncompanion.ui.appointment.AppointmentDetailViewModel
@@ -81,6 +84,7 @@ import com.github.se.oncompanion.ui.profile.EditProfileScreen
 import com.github.se.oncompanion.ui.profile.EditProfileViewModel
 import com.github.se.oncompanion.ui.profile.ProfileScreen
 import com.github.se.oncompanion.ui.profile.ProfileViewModel
+import com.github.se.oncompanion.ui.settings.SettingsScreen
 import com.github.se.oncompanion.ui.symptom.AddSymptomScreen
 import com.github.se.oncompanion.ui.symptom.AddSymptomViewModel
 import com.github.se.oncompanion.ui.symptom.SymptomDetailScreen
@@ -435,11 +439,29 @@ private fun SessionNavHost(
             caregiverOf = chosenPatient?.firstName,
         )
       }
-      composable(Screen.SYMPTOM_ADD) {
-        // Saving returns to the journal, where the new entry is at the top
+      composable(
+          Screen.SYMPTOM_ADD,
+          arguments =
+              listOf(
+                  navArgument(Screen.SYMPTOM_TYPE) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                  }
+              ),
+      ) { entry ->
+        // A check-in tile on the Overview opens the form with its symptom picked; an unknown name
+        // opens it empty
+        val picked =
+            entry.arguments?.getString(Screen.SYMPTOM_TYPE)?.let { name ->
+              SymptomType.entries.firstOrNull { it.name == name }
+            }
+        // Saving returns to where the form was opened: the journal, where the new entry is at the
+        // top, or the Overview
         // In caregiver mode, the symptom goes in the chosen patient's journal (US-22)
         AddSymptomScreen(
-            viewModel = viewModel { AddSymptomViewModel(patientUid = chosenPatient?.uid) },
+            viewModel =
+                viewModel { AddSymptomViewModel(patientUid = chosenPatient?.uid, picked = picked) },
             onBack = navigationActions::goBack,
             onSaved = navigationActions::goBack,
             caregiverOf = chosenPatient?.firstName,
@@ -671,11 +693,15 @@ private fun SessionNavHost(
         )
       }
     }
+    navigation(startDestination = Screen.SETTINGS, route = Route.SETTINGS) {
+      composable(Screen.SETTINGS) { SettingsScreen(onBack = navigationActions::goBack) }
+    }
     navigation(startDestination = Screen.PROFILE, route = Route.PROFILE) {
       composable(Screen.PROFILE) {
         ProfileScreen(
             onBack = navigationActions::goBack,
             onEdit = { navigationActions.navigateTo(Screen.EDIT_PROFILE) },
+            onSettings = { navigationActions.navigateTo(Route.SETTINGS) },
             onSignedOut = signOut,
             viewModel = viewModel { ProfileViewModel() },
             credentialProvider = credentialProvider,

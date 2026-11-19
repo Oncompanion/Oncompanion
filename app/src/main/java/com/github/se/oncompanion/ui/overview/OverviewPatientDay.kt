@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.resources.C
@@ -92,9 +93,9 @@ private fun DayCard(modifier: Modifier, onClick: () -> Unit, content: @Composabl
   )
 }
 
-/** The card's icon, white in a teal disc. */
+/** The card's icon, white in a teal disc ([iconSize] 18 dp, 20 for the check-in's heart). */
 @Composable
-private fun CardBadge(@DrawableRes icon: Int) {
+internal fun CardBadge(@DrawableRes icon: Int, iconSize: Dp = BADGE_ICON_SIZE) {
   Box(
       Modifier.size(BADGE_SIZE).background(MaterialTheme.colorScheme.primary, CircleShape),
       contentAlignment = Alignment.Center,
@@ -103,7 +104,7 @@ private fun CardBadge(@DrawableRes icon: Int) {
         painterResource(icon),
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onPrimary,
-        modifier = Modifier.size(BADGE_ICON_SIZE),
+        modifier = Modifier.size(iconSize),
     )
   }
 }
