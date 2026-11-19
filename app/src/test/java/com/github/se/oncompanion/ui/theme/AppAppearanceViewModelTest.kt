@@ -52,8 +52,12 @@ class AppAppearanceViewModelTest {
         }
     val vm = model(repo)
     runCurrent()
-    assertEquals(AppearancePreference.FOLLOW_DEVICE, vm.uiState.value.appearance)
-    repo.readFailure = null
+    try {
+      assertEquals(AppearancePreference.FOLLOW_DEVICE, vm.uiState.value.appearance)
+    } finally {
+      // Release retries even when the startup assertion fails.
+      repo.readFailure = null
+    }
     advanceTimeBy(1_000)
     runCurrent()
     assertEquals(AppearancePreference.DARK, vm.uiState.value.appearance)
@@ -78,12 +82,16 @@ class AppAppearanceViewModelTest {
     runCurrent()
     repo.observationFailure.value = IOException("disk")
     runCurrent()
-    repeat(3) {
-      advanceTimeBy(1_000)
-      runCurrent()
-      assertEquals(AppearancePreference.DARK, vm.uiState.value.appearance)
+    try {
+      repeat(3) {
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(AppearancePreference.DARK, vm.uiState.value.appearance)
+      }
+    } finally {
+      // End retries so a failed assertion is reported instead of hanging runTest.
+      repo.observationFailure.value = null
     }
-    repo.observationFailure.value = null
     repo.settings.value = DeviceSettings(AppearancePreference.LIGHT)
     advanceTimeBy(1_000)
     runCurrent()
