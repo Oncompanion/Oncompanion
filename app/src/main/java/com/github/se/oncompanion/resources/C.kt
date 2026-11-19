@@ -255,6 +255,7 @@ object C {
     const val profile_sign_out_cancel = "profile_sign_out_cancel"
     const val profile_sign_out_error = "profile_sign_out_error"
     const val profile_hospital = "profile_hospital"
+    const val profile_date_of_birth = "profile_date_of_birth"
     const val cancer_type_field = "cancer_type_field"
     const val cancer_type_suggestions = "cancer_type_suggestions"
     const val cancer_type_suggestion = "cancer_type_suggestion"

@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -29,6 +30,7 @@ import com.github.se.oncompanion.ui.assertIsFullyVisible
 import com.github.se.oncompanion.ui.common.LakeButtonDefaults
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import java.time.Instant
+import java.time.LocalDate
 import java.util.TimeZone
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -306,5 +308,43 @@ class ProfileScreenTest {
       composeTestRule.onNodeWithTag(C.Tag.profile_hospital).assertDoesNotExist()
       composeTestRule.onNodeWithTag(C.Tag.profile_edit).assertIsDisplayed()
     }
+  }
+
+  // ----- Date of birth (#218) -----
+
+  private fun loaded(dateOfBirth: LocalDate?) =
+      ProfileUiState.Loaded(
+          ProfileDetails(
+              firstName = "Alex",
+              familyName = "Martin",
+              cancerType = null,
+              email = "alex@example.com",
+              memberSince = null,
+              hospital = null,
+              dateOfBirth = dateOfBirth,
+          )
+      )
+
+  /** Shown right after the family name, as a day in the phone's language (Figma: British). */
+  @Test
+  @Config(qualifiers = "en-rGB")
+  fun dateOfBirth_whenSet_isShownAfterTheFamilyName() {
+    setContent(loaded(LocalDate.of(1968, 3, 12)))
+
+    composeTestRule.onNodeWithTag(C.Tag.profile_date_of_birth).performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("12 Mar 1968").assertIsDisplayed()
+    composeTestRule.onNodeWithText(string(R.string.profile_date_of_birth)).assertIsDisplayed()
+    // Unclipped: a row scrolled off the screen still has its place in the list
+    fun top(tag: String) = composeTestRule.onNodeWithTag(tag).getUnclippedBoundsInRoot().top
+    assert(top(C.Tag.profile_family_name) < top(C.Tag.profile_date_of_birth))
+    assert(top(C.Tag.profile_date_of_birth) < top(C.Tag.profile_email))
+  }
+
+  @Test
+  fun dateOfBirth_whenNotSet_hasNoRow() {
+    setContent(loaded(null))
+
+    composeTestRule.onNodeWithTag(C.Tag.profile_family_name).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.profile_date_of_birth).assertDoesNotExist()
   }
 }

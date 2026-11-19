@@ -61,6 +61,7 @@
     <string name="edit_profile_cancel">Cancel</string>
     <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
     <string name="profile_hospital">Hospital</string>
+    <string name="profile_date_of_birth">Date of birth</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>

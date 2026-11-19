@@ -297,6 +297,13 @@ private fun ProfileDetailsContent(
             testTag = C.Tag.profile_family_name,
         )
       }
+      details.dateOfBirth?.let { dateOfBirth ->
+        ProfileField(
+            label = stringResource(R.string.profile_date_of_birth),
+            value = dateOfBirthText(dateOfBirth),
+            testTag = C.Tag.profile_date_of_birth,
+        )
+      }
       details.email?.takeIf(String::isNotBlank)?.let { email ->
         ProfileField(
             label = stringResource(R.string.profile_email),
