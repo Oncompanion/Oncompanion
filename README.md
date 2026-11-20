@@ -41,15 +41,15 @@ People in active cancer therapy live with exhaustion, "chemo brain" and complica
 
 - **Your day at a glance.** The Overview shows the next appointment, today's medications and the events organized by the [Ligue genevoise contre le cancer](https://geneve.liguecancer.ch/) you signed up for.
 - **Planning.** A week calendar of appointments, active medications and confirmed events. Appointments can be added, edited and deleted.
-- **Symptom journal.** Tap what you feel, choose how bad it is, add a note if you want, and look back over your history.
+- **Symptom journal.** Tap what you feel or say it out loud, choose how bad it is, add a note if you want, and look back over your history. What you said is drafted into the form for you to check before saving.
 - **Prescriptions without retyping.** Photograph a prescription and on-device text recognition (ML Kit) drafts it. You check every field before anything is saved. The app warns you when a prescription is already saved or looks like a renewal.
 - **Ligue events.** Browse the Ligue genevoise's events and note that you registered with the organizer.
 - **Care circle.** Invite relatives with a code and choose which sections each one can see: planning, symptoms, prescriptions, events. You can also let a relative add entries for you, signed with their name. A prescription a relative adds stays unconfirmed until you have checked it.
 - **Find your hospital.** Search explicitly from Edit profile, select a hospital suggestion, or enter the location manually. New searches need connectivity and valid app attestation; manual entry remains available if search fails.
-- **Works offline.** Everything is saved on the phone first and syncs once you're back online. Prescription scanning works offline too.
+- **Works offline.** Everything is saved on the phone first and syncs once you're back online. Prescription scanning works offline too, and so does voice once the phone has your language: on Android 13 and later, the app offers to download it. The app keeps only the words you said, never the recording, so nothing is sent for transcription once you're back online.
 - **Made for tired days.** Light and dark themes, landscape, and text that stays usable at 200% font size.
 
-**Coming next:** reminders for appointments, events and medications; logging a symptom by voice; a summary of how you've been to show your doctor (on screen or as a PDF); and the Ligue's directory of contacts and support programs.
+**Coming next:** reminders for appointments, events and medications; a summary of how you've been to show your doctor (on screen or as a PDF); and the Ligue's directory of contacts and support programs.
 
 ## Design
 
