@@ -14,6 +14,7 @@ import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -26,7 +27,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** The profile details needed by the read-only Profile screen. */
+/**
+ * The profile details needed by the read-only Profile screen.
+ *
+ * @property dateOfBirth a calendar day, shown as is (no time zone conversion); null when not set
+ */
 data class ProfileDetails(
     val firstName: String,
     val familyName: String?,
@@ -34,6 +39,7 @@ data class ProfileDetails(
     val email: String?,
     val memberSince: Instant?,
     val hospital: String?,
+    val dateOfBirth: LocalDate? = null,
 )
 
 /** What the Profile screen displays while resolving the signed-in user's profile. */
@@ -161,6 +167,7 @@ class ProfileViewModel(
                           hospital = profile.hospital,
                           email = user.email,
                           memberSince = profile.createdAt,
+                          dateOfBirth = profile.dateOfBirth,
                       )
                   )
                 }

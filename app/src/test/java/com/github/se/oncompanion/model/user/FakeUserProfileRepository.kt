@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.update
  * Follows the same contract as [UserProfileRepositoryFirestore]:
  * - [createProfile] requires [UserProfile.isValid] (else [IllegalArgumentException]) and stores the
  *   profile with `createdAt = clock()`, ignoring the given `createdAt`.
- * - [updateProfile] requires [UserProfile.isValid] and only changes `firstName`, `familyName` and
- *   `cancerType` and `hospital` of an existing profile. The stored `role` and `createdAt` never
- *   change. It does nothing if no profile exists for that uid.
+ * - [updateProfile] requires [UserProfile.isValid] and only changes `firstName`, `familyName`,
+ *   `cancerType`, `hospital` and `dateOfBirth` of an existing profile. The stored `role` and
+ *   `createdAt` never change. It does nothing if no profile exists for that uid.
  * - [getProfile] returns the stored profile, or null.
  * - [observeProfile] emits the current value, then every change.
  *
@@ -98,6 +98,7 @@ class FakeUserProfileRepository(
                   familyName = profile.familyName,
                   cancerType = profile.cancerType,
                   hospital = profile.hospital,
+                  dateOfBirth = profile.dateOfBirth,
               ))
     }
   }

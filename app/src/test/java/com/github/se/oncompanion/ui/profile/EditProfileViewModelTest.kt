@@ -12,7 +12,10 @@ import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.common.SavePhase
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +70,12 @@ class EditProfileViewModelTest {
     Dispatchers.resetMain()
   }
 
-  private fun vm() = EditProfileViewModel(auth, repository)
+  // 09:00 on 17 Nov in Sydney, while it is still 16 Nov in Zurich: "today" is the phone's
+  private val clock =
+      Clock.fixed(Instant.parse("2026-11-16T22:00:00Z"), ZoneId.of("Australia/Sydney"))
+  private val today = LocalDate.of(2026, 11, 17)
+
+  private fun vm() = EditProfileViewModel(auth, repository, clock)
 
   private suspend fun signIn(uid: String = original.uid) {
     auth.signInWithGoogle(uid)
@@ -80,7 +88,7 @@ class EditProfileViewModelTest {
     assertEquals(EditProfileStatus.LOADING, vm.uiState.value.status)
     advanceUntilIdle()
     assertEquals(
-        EditProfileUiState(EditProfileStatus.READY, "Alex", "Doe", "Lymphoma"),
+        EditProfileUiState(EditProfileStatus.READY, "Alex", "Doe", "Lymphoma", today = today),
         vm.uiState.value,
     )
     assertTrue(vm.uiState.value.canSave)
@@ -250,7 +258,10 @@ class EditProfileViewModelTest {
     advanceUntilIdle()
     profiles.seed(original.copy(firstName = "New", familyName = "New", cancerType = "New"))
     advanceUntilIdle()
-    assertEquals(EditProfileUiState(EditProfileStatus.READY, "New", "New", "New"), vm.uiState.value)
+    assertEquals(
+        EditProfileUiState(EditProfileStatus.READY, "New", "New", "New", today = today),
+        vm.uiState.value,
+    )
     vm.onFirstNameChange("Draft")
     vm.onFamilyNameChange("Draft")
     vm.onCancerTypeChange("Draft")
@@ -261,7 +272,10 @@ class EditProfileViewModelTest {
         original.copy(uid = "uid-2", firstName = "Other", familyName = null, cancerType = null)
     )
     advanceUntilIdle()
-    assertEquals(EditProfileUiState(EditProfileStatus.READY, "Other"), vm.uiState.value)
+    assertEquals(
+        EditProfileUiState(EditProfileStatus.READY, "Other", today = today),
+        vm.uiState.value,
+    )
   }
 
   @Test
@@ -540,5 +554,177 @@ class EditProfileViewModelTest {
     model.saveProfile()
     advanceUntilIdle()
     assertEquals(caregiver.copy(firstName = "Updated"), profiles.profiles[original.uid])
+  }
+
+  // ---- date of birth ----
+
+  /** The saved date of birth prefills the draft; a profile saved before it existed has none. */
+  @Test
+  fun dateOfBirthPrefillsFromTheSavedProfile() = runTest {
+    signIn()
+    for (saved in listOf(LocalDate.of(1985, 6, 15), null)) {
+      profiles.seed(original.copy(dateOfBirth = saved))
+      val model = vm()
+      advanceUntilIdle()
+      assertEquals(saved, model.uiState.value.dateOfBirth)
+      assertFalse(model.uiState.value.dateOfBirthInFuture)
+      assertTrue(model.uiState.value.canSave)
+    }
+  }
+
+  @Test
+  fun dateOfBirthCanBeSetChangedAndCleared() = runTest {
+    signIn()
+    val model = vm()
+    advanceUntilIdle()
+    for (date in listOf(LocalDate.of(1985, 6, 15), today, null)) {
+      model.onDateOfBirthChange(date)
+      model.saveProfile()
+      advanceUntilIdle()
+      assertEquals(SavePhase.SAVED, model.uiState.value.save)
+      assertEquals(date, writes.last().dateOfBirth)
+      assertEquals(date, profiles.profiles[original.uid]!!.dateOfBirth)
+      model.consumeSaved()
+    }
+    assertEquals(3, writes.size)
+  }
+
+  /** A remote update doesn't overwrite a picked or cleared date, but refreshes an untouched one. */
+  @Test
+  fun dateOfBirthDraftSurvivesRemoteUpdates() = runTest {
+    signIn()
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1985, 6, 15)))
+    val model = vm()
+    advanceUntilIdle()
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1986, 1, 1)))
+    advanceUntilIdle()
+    assertEquals(LocalDate.of(1986, 1, 1), model.uiState.value.dateOfBirth)
+
+    for (draft in listOf(LocalDate.of(1990, 2, 3), null)) {
+      model.onDateOfBirthChange(draft)
+      profiles.seed(original.copy(dateOfBirth = LocalDate.of(1970, 1, 1), familyName = "Remote"))
+      advanceUntilIdle()
+      assertEquals(draft, model.uiState.value.dateOfBirth)
+    }
+    model.saveProfile()
+    advanceUntilIdle()
+    assertEquals(original.copy(dateOfBirth = null, familyName = "Remote"), writes.single())
+  }
+
+  /** A day after the phone's today shows an error and is not saved; picking another clears it. */
+  @Test
+  fun futureDateOfBirthIsRefusedWithAnErrorAndNotSaved() = runTest {
+    signIn()
+    val model = vm()
+    advanceUntilIdle()
+    assertEquals(today, model.uiState.value.today)
+
+    for (future in listOf(today.plusDays(1), today.plusYears(1))) {
+      model.onDateOfBirthChange(future)
+      assertTrue(model.uiState.value.dateOfBirthInFuture)
+      assertFalse(model.uiState.value.canSave)
+      model.saveProfile()
+      advanceUntilIdle()
+      assertEquals(SavePhase.EDITING, model.uiState.value.save)
+      assertTrue(writes.isEmpty())
+    }
+
+    model.onDateOfBirthChange(today)
+    assertFalse(model.uiState.value.dateOfBirthInFuture)
+    assertTrue(model.uiState.value.canSave)
+    model.onDateOfBirthChange(today.plusDays(1))
+    model.onDateOfBirthChange(null)
+    assertFalse(model.uiState.value.dateOfBirthInFuture)
+    assertTrue(model.uiState.value.canSave)
+  }
+
+  /** Retrying or switching accounts forgets the picked date and its error. */
+  @Test
+  fun retryResetsTheDateOfBirthDraft() = runTest {
+    signIn()
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1985, 6, 15)))
+    val model = vm()
+    advanceUntilIdle()
+    model.onDateOfBirthChange(today.plusDays(1))
+    model.retry()
+    advanceUntilIdle()
+    assertEquals(LocalDate.of(1985, 6, 15), model.uiState.value.dateOfBirth)
+    assertFalse(model.uiState.value.dateOfBirthInFuture)
+    // After the retry the date isn't marked as edited: a remote update shows again
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1986, 1, 1)))
+    advanceUntilIdle()
+    assertEquals(LocalDate.of(1986, 1, 1), model.uiState.value.dateOfBirth)
+  }
+
+  /**
+   * A future date saved by another phone (ahead in time zone, or with a wrong clock) shows the
+   * error and blocks Save until it is changed or cleared, instead of every save failing.
+   */
+  @Test
+  fun futureDateOfBirthLoadedFromTheProfileShowsTheErrorAndIsNotSaved() = runTest {
+    signIn()
+    for (fix in listOf<LocalDate?>(null, LocalDate.of(1985, 6, 15), today)) {
+      profiles.seed(original.copy(dateOfBirth = today.plusDays(1)))
+      val model = vm()
+      advanceUntilIdle()
+      assertTrue(model.uiState.value.dateOfBirthInFuture)
+      assertFalse(model.uiState.value.canSave)
+      model.onFirstNameChange("Alexandra")
+      model.saveProfile()
+      advanceUntilIdle()
+      assertTrue(writes.isEmpty())
+
+      model.onDateOfBirthChange(fix)
+      assertFalse("$fix", model.uiState.value.dateOfBirthInFuture)
+      assertTrue("$fix", model.uiState.value.canSave)
+    }
+  }
+
+  @Test
+  fun defaultClockUsesThePhonesToday() = runTest {
+    signIn()
+    val model = EditProfileViewModel(auth, repository)
+    advanceUntilIdle()
+    assertEquals(LocalDate.now(), model.uiState.value.today)
+  }
+
+  /**
+   * Typed text that isn't a whole, real day blocks Save and isn't written; it survives a remote
+   * update, and a real day (or emptying the field) ends it.
+   */
+  @Test
+  fun unreadableTypedDateOfBirthBlocksSaveUntilFixed() = runTest {
+    signIn()
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1985, 6, 15)))
+    val model = vm()
+    advanceUntilIdle()
+
+    model.onDateOfBirthTyped("3102", null)
+    assertTrue(model.uiState.value.dateOfBirthUnreadable)
+    assertNull(model.uiState.value.dateOfBirth)
+    assertFalse(model.uiState.value.canSave)
+    model.saveProfile()
+    advanceUntilIdle()
+    assertTrue(writes.isEmpty())
+
+    // A remote update doesn't replace what the user is typing
+    profiles.seed(original.copy(dateOfBirth = LocalDate.of(1970, 1, 1)))
+    advanceUntilIdle()
+    assertTrue(model.uiState.value.dateOfBirthUnreadable)
+    assertNull(model.uiState.value.dateOfBirth)
+
+    for (fixed in listOf(LocalDate.of(1990, 2, 3), null)) {
+      model.onDateOfBirthTyped("3102", null)
+      model.onDateOfBirthChange(fixed)
+      assertFalse("$fixed", model.uiState.value.dateOfBirthUnreadable)
+      assertTrue("$fixed", model.uiState.value.canSave)
+    }
+
+    // Retrying forgets it
+    model.onDateOfBirthTyped("3102", null)
+    model.retry()
+    advanceUntilIdle()
+    assertFalse(model.uiState.value.dateOfBirthUnreadable)
+    assertEquals(LocalDate.of(1970, 1, 1), model.uiState.value.dateOfBirth)
   }
 }

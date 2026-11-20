@@ -43,6 +43,9 @@ import kotlin.math.roundToInt
  * Its box shows its state: a 1 dp outline, a 1.5 dp red border [isError], a dawn box with a 1.5 dp
  * secondary border for a value the app drafted that the user should check ([isCheck]), and a 2 dp
  * border while the user types. [supportingText] goes below the box, in the state's color.
+ *
+ * @param visualTransformation how the value is shown, e.g. a date's separators added as it is
+ *   typed; shown as typed by default
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +68,7 @@ fun LakeTextField(
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
   val interactions = remember { MutableInteractionSource() }
   val focused by interactions.collectIsFocusedAsState()
@@ -85,6 +89,7 @@ fun LakeTextField(
       readOnly = readOnly,
       textStyle = MaterialTheme.typography.bodyLarge.copy(color = box.content),
       cursorBrush = SolidColor(box.border),
+      visualTransformation = visualTransformation,
       keyboardOptions = keyboardOptions,
       keyboardActions = keyboardActions,
       interactionSource = interactions,
@@ -97,7 +102,7 @@ fun LakeTextField(
         innerTextField = innerTextField,
         enabled = enabled,
         singleLine = singleLine,
-        visualTransformation = VisualTransformation.None,
+        visualTransformation = visualTransformation,
         interactionSource = interactions,
         isError = isError,
         label = label?.let { { NoTallerThanSmall(it) } },

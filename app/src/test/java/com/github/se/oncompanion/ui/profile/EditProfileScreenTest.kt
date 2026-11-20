@@ -56,6 +56,8 @@ class EditProfileScreenTest {
           onRetry = { retries++ },
           onFirstNameChange = { state = state.copy(firstName = it) },
           onFamilyNameChange = { state = state.copy(familyName = it) },
+          onDateOfBirthChange = { state = state.copy(dateOfBirth = it) },
+          onDateOfBirthTyped = { _, _ -> },
           onCancerTypeChange = { state = state.copy(cancerType = it) },
           onHospitalChange = { state = state.copy(hospital = it) },
           onSave = { saves++ },

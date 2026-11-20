@@ -12,6 +12,8 @@ import com.github.se.oncompanion.model.user.UserProfile
 import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.ui.common.SavePhase
+import java.time.Clock
+import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +32,16 @@ enum class EditProfileStatus {
   ERROR,
 }
 
-/** Profile draft with optional patient hospital text; an empty hospital never prevents saving. */
+/**
+ * Profile draft with optional patient hospital text; an empty hospital never prevents saving.
+ *
+ * @property dateOfBirth the optional date of birth, `null` when not set or cleared
+ * @property dateOfBirthTyped the digits the user typed as the date of birth, or `null` when the
+ *   field shows [dateOfBirth] (as saved, or as picked)
+ * @property today the phone's today: the latest date of birth that can be picked and saved. The
+ *   ViewModel sets it from its clock in every state it makes; the default (no day allowed) never
+ *   reads the wall clock, so a test that forgets it doesn't depend on the day it runs
+ */
 data class EditProfileUiState(
     val status: EditProfileStatus = EditProfileStatus.LOADING,
     val firstName: String = "",
@@ -40,20 +51,45 @@ data class EditProfileUiState(
     val saveFailed: Boolean = false,
     val hospital: String = "",
     val isPatient: Boolean = true,
+    val dateOfBirth: LocalDate? = null,
+    val today: LocalDate = LocalDate.MIN,
+    val dateOfBirthTyped: String? = null,
 ) {
+  /**
+   * What is typed as the date of birth isn't a whole, real day yet (e.g. "31/1" or "31/02/1980"):
+   * the draft can't be saved, and the field shows why.
+   */
+  val dateOfBirthUnreadable: Boolean
+    get() = !dateOfBirthTyped.isNullOrEmpty() && dateOfBirth == null
+
+  /**
+   * The date of birth is after [today], whether picked here or saved by another phone (one ahead in
+   * time zone, or whose clock was wrong): it is shown as an error and the draft can't be saved.
+   */
+  val dateOfBirthInFuture: Boolean
+    get() = dateOfBirth?.isAfter(today) == true
+
   val canEdit: Boolean
     get() = status == EditProfileStatus.READY && save == SavePhase.EDITING
 
   val canSave: Boolean
-    get() = canEdit && firstName.isNotBlank() && hospital.length <= UserProfile.MAX_HOSPITAL_LENGTH
+    get() =
+        canEdit &&
+            firstName.isNotBlank() &&
+            hospital.length <= UserProfile.MAX_HOSPITAL_LENGTH &&
+            !dateOfBirthInFuture &&
+            !dateOfBirthUnreadable
 }
 
 /**
  * An existing profile's draft. Observation refreshes untouched fields and preserves local edits.
+ *
+ * @param clock the phone's clock and time zone: a date of birth after its today is refused
  */
 class EditProfileViewModel(
     private val authRepository: AuthRepository = AuthRepositoryProvider.repository,
     private val profileRepository: UserProfileRepository = UserProfileRepositoryProvider.repository,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(EditProfileUiState())
   val uiState = _uiState.asStateFlow()
@@ -65,6 +101,7 @@ class EditProfileViewModel(
   private var familyNameEdited = false
   private var cancerTypeEdited = false
   private var hospitalEdited = false
+  private var dateOfBirthEdited = false
 
   init {
     retry()
@@ -91,6 +128,7 @@ class EditProfileViewModel(
                       _uiState.value =
                           state.copy(
                               status = EditProfileStatus.READY,
+                              today = LocalDate.now(clock),
                               isPatient = current.role == Role.PATIENT,
                               hospital =
                                   if (hospitalEdited) state.hospital
@@ -103,6 +141,10 @@ class EditProfileViewModel(
                               cancerType =
                                   if (cancerTypeEdited) state.cancerType
                                   else current.cancerType.orEmpty(),
+                              dateOfBirth =
+                                  if (dateOfBirthEdited) state.dateOfBirth else current.dateOfBirth,
+                              dateOfBirthTyped =
+                                  if (dateOfBirthEdited) state.dateOfBirthTyped else null,
                           )
                       profile = current
                     }
@@ -139,6 +181,22 @@ class EditProfileViewModel(
     if (it.isPatient) it.copy(hospital = value.take(UserProfile.MAX_HOSPITAL_LENGTH)) else it
   }
 
+  /**
+   * Sets, changes or clears ([date] null) the date of birth, e.g. picked; after today it's an
+   * error.
+   */
+  fun onDateOfBirthChange(date: LocalDate?) = edit {
+    it.copy(dateOfBirth = date, dateOfBirthTyped = null)
+  }
+
+  /**
+   * The user typed [digits] as the date of birth, which read as [date]: `null` while they aren't a
+   * whole, real day yet, which can't be saved.
+   */
+  fun onDateOfBirthTyped(digits: String, date: LocalDate?) = edit {
+    it.copy(dateOfBirth = date, dateOfBirthTyped = digits)
+  }
+
   private fun edit(change: (EditProfileUiState) -> EditProfileUiState) {
     val state = _uiState.value
     if (!state.canEdit) return
@@ -147,7 +205,12 @@ class EditProfileViewModel(
     familyNameEdited = familyNameEdited || updated.familyName != state.familyName
     cancerTypeEdited = cancerTypeEdited || updated.cancerType != state.cancerType
     hospitalEdited = hospitalEdited || updated.hospital != state.hospital
-    _uiState.value = updated.copy(saveFailed = false)
+    dateOfBirthEdited =
+        dateOfBirthEdited ||
+            updated.dateOfBirth != state.dateOfBirth ||
+            updated.dateOfBirthTyped != state.dateOfBirthTyped
+    // Today is read again at each edit, so a screen left open past midnight follows the date
+    _uiState.value = updated.copy(saveFailed = false, today = LocalDate.now(clock))
   }
 
   /**
@@ -193,6 +256,7 @@ class EditProfileViewModel(
           cancerType = draft.cancerType.trim().ifEmpty { null },
           hospital =
               if (draft.isPatient) draft.hospital.trim().ifEmpty { null } else original.hospital,
+          dateOfBirth = draft.dateOfBirth,
       )
 
   /** Navigation consumes completion once, so recomposition cannot pop another screen. */
@@ -208,6 +272,7 @@ class EditProfileViewModel(
     familyNameEdited = false
     cancerTypeEdited = false
     hospitalEdited = false
-    _uiState.value = EditProfileUiState(status = status)
+    dateOfBirthEdited = false
+    _uiState.value = EditProfileUiState(status = status, today = LocalDate.now(clock))
   }
 }

@@ -8,6 +8,7 @@ import com.github.se.oncompanion.model.user.FakeUserProfileRepository
 import com.github.se.oncompanion.model.user.Role
 import com.github.se.oncompanion.model.user.UserProfile
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -238,5 +239,19 @@ class ProfileViewModelTest {
     advanceUntilIdle()
 
     assertTrue(vm.uiState.value is ProfileUiState.Error)
+  }
+
+  /** The date of birth is passed as the saved calendar day, and is null for an old profile. */
+  @Test
+  fun dateOfBirthComesFromTheProfileWhenSet() = runTest {
+    val vm = viewModel()
+    for (saved in listOf(LocalDate.of(1985, 6, 15), null)) {
+      profiles.seed(
+          UserProfile(uid = user.uid, role = Role.PATIENT, firstName = "Alex", dateOfBirth = saved)
+      )
+      advanceUntilIdle()
+      val details = (vm.uiState.value as ProfileUiState.Loaded).details
+      assertEquals(saved, details.dateOfBirth)
+    }
   }
 }

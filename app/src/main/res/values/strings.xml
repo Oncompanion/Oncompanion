@@ -61,6 +61,13 @@
     <string name="edit_profile_cancel">Cancel</string>
     <string name="edit_profile_save_failed">Couldn\'t save your profile. Please try again.</string>
     <string name="profile_hospital">Hospital</string>
+    <string name="profile_date_of_birth">Date of birth</string>
+    <string name="edit_profile_optional">Optional</string>
+    <string name="edit_profile_date_of_birth_pick">Choose a date of birth</string>
+    <!-- A typed date of birth that isn't a day, with the format to use, e.g. "Enter the date as DD/MM/YYYY" -->
+    <string name="edit_profile_date_of_birth_unreadable">Enter the date as %1$s</string>
+    <string name="edit_profile_date_of_birth_in_future">Date of birth can\'t be in the future</string>
+    <string name="edit_profile_date_of_birth_confirm">OK</string>
 
     <!-- Overview -->
     <string name="overview_greeting_morning">Good morning</string>
