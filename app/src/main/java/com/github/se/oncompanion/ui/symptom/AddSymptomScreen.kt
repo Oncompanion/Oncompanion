@@ -184,6 +184,8 @@ fun AddSymptomScreen(
         onOpenSettings = { context.startActivity(appSettingsIntent(context)) },
         onDone = viewModel::onDone,
         onStartOver = viewModel::restartListening,
+        onDownloadForOffline = viewModel::onDownloadForOffline,
+        onNotNow = viewModel::onNotNow,
         modifier = modifier,
     )
     return

@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.model.speech
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -60,7 +61,13 @@ class FakeSpeechRecognizer(
     stops++
   }
 
-  override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech = offline
+  /** Whether [offlineSupport] never answers, as a phone whose speech service is stuck. */
+  var offlineHangs = false
+
+  override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech {
+    if (offlineHangs) awaitCancellation()
+    return offline
+  }
 
   override fun downloadForOffline(language: SpeechLanguage) {
     downloads += language

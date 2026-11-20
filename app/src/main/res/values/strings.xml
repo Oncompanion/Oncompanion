@@ -236,11 +236,19 @@
     <string name="symptom_voice_no_speech_title">We didn\'t hear anything</string>
     <string name="symptom_voice_no_speech_message">Try again a little closer to the phone, or type instead.</string>
     <string name="symptom_voice_offline_title">Voice needs a connection</string>
-    <string name="symptom_voice_offline_message">Your phone can only understand this language online. Try again once you\'re connected, or type instead.</string>
+    <string name="symptom_voice_offline_message">Your phone needs a connection to understand you right now. Try again once you\'re connected, or type instead.</string>
     <string name="symptom_voice_unavailable_title">Voice isn\'t available on this phone</string>
     <string name="symptom_voice_unavailable_message">You can type your symptoms instead.</string>
     <string name="symptom_voice_failed_title">Voice didn\'t work</string>
     <string name="symptom_voice_failed_message">Try again, or type instead.</string>
+    <!-- Voice without a connection (US-45); %1$s is a language name below, e.g. "English" -->
+    <string name="symptom_voice_offline_offer_title">Use voice without a connection?</string>
+    <string name="symptom_voice_offline_offer_message">Your phone can download %1$s to understand you even without signal, like in a waiting room. You only need to do it once.</string>
+    <string name="symptom_voice_download">Download %1$s</string>
+    <string name="symptom_voice_not_now">Not now</string>
+    <string name="symptom_voice_downloading">Downloading %1$s. Voice will work without a connection once it\'s done.</string>
+    <string name="symptom_voice_language_english">English</string>
+    <string name="symptom_voice_language_french">French</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>

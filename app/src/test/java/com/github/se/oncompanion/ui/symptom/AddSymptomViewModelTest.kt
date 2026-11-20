@@ -7,6 +7,7 @@ import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
 import com.github.se.oncompanion.model.auth.AuthUser
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.model.speech.FakeSpeechRecognizer
+import com.github.se.oncompanion.model.speech.OfflineSpeech
 import com.github.se.oncompanion.model.speech.SpeechError
 import com.github.se.oncompanion.model.speech.SpeechEvent
 import com.github.se.oncompanion.model.speech.SpeechLanguage
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -1346,6 +1348,186 @@ class AddSymptomViewModelTest {
         assertEquals(listOf(SpeechLanguage.FRENCH), speech.languages)
         viewModel.onDone()
         assertEquals(listOf(SymptomType.SLEEP_PROBLEMS), viewModel.state.types)
+      }
+
+  // ----- Voice without a connection (US-45) -----
+
+  @Test
+  fun beforeListening_theDownloadIsOfferedOnlyWhenThePhoneCanDownloadTheLanguage() =
+      runTest(dispatcher) {
+        // What the phone says about English offline → what Speak shows
+        val cases =
+            mapOf(
+                OfflineSpeech.DOWNLOADABLE to VoiceUiState.OfferingOffline(SpeechLanguage.ENGLISH),
+                OfflineSpeech.DOWNLOADING to
+                    VoiceUiState.Listening(downloading = SpeechLanguage.ENGLISH),
+                OfflineSpeech.READY to VoiceUiState.Listening(),
+                OfflineSpeech.ONLINE_ONLY to VoiceUiState.Listening(),
+                OfflineSpeech.UNKNOWN to VoiceUiState.Listening(),
+            )
+        for ((support, expected) in cases) {
+          speech.offline = support
+          val viewModel = listening()
+
+          assertEquals("$support", expected, viewModel.state.voice)
+          assertEquals("$support", expected is VoiceUiState.Listening, speech.isListening)
+          viewModel.cancelVoice()
+          advanceUntilIdle()
+        }
+        assertEquals(emptyList<SpeechLanguage>(), speech.downloads)
+      }
+
+  @Test
+  fun acceptingTheOffer_downloadsTheLanguage_andListensSayingItIsDownloading() =
+      runTest(dispatcher) {
+        speech.offline = OfflineSpeech.DOWNLOADABLE
+        val viewModel = listening(viewModel(Locale.FRANCE))
+        assertEquals(VoiceUiState.OfferingOffline(SpeechLanguage.FRENCH), viewModel.state.voice)
+
+        viewModel.onDownloadForOffline()
+        advanceUntilIdle()
+
+        assertEquals(listOf(SpeechLanguage.FRENCH), speech.downloads)
+        assertTrue(speech.isListening)
+        // The note stays while words come in and after starting over
+        hear(SpeechEvent.PartialText("j'ai mal"))
+        assertEquals(
+            SpeechLanguage.FRENCH,
+            (viewModel.state.voice as VoiceUiState.Listening).downloading,
+        )
+        viewModel.restartListening()
+        advanceUntilIdle()
+        assertEquals(
+            VoiceUiState.Listening(downloading = SpeechLanguage.FRENCH),
+            viewModel.state.voice,
+        )
+      }
+
+  @Test
+  fun theDownloadingNote_followsWhatThePhoneSaysEachTimeSpeakIsTapped() =
+      runTest(dispatcher) {
+        speech.offline = OfflineSpeech.DOWNLOADABLE
+        val viewModel = listening()
+        viewModel.onDownloadForOffline()
+        advanceUntilIdle()
+        // The phone's answer on each later Speak → the note shown while listening; no answer (a
+        // stuck phone, null here) or "can't tell" keeps what was known
+        val cases =
+            listOf(
+                OfflineSpeech.UNKNOWN to SpeechLanguage.ENGLISH,
+                null to SpeechLanguage.ENGLISH,
+                OfflineSpeech.READY to null,
+                OfflineSpeech.DOWNLOADING to SpeechLanguage.ENGLISH,
+                OfflineSpeech.ONLINE_ONLY to null,
+                OfflineSpeech.DOWNLOADING to SpeechLanguage.ENGLISH,
+                OfflineSpeech.DOWNLOADABLE to null,
+            )
+        for ((answer, note) in cases) {
+          viewModel.cancelVoice()
+          speech.offlineHangs = answer == null
+          answer?.let { speech.offline = it }
+          viewModel.onSpeak(hasMicrophone = true)
+          advanceUntilIdle()
+          // A phone that could download offers it again; declining listens without the note
+          if (viewModel.state.voice is VoiceUiState.OfferingOffline) viewModel.onNotNow()
+          advanceUntilIdle()
+
+          assertEquals(
+              "$answer",
+              note,
+              (viewModel.state.voice as VoiceUiState.Listening).downloading,
+          )
+        }
+      }
+
+  @Test
+  fun whileThePhoneIsAsked_theScreenShowsAtOnce_andDoneWaits() =
+      runTest(dispatcher) {
+        speech.offlineHangs = true
+        val viewModel = viewModel()
+
+        viewModel.onSpeak(hasMicrophone = true)
+        assertEquals(VoiceUiState.Listening(isStarting = true), viewModel.state.voice)
+        viewModel.onDone()
+
+        assertEquals(0, speech.stops)
+        assertEquals(VoiceUiState.Listening(isStarting = true), viewModel.state.voice)
+        assertFalse(speech.isListening)
+      }
+
+  @Test
+  fun savingWhileThePhoneIsAsked_goesBackToTheForm_withoutListening() =
+      runTest(dispatcher) {
+        speech.offlineHangs = true
+        val viewModel = viewModel()
+        viewModel.toggleType(SymptomType.PAIN)
+        viewModel.onSpeak(hasMicrophone = true)
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(SavePhase.SAVED, viewModel.state.save)
+        assertNull(viewModel.state.voice)
+        assertEquals(emptyList<SpeechLanguage>(), speech.languages)
+      }
+
+  @Test
+  fun notNow_listensWithoutDownloading() =
+      runTest(dispatcher) {
+        speech.offline = OfflineSpeech.DOWNLOADABLE
+        val viewModel = listening()
+
+        viewModel.onNotNow()
+        advanceUntilIdle()
+
+        assertEquals(VoiceUiState.Listening(), viewModel.state.voice)
+        assertTrue(speech.isListening)
+        assertEquals(emptyList<SpeechLanguage>(), speech.downloads)
+      }
+
+  @Test
+  fun theOfferButtons_doNothingOnceTheOfferIsGone() =
+      runTest(dispatcher) {
+        val viewModel = listening()
+        hear(SpeechEvent.PartialText("I feel sick"))
+
+        viewModel.onDownloadForOffline()
+        viewModel.onNotNow()
+        advanceUntilIdle()
+
+        assertEquals("I feel sick", (viewModel.state.voice as VoiceUiState.Listening).text)
+        assertEquals(emptyList<SpeechLanguage>(), speech.downloads)
+        assertEquals(1, speech.languages.size)
+      }
+
+  @Test
+  fun aPhoneSlowToAnswer_isNotWaitedFor_andASecondTapDoesNotAskAgain() =
+      runTest(dispatcher) {
+        speech.offlineHangs = true
+        val viewModel = viewModel()
+
+        viewModel.onSpeak(hasMicrophone = true)
+        viewModel.onSpeak(hasMicrophone = true)
+        advanceTimeBy(1_900)
+        assertFalse(speech.isListening)
+        advanceUntilIdle()
+
+        assertEquals(VoiceUiState.Listening(), viewModel.state.voice)
+        assertEquals(1, speech.languages.size)
+      }
+
+  @Test
+  fun goingBackWhileThePhoneIsAsked_neverStartsListening() =
+      runTest(dispatcher) {
+        speech.offlineHangs = true
+        val viewModel = viewModel()
+        viewModel.onSpeak(hasMicrophone = true)
+
+        viewModel.cancelVoice()
+        advanceUntilIdle()
+
+        assertNull(viewModel.state.voice)
+        assertFalse(speech.isListening)
       }
 
   @Test

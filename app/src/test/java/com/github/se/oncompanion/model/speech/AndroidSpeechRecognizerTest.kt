@@ -428,6 +428,18 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun aSecondAnswerFromThePhone_isIgnored() = runTest {
+    ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+    val answer = askOffline()
+
+    android.triggerSupportResult(support(installed = listOf("en-US")))
+    android.triggerSupportError(AndroidRecognizer.ERROR_SERVER)
+    runCurrent()
+
+    assertEquals(OfflineSpeech.READY, answer.await())
+  }
+
+  @Test
   fun leavingBeforeThePhoneAnswersReleasesTheRecognizer() = runTest {
     ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
     val answer = askOffline()

@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -19,6 +20,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.symptom.SymptomDraft
 import com.github.se.oncompanion.model.speech.SpeechError
+import com.github.se.oncompanion.model.speech.SpeechLanguage
 import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.LANDSCAPE_PHONE
@@ -64,6 +66,8 @@ class VoiceSymptomContentTest {
           onOpenSettings = { events += "settings" },
           onDone = { events += "done" },
           onStartOver = { events += "startOver" },
+          onDownloadForOffline = { events += "download" },
+          onNotNow = { events += "notNow" },
       )
     }
   }
@@ -94,6 +98,16 @@ class VoiceSymptomContentTest {
               R.string.symptom_voice_refused_title,
               R.string.symptom_voice_refused_message,
               mapOf(C.Tag.symptom_voice_open_settings to "settings", typeInstead),
+          ),
+          // Declining still listens, so it replaces Type instead; close stays the way back
+          Case(
+              VoiceUiState.OfferingOffline(SpeechLanguage.ENGLISH),
+              R.string.symptom_voice_offline_offer_title,
+              null,
+              mapOf(
+                  C.Tag.symptom_voice_download to "download",
+                  C.Tag.symptom_voice_not_now to "notNow",
+              ),
           ),
           Case(
               VoiceUiState.Listening(),
@@ -160,6 +174,8 @@ class VoiceSymptomContentTest {
           C.Tag.symptom_voice_start_over,
           C.Tag.symptom_voice_try_again,
           C.Tag.symptom_voice_type_instead,
+          C.Tag.symptom_voice_download,
+          C.Tag.symptom_voice_not_now,
       )
 
   @Test
@@ -230,13 +246,64 @@ class VoiceSymptomContentTest {
     node(C.Tag.symptom_voice_done).assertIsNotEnabled()
   }
 
-  /** Held sideways, the main action and the way out can be reached and are fully visible. */
+  @Test
+  fun theOffer_namesTheLanguageTheScreenWillListenIn() {
+    show(VoiceUiState.OfferingOffline(SpeechLanguage.FRENCH))
+    val french = string(R.string.symptom_voice_language_french)
+
+    compose
+        .onNodeWithText(string(R.string.symptom_voice_offline_offer_message, french))
+        .assertIsDisplayed()
+    node(C.Tag.symptom_voice_download)
+        .assertTextEquals(string(R.string.symptom_voice_download, french))
+  }
+
+  @Test
+  fun whileTheLanguageDownloads_listeningSaysSo() {
+    show(VoiceUiState.Listening())
+    node(C.Tag.symptom_voice_downloading).assertDoesNotExist()
+
+    voice = VoiceUiState.Listening(said, draft, downloading = SpeechLanguage.ENGLISH)
+    compose.waitForIdle()
+
+    val english = string(R.string.symptom_voice_language_english)
+    node(C.Tag.symptom_voice_downloading).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.symptom_voice_downloading, english)).assertIsDisplayed()
+    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+  }
+
+  @Test
+  fun whileThePhoneIsAsked_itSaysListening_butDoneWaits() {
+    show(VoiceUiState.Listening(isStarting = true))
+
+    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+    node(C.Tag.symptom_voice_done).assertIsNotEnabled()
+    node(C.Tag.symptom_voice_type_instead).assertIsEnabled()
+  }
+
+  /** Held sideways, each state's main action and way out can be reached and are fully visible. */
   private fun assertActionsReachableSideways() {
-    show(VoiceUiState.Heard(said, draft))
-    for (tag in listOf(C.Tag.symptom_voice_done, C.Tag.symptom_voice_type_instead)) {
-      node(tag).performScrollTo().assertIsFullyVisible()
+    val states =
+        mapOf(
+            VoiceUiState.Heard(said, draft) to
+                listOf(C.Tag.symptom_voice_done, C.Tag.symptom_voice_type_instead),
+            VoiceUiState.OfferingOffline(SpeechLanguage.ENGLISH) to
+                listOf(C.Tag.symptom_voice_download, C.Tag.symptom_voice_not_now),
+            // The downloading note makes the column taller
+            VoiceUiState.Listening(said, draft, downloading = SpeechLanguage.ENGLISH) to
+                listOf(
+                    C.Tag.symptom_voice_downloading,
+                    C.Tag.symptom_voice_done,
+                    C.Tag.symptom_voice_type_instead,
+                ),
+        )
+    show(VoiceUiState.Listening())
+    for ((state, tags) in states) {
+      voice = state
+      compose.waitForIdle()
+      for (tag in tags) node(tag).performScrollTo().assertIsFullyVisible()
+      node(C.Tag.symptom_voice_lake).assertIsDisplayed()
     }
-    node(C.Tag.symptom_voice_lake).assertIsDisplayed()
   }
 
   @Test

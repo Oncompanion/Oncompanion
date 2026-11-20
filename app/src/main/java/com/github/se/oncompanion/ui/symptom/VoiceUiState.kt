@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.symptom
 
 import com.github.se.oncompanion.domain.symptom.SymptomDraft
 import com.github.se.oncompanion.model.speech.SpeechError
+import com.github.se.oncompanion.model.speech.SpeechLanguage
 
 /**
  * Where dictating a symptom is (US-44), shown instead of the form while it lasts. The form comes
@@ -17,6 +18,13 @@ sealed interface VoiceUiState {
   data object MicrophoneRefused : VoiceUiState
 
   /**
+   * Before listening, the phone could download [language] to understand it without a connection
+   * (US-45): the app offers it now, while the patient is likely still online, so voice works later
+   * in a waiting room without signal.
+   */
+  data class OfferingOffline(val language: SpeechLanguage) : VoiceUiState
+
+  /**
    * Listening, with the [text] understood so far (empty until the first words) and the [draft] it
    * gives, so the patient sees what is picked up as they speak.
    *
@@ -24,12 +32,18 @@ sealed interface VoiceUiState {
    *   text
    * @property level how loud the patient is right now, from 0 to 1, so the screen shows it hears
    *   them
+   * @property downloading the language the phone is downloading for use without a connection, said
+   *   while listening so the patient knows it isn't there yet; `null` if none
+   * @property isStarting the phone is still being asked whether it understands the patient offline
+   *   (US-45): the screen shows at once, with the sun low, but nothing is heard yet
    */
   data class Listening(
       val text: String = "",
       val draft: SymptomDraft = SymptomDraft(),
       val isFinishing: Boolean = false,
       val level: Float = 0f,
+      val downloading: SpeechLanguage? = null,
+      val isStarting: Boolean = false,
   ) : VoiceUiState
 
   /**

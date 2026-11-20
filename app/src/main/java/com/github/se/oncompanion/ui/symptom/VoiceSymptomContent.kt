@@ -37,7 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import com.github.se.oncompanion.R
 import com.github.se.oncompanion.domain.symptom.SymptomDraft
 import com.github.se.oncompanion.model.speech.SpeechError
+import com.github.se.oncompanion.model.speech.SpeechLanguage
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.common.LakeBanner
+import com.github.se.oncompanion.ui.common.LakeBannerTone
 import com.github.se.oncompanion.ui.common.LakeButton
 import com.github.se.oncompanion.ui.common.LakeButtonStyle
 import com.github.se.oncompanion.ui.common.isCompactHeight
@@ -59,6 +62,8 @@ private const val LAKE_RATIO = 390f / 270f
  * @param onOpenSettings opens this app's page in the phone's settings, to allow the microphone
  * @param onDone fills the form with what was heard
  * @param onStartOver drops what was heard and listens again
+ * @param onDownloadForOffline downloads the language for use without a connection, then listens
+ * @param onNotNow listens without downloading the language
  */
 @Composable
 fun VoiceSymptomContent(
@@ -69,8 +74,20 @@ fun VoiceSymptomContent(
     onOpenSettings: () -> Unit,
     onDone: () -> Unit,
     onStartOver: () -> Unit,
+    onDownloadForOffline: () -> Unit,
+    onNotNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  val actions =
+      VoiceActionHandlers(
+          onClose,
+          onAllowMicrophone,
+          onOpenSettings,
+          onDone,
+          onStartOver,
+          onDownloadForOffline,
+          onNotNow,
+      )
   val sun = voice.sun()
   val level = (voice as? VoiceUiState.Listening)?.level ?: 0f
   Surface(modifier.fillMaxSize().testTag(C.Tag.symptom_voice_screen)) {
@@ -90,7 +107,7 @@ fun VoiceSymptomContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
           VoiceMessage(voice, today)
-          VoiceActions(voice, onClose, onAllowMicrophone, onOpenSettings, onDone, onStartOver)
+          VoiceActions(voice, actions)
         }
       }
     } else {
@@ -121,18 +138,40 @@ fun VoiceSymptomContent(
                     bottom = Spacing.xl,
                 )
         ) {
-          VoiceActions(voice, onClose, onAllowMicrophone, onOpenSettings, onDone, onStartOver)
+          VoiceActions(voice, actions)
         }
       }
     }
   }
 }
 
+/** What the voice screen's buttons do, passed down as one. */
+private class VoiceActionHandlers(
+    val onClose: () -> Unit,
+    val onAllowMicrophone: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onDone: () -> Unit,
+    val onStartOver: () -> Unit,
+    val onDownloadForOffline: () -> Unit,
+    val onNotNow: () -> Unit,
+)
+
+/** The language's name, as the offer and the downloading note say it. */
+private val SpeechLanguage.label: Int
+  get() =
+      when (this) {
+        SpeechLanguage.ENGLISH -> R.string.symptom_voice_language_english
+        SpeechLanguage.FRENCH -> R.string.symptom_voice_language_french
+      }
+
 /** Where the sun is for each state: it is the microphone, so it shows only what can listen. */
 private fun VoiceUiState.sun(): VoiceSun =
     when (this) {
-      VoiceUiState.ExplainingMicrophone -> VoiceSun.SETTLED
-      is VoiceUiState.Listening -> if (isFinishing) VoiceSun.SETTLED else VoiceSun.LISTENING
+      // Before listening, the sun waits low behind the Salève
+      VoiceUiState.ExplainingMicrophone,
+      is VoiceUiState.OfferingOffline -> VoiceSun.SETTLED
+      is VoiceUiState.Listening ->
+          if (isFinishing || isStarting) VoiceSun.SETTLED else VoiceSun.LISTENING
       is VoiceUiState.Heard -> VoiceSun.RESTING
       VoiceUiState.MicrophoneRefused,
       is VoiceUiState.Failed -> VoiceSun.HIDDEN
@@ -160,14 +199,23 @@ private fun VoiceTopBar(onClose: () -> Unit) {
   )
 }
 
-/** The wording of a state that has only a message: a title and what to do. */
-private data class Message(val title: Int, val text: Int)
+/**
+ * The wording of a state that has only a message: a title and what to do, naming [language] when
+ * the text is about one.
+ */
+private data class Message(val title: Int, val text: Int, val language: SpeechLanguage? = null)
 
 /** The message of [this] state, or `null` when it shows what was said instead. */
 private fun VoiceUiState.message(): Message? =
     when (this) {
       VoiceUiState.ExplainingMicrophone ->
           Message(R.string.symptom_voice_why_title, R.string.symptom_voice_why_message)
+      is VoiceUiState.OfferingOffline ->
+          Message(
+              R.string.symptom_voice_offline_offer_title,
+              R.string.symptom_voice_offline_offer_message,
+              language,
+          )
       VoiceUiState.MicrophoneRefused ->
           Message(R.string.symptom_voice_refused_title, R.string.symptom_voice_refused_message)
       is VoiceUiState.Failed ->
@@ -222,6 +270,16 @@ private fun SpeechError.kind(): FailureKind =
 @Composable
 private fun VoiceMessage(voice: VoiceUiState, today: LocalDate) {
   val message = voice.message()
+  // While the phone downloads the language, a note says voice still needs a connection
+  val downloading = (voice as? VoiceUiState.Listening)?.downloading
+  if (downloading != null) {
+    LakeBanner(
+        message =
+            stringResource(R.string.symptom_voice_downloading, stringResource(downloading.label)),
+        tone = LakeBannerTone.Waiting,
+        modifier = Modifier.testTag(C.Tag.symptom_voice_downloading),
+    )
+  }
   val headline =
       when {
         message != null -> stringResource(message.title)
@@ -244,7 +302,11 @@ private fun VoiceMessage(voice: VoiceUiState, today: LocalDate) {
         else -> "" to SymptomDraft()
       }
   when {
-    message != null -> CenteredText(stringResource(message.text))
+    message != null ->
+        CenteredText(
+            message.language?.let { stringResource(message.text, stringResource(it.label)) }
+                ?: stringResource(message.text)
+        )
     // No words yet: what to say
     text.isEmpty() -> CenteredText(stringResource(R.string.symptom_voice_hint))
     else -> {
@@ -335,14 +397,10 @@ private fun PickedUp(draft: SymptomDraft, today: LocalDate) {
 
 /** The buttons of each state: one filled main action, then the ways out. */
 @Composable
-private fun VoiceActions(
-    voice: VoiceUiState,
-    onClose: () -> Unit,
-    onAllowMicrophone: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onDone: () -> Unit,
-    onStartOver: () -> Unit,
-) {
+private fun VoiceActions(voice: VoiceUiState, actions: VoiceActionHandlers) {
+  val onClose = actions.onClose
+  val onDone = actions.onDone
+  val onStartOver = actions.onStartOver
   val typeInstead = stringResource(R.string.symptom_voice_type_instead)
   Column(
       Modifier.fillMaxWidth(),
@@ -354,18 +412,26 @@ private fun VoiceActions(
           Main(
               stringResource(R.string.symptom_voice_allow),
               C.Tag.symptom_voice_allow,
-              onAllowMicrophone,
+              actions.onAllowMicrophone,
           )
       VoiceUiState.MicrophoneRefused ->
           Main(
               stringResource(R.string.symptom_voice_open_settings),
               C.Tag.symptom_voice_open_settings,
-              onOpenSettings,
+              actions.onOpenSettings,
+          )
+      is VoiceUiState.OfferingOffline ->
+          Main(
+              stringResource(R.string.symptom_voice_download, stringResource(voice.language.label)),
+              C.Tag.symptom_voice_download,
+              actions.onDownloadForOffline,
           )
       is VoiceUiState.Listening ->
           LakeButton(
               text = stringResource(R.string.symptom_voice_done),
               onClick = onDone,
+              // Nothing to use until the phone listens
+              enabled = !voice.isStarting,
               isWorking = voice.isFinishing,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptom_voice_done),
           )
@@ -382,7 +448,14 @@ private fun VoiceActions(
     }
     // Typing is always a way out; it is the main action when the phone can't listen
     val onlyTyping = voice is VoiceUiState.Failed && voice.error.kind() == FailureKind.UNAVAILABLE
-    if (voice is VoiceUiState.Heard) {
+    if (voice is VoiceUiState.OfferingOffline) {
+      // Declining still listens: the close button is the way back to typing
+      Quiet(
+          stringResource(R.string.symptom_voice_not_now),
+          C.Tag.symptom_voice_not_now,
+          actions.onNotNow,
+      )
+    } else if (voice is VoiceUiState.Heard) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Quiet(
             stringResource(R.string.symptom_voice_start_over),

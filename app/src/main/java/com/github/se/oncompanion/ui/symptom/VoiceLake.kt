@@ -48,7 +48,11 @@ internal enum class VoiceSun {
   LISTENING,
   /** Listening ended on a pause: one still halo, waiting for Done or Start over. */
   RESTING,
-  /** Before Android asks for the microphone, and once Done is tapped: half behind the Salève. */
+  /**
+   * Before listening (Android asking for the microphone, the offer to download the language, the
+   * phone being asked whether it understands offline) and once Done is tapped: half behind the
+   * Salève.
+   */
   SETTLED,
 }
 
