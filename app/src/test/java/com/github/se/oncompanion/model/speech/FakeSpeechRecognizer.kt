@@ -15,8 +15,15 @@ import kotlinx.coroutines.flow.transformWhile
  * [SpeechEvent.FinalText] or [SpeechEvent.Failed].
  *
  * @param available what [isAvailable] answers, as a phone with or without a recognizer
+ * @param offline what [offlineSupport] answers, for every language
  */
-class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
+class FakeSpeechRecognizer(
+    var available: Boolean = true,
+    var offline: OfflineSpeech = OfflineSpeech.UNKNOWN,
+) : SpeechRecognizer {
+
+  /** The languages the phone was asked to download, in order. */
+  val downloads = mutableListOf<SpeechLanguage>()
 
   /** The languages each session listened in, in order. */
   val languages = mutableListOf<SpeechLanguage>()
@@ -51,6 +58,12 @@ class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
 
   override fun stop() {
     stops++
+  }
+
+  override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech = offline
+
+  override fun downloadForOffline(language: SpeechLanguage) {
+    downloads += language
   }
 
   /** What the phone hears next in the session being listened to. */

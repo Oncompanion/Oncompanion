@@ -54,6 +54,10 @@ class SpeechRecognizerProviderTest {
           override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = emptyFlow()
 
           override fun stop() = Unit
+
+          override suspend fun offlineSupport(language: SpeechLanguage) = OfflineSpeech.UNKNOWN
+
+          override fun downloadForOffline(language: SpeechLanguage) = Unit
         }
     SpeechRecognizerProvider.recognizer = fake
 

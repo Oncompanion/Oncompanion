@@ -32,4 +32,17 @@ interface SpeechRecognizer {
    * not listening. Call it on the main thread, like [listen].
    */
   fun stop()
+
+  /**
+   * Whether the phone can understand [language] without a connection (US-45). Asks the phone, so it
+   * may take a moment; call it on the main thread, like [listen].
+   */
+  suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech
+
+  /**
+   * Asks the phone to download [language] so it understands it without a connection. The phone
+   * downloads it in the background; [offlineSupport] says when it is [OfflineSpeech.READY]. Does
+   * nothing on a phone that can't download languages for the app. Call it on the main thread.
+   */
+  fun downloadForOffline(language: SpeechLanguage)
 }

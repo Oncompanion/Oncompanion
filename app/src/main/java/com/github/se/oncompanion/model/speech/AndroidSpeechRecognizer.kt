@@ -10,9 +10,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer as AndroidRecognizer
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -23,11 +27,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 /**
  * Listens with the phone's own speech recognizer (usually Google's), so the app needs no speech
  * model or server of its own. Recognition on the phone is preferred, so it works offline when the
- * language is installed on the phone; otherwise the phone's recognizer may go online.
+ * language is installed on the phone; otherwise the phone's recognizer may go online. On Android
+ * 13+, the app can also ask which languages work offline and have one downloaded (US-45).
  *
  * Nothing is recorded by the app: Android only hands back the text.
  *
@@ -66,6 +73,61 @@ class AndroidSpeechRecognizer(
     val recognizer = listening ?: return
     stopRequested = true
     recognizer.stopListening()
+  }
+
+  // Android 13+ only: older phones can't say which languages they understand offline
+  override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech =
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) OfflineSpeech.UNKNOWN
+      else withContext(mainDispatcher) { onDeviceSupport(language) }
+
+  override fun downloadForOffline(language: SpeechLanguage) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (!AndroidRecognizer.isOnDeviceRecognitionAvailable(appContext)) return
+    val recognizer = AndroidRecognizer.createOnDeviceSpeechRecognizer(appContext)
+    recognizer.triggerModelDownload(recognizerIntent(language, appContext.packageName))
+    // Kept until the next download: destroying it now could drop the request before it reaches
+    // the phone's speech service, which then downloads on its own
+    downloader?.destroy()
+    downloader = recognizer
+  }
+
+  /** The recognizer that asked for the last download; see [downloadForOffline]. */
+  private var downloader: AndroidRecognizer? = null
+
+  /** Asks the phone's on-device recognizer about [language], then releases it. */
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+  private suspend fun onDeviceSupport(language: SpeechLanguage): OfflineSpeech {
+    if (!AndroidRecognizer.isOnDeviceRecognitionAvailable(appContext)) {
+      return OfflineSpeech.ONLINE_ONLY
+    }
+    val recognizer = AndroidRecognizer.createOnDeviceSpeechRecognizer(appContext)
+    try {
+      return suspendCancellableCoroutine { answer ->
+        fun reply(support: OfflineSpeech) {
+          if (answer.isActive) answer.resume(support)
+        }
+        recognizer.checkRecognitionSupport(
+            recognizerIntent(language, appContext.packageName),
+            Runnable::run,
+            object : RecognitionSupportCallback {
+              override fun onSupportResult(support: RecognitionSupport) =
+                  reply(
+                      offlineSpeechOf(
+                          language,
+                          installed = support.installedOnDeviceLanguages,
+                          pending = support.pendingOnDeviceLanguages,
+                          downloadable = support.supportedOnDeviceLanguages,
+                      )
+                  )
+
+              // The phone couldn't answer: listening still works as before
+              override fun onError(error: Int) = reply(OfflineSpeech.UNKNOWN)
+            },
+        )
+      }
+    } finally {
+      recognizer.destroy()
+    }
   }
 
   /** One listening session with Android's recognizer, destroyed when the flow ends. */
@@ -172,6 +234,25 @@ internal fun recognizerIntent(language: SpeechLanguage, packageName: String): In
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, PAUSE_MILLIS)
       }
     }
+
+/**
+ * What the phone's lists of on-device languages say about [language]: [installed] ones work
+ * offline, [pending] ones are downloading, [downloadable] ones can be downloaded.
+ */
+internal fun offlineSpeechOf(
+    language: SpeechLanguage,
+    installed: List<String>,
+    pending: List<String>,
+    downloadable: List<String>,
+): OfflineSpeech {
+  fun List<String>.has() = any { it.equals(language.tag, ignoreCase = true) }
+  return when {
+    installed.has() -> OfflineSpeech.READY
+    pending.has() -> OfflineSpeech.DOWNLOADING
+    downloadable.has() -> OfflineSpeech.DOWNLOADABLE
+    else -> OfflineSpeech.ONLINE_ONLY
+  }
+}
 
 /**
  * How loud [rmsdB] is, from 0 to 1. Android's recognizers report roughly -2 dB (silence) to 10 dB
