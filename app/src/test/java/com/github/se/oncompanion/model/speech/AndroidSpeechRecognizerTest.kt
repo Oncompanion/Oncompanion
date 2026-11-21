@@ -451,6 +451,45 @@ class AndroidSpeechRecognizerTest {
   }
 
   @Test
+  fun onDevice_listensWithTheRecognizerThatHasTheDownload_whenThePhoneHasOne() = runTest {
+    // Whether the phone has an on-device recognizer, and whether the app asks for it → whether it
+    // listens with it
+    val cases =
+        listOf(Triple(true, true, true), Triple(true, false, false), Triple(false, true, false))
+    for ((available, asked, expected) in cases) {
+      ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(available)
+      val session = startListening(onDevice = asked)
+
+      assertEquals("available $available, asked $asked", expected, latestIsOnDevice())
+      session.job.cancel()
+    }
+  }
+
+  @Test
+  fun theDownloadRecognizer_isReleasedOnceThePhoneHasTheDownload() = runTest {
+    ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
+    // The phone's answer after a download → whether the recognizer that asked for it is released
+    val cases =
+        listOf(
+            support(downloadable = listOf("en-US")) to false,
+            support(installed = listOf("en-GB")) to false,
+            support(pending = listOf("en-US")) to true,
+            support(installed = listOf("en-US")) to true,
+        )
+    for ((answer, released) in cases) {
+      recognizer.downloadForOffline(SpeechLanguage.ENGLISH)
+      val downloader = android
+      val support = askOffline(recognizer = recognizer)
+      android.triggerSupportResult(answer)
+      runCurrent()
+      support.await()
+
+      assertEquals("$answer", released, downloader.isDestroyed)
+    }
+  }
+
+  @Test
   fun aPhoneWithoutOnDeviceRecognition_onlyListensOnline_andDownloadsNothing() = runTest {
     ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(false)
     val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
@@ -472,6 +511,9 @@ class AndroidSpeechRecognizerTest {
       recognizer.downloadForOffline(SpeechLanguage.ENGLISH)
 
       assertNull(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+      // Asked to listen on the phone anyway, it listens with the default recognizer
+      startListening(recognizer = recognizer, onDevice = true).job.cancel()
+      assertFalse(latestIsOnDevice())
     } finally {
       ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", sdk)
     }
@@ -527,6 +569,10 @@ class AndroidSpeechRecognizerTest {
   /** What one listening session sent so far, and the coroutine collecting it. */
   private class Session(val events: List<SpeechEvent>, val job: Job)
 
+  /** Whether Android's latest recognizer is the on-device one, which Robolectric doesn't say. */
+  private fun latestIsOnDevice(): Boolean =
+      ReflectionHelpers.getField(ShadowSpeechRecognizer.getLatestSpeechRecognizer(), "mOnDevice")
+
   /** Android's recognizer created by the last [startListening]. */
   private val android
     get() = shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
@@ -554,11 +600,12 @@ class AndroidSpeechRecognizerTest {
       language: SpeechLanguage = SpeechLanguage.ENGLISH,
       recognizer: AndroidSpeechRecognizer =
           AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler)),
+      onDevice: Boolean = false,
   ): Session {
     val events = mutableListOf<SpeechEvent>()
     val job =
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-          recognizer.listen(language).toList(events)
+          recognizer.listen(language, onDevice).toList(events)
         }
     shadowOf(Looper.getMainLooper()).idle()
     return Session(events, job)
@@ -566,9 +613,10 @@ class AndroidSpeechRecognizerTest {
 
   /** Asks whether [language] works offline, and lets the phone receive the question. */
   private fun TestScope.askOffline(
-      language: SpeechLanguage = SpeechLanguage.ENGLISH
+      language: SpeechLanguage = SpeechLanguage.ENGLISH,
+      recognizer: AndroidSpeechRecognizer =
+          AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler)),
   ): Deferred<OfflineSpeech> {
-    val recognizer = AndroidSpeechRecognizer(context, UnconfinedTestDispatcher(testScheduler))
     val answer =
         backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
           recognizer.offlineSupport(language)

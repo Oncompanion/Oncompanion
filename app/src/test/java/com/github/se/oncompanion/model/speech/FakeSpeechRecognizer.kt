@@ -29,6 +29,9 @@ class FakeSpeechRecognizer(
   /** The languages each session listened in, in order. */
   val languages = mutableListOf<SpeechLanguage>()
 
+  /** Whether each session listened with the phone's on-device recognizer, in order. */
+  val onDevice = mutableListOf<Boolean>()
+
   /** How many times [stop] was called. */
   var stops = 0
     private set
@@ -41,8 +44,9 @@ class FakeSpeechRecognizer(
 
   override fun isAvailable(): Boolean = available
 
-  override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = flow {
+  override fun listen(language: SpeechLanguage, onDevice: Boolean): Flow<SpeechEvent> = flow {
     languages += language
+    this@FakeSpeechRecognizer.onDevice += onDevice
     val events = Channel<SpeechEvent>(Channel.UNLIMITED).also { session = it }
     isListening = true
     try {

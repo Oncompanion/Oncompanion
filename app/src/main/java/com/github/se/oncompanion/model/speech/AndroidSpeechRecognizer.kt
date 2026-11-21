@@ -34,7 +34,8 @@ import kotlinx.coroutines.withContext
  * Listens with the phone's own speech recognizer (usually Google's), so the app needs no speech
  * model or server of its own. Recognition on the phone is preferred, so it works offline when the
  * language is installed on the phone; otherwise the phone's recognizer may go online. On Android
- * 13+, the app can also ask which languages work offline and have one downloaded (US-45).
+ * 13+, the app can also ask which languages work offline and have one downloaded (US-45), then
+ * listen with that same on-device recognizer.
  *
  * Nothing is recorded by the app: Android only hands back the text.
  *
@@ -58,13 +59,13 @@ class AndroidSpeechRecognizer(
 
   override fun isAvailable(): Boolean = AndroidRecognizer.isRecognitionAvailable(appContext)
 
-  override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = flow {
+  override fun listen(language: SpeechLanguage, onDevice: Boolean): Flow<SpeechEvent> = flow {
     // Checked when listening starts, not when the flow is built: the user may have
     // granted the microphone in between
     when {
       !hasMicrophone() -> emit(SpeechEvent.Failed(SpeechError.NO_PERMISSION))
       !isAvailable() -> emit(SpeechEvent.Failed(SpeechError.UNAVAILABLE))
-      else -> emitAll(recognition(language))
+      else -> emitAll(recognition(language, onDevice))
     }
   }
       .flowOn(mainDispatcher)
@@ -78,21 +79,32 @@ class AndroidSpeechRecognizer(
   // Android 13+ only: older phones can't say which languages they understand offline
   override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech =
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) OfflineSpeech.UNKNOWN
-      else withContext(mainDispatcher) { onDeviceSupport(language) }
+      else
+          withContext(mainDispatcher) {
+            onDeviceSupport(language).also {
+              // The phone has the download: the recognizer that asked for it can go
+              if (it == OfflineSpeech.DOWNLOADING || it == OfflineSpeech.READY) releaseDownloader()
+            }
+          }
 
   override fun downloadForOffline(language: SpeechLanguage) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     if (!AndroidRecognizer.isOnDeviceRecognitionAvailable(appContext)) return
     val recognizer = AndroidRecognizer.createOnDeviceSpeechRecognizer(appContext)
     recognizer.triggerModelDownload(recognizerIntent(language, appContext.packageName))
-    // Kept until the next download: destroying it now could drop the request before it reaches
-    // the phone's speech service, which then downloads on its own
-    downloader?.destroy()
+    // Kept until the phone says it has the download (see offlineSupport): destroying it now could
+    // drop the request before it reaches the phone's speech service
+    releaseDownloader()
     downloader = recognizer
   }
 
   /** The recognizer that asked for the last download; see [downloadForOffline]. */
   private var downloader: AndroidRecognizer? = null
+
+  private fun releaseDownloader() {
+    downloader?.destroy()
+    downloader = null
+  }
 
   /** Asks the phone's on-device recognizer about [language], then releases it. */
   @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -131,8 +143,8 @@ class AndroidSpeechRecognizer(
   }
 
   /** One listening session with Android's recognizer, destroyed when the flow ends. */
-  private fun recognition(language: SpeechLanguage): Flow<SpeechEvent> = callbackFlow {
-    val recognizer = AndroidRecognizer.createSpeechRecognizer(appContext)
+  private fun recognition(language: SpeechLanguage, onDevice: Boolean) = callbackFlow {
+    val recognizer = newRecognizer(onDevice)
     listening = recognizer
     stopRequested = false
     // What was heard in the segments already finished, when the recognizer cuts at each pause
@@ -205,6 +217,18 @@ class AndroidSpeechRecognizer(
   }
       // A session is short: keep every event, so a slow screen never loses the final one
       .buffer(Channel.UNLIMITED)
+
+  /** The on-device recognizer if [onDevice] and the phone has it, else the phone's default one. */
+  private fun newRecognizer(onDevice: Boolean): AndroidRecognizer =
+      if (
+          onDevice &&
+              Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+              AndroidRecognizer.isOnDeviceRecognitionAvailable(appContext)
+      ) {
+        AndroidRecognizer.createOnDeviceSpeechRecognizer(appContext)
+      } else {
+        AndroidRecognizer.createSpeechRecognizer(appContext)
+      }
 
   private fun hasMicrophone(): Boolean =
       ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
