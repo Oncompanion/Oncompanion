@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.se.oncompanion.domain.carecircle.CareAccess
 import com.github.se.oncompanion.domain.carecircle.ResolveCareCircleAccess
 import com.github.se.oncompanion.domain.planning.CarePlanning
+import com.github.se.oncompanion.domain.planning.DEFAULT_PLANNING_DURATION
 import com.github.se.oncompanion.domain.planning.ObserveCarePlanning
 import com.github.se.oncompanion.model.auth.AuthRepository
 import com.github.se.oncompanion.model.auth.AuthRepositoryProvider
@@ -317,14 +318,14 @@ class OverviewViewModel(
 
   /**
    * The next moment the Overview's content changes after [now]: an entry starts (Next up moves on,
-   * an entry is happening), an entry ends [DEFAULT_DURATION] after its start, or midnight (the new
-   * day loads). Midnight is always one of them, so it is never more than a day away. In instants,
-   * so the hour repeated when the clocks go back can't give a moment already past.
+   * an entry is happening), an entry ends (it is done), or midnight (the new day loads). Midnight
+   * is always one of them, so it is never more than a day away. In instants, so the hour repeated
+   * when the clocks go back can't give a moment already past.
    */
   private fun nextChangeAfter(planned: List<PlanningItem>, now: Instant): Instant =
       (planned
-              .mapNotNull { (it.timing as? PlanningTiming.Timed)?.instant }
-              .flatMap { start -> listOf(start, start.plus(DEFAULT_DURATION)) } +
+              .mapNotNull { it.timing as? PlanningTiming.Timed }
+              .flatMap { listOf(it.instant, it.endOrDefault()) } +
               now.atZone(zoneId).toLocalDate().plusDays(1).atStartOfDay(zoneId).toInstant())
           .filter { it.isAfter(now) }
           .min()
@@ -402,8 +403,8 @@ class OverviewViewModel(
 
   /**
    * Today's entries: those without a time first, as in Planning, then the timed ones by time. A
-   * timed entry is happening from its start until [DEFAULT_DURATION] later (the planning data has
-   * no end time), then it's done; the first one still to come is the next.
+   * timed entry is happening from its start until its end, then it's done; the first one still to
+   * come is the next.
    */
   private fun entriesOf(planned: List<PlanningItem>, now: LocalDateTime): List<TodayEntry> {
     val today = now.toLocalDate()
@@ -416,7 +417,7 @@ class OverviewViewModel(
         timed.map { (item, start) ->
           val status =
               when {
-                !start.plus(DEFAULT_DURATION).isAfter(now) -> TodayItemStatus.DONE
+                !item.endIn().isAfter(now) -> TodayItemStatus.DONE
                 !start.isAfter(now) -> TodayItemStatus.NOW
                 item == next -> TodayItemStatus.NEXT
                 else -> TodayItemStatus.LATER
@@ -424,6 +425,17 @@ class OverviewViewModel(
           item.toEntry(time = start.toLocalTime(), status = status)
         }
   }
+
+  /**
+   * When a timed entry ends: Planning gives every entry an end, so the [DEFAULT_PLANNING_DURATION]
+   * here only covers one built without it.
+   */
+  private fun PlanningTiming.Timed.endOrDefault(): Instant =
+      end ?: instant + DEFAULT_PLANNING_DURATION
+
+  /** When a timed entry ends, in [zoneId]. */
+  private fun PlanningItem.endIn(): LocalDateTime =
+      LocalDateTime.ofInstant((timing as PlanningTiming.Timed).endOrDefault(), zoneId)
 
   /** When a timed entry starts, in [zoneId]; `null` for an entry without a time. */
   private fun PlanningItem.startIn(): LocalDateTime? =
@@ -478,12 +490,6 @@ class OverviewViewModel(
 
     /** How far ahead the next appointment is looked for. */
     val LOOKAHEAD: Period = Period.ofYears(1)
-
-    /**
-     * How long an event or appointment counts as happening (the planning data only has start
-     * times), so it isn't ticked as done the minute it starts.
-     */
-    val DEFAULT_DURATION: Duration = Duration.ofHours(1)
 
     private const val NANOS_PER_MILLI = 1_000_000L
   }
