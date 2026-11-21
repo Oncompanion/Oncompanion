@@ -58,6 +58,12 @@ class AppointmentEditTest {
     val db = FirebaseEmulator.firestore
     val repository = AppointmentRepositoryFirestore(db)
     val today = LocalDate.now()
+    // Planning starts from this clock, so a run crossing midnight can't open it on another day
+    val clock =
+        Clock.fixed(
+            today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            ZoneId.systemDefault(),
+        )
     val day = today.plusDays(1)
     val original = runBlocking {
       withTimeout(10_000) {
@@ -94,7 +100,7 @@ class AppointmentEditTest {
     }
     compose.runOnUiThread {
       AppHostActivity.content.value = {
-        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) }
+        OncompanionTheme { AppNavHost(startRoute = Route.PLANNING, clock = clock) }
       }
     }
     val planningDay = C.Tag.planningDay(day.toString())
