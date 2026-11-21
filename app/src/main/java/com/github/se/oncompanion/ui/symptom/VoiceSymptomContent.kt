@@ -424,12 +424,20 @@ private fun VoiceActions(voice: VoiceUiState, actions: VoiceActionHandlers) {
               C.Tag.symptom_voice_open_settings,
               actions.onOpenSettings,
           )
-      is VoiceUiState.OfferingOffline ->
-          Main(
-              stringResource(R.string.symptom_voice_download, stringResource(voice.language.label)),
-              C.Tag.symptom_voice_download,
-              actions.onDownloadForOffline,
-          )
+      is VoiceUiState.OfferingOffline -> {
+        Main(
+            stringResource(R.string.symptom_voice_download, stringResource(voice.language.label)),
+            C.Tag.symptom_voice_download,
+            actions.onDownloadForOffline,
+        )
+        // Declining still listens: the close button is the way back to typing
+        Quiet(
+            stringResource(R.string.symptom_voice_not_now),
+            C.Tag.symptom_voice_not_now,
+            actions.onNotNow,
+        )
+        return@Column
+      }
       // Shown but off until the phone listens, so the buttons don't jump
       VoiceUiState.Preparing ->
           LakeButton(
@@ -458,14 +466,7 @@ private fun VoiceActions(voice: VoiceUiState, actions: VoiceActionHandlers) {
     }
     // Typing is always a way out; it is the main action when the phone can't listen
     val onlyTyping = voice is VoiceUiState.Failed && voice.error.kind() == FailureKind.UNAVAILABLE
-    if (voice is VoiceUiState.OfferingOffline) {
-      // Declining still listens: the close button is the way back to typing
-      Quiet(
-          stringResource(R.string.symptom_voice_not_now),
-          C.Tag.symptom_voice_not_now,
-          actions.onNotNow,
-      )
-    } else if (voice is VoiceUiState.Heard) {
+    if (voice is VoiceUiState.Heard) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Quiet(
             stringResource(R.string.symptom_voice_start_over),
