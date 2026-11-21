@@ -93,3 +93,29 @@ val OnHorizonDark = Color(0xFFE3E6E7)
 // The hull of the boats on the lake: dark ink by day, a grey that still reads on dark water
 val LakeHullLight = Color(0xFF1F2A30)
 val LakeHullDark = Color(0xFF3B4448)
+
+// Stone: the patient's Overview of the Overview UX Refactor (Figma M3, Home · Dawn and Dusk). A
+// warm grey page under off-white cards by day; by night, black cards on a slate page and a lighter
+// check-in dock.
+val StonePageLight = Color(0xFFE2DDD5)
+val StoneCardLight = Color(0xFFFAF8F5)
+val StoneCardBorderLight = Color(0x141C252A)
+val StoneDockLight = Color(0xFFFAF8F5)
+val StoneChipLight = Color(0xFFE6E1D8)
+val StoneTileLight = Color(0xFFE6E1D8)
+// The badges follow the theme: primary by day, the primary container at night, and the
+// heart the secondary container at night
+val StoneBadgeLight = PrimaryLight
+val StoneOnBadgeLight = OnPrimaryLight
+val StoneHeartBadgeLight = PrimaryLight
+val StoneOnHeartBadgeLight = OnPrimaryLight
+val StonePageDark = Color(0xFF1C252A)
+val StoneCardDark = Color(0xFF0F1416)
+val StoneCardBorderDark = Color(0x00000000)
+val StoneDockDark = Color(0xFF26343C)
+val StoneChipDark = Color(0xFF26343C)
+val StoneTileDark = SurfaceContainerDark
+val StoneBadgeDark = PrimaryContainerDark
+val StoneOnBadgeDark = OnPrimaryContainerDark
+val StoneHeartBadgeDark = SecondaryContainerDark
+val StoneOnHeartBadgeDark = OnSecondaryContainerDark

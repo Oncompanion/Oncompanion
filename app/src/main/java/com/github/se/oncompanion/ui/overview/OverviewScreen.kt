@@ -217,8 +217,14 @@ fun OverviewContent(
     onSwitchPatient: () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
 ) {
-  Scaffold(modifier = modifier.testTag(C.Tag.overview_screen), bottomBar = bottomBar) { innerPadding
-    ->
+  Scaffold(
+      modifier = modifier.testTag(C.Tag.overview_screen),
+      bottomBar = bottomBar,
+      // The patient's day sits on the stone page; the caregiver's comes later
+      containerColor =
+          if (caregiverOf == null) MaterialTheme.lakeColors.stone.page
+          else MaterialTheme.colorScheme.background,
+  ) { innerPadding ->
     val layoutDirection = LocalLayoutDirection.current
     // The header draws behind the status bar, so the top inset is kept inside it
     Box(

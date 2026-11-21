@@ -69,14 +69,15 @@ internal fun CheckInDock(
   Surface(
       modifier = modifier.fillMaxWidth().elevation1(shape).testTag(C.Tag.overview_check_in),
       shape = shape,
-      color = MaterialTheme.colorScheme.surfaceContainerLowest,
+      color = MaterialTheme.lakeColors.stone.dock,
+      border = cardBorder(),
   ) {
     Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
       Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
       ) {
-        CardBadge(R.drawable.ic_heart, iconSize = HEART_SIZE)
+        HeartBadge()
         Text(
             stringResource(R.string.overview_check_in_title),
             style = MaterialTheme.typography.titleLarge,
@@ -176,7 +177,7 @@ private fun SymptomTile(
                   type?.let { C.Tag.overviewCheckIn(it.name) } ?: C.Tag.overview_check_in_more
               ),
       shape = MaterialTheme.shapes.large,
-      color = MaterialTheme.colorScheme.surfaceContainerHighest,
+      color = MaterialTheme.lakeColors.stone.tile,
       contentColor = MaterialTheme.colorScheme.onSurface,
   ) {
     Column(
@@ -189,9 +190,6 @@ private fun SymptomTile(
     }
   }
 }
-
-/** The Figma's heart in the dock's badge, a little larger than the other cards' icons. */
-private val HEART_SIZE = 20.dp
 
 /** The Figma's tile: 80 dp tall at least (it grows with a large font), 8 dp apart. */
 private val TILE_HEIGHT = 80.dp
