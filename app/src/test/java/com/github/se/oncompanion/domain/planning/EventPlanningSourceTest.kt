@@ -44,12 +44,18 @@ class EventPlanningSourceTest {
 
   private val registrations = FakeEventRegistrationRepository()
 
-  private fun event(id: String, start: LocalDateTime, place: String = "Ligue office") =
+  private fun event(
+      id: String,
+      start: LocalDateTime,
+      place: String = "Ligue office",
+      end: LocalDateTime? = null,
+  ) =
       Event(
           id = id,
           title = "Event $id",
           place = place,
           startDateTime = start,
+          endDateTime = end,
           summary = "Summary",
           description = "Description",
       )
@@ -91,7 +97,12 @@ class EventPlanningSourceTest {
     assertEquals(
         PlanningItem(
             source = PlanningSource.Event("walk"),
-            timing = PlanningTiming.Timed(start.atZone(zone).toInstant()),
+            // No end time: it lasts an hour
+            timing =
+                PlanningTiming.Timed(
+                    start.atZone(zone).toInstant(),
+                    start.plusHours(1).atZone(zone).toInstant(),
+                ),
             title = "Event walk",
             subtitle = "Parc des Bastions",
         ),
@@ -132,7 +143,10 @@ class EventPlanningSourceTest {
     // (event, when it starts, whether the week shows it)
     val cases =
         listOf(
-            Triple("sunday-before", monday.minusDays(1).atTime(23, 59), false),
+            // Over (an hour long) before the week starts
+            Triple("sunday-before", monday.minusDays(1).atTime(22, 59), false),
+            // Still going on when it starts
+            Triple("sunday-late", monday.minusDays(1).atTime(23, 30), true),
             Triple("monday-midnight", monday.atStartOfDay(), true),
             Triple("sunday-last", monday.plusDays(6).atTime(23, 59), true),
             Triple("next-monday", monday.plusWeeks(1).atStartOfDay(), false),
@@ -146,6 +160,91 @@ class EventPlanningSourceTest {
         cases.filter { it.third }.map { PlanningSource.Event(it.first) },
         items.map { it.source },
     )
+  }
+
+  @Test
+  fun anEvent_endsAtItsEndTime_orAnHourAfterItStarts() = runTest {
+    val start = monday.atTime(10, 0)
+    // (end time recorded by the Ligue, end shown): a missing or wrong end gives an hour
+    val cases =
+        listOf(
+            start.plusMinutes(90) to start.plusMinutes(90),
+            null to start.plusHours(1),
+            start to start.plusHours(1),
+            start.minusMinutes(30) to start.plusHours(1),
+        )
+    confirm("patient", "yoga")
+
+    for ((recorded, shown) in cases) {
+      val item = latest(source(event("yoga", start, end = recorded))).single()
+
+      assertEquals(
+          "Recorded end $recorded",
+          shown.atZone(zone).toInstant(),
+          (item.timing as PlanningTiming.Timed).end,
+      )
+    }
+  }
+
+  @Test
+  fun anEventStartedTheDayBefore_showsWhileItIsStillGoingOn() = runTest {
+    val sunday = monday.minusDays(1)
+    // (event, start, end, whether the week shows it), by start: events are read from exactly a
+    // day before the week, so a longer read or a shorter one fails here
+    val cases =
+        listOf(
+            // Started more than a day before: a known limit, documented on the source
+            Triple("retreat", sunday.minusDays(2).atTime(9, 0), monday.atTime(17, 0)) to false,
+            Triple("over-a-day", sunday.minusDays(1).atTime(23, 59), monday.atTime(1, 0)) to false,
+            Triple("a-day", sunday.atStartOfDay(), monday.atTime(1, 0)) to true,
+            Triple("evening", sunday.atTime(18, 0), sunday.atTime(21, 0)) to false,
+            Triple("night-walk", sunday.atTime(20, 0), monday.atTime(2, 0)) to true,
+        )
+    confirm("patient", *cases.map { it.first.first }.toTypedArray())
+    val events = cases.map { (e, _) -> event(e.first, e.second, end = e.third) }.toTypedArray()
+
+    val items = latest(source(*events))
+
+    assertEquals(
+        cases.filter { it.second }.map { PlanningSource.Event(it.first.first) },
+        items.map { it.source },
+    )
+  }
+
+  @Test
+  fun rangesAtTheEdgesOfTime_neverQueryOutsideWhatFirestoreCanStore() = runTest {
+    val earliest = Instant.parse("0001-01-01T00:00:00Z")
+    val latest = Instant.parse("9999-12-31T23:59:59.999999999Z")
+    // (zone, first day, day after the range): east of UTC, year 1 starts before the earliest
+    // timestamp; west of UTC, the end of 9999 comes after the latest one
+    val cases =
+        listOf(
+            Triple("Europe/Zurich", LocalDate.of(1, 1, 1), LocalDate.of(1, 1, 8)),
+            Triple("Asia/Tokyo", LocalDate.of(1, 1, 1), LocalDate.of(1, 1, 2)),
+            Triple("America/New_York", LocalDate.of(9999, 12, 1), LocalDate.of(10000, 1, 1)),
+            Triple("Pacific/Honolulu", LocalDate.of(9999, 12, 31), LocalDate.of(10000, 1, 1)),
+        )
+    confirm("patient", "walk")
+
+    for ((zoneId, firstDay, dayAfter) in cases) {
+      val zone = ZoneId.of(zoneId)
+      val walk = event("walk", firstDay.atTime(10, 0))
+      val inZone = FakeEventRepository(listOf(walk), zone = { zone })
+      val firestoreLike =
+          object : EventRepository by inZone {
+            override fun observeEvents(from: Instant, until: Instant): Flow<List<Event>> {
+              require(from >= earliest && until <= latest) { "Timestamp out of range" }
+              return inZone.observeEvents(from, until)
+            }
+          }
+
+      val items =
+          source(repository = firestoreLike)
+              .observeItems("patient", PlanningRange(firstDay, dayAfter, zone))
+              .first()
+
+      assertEquals(zoneId, listOf(PlanningSource.Event("walk")), items.map { it.source })
+    }
   }
 
   @Test

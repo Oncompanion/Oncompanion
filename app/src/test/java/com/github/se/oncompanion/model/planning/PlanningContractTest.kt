@@ -34,6 +34,36 @@ class PlanningContractTest {
   }
 
   @Test
+  fun aTimedEntryIsInTheRangeFromItsStartToItsEnd() {
+    val end = range.endExclusive
+    val hour = java.time.Duration.ofHours(1)
+    // (start, end, expected): an entry under way when the range starts is in it
+    val cases =
+        listOf(
+            Triple(start, start + hour, true),
+            Triple(start - hour, start + hour, true),
+            Triple(start - hour, start.plusNanos(1), true),
+            Triple(start - hour, end + hour, true),
+            Triple(end.minusNanos(1), end + hour, true),
+            Triple(start - hour, start, false),
+            Triple(start - hour - hour, start - hour, false),
+            Triple(end, end + hour, false),
+            // Without an end, only the start counts, as before
+            Triple(start, null, true),
+            Triple(start.minusNanos(1), null, false),
+        )
+    for ((from, until, expected) in cases) {
+      assertEquals("$from to $until", expected, PlanningTiming.Timed(from, until) in range)
+    }
+  }
+
+  @Test
+  fun aTimedEntryMustEndAfterItStarts() {
+    reject { PlanningTiming.Timed(start, start) }
+    reject { PlanningTiming.Timed(start, start.minusSeconds(1)) }
+  }
+
+  @Test
   fun emptyAndReversedRangesAreRejected() {
     reject { PlanningRange(date, date, zone) }
     reject { PlanningRange(date, date.minusDays(1), zone) }
@@ -97,6 +127,11 @@ class PlanningContractTest {
         listOf(appointment, event, medication, nextDay, nextTime).map { it.key }.distinct().size,
     )
     assertEquals(event.key, event.copy(title = "Changed", subtitle = "Elsewhere").key)
+    // Its end can change without making it another entry
+    assertEquals(
+        event.key,
+        event.copy(timing = PlanningTiming.Timed(start, start.plusSeconds(3600))).key,
+    )
     assertEquals(medication.key, medication.copy(title = "Changed", frequency = "Twice daily").key)
     assertEquals("p", (medication.source as PlanningSource.Medication).prescriptionId)
     assertEquals("same", medication.source.medicationId)
