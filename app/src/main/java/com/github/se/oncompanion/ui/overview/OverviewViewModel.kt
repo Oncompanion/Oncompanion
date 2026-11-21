@@ -338,20 +338,17 @@ class OverviewViewModel(
       )
 
   /**
-   * Today's next event or appointment that hasn't started yet; if there is none, the next
-   * appointment of a later day, so a check-up weeks away still shows. Later events don't: the
-   * patient chooses to go to them, unlike an appointment.
+   * The next event or appointment that hasn't started yet, today or on a later day, so a check-up
+   * weeks away still shows. An event is in the planning only once the patient registered for it, so
+   * a later one shows too.
    */
   private fun nextUpOf(planned: List<PlanningItem>, now: LocalDateTime): NextUp? {
-    val upcoming = planned.mapNotNull { item ->
-      item.startIn()?.takeIf { it.isAfter(now) }?.let { start -> item to start }
-    }
-    val today = now.toLocalDate()
     val next =
-        upcoming.filter { (_, start) -> start.toLocalDate() == today }.minByOrNull { it.second }
-            ?: upcoming
-                .filter { (item, _) -> item.source is PlanningSource.Appointment }
-                .minByOrNull { it.second }
+        planned
+            .mapNotNull { item ->
+              item.startIn()?.takeIf { it.isAfter(now) }?.let { start -> item to start }
+            }
+            .minByOrNull { it.second }
     return next?.let { (item, start) ->
       when (val source = item.source) {
         is PlanningSource.Appointment ->

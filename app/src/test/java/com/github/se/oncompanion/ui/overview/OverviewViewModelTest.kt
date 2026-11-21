@@ -383,7 +383,7 @@ class OverviewViewModelTest {
   // ----- Patient's day (Overview UX Refactor) -----
 
   @Test
-  fun nextUp_isTodaysNextEventOrAppointment_elseTheNextAppointment() {
+  fun nextUp_isTheNextEventOrAppointment_todayOrLater() {
     val today = now.toLocalDate()
     val tomorrow = today.plusDays(1)
     listOf(
@@ -400,12 +400,18 @@ class OverviewViewModelTest {
                 appointment("past", now.withHour(8)),
                 appointment("later", now.plusDays(1)),
             ) to "later",
-            // Nothing more today: the next appointment, even weeks away, but not a later event
+            // Nothing more today: the next appointment or registered event, even weeks away
             listOf(
                 event("tomorrow", tomorrow.atTime(10, 0)),
                 appointment("check-up", now.plusWeeks(3)),
+            ) to "tomorrow",
+            listOf(
+                appointment("check-up", tomorrow.atTime(9, 0)),
+                event("tomorrow", tomorrow.atTime(10, 0)),
             ) to "check-up",
-            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to null,
+            listOf(appointment("check-up", now.plusWeeks(3))) to "check-up",
+            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to "tomorrow",
+            listOf(medication("m")) to null,
         )
         .forEach { (items, expected) ->
           val vm = viewModel(planning = planning(*items.toTypedArray()))
