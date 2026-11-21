@@ -459,16 +459,21 @@ class AddSymptomViewModel(
     }
   }
 
-  /** The language the phone is downloading, said while listening; see [phone]. */
-  private fun downloading(language: SpeechLanguage): SpeechLanguage? = language.takeIf {
-    phone == OfflineSpeech.DOWNLOADING
-  }
+  /** What to say while listening about using voice without a connection; see [phone]. */
+  private fun connectionNote(language: SpeechLanguage): ConnectionNote? =
+      when (phone) {
+        OfflineSpeech.DOWNLOADING -> ConnectionNote.Downloading(language)
+        OfflineSpeech.ONLINE_ONLY -> ConnectionNote.OnlineOnly
+        else -> null
+      }
 
   /** Listens to the patient in the phone's language, replacing any session already running. */
   private fun startListening() {
     listening?.cancel()
     val language = SpeechLanguage.of(locale)
-    _uiState.update { it.copy(voice = VoiceUiState.Listening(downloading = downloading(language))) }
+    _uiState.update {
+      it.copy(voice = VoiceUiState.Listening(connection = connectionNote(language)))
+    }
     // The language is on the phone: listen with the recognizer that has it, so it works offline
     val onDevice = phone == OfflineSpeech.READY
     listening = viewModelScope.launch {
@@ -487,7 +492,7 @@ class AddSymptomViewModel(
     val current = _uiState.value.voice as? VoiceUiState.Listening
     when {
       current?.isFinishing == true && next is VoiceUiState.Heard -> useDraft(next.draft)
-      // New words keep how loud the patient is, whether Done was tapped and what is downloading
+      // New words keep how loud the patient is, whether Done was tapped and the connection note
       current != null && next is VoiceUiState.Listening ->
           _uiState.update {
             it.copy(
@@ -495,7 +500,7 @@ class AddSymptomViewModel(
                     next.copy(
                         isFinishing = current.isFinishing,
                         level = current.level,
-                        downloading = current.downloading,
+                        connection = current.connection,
                     )
             )
           }

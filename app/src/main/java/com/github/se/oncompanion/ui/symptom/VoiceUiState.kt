@@ -38,15 +38,15 @@ sealed interface VoiceUiState {
    *   text
    * @property level how loud the patient is right now, from 0 to 1, so the screen shows it hears
    *   them
-   * @property downloading the language the phone is downloading for use without a connection, said
-   *   while listening so the patient knows it isn't there yet; `null` if none
+   * @property connection what the patient should know about using voice without a connection on
+   *   this phone (US-45); `null` if nothing
    */
   data class Listening(
       val text: String = "",
       val draft: SymptomDraft = SymptomDraft(),
       val isFinishing: Boolean = false,
       val level: Float = 0f,
-      val downloading: SpeechLanguage? = null,
+      val connection: ConnectionNote? = null,
   ) : VoiceUiState
 
   /**
@@ -57,4 +57,13 @@ sealed interface VoiceUiState {
 
   /** Listening ended without a text, because of [error]; the patient can try again. */
   data class Failed(val error: SpeechError) : VoiceUiState
+}
+
+/** Said while listening when voice may not work without a connection on this phone (US-45). */
+sealed interface ConnectionNote {
+  /** The phone is downloading [language]: until it is done, voice needs a connection. */
+  data class Downloading(val language: SpeechLanguage) : ConnectionNote
+
+  /** The phone can only understand the patient online: without a connection, type instead. */
+  data object OnlineOnly : ConnectionNote
 }

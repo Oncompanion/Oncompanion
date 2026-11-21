@@ -250,6 +250,7 @@
     <string name="symptom_voice_language_english">English</string>
     <string name="symptom_voice_language_french">French</string>
     <string name="symptom_voice_preparing">Getting ready…</string>
+    <string name="symptom_voice_online_only">Your phone needs a connection to understand you. Without one, type your symptom instead.</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>

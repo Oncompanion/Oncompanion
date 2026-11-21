@@ -1366,13 +1366,15 @@ class AddSymptomViewModelTest {
                 ),
                 Triple(
                     OfflineSpeech.DOWNLOADING,
-                    VoiceUiState.Listening(downloading = SpeechLanguage.ENGLISH),
+                    VoiceUiState.Listening(
+                        connection = ConnectionNote.Downloading(SpeechLanguage.ENGLISH)
+                    ),
                     false,
                 ),
                 Triple(OfflineSpeech.READY, VoiceUiState.Listening(), true),
                 Triple(
                     OfflineSpeech.ONLINE_ONLY,
-                    VoiceUiState.Listening(),
+                    VoiceUiState.Listening(connection = ConnectionNote.OnlineOnly),
                     false,
                 ),
                 Triple(OfflineSpeech.UNKNOWN, VoiceUiState.Listening(), false),
@@ -1404,11 +1406,11 @@ class AddSymptomViewModelTest {
         assertTrue(speech.isListening)
         // The note stays while words come in and after starting over
         hear(SpeechEvent.PartialText("j'ai mal"))
-        val downloading = SpeechLanguage.FRENCH
-        assertEquals(downloading, (viewModel.state.voice as VoiceUiState.Listening).downloading)
+        val downloading = ConnectionNote.Downloading(SpeechLanguage.FRENCH)
+        assertEquals(downloading, (viewModel.state.voice as VoiceUiState.Listening).connection)
         viewModel.restartListening()
         advanceUntilIdle()
-        assertEquals(VoiceUiState.Listening(downloading = downloading), viewModel.state.voice)
+        assertEquals(VoiceUiState.Listening(connection = downloading), viewModel.state.voice)
         // Not on the phone yet: it listens with the default recognizer, which may go online
         assertEquals(listOf(false, false), speech.onDevice)
       }
@@ -1420,7 +1422,7 @@ class AddSymptomViewModelTest {
         val viewModel = listening()
         viewModel.onDownloadForOffline()
         advanceUntilIdle()
-        val downloading = SpeechLanguage.ENGLISH
+        val downloading = ConnectionNote.Downloading(SpeechLanguage.ENGLISH)
         // The phone's answer on each later Speak → the note shown while listening, and whether it
         // listens on the phone; no answer (a stuck phone, null here) or "can't tell" keeps what was
         // known
@@ -1431,7 +1433,7 @@ class AddSymptomViewModelTest {
                 Triple(OfflineSpeech.READY, null, true),
                 Triple(null, null, true),
                 Triple(OfflineSpeech.DOWNLOADING, downloading, false),
-                Triple(OfflineSpeech.ONLINE_ONLY, null, false),
+                Triple(OfflineSpeech.ONLINE_ONLY, ConnectionNote.OnlineOnly, false),
                 Triple(OfflineSpeech.DOWNLOADABLE, null, false),
             )
         for ((answer, note, onDevice) in cases) {
@@ -1447,7 +1449,7 @@ class AddSymptomViewModelTest {
           assertEquals(
               "$answer",
               note,
-              (viewModel.state.voice as VoiceUiState.Listening).downloading,
+              (viewModel.state.voice as VoiceUiState.Listening).connection,
           )
           assertEquals("$answer", onDevice, speech.onDevice.last())
         }
