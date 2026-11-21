@@ -77,7 +77,7 @@ internal fun CheckInDock(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
       ) {
-        CardBadge(R.drawable.ic_heart, iconSize = HEART_SIZE)
+        HeartBadge()
         Text(
             stringResource(R.string.overview_check_in_title),
             style = MaterialTheme.typography.titleLarge,
@@ -190,9 +190,6 @@ private fun SymptomTile(
     }
   }
 }
-
-/** The Figma's heart in the dock's badge, a little larger than the other cards' icons. */
-private val HEART_SIZE = 20.dp
 
 /** The Figma's tile: 80 dp tall at least (it grows with a large font), 8 dp apart. */
 private val TILE_HEIGHT = 80.dp

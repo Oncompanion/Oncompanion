@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -124,23 +125,33 @@ private fun DayCard(
 internal fun cardBorder() =
     BorderStroke(CARD_BORDER_WIDTH, MaterialTheme.lakeColors.stone.cardBorder)
 
+/** A card's icon, 18 dp, in a teal disc. */
+@Composable
+internal fun CardBadge(@DrawableRes icon: Int) {
+  val stone = MaterialTheme.lakeColors.stone
+  Badge(icon, BADGE_ICON_SIZE, stone.badge, stone.onBadge)
+}
+
 /**
- * The card's icon in a disc ([iconSize] 18 dp, 20 for the check-in's heart): teal, and the heart
- * warm at night (Figma M3, Home · Dusk).
+ * The check-in's heart, 20 dp, in a disc of its own: teal by day, warm at night (Figma M3, Home ·
+ * Dusk). Its own composable rather than a choice made from the icon, so no other card turns warm.
  */
 @Composable
-internal fun CardBadge(@DrawableRes icon: Int, iconSize: Dp = BADGE_ICON_SIZE) {
+internal fun HeartBadge() {
   val stone = MaterialTheme.lakeColors.stone
-  val heart = icon == R.drawable.ic_heart
+  Badge(R.drawable.ic_heart, HEART_ICON_SIZE, stone.heartBadge, stone.onHeartBadge)
+}
+
+@Composable
+private fun Badge(@DrawableRes icon: Int, iconSize: Dp, container: Color, content: Color) {
   Box(
-      Modifier.size(BADGE_SIZE)
-          .background(if (heart) stone.heartBadge else stone.badge, CircleShape),
+      Modifier.size(BADGE_SIZE).background(container, CircleShape),
       contentAlignment = Alignment.Center,
   ) {
     Icon(
         painterResource(icon),
         contentDescription = null,
-        tint = if (heart) stone.onHeartBadge else stone.onBadge,
+        tint = content,
         modifier = Modifier.size(iconSize),
     )
   }
@@ -409,6 +420,9 @@ private val BADGE_SIZE = 36.dp
 /** The hairline around the patient's cards (Figma M3: 1 dp, ink at 8 %). */
 private val CARD_BORDER_WIDTH = 1.dp
 private val BADGE_ICON_SIZE = 18.dp
+
+/** The heart is a little larger in its disc than the other icons. */
+private val HEART_ICON_SIZE = 20.dp
 
 /** The Figma's chevron after "Planning" and "N more". */
 private val CHEVRON_SIZE = 18.dp
