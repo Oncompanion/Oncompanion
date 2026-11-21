@@ -1058,8 +1058,8 @@
         "type": 3
       },
       "seed": 2080317198,
-      "version": 1,
-      "versionNonce": 515515126,
+      "version": 2,
+      "versionNonce": 523691981,
       "isDeleted": false,
       "boundElements": [
         {
@@ -1074,10 +1074,10 @@
     {
       "id": "voice_ui_t",
       "type": "text",
-      "x": 2599.225,
-      "y": 86.75,
-      "width": 121.55000000000001,
-      "height": 42.5,
+      "x": 2560,
+      "y": 97.375,
+      "width": 200,
+      "height": 21.25,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -1090,8 +1090,8 @@
       "frameId": null,
       "roundness": null,
       "seed": 235944160,
-      "version": 1,
-      "versionNonce": 1996830428,
+      "version": 2,
+      "versionNonce": 1745010009,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
@@ -1454,76 +1454,6 @@
       "textAlign": "center",
       "verticalAlign": "middle",
       "containerId": "meds",
-      "lineHeight": 1.25,
-      "autoResize": true
-    },
-    {
-      "id": "caregiver",
-      "type": "rectangle",
-      "x": 1550,
-      "y": 250,
-      "width": 150,
-      "height": 96,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "#ffffff",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dashed",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 3
-      },
-      "seed": 1970628138,
-      "version": 1,
-      "versionNonce": 2017201748,
-      "isDeleted": false,
-      "boundElements": [
-        {
-          "type": "text",
-          "id": "caregiver_t"
-        }
-      ],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false
-    },
-    {
-      "id": "caregiver_t",
-      "type": "text",
-      "x": 1540.85,
-      "y": 255.5,
-      "width": 168.3,
-      "height": 85.0,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": null,
-      "seed": 1227560883,
-      "version": 1,
-      "versionNonce": 125683340,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "text": "Editing, deleting,\nevents for\nthe patient\n(planned)",
-      "originalText": "Editing, deleting,\nevents for\nthe patient\n(planned)",
-      "fontSize": 17,
-      "fontFamily": 2,
-      "textAlign": "center",
-      "verticalAlign": "middle",
-      "containerId": "caregiver",
       "lineHeight": 1.25,
       "autoResize": true
     },
@@ -3700,7 +3630,7 @@
     {
       "id": "ligue_repos",
       "type": "arrow",
-      "x": 1740,
+      "x": 1660,
       "y": 156,
       "width": 0,
       "height": 284,
@@ -3718,7 +3648,7 @@
         "type": 2
       },
       "seed": 1615806038,
-      "version": 1,
+      "version": 2,
       "versionNonce": 1031219303,
       "isDeleted": false,
       "boundElements": [],
@@ -3740,58 +3670,6 @@
       "endArrowhead": "arrow",
       "startBinding": {
         "elementId": "ligue_ui",
-        "focus": 0,
-        "gap": 4
-      },
-      "endBinding": {
-        "elementId": "repos",
-        "focus": 0,
-        "gap": 4
-      }
-    },
-    {
-      "id": "caregiver_repos",
-      "type": "arrow",
-      "x": 1625,
-      "y": 346,
-      "width": 0,
-      "height": 94,
-      "angle": 0,
-      "strokeColor": "#868e96",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "dotted",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 768550546,
-      "version": 1,
-      "versionNonce": 881600299,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1794000000000,
-      "link": null,
-      "locked": false,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          0,
-          94
-        ]
-      ],
-      "lastCommittedPoint": null,
-      "startArrowhead": null,
-      "endArrowhead": "arrow",
-      "startBinding": {
-        "elementId": "caregiver",
         "focus": 0,
         "gap": 4
       },
@@ -4342,8 +4220,8 @@
         "type": 2
       },
       "seed": 1720030922,
-      "version": 1,
-      "versionNonce": 1356960357,
+      "version": 2,
+      "versionNonce": 1925868597,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1794000000000,
