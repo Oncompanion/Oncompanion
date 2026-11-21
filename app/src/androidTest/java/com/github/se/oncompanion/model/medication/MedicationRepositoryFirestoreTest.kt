@@ -9,6 +9,8 @@ import com.github.se.oncompanion.domain.medication.toDraft
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertReturnsOffline
+import com.github.se.oncompanion.utils.assertReturnsWithoutServer
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -490,7 +492,9 @@ class MedicationRepositoryFirestoreTest {
     EmulatorTestData.signIn("alice")
 
     // Returns once deleted on the device, before the server answers
-    withTimeout(5.seconds) { repository.deletePrescription(bobUid, "presc-1") }
+    assertReturnsOffline(db, "deletePrescription") {
+      repository.deletePrescription(bobUid, "presc-1")
+    }
     awaitServerAck()
     awaitRejectionReported()
 
@@ -1115,7 +1119,9 @@ class MedicationRepositoryFirestoreTest {
   fun addAndObserveWorkOffline(): Unit = runBlocking {
     db.disableNetwork().await()
 
-    withTimeout(5.seconds) { repository.addPrescription(aliceUid, prescription()) }
+    assertReturnsWithoutServer("addPrescription") {
+      repository.addPrescription(aliceUid, prescription())
+    }
 
     val cached =
         withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() }
@@ -1194,13 +1200,17 @@ class MedicationRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
 
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertReturnsWithoutServer("updatePrescription") {
+      repository.updatePrescription(aliceUid, edited())
+    }
     assertSameContent(
         edited(),
         withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() },
     )
 
-    withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
+    assertReturnsWithoutServer("deletePrescription") {
+      repository.deletePrescription(aliceUid, "presc-1")
+    }
     assertNull(
         withTimeout(5.seconds) { repository.observePrescription(aliceUid, "presc-1").awaitFirst() }
     )

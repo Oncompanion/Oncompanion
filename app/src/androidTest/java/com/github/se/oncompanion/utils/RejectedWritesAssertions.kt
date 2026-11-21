@@ -12,15 +12,15 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 
 /** A repository write that the rules deny, with a name for the failure messages. */
 typealias DeniedWrite = Pair<String, suspend () -> Unit>
 
 /**
- * Runs each of [writes] in turn on [db], which the rules must deny, and checks that it returns at
- * once (saved on the device, without waiting for the server) and that the server's rejection is
- * then reported to [rejectedWrites] exactly once, so the user is told their change was undone.
+ * Runs each of [writes] in turn on [db], which the rules must deny, and checks that it returns
+ * without waiting for the server (saved on the device, see [assertReturnsOffline]) and that the
+ * server's rejection is then reported to [rejectedWrites] exactly once, so the user is told their
+ * change was undone.
  */
 suspend fun assertEachRejectionIsReported(
     db: FirebaseFirestore,
@@ -35,10 +35,7 @@ suspend fun assertEachRejectionIsReported(
         index,
         rejectedWrites.unseen.value,
     )
-    val start = System.currentTimeMillis()
-    withTimeout(5.seconds) { block() }
-    val elapsed = System.currentTimeMillis() - start
-    assertTrue("$name took $elapsed ms: it waited for the server", elapsed < 1_000)
+    assertReturnsOffline(db, name, block)
     val reported = withTimeoutOrNull(10.seconds) { rejectedWrites.unseen.first { it > index } }
     assertNotNull("the server's rejection of $name wasn't reported", reported)
   }
