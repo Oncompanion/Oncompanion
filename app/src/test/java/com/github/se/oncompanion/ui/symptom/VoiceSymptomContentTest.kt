@@ -273,12 +273,14 @@ class VoiceSymptomContentTest {
   }
 
   @Test
-  fun whileThePhoneIsAsked_itSaysListening_butDoneWaits() {
-    show(VoiceUiState.Listening(isStarting = true))
+  fun whileThePhoneIsAsked_itSaysItIsGettingReady_withoutTheHint_andDoneWaits() {
+    show(VoiceUiState.Preparing)
 
-    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_preparing))
+    compose.onNodeWithText(string(R.string.symptom_voice_hint)).assertDoesNotExist()
     node(C.Tag.symptom_voice_done).assertIsNotEnabled()
-    node(C.Tag.symptom_voice_type_instead).assertIsEnabled()
+    node(C.Tag.symptom_voice_type_instead).assertIsEnabled().performClick()
+    assertEquals(listOf("close"), events)
   }
 
   /** Held sideways, each state's main action and way out can be reached and are fully visible. */
@@ -296,6 +298,8 @@ class VoiceSymptomContentTest {
                     C.Tag.symptom_voice_done,
                     C.Tag.symptom_voice_type_instead,
                 ),
+            VoiceUiState.Preparing to
+                listOf(C.Tag.symptom_voice_done, C.Tag.symptom_voice_type_instead),
         )
     show(VoiceUiState.Listening())
     for ((state, tags) in states) {

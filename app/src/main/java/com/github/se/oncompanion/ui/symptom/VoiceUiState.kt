@@ -25,6 +25,12 @@ sealed interface VoiceUiState {
   data class OfferingOffline(val language: SpeechLanguage) : VoiceUiState
 
   /**
+   * The phone is being asked whether it understands the patient without a connection (US-45). The
+   * screen shows at once, but nothing is heard yet, so it doesn't say it listens.
+   */
+  data object Preparing : VoiceUiState
+
+  /**
    * Listening, with the [text] understood so far (empty until the first words) and the [draft] it
    * gives, so the patient sees what is picked up as they speak.
    *
@@ -34,8 +40,6 @@ sealed interface VoiceUiState {
    *   them
    * @property downloading the language the phone is downloading for use without a connection, said
    *   while listening so the patient knows it isn't there yet; `null` if none
-   * @property isStarting the phone is still being asked whether it understands the patient offline
-   *   (US-45): the screen shows at once, with the sun low, but nothing is heard yet
    */
   data class Listening(
       val text: String = "",
@@ -43,7 +47,6 @@ sealed interface VoiceUiState {
       val isFinishing: Boolean = false,
       val level: Float = 0f,
       val downloading: SpeechLanguage? = null,
-      val isStarting: Boolean = false,
   ) : VoiceUiState
 
   /**

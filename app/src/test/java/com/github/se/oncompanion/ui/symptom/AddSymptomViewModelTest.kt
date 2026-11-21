@@ -1447,11 +1447,11 @@ class AddSymptomViewModelTest {
         val viewModel = viewModel()
 
         viewModel.onSpeak(hasMicrophone = true)
-        assertEquals(VoiceUiState.Listening(isStarting = true), viewModel.state.voice)
+        assertEquals(VoiceUiState.Preparing, viewModel.state.voice)
         viewModel.onDone()
 
         assertEquals(0, speech.stops)
-        assertEquals(VoiceUiState.Listening(isStarting = true), viewModel.state.voice)
+        assertEquals(VoiceUiState.Preparing, viewModel.state.voice)
         assertFalse(speech.isListening)
       }
 

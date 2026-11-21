@@ -249,6 +249,7 @@
     <string name="symptom_voice_downloading">Downloading %1$s. Voice will work without a connection once it\'s done.</string>
     <string name="symptom_voice_language_english">English</string>
     <string name="symptom_voice_language_french">French</string>
+    <string name="symptom_voice_preparing">Getting ready…</string>
 
     <!-- Sign-in -->
     <string name="sign_in_welcome">Welcome to oncompanion</string>

@@ -410,9 +410,8 @@ class AddSymptomViewModel(
   fun onDone() {
     when (val voice = _uiState.value.voice) {
       is VoiceUiState.Heard -> useDraft(voice.draft)
-      // Nothing to use before the phone listens
       is VoiceUiState.Listening ->
-          if (!voice.isFinishing && !voice.isStarting) {
+          if (!voice.isFinishing) {
             _uiState.update { it.copy(voice = voice.copy(isFinishing = true)) }
             speechRecognizer.stop()
           }
@@ -439,8 +438,8 @@ class AddSymptomViewModel(
   private fun startDictating() {
     if (checkingOffline?.isActive == true) return
     val language = SpeechLanguage.of(locale)
-    val starting = VoiceUiState.Listening(downloading = downloading, isStarting = true)
-    _uiState.update { it.copy(voice = starting) }
+    _uiState.update { it.copy(voice = VoiceUiState.Preparing) }
+    // Cancelled by cancelVoice, so it never listens after the patient left
     checkingOffline = viewModelScope.launch {
       val support =
           withTimeoutOrNull(OFFLINE_CHECK_TIMEOUT) { speechRecognizer.offlineSupport(language) }
@@ -454,16 +453,12 @@ class AddSymptomViewModel(
             OfflineSpeech.UNKNOWN,
             null -> downloading
           }
-      // Only if the patient is still on this starting screen; a form saved meanwhile goes back to
-      // the form instead of listening
-      val state = _uiState.value
-      if (state.voice != starting) return@launch
-      if (!state.canStartDictating) {
-        _uiState.update { it.copy(voice = null) }
-      } else if (support == OfflineSpeech.DOWNLOADABLE) {
-        _uiState.update { it.copy(voice = VoiceUiState.OfferingOffline(language)) }
-      } else {
-        startListening()
+      when {
+        // A form saved meanwhile goes back to the form instead of listening
+        !_uiState.value.canStartDictating -> _uiState.update { it.copy(voice = null) }
+        support == OfflineSpeech.DOWNLOADABLE ->
+            _uiState.update { it.copy(voice = VoiceUiState.OfferingOffline(language)) }
+        else -> startListening()
       }
     }
   }
@@ -471,8 +466,8 @@ class AddSymptomViewModel(
   /** Listens to the patient in the phone's language, replacing any session already running. */
   private fun startListening() {
     listening?.cancel()
-    _uiState.update { it.copy(voice = VoiceUiState.Listening(downloading = downloading)) }
     val language = SpeechLanguage.of(locale)
+    _uiState.update { it.copy(voice = VoiceUiState.Listening(downloading = downloading)) }
     listening = viewModelScope.launch {
       speechRecognizer.listen(language).collect { event ->
         if (event is SpeechEvent.Level) hearLevel(event.level)

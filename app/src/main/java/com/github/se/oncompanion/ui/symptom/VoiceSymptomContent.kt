@@ -169,9 +169,9 @@ private fun VoiceUiState.sun(): VoiceSun =
     when (this) {
       // Before listening, the sun waits low behind the Salève
       VoiceUiState.ExplainingMicrophone,
-      is VoiceUiState.OfferingOffline -> VoiceSun.SETTLED
-      is VoiceUiState.Listening ->
-          if (isFinishing || isStarting) VoiceSun.SETTLED else VoiceSun.LISTENING
+      is VoiceUiState.OfferingOffline,
+      VoiceUiState.Preparing -> VoiceSun.SETTLED
+      is VoiceUiState.Listening -> if (isFinishing) VoiceSun.SETTLED else VoiceSun.LISTENING
       is VoiceUiState.Heard -> VoiceSun.RESTING
       VoiceUiState.MicrophoneRefused,
       is VoiceUiState.Failed -> VoiceSun.HIDDEN
@@ -238,6 +238,7 @@ private fun VoiceUiState.message(): Message? =
                     R.string.symptom_voice_unavailable_message,
                 )
           }
+      VoiceUiState.Preparing,
       is VoiceUiState.Listening,
       is VoiceUiState.Heard -> null
     }
@@ -283,6 +284,7 @@ private fun VoiceMessage(voice: VoiceUiState, today: LocalDate) {
   val headline =
       when {
         message != null -> stringResource(message.title)
+        voice == VoiceUiState.Preparing -> stringResource(R.string.symptom_voice_preparing)
         voice is VoiceUiState.Heard -> stringResource(R.string.symptom_voice_heard)
         (voice as VoiceUiState.Listening).isFinishing ->
             stringResource(R.string.symptom_voice_finishing)
@@ -302,6 +304,8 @@ private fun VoiceMessage(voice: VoiceUiState, today: LocalDate) {
         else -> "" to SymptomDraft()
       }
   when {
+    // Nothing is heard yet: no hint, so the patient doesn't start speaking too early
+    voice == VoiceUiState.Preparing -> Unit
     message != null ->
         CenteredText(
             message.language?.let { stringResource(message.text, stringResource(it.label)) }
@@ -426,12 +430,18 @@ private fun VoiceActions(voice: VoiceUiState, actions: VoiceActionHandlers) {
               C.Tag.symptom_voice_download,
               actions.onDownloadForOffline,
           )
+      // Shown but off until the phone listens, so the buttons don't jump
+      VoiceUiState.Preparing ->
+          LakeButton(
+              text = stringResource(R.string.symptom_voice_done),
+              onClick = onDone,
+              enabled = false,
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptom_voice_done),
+          )
       is VoiceUiState.Listening ->
           LakeButton(
               text = stringResource(R.string.symptom_voice_done),
               onClick = onDone,
-              // Nothing to use until the phone listens
-              enabled = !voice.isStarting,
               isWorking = voice.isFinishing,
               modifier = Modifier.fillMaxWidth().testTag(C.Tag.symptom_voice_done),
           )
