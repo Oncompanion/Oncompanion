@@ -168,6 +168,7 @@ rounded:
   extra-large: "28px"
   full: "999px"
 spacing:
+  xxs: "2px"
   xs: "4px"
   sm: "8px"
   md: "12px"

@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
  * dp between form groups ([xl]), and pinned actions 16 dp from the sides and 24 dp from the bottom.
  */
 object Spacing {
+  /** 2 dp: between a short link and its arrow ("Planning ›"). */
+  val xxs = 2.dp
   /** 4 dp: between an icon and its text, or a label and its value. */
   val xs = 4.dp
   /** 8 dp: between the chips of a group, or small related items. */

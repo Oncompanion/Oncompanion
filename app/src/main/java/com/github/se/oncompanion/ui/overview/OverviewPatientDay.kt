@@ -238,7 +238,7 @@ private fun MedicationsCard(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
       CardBadge(R.drawable.ic_pill)
-      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         val hidden = medications.size - MEDICATIONS_SHOWN
         Row(verticalAlignment = Alignment.CenterVertically) {
           Eyebrow(
@@ -276,7 +276,7 @@ private fun PlanningLink(onOpenPlanning: () -> Unit, modifier: Modifier) {
           .clip(MaterialTheme.shapes.medium)
           .clickable(role = Role.Button, onClick = onOpenPlanning),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(2.dp),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
   ) {
     Text(
         stringResource(R.string.overview_planning_link),
@@ -304,7 +304,7 @@ private fun MedicationRow(
 ) {
   Column(
       Modifier.testTag(C.Tag.overviewMedication(medication.key)),
-      verticalArrangement = Arrangement.spacedBy(6.dp),
+      verticalArrangement = Arrangement.spacedBy(Spacing.xs),
   ) {
     Text(
         medication.name,
@@ -330,7 +330,7 @@ private fun FrequencyChip(text: String) {
       color = MaterialTheme.colorScheme.onSurface,
       modifier =
           Modifier.background(MaterialTheme.lakeColors.stone.chip, CHIP_SHAPE)
-              .padding(horizontal = 10.dp, vertical = Spacing.xs),
+              .padding(horizontal = Spacing.md, vertical = Spacing.xs),
   )
 }
 
@@ -347,7 +347,7 @@ private fun MorePill(count: Int, onOpenPlanning: () -> Unit) {
     Row(
         Modifier.padding(start = Spacing.md, end = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
     ) {
       Text(
           pluralStringResource(R.plurals.overview_more_medications, count, count),
