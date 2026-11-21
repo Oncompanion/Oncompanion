@@ -8,7 +8,7 @@
       "type": "rectangle",
       "x": 20,
       "y": -2,
-      "width": 2400,
+      "width": 2780,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -37,7 +37,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 178,
-      "width": 2400,
+      "width": 2780,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -66,7 +66,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 358,
-      "width": 2400,
+      "width": 2780,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -95,7 +95,7 @@
       "type": "rectangle",
       "x": 20,
       "y": 538,
-      "width": 2400,
+      "width": 2780,
       "height": 144,
       "angle": 0,
       "strokeColor": "transparent",
@@ -2091,6 +2091,10 @@
         {
           "id": "appearance_observe",
           "type": "arrow"
+        },
+        {
+          "type": "arrow",
+          "id": "settings_more_repo"
         }
       ],
       "updated": 1794000000000,
@@ -2573,6 +2577,138 @@
         "elementId": "settings_repo",
         "focus": 0,
         "gap": 1
+      }
+    },
+    {
+      "id": "settings_more",
+      "type": "rectangle",
+      "x": 2450,
+      "y": 20,
+      "width": 320,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1248689447,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "settings_more_t"
+        },
+        {
+          "type": "arrow",
+          "id": "settings_more_repo"
+        }
+      ],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "settings_more_t",
+      "type": "text",
+      "x": 2460,
+      "y": 32.5,
+      "width": 300,
+      "height": 75.0,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1193303048,
+      "version": 2,
+      "versionNonce": 817812896,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "text": "Date and time formats,\nlanguage, text size row\n(US-53 to US-55, planned)",
+      "originalText": "Date and time formats,\nlanguage, text size row\n(US-53 to US-55, planned)",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "settings_more",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "settings_more_repo",
+      "type": "arrow",
+      "x": 2610,
+      "y": 120,
+      "width": 630,
+      "height": 380,
+      "angle": 0,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1098238238,
+      "version": 2,
+      "versionNonce": 927187872,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1794000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          380
+        ],
+        [
+          -630,
+          380
+        ],
+        [
+          -630,
+          364
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "settings_more",
+        "focus": 0,
+        "gap": 4
+      },
+      "endBinding": {
+        "elementId": "settings_repo",
+        "focus": 0,
+        "gap": 4
       }
     }
   ],
