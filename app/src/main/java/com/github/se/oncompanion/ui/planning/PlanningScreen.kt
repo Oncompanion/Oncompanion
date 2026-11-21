@@ -52,8 +52,8 @@ import java.util.Locale
 /** Calendar and agenda events supplied by the screen or preview. */
 data class PlanningActions(
     val onDateSelected: (LocalDate) -> Unit,
-    val onPreviousWeek: () -> Unit,
-    val onNextWeek: () -> Unit,
+    val onPreviousPeriod: () -> Unit,
+    val onNextPeriod: () -> Unit,
     val onToday: () -> Unit,
     val onRetry: () -> Unit,
     val onAddAppointment: ((LocalDate) -> Unit)? = null,
@@ -94,8 +94,8 @@ fun PlanningScreen(
       actions =
           PlanningActions(
               viewModel::selectDate,
-              viewModel::previousWeek,
-              viewModel::nextWeek,
+              viewModel::previousPeriod,
+              viewModel::nextPeriod,
               viewModel::goToToday,
               viewModel::retry,
               onAddAppointment = onAddAppointment,
@@ -207,11 +207,11 @@ private fun PlanningHeader(
       )
       val previousLabel = stringResource(R.string.planning_previous_week)
       TextButton(
-          actions.onPreviousWeek,
+          actions.onPreviousPeriod,
           Modifier.testTag(C.Tag.planning_previous).semantics {
             contentDescription = previousLabel
           },
-          enabled = state.canGoToPreviousWeek,
+          enabled = state.canGoToPreviousPeriod,
       ) {
         Text("‹")
       }
@@ -224,9 +224,9 @@ private fun PlanningHeader(
       }
       val nextLabel = stringResource(R.string.planning_next_week)
       TextButton(
-          actions.onNextWeek,
+          actions.onNextPeriod,
           Modifier.testTag(C.Tag.planning_next).semantics { contentDescription = nextLabel },
-          enabled = state.canGoToNextWeek,
+          enabled = state.canGoToNextPeriod,
       ) {
         Text("›")
       }

@@ -42,8 +42,7 @@ class PlanningLandscapeTest {
         )
       }
 
-  private fun state() =
-      PlanningUiState(day, day.minusDays(2), scheduledItems = entries, isLoading = false)
+  private fun state() = PlanningUiState(day, scheduledItems = entries, isLoading = false)
 
   /** Scrolling removes the header and exposes full rows while calendar actions remain reachable. */
   @Test fun landscapeReclaimsHeaderSpace() = checkScrollableCalendar()

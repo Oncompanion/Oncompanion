@@ -8,10 +8,8 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningSource
 import com.github.se.oncompanion.model.planning.PlanningTiming
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
 
 /** Preview-only fixtures; never installed as the application's repository. */
 @Composable
@@ -62,7 +60,6 @@ private fun PlanningPreviewContent(
     PlanningContent(
         PlanningUiState(
             selected,
-            selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
             untimedItems =
                 entries.filter {
                   it.timing.dateIn(zone) == selected && it.timing is PlanningTiming.DateOnly
@@ -79,8 +76,8 @@ private fun PlanningPreviewContent(
         actions =
             PlanningActions(
                 onDateSelected = { selected = it },
-                onPreviousWeek = { selected = selected.minusWeeks(1) },
-                onNextWeek = { selected = selected.plusWeeks(1) },
+                onPreviousPeriod = { selected = selected.minusWeeks(1) },
+                onNextPeriod = { selected = selected.plusWeeks(1) },
                 onToday = { selected = today },
                 onRetry = {},
             ),

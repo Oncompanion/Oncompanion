@@ -80,7 +80,6 @@ class PlanningScreenTest {
   ) =
       PlanningUiState(
           date,
-          LocalDate.of(2026, 9, 28),
           untimedItems = items.filter { it.timing is PlanningTiming.DateOnly },
           scheduledItems = items.filter { it.timing is PlanningTiming.Timed },
           isLoading = loading,
@@ -200,7 +199,7 @@ class PlanningScreenTest {
   @Test
   fun upperBoundaryDisablesNextWeekAndUnsupportedDays() {
     val last = java.time.LocalDate.of(9999, 12, 31)
-    render(PlanningUiState(last, last.minusDays(4), isLoading = false))
+    render(PlanningUiState(last, isLoading = false))
     compose.onNodeWithTag(C.Tag.planning_next).assertIsNotEnabled()
     compose
         .onNodeWithTag(C.Tag.planningDay("+10000-01-01"))
@@ -212,7 +211,7 @@ class PlanningScreenTest {
   @Test
   fun lowerBoundaryDisablesPreviousWeek() {
     val first = java.time.LocalDate.of(1, 1, 1)
-    render(PlanningUiState(first, first, isLoading = false))
+    render(PlanningUiState(first, isLoading = false))
     compose.onNodeWithTag(C.Tag.planning_previous).assertIsNotEnabled()
   }
 
