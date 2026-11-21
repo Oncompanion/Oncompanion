@@ -105,6 +105,21 @@ class AppointmentNavigationTest {
     assertTrue(repository.appointments("uid-patient").isEmpty())
   }
 
+  /** A new appointment without a usable day starts on today, as the app's clock gives it. */
+  @Test
+  fun addWithoutUsableDayStartsOnToday() {
+    show()
+    val today = PlannedDay.today.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
+    // No day, not a date, and years the form can't show
+    for (date in listOf(null, "not-a-date", "0000-06-03", "%2B10000-06-03")) {
+      val route = if (date == null) "appointment_add" else "appointment_add?date=$date"
+      compose.runOnIdle { NavigationActions(nav).navigateTo(route) }
+      compose.onNodeWithTag(C.Tag.appointment_date).assertTextContains(today)
+      compose.onNodeWithTag(C.Tag.appointment_back).performClick()
+      compose.onNodeWithTag(C.Tag.planning_screen).assertIsDisplayed()
+    }
+  }
+
   /** Local save updates the live agenda once and a reopened form starts empty. */
   @Test
   fun manualLocationSaveReturnsToExistingPlanningAndReopensFresh() {
