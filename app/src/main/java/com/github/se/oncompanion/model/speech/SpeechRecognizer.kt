@@ -45,8 +45,9 @@ interface SpeechRecognizer {
   suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech
 
   /**
-   * Asks the phone to download [language] so it understands it without a connection. The phone
-   * downloads it in the background; [offlineSupport] says when it is [OfflineSpeech.READY]. Does
+   * Asks the phone to download [language] so it understands it without a connection. The phone may
+   * first ask the user to confirm in its own dialog, then downloads it in the background;
+   * [offlineSupport] says when it is [OfflineSpeech.DOWNLOADING], then [OfflineSpeech.READY]. Does
    * nothing on a phone that can't download languages for the app. Call it on the main thread.
    */
   fun downloadForOffline(language: SpeechLanguage)

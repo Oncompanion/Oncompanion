@@ -1400,6 +1400,9 @@ class AddSymptomViewModelTest {
         assertEquals(VoiceUiState.OfferingOffline(SpeechLanguage.FRENCH), viewModel.state.voice)
 
         viewModel.onDownloadForOffline()
+        // The phone is asked again before listening: it now says it downloads
+        assertEquals(VoiceUiState.Preparing, viewModel.state.voice)
+        speech.offline = OfflineSpeech.DOWNLOADING
         advanceUntilIdle()
 
         assertEquals(listOf(SpeechLanguage.FRENCH), speech.downloads)
@@ -1421,6 +1424,7 @@ class AddSymptomViewModelTest {
         speech.offline = OfflineSpeech.DOWNLOADABLE
         val viewModel = listening()
         viewModel.onDownloadForOffline()
+        speech.offline = OfflineSpeech.DOWNLOADING
         advanceUntilIdle()
         val downloading = ConnectionNote.Downloading(SpeechLanguage.ENGLISH)
         // The phone's answer on each later Speak → the note shown while listening, and whether it
@@ -1498,6 +1502,68 @@ class AddSymptomViewModelTest {
         assertEquals(VoiceUiState.Listening(), viewModel.state.voice)
         assertTrue(speech.isListening)
         assertEquals(emptyList<SpeechLanguage>(), speech.downloads)
+      }
+
+  @Test
+  fun thePhonesOwnDialog_isWaitedFor_andTheNoteShowsOnlyIfThePatientConfirmed() =
+      runTest(dispatcher) {
+        // The phone's answer once its dialog closed → the note while listening, and whether it
+        // listens on the phone; still downloadable means the patient cancelled in the dialog
+        val cases =
+            listOf(
+                Triple(
+                    OfflineSpeech.DOWNLOADING,
+                    ConnectionNote.Downloading(SpeechLanguage.ENGLISH),
+                    false,
+                ),
+                Triple(OfflineSpeech.READY, null, true),
+                Triple(OfflineSpeech.DOWNLOADABLE, null, false),
+            )
+        for ((answer, note, onDevice) in cases) {
+          speech.offline = OfflineSpeech.DOWNLOADABLE
+          val viewModel = listening()
+          viewModel.onDownloadForOffline()
+          viewModel.onScreenHidden()
+          advanceTimeBy(60_000)
+          assertEquals("$answer", VoiceUiState.Preparing, viewModel.state.voice)
+          assertFalse("$answer", speech.isListening)
+
+          speech.offline = answer
+          viewModel.onScreenShown()
+          advanceUntilIdle()
+
+          assertEquals("$answer", VoiceUiState.Listening(connection = note), viewModel.state.voice)
+          assertEquals("$answer", onDevice, speech.onDevice.last())
+          // Cancelled in the phone's dialog: offered again next time
+          viewModel.cancelVoice()
+          viewModel.onSpeak(hasMicrophone = true)
+          advanceUntilIdle()
+          assertEquals(
+              "$answer",
+              answer == OfflineSpeech.DOWNLOADABLE,
+              viewModel.state.voice is VoiceUiState.OfferingOffline,
+          )
+          viewModel.cancelVoice()
+          advanceUntilIdle()
+        }
+        assertEquals(List(3) { SpeechLanguage.ENGLISH }, speech.downloads)
+      }
+
+  @Test
+  fun leavingWhileThePhonesDialogIsOpen_neverListens() =
+      runTest(dispatcher) {
+        speech.offline = OfflineSpeech.DOWNLOADABLE
+        val viewModel = listening()
+        viewModel.onDownloadForOffline()
+        viewModel.onScreenHidden()
+        advanceTimeBy(60_000)
+
+        viewModel.cancelVoice()
+        viewModel.onScreenShown()
+        advanceUntilIdle()
+
+        assertNull(viewModel.state.voice)
+        assertEquals(emptyList<SpeechLanguage>(), speech.languages)
       }
 
   @Test
