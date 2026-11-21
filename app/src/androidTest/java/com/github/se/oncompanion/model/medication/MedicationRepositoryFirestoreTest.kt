@@ -272,7 +272,7 @@ class MedicationRepositoryFirestoreTest {
           }!!
       db.disableNetwork().await()
       try {
-        withTimeout(5.seconds) {
+        assertReturnsWithoutServer("update") {
           assertTrue(
               schedule.update(
                   aliceUid,
@@ -302,7 +302,7 @@ class MedicationRepositoryFirestoreTest {
       assertEquals(0, rejectedWrites.unseen.value)
       db.disableNetwork().await()
       try {
-        withTimeout(5.seconds) { schedule.delete(aliceUid, saved.id) }
+        assertReturnsWithoutServer("delete") { schedule.delete(aliceUid, saved.id) }
         assertNull(repository.observePrescription(aliceUid, saved.id).awaitFirst { it == null })
       } finally {
         db.enableNetwork().await()
@@ -336,7 +336,7 @@ class MedicationRepositoryFirestoreTest {
       assertEquals(PrescriptionConfirmation.PENDING, cached.confirmation)
       db.disableNetwork().await()
       try {
-        withTimeout(5.seconds) {
+        assertReturnsWithoutServer("update") {
           assertTrue(
               ManageMedicationSchedule(repository)
                   .update(
@@ -1220,7 +1220,9 @@ class MedicationRepositoryFirestoreTest {
   fun deleteOfUnknownPrescriptionDoesNothingOffline(): Unit = runBlocking {
     db.disableNetwork().await()
 
-    withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
+    assertReturnsWithoutServer("deletePrescription") {
+      repository.deletePrescription(aliceUid, "presc-1")
+    }
 
     assertTrue(repository.observePrescriptions(aliceUid).awaitFirst().isEmpty())
   }
@@ -1239,7 +1241,9 @@ class MedicationRepositoryFirestoreTest {
         )
         db.disableNetwork().await()
 
-        withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+        assertReturnsWithoutServer("updatePrescription") {
+          repository.updatePrescription(aliceUid, edited())
+        }
         db.enableNetwork().await()
         awaitServerAck()
 
@@ -1263,7 +1267,9 @@ class MedicationRepositoryFirestoreTest {
         )
         db.disableNetwork().await()
 
-        withTimeout(5.seconds) { repository.deletePrescription(aliceUid, "presc-1") }
+        assertReturnsWithoutServer("deletePrescription") {
+          repository.deletePrescription(aliceUid, "presc-1")
+        }
         db.enableNetwork().await()
         awaitServerAck()
 
@@ -1287,7 +1293,9 @@ class MedicationRepositoryFirestoreTest {
         ),
     )
 
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertReturnsWithoutServer("updatePrescription") {
+      repository.updatePrescription(aliceUid, edited())
+    }
     db.enableNetwork().await()
     awaitServerAck()
 
@@ -1300,7 +1308,9 @@ class MedicationRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
     // Both devices replace the medications of presc-1 before seeing each other's change
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertReturnsWithoutServer("updatePrescription") {
+      repository.updatePrescription(aliceUid, edited())
+    }
     EmulatorTestData.replaceRawDocument(
         "users/$aliceUid/prescriptions",
         "presc-1",
@@ -1323,7 +1333,9 @@ class MedicationRepositoryFirestoreTest {
     db.disableNetwork().await()
 
     // The device can't tell whether presc-1 exists: the update is kept for the server to decide
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertReturnsWithoutServer("updatePrescription") {
+      repository.updatePrescription(aliceUid, edited())
+    }
     assertTrue(repository.observePrescriptions(aliceUid).awaitFirst().isEmpty())
 
     db.enableNetwork().await()
@@ -1341,7 +1353,9 @@ class MedicationRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
 
-    withTimeout(5.seconds) { repository.updatePrescription(aliceUid, edited()) }
+    assertReturnsWithoutServer("updatePrescription") {
+      repository.updatePrescription(aliceUid, edited())
+    }
 
     // Nothing was written, not even on the device while waiting for the server
     assertTrue(repository.observeMedications(aliceUid).awaitFirst().isEmpty())
