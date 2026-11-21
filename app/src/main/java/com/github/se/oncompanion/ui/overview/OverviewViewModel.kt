@@ -25,6 +25,7 @@ import com.github.se.oncompanion.model.user.UserProfileRepository
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
@@ -305,10 +306,11 @@ class OverviewViewModel(
     items.collectLatest { planned ->
       while (true) {
         refreshNow()
-        val next = nextChangeAfter(planned, now()).atZone(zoneId).toInstant()
-        val wait = Duration.between(clock.instant(), next)
-        // Rounded up, so it never wakes just before the change; never negative if the clock moved
-        delay(((wait.toNanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI).coerceAtLeast(0))
+        val now = clock.instant()
+        val wait = Duration.between(now, nextChangeAfter(planned, now))
+        // Rounded up, so it never wakes just before the change; at least 1 ms, so it always
+        // suspends even if the clock moved
+        delay(((wait.toNanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI).coerceAtLeast(1))
       }
     }
   }
@@ -316,13 +318,14 @@ class OverviewViewModel(
   /**
    * The next moment the Overview's content changes after [now]: an entry starts (Next up moves on,
    * an entry is happening), an entry ends [DEFAULT_DURATION] after its start, or midnight (the new
-   * day loads). Midnight is always one of them, so it is never more than a day away.
+   * day loads). Midnight is always one of them, so it is never more than a day away. In instants,
+   * so the hour repeated when the clocks go back can't give a moment already past.
    */
-  private fun nextChangeAfter(planned: List<PlanningItem>, now: LocalDateTime): LocalDateTime =
+  private fun nextChangeAfter(planned: List<PlanningItem>, now: Instant): Instant =
       (planned
-              .mapNotNull { it.startIn() }
+              .mapNotNull { (it.timing as? PlanningTiming.Timed)?.instant }
               .flatMap { start -> listOf(start, start.plus(DEFAULT_DURATION)) } +
-              now.toLocalDate().plusDays(1).atStartOfDay())
+              now.atZone(zoneId).toLocalDate().plusDays(1).atStartOfDay(zoneId).toInstant())
           .filter { it.isAfter(now) }
           .min()
 

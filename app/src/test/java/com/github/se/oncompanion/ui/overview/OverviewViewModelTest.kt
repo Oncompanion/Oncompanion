@@ -745,6 +745,46 @@ class OverviewViewModelTest {
   }
 
   @Test
+  fun followToday_movesOn_inTheHourRepeatedWhenTheClocksGoBack(): Unit = runTestOnVirtualMain {
+    val zurich = ZoneId.of("Europe/Zurich")
+    // 25 October 2026, 02:10 the second time: at 03:00 summer time the clocks went back to 02:00
+    val clock = VirtualClock(testScheduler, Instant.parse("2026-10-25T01:10:00Z"), zurich)
+    val planning =
+        planning(
+            // 02:45, also the second time
+            PlanningItem(
+                PlanningSource.Appointment("blood"),
+                PlanningTiming.Timed(Instant.parse("2026-10-25T01:45:00Z")),
+                "Appointment blood",
+            ),
+            PlanningItem(
+                PlanningSource.Event("yoga"),
+                PlanningTiming.Timed(Instant.parse("2026-10-25T09:00:00Z")),
+                "Event yoga",
+            ),
+        )
+    val vm =
+        OverviewViewModel(
+            FakeAuthRepository(),
+            FakeUserProfileRepository(),
+            ownPlanning(planning),
+            clock,
+            zurich,
+        )
+    val following = vm.followToday()
+    runCurrent()
+    assertEquals("blood", vm.uiState.value.nextUp?.id)
+
+    // Planned in local times, the wake-up at 02:45 was read in summer time, already past: it never
+    // suspended and froze the screen
+    advanceTimeBy(35.minutes)
+    runCurrent()
+
+    assertEquals("yoga", vm.uiState.value.nextUp?.id)
+    following.cancel()
+  }
+
+  @Test
   fun followToday_reloadsTheNewDayAtMidnight() = runTestOnVirtualMain {
     val lateEvening = now.withHour(23).withMinute(59)
     val planning = FakePlanningRepository()
