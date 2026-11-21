@@ -2,6 +2,7 @@
 
 package com.github.se.oncompanion.model.speech
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -15,11 +16,21 @@ import kotlinx.coroutines.flow.transformWhile
  * [SpeechEvent.FinalText] or [SpeechEvent.Failed].
  *
  * @param available what [isAvailable] answers, as a phone with or without a recognizer
+ * @param offline what [offlineSupport] answers, for every language
  */
-class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
+class FakeSpeechRecognizer(
+    var available: Boolean = true,
+    var offline: OfflineSpeech = OfflineSpeech.UNKNOWN,
+) : SpeechRecognizer {
+
+  /** The languages the phone was asked to download, in order. */
+  val downloads = mutableListOf<SpeechLanguage>()
 
   /** The languages each session listened in, in order. */
   val languages = mutableListOf<SpeechLanguage>()
+
+  /** Whether each session listened with the phone's on-device recognizer, in order. */
+  val onDevice = mutableListOf<Boolean>()
 
   /** How many times [stop] was called. */
   var stops = 0
@@ -33,8 +44,9 @@ class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
 
   override fun isAvailable(): Boolean = available
 
-  override fun listen(language: SpeechLanguage): Flow<SpeechEvent> = flow {
+  override fun listen(language: SpeechLanguage, onDevice: Boolean): Flow<SpeechEvent> = flow {
     languages += language
+    this@FakeSpeechRecognizer.onDevice += onDevice
     val events = Channel<SpeechEvent>(Channel.UNLIMITED).also { session = it }
     isListening = true
     try {
@@ -51,6 +63,18 @@ class FakeSpeechRecognizer(var available: Boolean = true) : SpeechRecognizer {
 
   override fun stop() {
     stops++
+  }
+
+  /** Whether [offlineSupport] never answers, as a phone whose speech service is stuck. */
+  var offlineHangs = false
+
+  override suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech {
+    if (offlineHangs) awaitCancellation()
+    return offline
+  }
+
+  override fun downloadForOffline(language: SpeechLanguage) {
+    downloads += language
   }
 
   /** What the phone hears next in the session being listened to. */

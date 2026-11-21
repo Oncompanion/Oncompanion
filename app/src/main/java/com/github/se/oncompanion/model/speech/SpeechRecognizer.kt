@@ -21,10 +21,15 @@ interface SpeechRecognizer {
    * phone so it works offline when the phone can. See [SpeechEvent] for what is sent and in which
    * order; the flow completes after [SpeechEvent.FinalText] or [SpeechEvent.Failed].
    *
+   * With [onDevice], it listens with the phone's on-device recognizer: the one [offlineSupport]
+   * asks and [downloadForOffline] downloads to, which may not be the phone's default one. Pass it
+   * when [offlineSupport] said [OfflineSpeech.READY], so a language downloaded by the app is the
+   * one used without a connection.
+   *
    * Cancelling the collection stops listening and drops what was said. Only one listening at a
    * time: collect on the main thread.
    */
-  fun listen(language: SpeechLanguage): Flow<SpeechEvent>
+  fun listen(language: SpeechLanguage, onDevice: Boolean = false): Flow<SpeechEvent>
 
   /**
    * The user is done speaking: stops listening, then [listen]'s flow ends as usual, with
@@ -32,4 +37,17 @@ interface SpeechRecognizer {
    * not listening. Call it on the main thread, like [listen].
    */
   fun stop()
+
+  /**
+   * Whether the phone can understand [language] without a connection (US-45). Asks the phone, so it
+   * may take a moment; call it on the main thread, like [listen].
+   */
+  suspend fun offlineSupport(language: SpeechLanguage): OfflineSpeech
+
+  /**
+   * Asks the phone to download [language] so it understands it without a connection. The phone
+   * downloads it in the background; [offlineSupport] says when it is [OfflineSpeech.READY]. Does
+   * nothing on a phone that can't download languages for the app. Call it on the main thread.
+   */
+  fun downloadForOffline(language: SpeechLanguage)
 }
