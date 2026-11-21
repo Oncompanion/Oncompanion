@@ -4,6 +4,7 @@ package com.github.se.oncompanion.ui.symptom
 
 import android.Manifest
 import android.app.Application
+import android.os.Looper
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,6 +28,7 @@ import com.github.se.oncompanion.model.symptom.SymptomType
 import com.github.se.oncompanion.resources.C
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import java.time.Clock
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
@@ -181,7 +183,7 @@ class VoiceSymptomScreenTest {
   }
 
   @Test
-  fun downloadingForOffline_listensWithANote_thatStaysWhenRotated() {
+  fun downloadingForOffline_waitsForThePhonesDialog_thenListensWithANote_thatStaysWhenRotated() {
     speech.offline = OfflineSpeech.DOWNLOADABLE
     microphone(allowed = true)
     showScreen()
@@ -193,6 +195,14 @@ class VoiceSymptomScreenTest {
     // The offer is still there after a rotation
     showScreenAgain()
     node(C.Tag.symptom_voice_download).performClick()
+    // The phone's own dialog covers the app: nothing listens until it closes
+    compose.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMinutes(1))
+    assertFalse(speech.isListening)
+    assertEquals(VoiceUiState.Preparing, viewModel.uiState.value.voice)
+    // The patient confirmed: the phone now says it downloads
+    speech.offline = OfflineSpeech.DOWNLOADING
+    compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
     compose.waitForIdle()
 
     assertEquals(listOf(SpeechLanguage.ENGLISH), speech.downloads)

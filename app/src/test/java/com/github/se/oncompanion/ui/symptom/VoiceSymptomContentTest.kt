@@ -259,17 +259,32 @@ class VoiceSymptomContentTest {
   }
 
   @Test
-  fun whileTheLanguageDownloads_listeningSaysSo() {
+  fun whenVoiceMayNeedAConnection_listeningSaysWhy() {
+    val notes = listOf(C.Tag.symptom_voice_downloading, C.Tag.symptom_voice_online_only)
     show(VoiceUiState.Listening())
-    node(C.Tag.symptom_voice_downloading).assertDoesNotExist()
-
-    voice = VoiceUiState.Listening(said, draft, downloading = SpeechLanguage.ENGLISH)
-    compose.waitForIdle()
-
+    notes.forEach { node(it).assertDoesNotExist() }
     val english = string(R.string.symptom_voice_language_english)
-    node(C.Tag.symptom_voice_downloading).assertIsDisplayed()
-    compose.onNodeWithText(string(R.string.symptom_voice_downloading, english)).assertIsDisplayed()
-    node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+    // The note while listening → its tag and what it says
+    val cases =
+        listOf(
+            ConnectionNote.Downloading(SpeechLanguage.ENGLISH) to
+                (C.Tag.symptom_voice_downloading to
+                    string(R.string.symptom_voice_downloading, english)),
+            ConnectionNote.OnlineOnly to
+                (C.Tag.symptom_voice_online_only to string(R.string.symptom_voice_online_only)),
+        )
+    for ((note, shown) in cases) {
+      val (tag, text) = shown
+      voice = VoiceUiState.Listening(said, draft, connection = note)
+      compose.waitForIdle()
+
+      node(tag).assertIsDisplayed()
+      notes.filter { it != tag }.forEach { node(it).assertDoesNotExist() }
+      compose.onNodeWithText(text).assertIsDisplayed()
+      node(C.Tag.symptom_voice_headline).assertTextEquals(string(R.string.symptom_voice_listening))
+      // Typing stays a way out
+      node(C.Tag.symptom_voice_type_instead).assertIsEnabled()
+    }
   }
 
   @Test
@@ -291,10 +306,20 @@ class VoiceSymptomContentTest {
                 listOf(C.Tag.symptom_voice_done, C.Tag.symptom_voice_type_instead),
             VoiceUiState.OfferingOffline(SpeechLanguage.ENGLISH) to
                 listOf(C.Tag.symptom_voice_download, C.Tag.symptom_voice_not_now),
-            // The downloading note makes the column taller
-            VoiceUiState.Listening(said, draft, downloading = SpeechLanguage.ENGLISH) to
+            // The connection notes make the column taller
+            VoiceUiState.Listening(
+                said,
+                draft,
+                connection = ConnectionNote.Downloading(SpeechLanguage.ENGLISH),
+            ) to
                 listOf(
                     C.Tag.symptom_voice_downloading,
+                    C.Tag.symptom_voice_done,
+                    C.Tag.symptom_voice_type_instead,
+                ),
+            VoiceUiState.Listening(said, draft, connection = ConnectionNote.OnlineOnly) to
+                listOf(
+                    C.Tag.symptom_voice_online_only,
                     C.Tag.symptom_voice_done,
                     C.Tag.symptom_voice_type_instead,
                 ),

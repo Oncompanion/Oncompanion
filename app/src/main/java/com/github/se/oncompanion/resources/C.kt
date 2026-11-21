@@ -234,6 +234,7 @@ object C {
     const val symptom_voice_download = "symptom_voice_download"
     const val symptom_voice_not_now = "symptom_voice_not_now"
     const val symptom_voice_downloading = "symptom_voice_downloading"
+    const val symptom_voice_online_only = "symptom_voice_online_only"
     const val prescriptions_screen = "prescriptions_screen"
     const val care_circle_screen = "care_circle_screen"
     // Settings
