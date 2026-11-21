@@ -69,7 +69,8 @@ internal fun CheckInDock(
   Surface(
       modifier = modifier.fillMaxWidth().elevation1(shape).testTag(C.Tag.overview_check_in),
       shape = shape,
-      color = MaterialTheme.colorScheme.surfaceContainerLowest,
+      color = MaterialTheme.lakeColors.stone.dock,
+      border = cardBorder(),
   ) {
     Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
       Row(
@@ -176,7 +177,7 @@ private fun SymptomTile(
                   type?.let { C.Tag.overviewCheckIn(it.name) } ?: C.Tag.overview_check_in_more
               ),
       shape = MaterialTheme.shapes.large,
-      color = MaterialTheme.colorScheme.surfaceContainerHighest,
+      color = MaterialTheme.lakeColors.stone.tile,
       contentColor = MaterialTheme.colorScheme.onSurface,
   ) {
     Column(

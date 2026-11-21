@@ -3,6 +3,7 @@
 package com.github.se.oncompanion.ui.overview
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -94,7 +95,7 @@ internal fun PatientDay(
   }
 }
 
-/** A white card of the patient's day, raised with the shared shadow. */
+/** A card of the patient's day on the stone page, raised with the shared shadow. */
 @Composable
 private fun DayCard(
     modifier: Modifier,
@@ -102,24 +103,44 @@ private fun DayCard(
     content: @Composable () -> Unit,
 ) {
   val shape = MaterialTheme.shapes.large
-  val color = MaterialTheme.colorScheme.surfaceContainerLowest
+  val stone = MaterialTheme.lakeColors.stone
+  val border = cardBorder()
   val raised = modifier.fillMaxWidth().elevation1(shape)
-  if (onClick == null) Surface(raised, shape = shape, color = color, content = content)
+  if (onClick == null)
+      Surface(raised, shape = shape, color = stone.card, border = border, content = content)
   else
-      Surface(onClick = onClick, modifier = raised, shape = shape, color = color, content = content)
+      Surface(
+          onClick = onClick,
+          modifier = raised,
+          shape = shape,
+          color = stone.card,
+          border = border,
+          content = content,
+      )
 }
 
-/** The card's icon, white in a teal disc ([iconSize] 18 dp, 20 for the check-in's heart). */
+/** The hairline around the patient's cards, so they stay distinct from the stone page by day. */
+@Composable
+internal fun cardBorder() =
+    BorderStroke(CARD_BORDER_WIDTH, MaterialTheme.lakeColors.stone.cardBorder)
+
+/**
+ * The card's icon in a disc ([iconSize] 18 dp, 20 for the check-in's heart): teal, and the heart
+ * warm at night (Figma M3, Home · Dusk).
+ */
 @Composable
 internal fun CardBadge(@DrawableRes icon: Int, iconSize: Dp = BADGE_ICON_SIZE) {
+  val stone = MaterialTheme.lakeColors.stone
+  val heart = icon == R.drawable.ic_heart
   Box(
-      Modifier.size(BADGE_SIZE).background(MaterialTheme.colorScheme.primary, CircleShape),
+      Modifier.size(BADGE_SIZE)
+          .background(if (heart) stone.heartBadge else stone.badge, CircleShape),
       contentAlignment = Alignment.Center,
   ) {
     Icon(
         painterResource(icon),
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.onPrimary,
+        tint = if (heart) stone.onHeartBadge else stone.onBadge,
         modifier = Modifier.size(iconSize),
     )
   }
@@ -308,7 +329,7 @@ private fun FrequencyChip(text: String) {
       style = MaterialTheme.typography.cardChip,
       color = MaterialTheme.colorScheme.onSurface,
       modifier =
-          Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, CHIP_SHAPE)
+          Modifier.background(MaterialTheme.lakeColors.stone.chip, CHIP_SHAPE)
               .padding(horizontal = 10.dp, vertical = Spacing.xs),
   )
 }
@@ -384,6 +405,9 @@ private fun NothingPlannedCard(
 
 /** The Figma's teal disc behind each card's icon, and the icon in it. */
 private val BADGE_SIZE = 36.dp
+
+/** The hairline around the patient's cards (Figma M3: 1 dp, ink at 8 %). */
+private val CARD_BORDER_WIDTH = 1.dp
 private val BADGE_ICON_SIZE = 18.dp
 
 /** The Figma's chevron after "Planning" and "N more". */

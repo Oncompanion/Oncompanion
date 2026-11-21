@@ -1,5 +1,6 @@
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: Claude Code <noreply@anthropic.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.overview
 
@@ -67,6 +68,10 @@ import com.github.se.oncompanion.ui.theme.LightLakeColors
 import com.github.se.oncompanion.ui.theme.OncompanionTheme
 import com.github.se.oncompanion.ui.theme.PrimaryContainerDark
 import com.github.se.oncompanion.ui.theme.PrimaryContainerLight
+import com.github.se.oncompanion.ui.theme.StoneCardDark
+import com.github.se.oncompanion.ui.theme.StoneCardLight
+import com.github.se.oncompanion.ui.theme.StoneDockDark
+import com.github.se.oncompanion.ui.theme.StoneDockLight
 import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestDark
 import com.github.se.oncompanion.ui.theme.SurfaceContainerLowestLight
 import java.time.Clock
@@ -1226,31 +1231,39 @@ class OverviewScreenTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun patientCardsAreWhite_inBothThemes() {
+  fun patientCardsUseTheStonePalette_inBothThemes() {
     var dark by mutableStateOf(false)
     var state by mutableStateOf(loaded)
     composeTestRule.setContent {
       OncompanionTheme(darkTheme = dark) { OverviewContent(state, {}, {}, {}, {}) }
     }
-    listOf(false to SurfaceContainerLowestLight, true to SurfaceContainerLowestDark).forEach {
-        (isDark, card) ->
-      dark = isDark
-      listOf(
-              loaded.copy(nextUp = nextUp, todayMedications = listOf(medication("a"))) to
-                  listOf(C.Tag.overview_next_up, C.Tag.overview_medications),
-              loaded to listOf(C.Tag.overview_nothing_planned),
-          )
-          .forEach { (shown, tags) ->
-            state = shown
-            composeTestRule.waitForIdle()
-            tags.forEach { tag ->
-              // In the card's bottom-left corner padding, away from the badge and the text
-              val node = composeTestRule.onNodeWithTag(tag).performScrollTo()
-              val height = node.fetchSemanticsNode().size.height
-              val y = with(composeTestRule.density) { height.toDp() } - 6.dp
-              assertSameColor("$tag, dark=$isDark", card, node.colorAt(24.dp, y))
-            }
-          }
-    }
+    // At night the check-in dock is lighter than the other cards (Figma M3, Home · Dusk)
+    listOf(
+            Triple(false, StoneCardLight, StoneDockLight),
+            Triple(true, StoneCardDark, StoneDockDark),
+        )
+        .forEach { (isDark, card, dock) ->
+          dark = isDark
+          listOf(
+                  loaded.copy(nextUp = nextUp, todayMedications = listOf(medication("a"))) to
+                      listOf(
+                          C.Tag.overview_next_up to card,
+                          C.Tag.overview_medications to card,
+                          C.Tag.overview_check_in to dock,
+                      ),
+                  loaded to listOf(C.Tag.overview_nothing_planned to card),
+              )
+              .forEach { (shown, cards) ->
+                state = shown
+                composeTestRule.waitForIdle()
+                cards.forEach { (tag, color) ->
+                  // In the card's bottom-left corner padding, away from the badge and the text
+                  val node = composeTestRule.onNodeWithTag(tag).performScrollTo()
+                  val height = node.fetchSemanticsNode().size.height
+                  val y = with(composeTestRule.density) { height.toDp() } - 6.dp
+                  assertSameColor("$tag, dark=$isDark", color, node.colorAt(24.dp, y))
+                }
+              }
+        }
   }
 }

@@ -16,6 +16,36 @@ import androidx.compose.ui.graphics.Color
 @Immutable data class Horizon(val top: Color, val bottom: Color)
 
 /**
+ * The stone palette of the patient's Overview (Figma M3, Home · Dawn and Dusk): a warm grey page
+ * under the day's cards.
+ *
+ * @property page the page behind the cards
+ * @property card the Next up and medications cards
+ * @property cardBorder the hairline around a card, so it stays distinct from the page by day;
+ *   transparent at night, where the cards are darker than the page
+ * @property dock the "How do you feel?" check-in card, lighter than the other cards at night
+ * @property chip a medication's frequency chip
+ * @property tile a check-in tile
+ * @property badge the disc behind a card's icon
+ * @property onBadge the icon in [badge]
+ * @property heartBadge the disc behind the check-in's heart, warm at night
+ * @property onHeartBadge the heart in [heartBadge]
+ */
+@Immutable
+data class StoneColors(
+    val page: Color,
+    val card: Color,
+    val cardBorder: Color,
+    val dock: Color,
+    val chip: Color,
+    val tile: Color,
+    val badge: Color,
+    val onBadge: Color,
+    val heartBadge: Color,
+    val onHeartBadge: Color,
+)
+
+/**
  * The theme's colors that Material 3 has no role for, so screens and illustrations still take every
  * color from the theme, in light and dark.
  *
@@ -25,6 +55,7 @@ import androidx.compose.ui.graphics.Color
  * @property dusk the illustrations from 18:00 to 05:00
  * @property onHorizon text drawn on an illustration, at any time of day
  * @property hull the hull of the boats on the lake (members' boats, the illustrations)
+ * @property stone the patient's Overview
  */
 @Immutable
 data class LakeColors(
@@ -34,6 +65,7 @@ data class LakeColors(
     val dusk: Horizon,
     val onHorizon: Color,
     val hull: Color,
+    val stone: StoneColors,
 )
 
 internal val LightLakeColors =
@@ -44,6 +76,19 @@ internal val LightLakeColors =
         dusk = Horizon(HorizonDuskTopLight, HorizonDuskBottomLight),
         onHorizon = OnHorizonLight,
         hull = LakeHullLight,
+        stone =
+            StoneColors(
+                page = StonePageLight,
+                card = StoneCardLight,
+                cardBorder = StoneCardBorderLight,
+                dock = StoneDockLight,
+                chip = StoneChipLight,
+                tile = StoneTileLight,
+                badge = StoneBadgeLight,
+                onBadge = StoneOnBadgeLight,
+                heartBadge = StoneHeartBadgeLight,
+                onHeartBadge = StoneOnHeartBadgeLight,
+            ),
     )
 
 internal val DarkLakeColors =
@@ -54,6 +99,19 @@ internal val DarkLakeColors =
         dusk = Horizon(HorizonDuskTopDark, HorizonDuskBottomDark),
         onHorizon = OnHorizonDark,
         hull = LakeHullDark,
+        stone =
+            StoneColors(
+                page = StonePageDark,
+                card = StoneCardDark,
+                cardBorder = StoneCardBorderDark,
+                dock = StoneDockDark,
+                chip = StoneChipDark,
+                tile = StoneTileDark,
+                badge = StoneBadgeDark,
+                onBadge = StoneOnBadgeDark,
+                heartBadge = StoneHeartBadgeDark,
+                onHeartBadge = StoneOnHeartBadgeDark,
+            ),
     )
 
 // Light by default, so a composable shown without OncompanionTheme (e.g. in a test) still draws.

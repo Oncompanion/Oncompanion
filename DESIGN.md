@@ -47,6 +47,16 @@ colors:
   dark-surface-container: "#1F2629"
   dark-on-surface: "#E3E6E7"
   dark-on-surface-variant: "#BCC6CB"
+  stone-page: "#E2DDD5"
+  stone-card: "#FAF8F5"
+  stone-card-border: "#1C252A14"
+  stone-chip: "#E6E1D8"
+  stone-tile: "#E6E1D8"
+  dark-stone-page: "#1C252A"
+  dark-stone-card: "#0F1416"
+  dark-stone-dock: "#26343C"
+  dark-stone-chip: "#26343C"
+  dark-stone-tile: "#1F2629"
 typography:
   display-small:
     fontFamily: "Figtree, Roboto, sans-serif"
@@ -286,6 +296,9 @@ Warm off-white surface (`#FBF8F4`), white cards (`#FFFFFF`), ink (`#1F2A30`) and
 
 ### Horizon
 The *Horizon* variables give each time of day its sky and lake: dawn 05:00–11:00, day 11:00–18:00, dusk 18:00–05:00, in both themes. Text on the illustrations always uses *On Horizon*.
+
+### Stone
+The patient's Overview sits on a warm stone page (`#E2DDD5`; dark `#1C252A`) under off-white cards (`#FAF8F5`, with a 1 dp hairline of ink at 8 %; dark `#0F1416`, no hairline). At night the "How do you feel?" dock is lighter than the other cards (`#26343C`), and the check-in's heart sits on a Dawn disc (`#6B3B1F`) instead of teal. Frequency chips and check-in tiles are a darker stone (`#E6E1D8`; dark chips `#26343C`, tiles `#1F2629`). Card badges are teal by day and the dark primary container (`#134F5B`) at night. In code: `MaterialTheme.lakeColors.stone`.
 
 ### Dark theme
 Every role has a Dark value in the variables (surface `#151B1E`, primary `#9AD0DC`, primary container `#134F5B`). The dark theme is designed from those values, never by inverting colours. The scan camera is always dark.
