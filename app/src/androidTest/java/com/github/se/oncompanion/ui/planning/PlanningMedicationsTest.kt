@@ -1,5 +1,6 @@
 // Co-authored-by: Codex <noreply@openai.com>
 // Co-authored-by: ChatGPT <noreply@openai.com>
+// Co-authored-by: Claude Code <noreply@anthropic.com>
 
 package com.github.se.oncompanion.ui.planning
 
@@ -25,6 +26,7 @@ import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.github.se.oncompanion.utils.awaitDisplayed
 import com.google.firebase.firestore.Source
 import java.io.File
+import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
@@ -54,6 +56,12 @@ class PlanningMedicationsTest {
     val db = FirebaseEmulator.firestore
     val repository = MedicationRepositoryFirestore(db)
     val today = LocalDate.now()
+    // Planning starts from this clock, so a run crossing midnight can't open it on another day
+    val clock =
+        Clock.fixed(
+            today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            ZoneId.systemDefault(),
+        )
     val a =
         Medication(
             "a",
@@ -95,7 +103,9 @@ class PlanningMedicationsTest {
         patient
       }
     }
-    compose.setContent { OncompanionTheme { AppNavHost(startRoute = Route.PLANNING) } }
+    compose.setContent {
+      OncompanionTheme { AppNavHost(startRoute = Route.PLANNING, clock = clock) }
+    }
     awaitMedication(today, a.name)
     compose.onNodeWithText(a.name).assertIsDisplayed()
     compose.onNodeWithText("Frequency: Mondays and Thursdays").assertIsDisplayed()

@@ -24,10 +24,10 @@ import com.github.se.oncompanion.model.medication.FakeMedicationRepository
 import com.github.se.oncompanion.model.medication.MedicationRepositoryProvider
 import com.github.se.oncompanion.model.user.UserProfileRepositoryProvider
 import com.github.se.oncompanion.resources.C
+import com.github.se.oncompanion.ui.PlannedDay
 import com.github.se.oncompanion.ui.auth.FakeAuthRepository
 import com.github.se.oncompanion.ui.navigation.*
 import com.github.se.oncompanion.ui.planning.PlanningDates
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -77,6 +77,7 @@ class AppointmentNavigationTest {
       AppNavHost(
           navController = nav,
           startRoute = startRoute,
+          clock = PlannedDay.clock,
       )
     }
   }
@@ -92,7 +93,7 @@ class AppointmentNavigationTest {
   fun selectedDayPrefillsFormAndCancelReturnsWithoutWriting() {
     show()
     compose.onNodeWithTag(C.Tag.planning_next).performClick()
-    val day = LocalDate.now().plusWeeks(1)
+    val day = PlannedDay.today.plusWeeks(1)
     compose.onNodeWithTag(C.Tag.planning_add).performClick()
     compose
         .onNodeWithTag(C.Tag.appointment_date)
@@ -133,7 +134,7 @@ class AppointmentNavigationTest {
   @Test
   fun savedDateResultChangesSelectionAndIsConsumed() {
     show()
-    val savedDay = LocalDate.now().plusWeeks(2)
+    val savedDay = PlannedDay.today.plusWeeks(2)
     // Exercise the same dated route used by Add, starting from an existing Planning entry.
     compose.runOnIdle { NavigationActions(nav).navigateTo(Screen.appointmentAdd(savedDay)) }
     fill("Later visit")
@@ -160,7 +161,7 @@ class AppointmentNavigationTest {
   /** Detail navigation retains the selected non-current day and the existing calendar entry. */
   @Test
   fun planningDetailBackKeepsSelectedDay() {
-    val day = LocalDate.now().plusWeeks(1)
+    val day = PlannedDay.today.plusWeeks(1)
     repository.seed(
         "uid-patient",
         Appointment(
@@ -189,7 +190,7 @@ class AppointmentNavigationTest {
         Appointment(
             "overview-visit",
             "Overview visit",
-            LocalDate.now().plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            PlannedDay.today.plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
             AppointmentType.TREATMENT,
         ),
     )
@@ -223,7 +224,7 @@ class AppointmentNavigationTest {
   /** Returning from details retains a scrolled agenda instead of jumping to its first row. */
   @Test
   fun detailBackKeepsAgendaScroll() {
-    val day = LocalDate.now()
+    val day = PlannedDay.today
     repository.seed(
         "uid-patient",
         *Array(25) { index ->
@@ -247,7 +248,7 @@ class AppointmentNavigationTest {
   /** Editing returns to live details; Back keeps the originating day and Overview also updates. */
   @Test
   fun editSaveReturnsToDetailsAndPreservesPlanningDay() {
-    val day = LocalDate.now().plusWeeks(1)
+    val day = PlannedDay.today.plusWeeks(1)
     repository.seed(
         "uid-patient",
         Appointment(
@@ -281,7 +282,7 @@ class AppointmentNavigationTest {
   /** Cancelling an invalid edit writes nothing and Back still returns directly to Overview. */
   @Test
   fun overviewEditCancelKeepsAppointment() {
-    val day = LocalDate.now().plusDays(1)
+    val day = PlannedDay.today.plusDays(1)
     repository.seed(
         "uid-patient",
         Appointment(
@@ -307,7 +308,7 @@ class AppointmentNavigationTest {
   /** A save completed beneath another destination is consumed only when the edit form resumes. */
   @Test
   fun backgroundEditCompletionWaitsForItsOwnDestination() {
-    val day = LocalDate.now()
+    val day = PlannedDay.today
     repository.seed(
         "uid-patient",
         Appointment(
@@ -375,7 +376,7 @@ class AppointmentNavigationTest {
   @Test
   @OptIn(ExperimentalMaterial3Api::class)
   fun rescheduledAppointmentKeepsOriginAndMovesToChosenDay() {
-    val originalDay = LocalDate.now().plusWeeks(1)
+    val originalDay = PlannedDay.today.plusWeeks(1)
     // Pick a different week in the displayed month so this works across month/year boundaries.
     val movedDay =
         if (originalDay.dayOfMonth <= 14) originalDay.plusWeeks(2) else originalDay.minusWeeks(2)
@@ -440,7 +441,7 @@ class AppointmentNavigationTest {
   /** Cancel preserves storage; confirmation returns to the same selected Planning day. */
   @Test
   fun deleteFromPlanningKeepsSelectionAndRemovesRow() {
-    val day = LocalDate.now().plusWeeks(1)
+    val day = PlannedDay.today.plusWeeks(1)
     val appointment =
         Appointment(
             "delete-visit",
@@ -466,7 +467,7 @@ class AppointmentNavigationTest {
   /** Deleting one appointment preserves the other appointment on the selected Planning day. */
   @Test
   fun deleteFromPlanningKeepsOtherAppointmentOnSameDay() {
-    val day = LocalDate.now().plusWeeks(1)
+    val day = PlannedDay.today.plusWeeks(1)
     val first =
         Appointment(
             "first-visit",
@@ -503,7 +504,7 @@ class AppointmentNavigationTest {
   /** Overview immediately chooses the next remaining appointment after confirmed deletion. */
   @Test
   fun deleteFromOverviewRefreshesNextAppointment() {
-    val time = LocalDate.now().plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+    val time = PlannedDay.today.plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
     repository.seed(
         "uid-patient",
         Appointment("first", "First visit", time, AppointmentType.CONSULTATION),
@@ -522,7 +523,7 @@ class AppointmentNavigationTest {
   /** A paused detail cannot pop another destination; returning delivers completion once. */
   @Test
   fun delayedDeletionDoesNotPopAnotherScreen() {
-    val time = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+    val time = PlannedDay.today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
     repository.seed(
         "uid-patient",
         Appointment("visit", "Delayed visit", time, AppointmentType.OTHER),
@@ -549,7 +550,7 @@ class AppointmentNavigationTest {
         Appointment(
             "combined-visit",
             "Original visit",
-            LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
+            PlannedDay.today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant(),
             AppointmentType.OTHER,
         ),
     )
