@@ -46,8 +46,26 @@ data class PlanningItem(
 
 /** A recorded time or a calendar day without an inferred intake time. */
 sealed interface PlanningTiming {
-  /** A timed appointment or event, displayed in the phone's time zone. */
-  data class Timed(val instant: Instant) : PlanningTiming
+  /**
+   * A timed appointment or event, displayed in the phone's time zone.
+   *
+   * @property instant when it starts
+   * @property end when it ends, after [instant]; `null` when unknown, as in hand-built entries: the
+   *   Planning sources always give one, so the calendar can draw how long it lasts
+   */
+  data class Timed(val instant: Instant, val end: Instant? = null) : PlanningTiming {
+    init {
+      require(end == null || end > instant) { "An entry must end after it starts" }
+    }
+
+    /**
+     * Whether it starts within [from] (included) and [until] (excluded), or started before [from]
+     * and is still going on then, so an entry under way when a calendar range starts shows in it.
+     * Without an [end], only its start counts.
+     */
+    fun overlaps(from: Instant, until: Instant): Boolean =
+        instant < until && (instant >= from || (end != null && end > from))
+  }
 
   /** A medication listed on this calendar day, not an individual dose that is due. */
   data class DateOnly(val date: LocalDate) : PlanningTiming

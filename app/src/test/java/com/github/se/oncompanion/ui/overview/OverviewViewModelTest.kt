@@ -543,6 +543,36 @@ class OverviewViewModelTest {
   }
 
   @Test
+  fun anEventWithAnEndTime_isNowUntilItEnds() {
+    val clock = TestClock(now)
+    val start = now.minusMinutes(10)
+    val workshop =
+        event("workshop", start)
+            .copy(
+                timing =
+                    PlanningTiming.Timed(
+                        start.toInstant(zone),
+                        start.plusMinutes(90).toInstant(zone),
+                    )
+            )
+    val vm = viewModel(planning = planning(workshop), clock = clock)
+
+    // (time, status): an hour after it started, the 90-minute workshop is still going on
+    val cases =
+        listOf(
+            now.plusMinutes(50) to TodayItemStatus.NOW,
+            now.plusMinutes(79) to TodayItemStatus.NOW,
+            now.plusMinutes(80) to TodayItemStatus.DONE,
+        )
+    for ((time, expected) in cases) {
+      clock.time = time
+      vm.refreshNow()
+
+      assertEquals("At $time", expected, statusesOf(vm)["Event workshop"])
+    }
+  }
+
+  @Test
   fun whenEverythingIsOver_nothingIsNext() {
     val vm =
         viewModel(planning = planning(event("a", now.withHour(6)), event("b", now.withHour(7))))
@@ -658,6 +688,34 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(TodayItemStatus.DONE, statusesOf(vm)["Appointment blood"])
+    following.cancel()
+  }
+
+  @Test
+  fun followToday_marksAnEventDoneAtItsEndTime() = runTestOnVirtualMain {
+    val clock = VirtualClock(testScheduler, now.toInstant(zone), zone)
+    // From 8:30 to 10:00: still happening an hour after it started
+    val start = now.minusMinutes(30)
+    val workshop =
+        event("workshop", start)
+            .copy(
+                timing =
+                    PlanningTiming.Timed(
+                        start.toInstant(zone),
+                        start.plusMinutes(90).toInstant(zone),
+                    )
+            )
+    val vm = viewModel(planning = planning(workshop), clock = clock)
+    val following = vm.followToday()
+    runCurrent()
+
+    advanceTimeBy(59.minutes)
+    runCurrent()
+    assertEquals(TodayItemStatus.NOW, statusesOf(vm)["Event workshop"])
+
+    advanceTimeBy(1.minutes)
+    runCurrent()
+    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["Event workshop"])
     following.cancel()
   }
 

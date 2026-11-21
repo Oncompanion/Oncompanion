@@ -49,7 +49,11 @@ class AppointmentPlanningSourceTest {
         listOf("early", "a", "b"),
         emissions.last().map { (it.source as PlanningSource.Appointment).appointmentId },
     )
-    assertEquals(PlanningTiming.Timed(early.scheduledAt), emissions.last().first().timing)
+    // An appointment records no end: it lasts an hour
+    assertEquals(
+        PlanningTiming.Timed(early.scheduledAt, early.scheduledAt.plusSeconds(3600)),
+        emissions.last().first().timing,
+    )
     assertEquals(early.title, emissions.last().first().title)
     assertEquals("HUG", emissions.last().first().subtitle)
     assertNull(emissions.last()[1].subtitle)
@@ -57,14 +61,19 @@ class AppointmentPlanningSourceTest {
     assertTrue(emissions.last().all { it.frequency == null })
   }
 
-  /** Includes exactly the requested calendar day during short and long daylight-saving days. */
+  /**
+   * Includes the appointments of the requested calendar day, and the one still going on when it
+   * starts, during short and long daylight-saving days.
+   */
   @Test
   fun filtersLocalDayBoundariesAcrossBothDaylightSavingTransitions() = runTest {
     for (date in listOf(LocalDate.of(2026, 3, 29), day)) {
       val requested = PlanningRange(date, date.plusDays(1), zone)
       val fixtures =
           listOf(
-              appointment("before-$date", requested.startInclusive.minusNanos(1)),
+              // Ends exactly when the day starts
+              appointment("ended-$date", requested.startInclusive.minusSeconds(3600)),
+              appointment("underWay-$date", requested.startInclusive.minusNanos(1)),
               appointment("start-$date", requested.startInclusive),
               appointment("last-$date", requested.endExclusive.minusNanos(1)),
               appointment("end-$date", requested.endExclusive),
@@ -77,12 +86,45 @@ class AppointmentPlanningSourceTest {
           }
       runCurrent()
       assertEquals(
-          listOf("start-$date", "last-$date"),
+          listOf("underWay-$date", "start-$date", "last-$date"),
           latest.map { (it.source as PlanningSource.Appointment).appointmentId },
       )
-      assertTrue(latest.all { it.timing.dateIn(zone) == date })
       observation.cancel()
     }
+  }
+
+  /** The hour is real time: on the night the clocks go forward, 1:30 ends at 3:30 on the clock. */
+  @Test
+  fun anAppointmentLastsAnHourOfRealTime_onTheNightTheClocksGoForward() = runTest {
+    val night = LocalDate.of(2026, 3, 29)
+    val start = night.atTime(1, 30).atZone(zone).toInstant()
+    appointments.seed("patient", appointment("night", start))
+
+    val timing =
+        source
+            .observeItems("patient", PlanningRange(night, night.plusDays(1), zone))
+            .first()
+            .single()
+            .timing as PlanningTiming.Timed
+
+    assertEquals(night.atTime(3, 30), timing.end!!.atZone(zone).toLocalDateTime())
+  }
+
+  /** The latest appointment Firestore can store still gets its hour, past year 9999. */
+  @Test
+  fun theLatestPossibleAppointment_stillGetsItsHour() = runTest {
+    val last = LocalDate.of(9999, 12, 31)
+    appointments.seed("patient", appointment("last", Appointment.MAX_SCHEDULED_AT))
+
+    val items =
+        source
+            .observeItems("patient", PlanningRange(last, last.plusDays(1), ZoneId.of("UTC")))
+            .first()
+
+    assertEquals(
+        Appointment.MAX_SCHEDULED_AT.plusSeconds(3600),
+        (items.single().timing as PlanningTiming.Timed).end,
+    )
   }
 
   /** Receives later additions and assigns their date using the caller's display zone. */

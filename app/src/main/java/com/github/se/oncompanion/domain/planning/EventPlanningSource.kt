@@ -10,7 +10,8 @@ import com.github.se.oncompanion.model.planning.PlanningItem
 import com.github.se.oncompanion.model.planning.PlanningRange
 import com.github.se.oncompanion.model.planning.PlanningRepository
 import com.github.se.oncompanion.model.planning.PlanningSource
-import com.github.se.oncompanion.model.planning.PlanningTiming
+import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -19,13 +20,21 @@ import kotlinx.coroutines.flow.combine
  * their place below the title. Past weeks show the confirmed events that took place then. Whose
  * events they are is decided by the caller ([ObserveCarePlanning]): the signed-in patient, or the
  * patient a caregiver follows.
+ *
+ * An event ends at its end time, or [DEFAULT_PLANNING_DURATION] after it starts when that is
+ * unknown. One still going on when the range starts is shown too, if it started at most [LOOKBACK]
+ * before: events can only be queried by their start, and the Ligue's events last a few hours. An
+ * event over several days is missed by a range that starts more than [LOOKBACK] after it.
  */
 class EventPlanningSource(
     private val events: EventRepository,
     private val registrations: EventRegistrationRepository,
 ) : PlanningRepository {
 
-  /** [ownerUid]'s confirmed events starting within [range], as timed entries, updated live. */
+  /**
+   * [ownerUid]'s confirmed events within [range], including those under way when it starts, as
+   * timed entries, updated live.
+   */
   override fun observeItems(
       ownerUid: String,
       range: PlanningRange,
@@ -33,7 +42,7 @@ class EventPlanningSource(
   ): Flow<List<PlanningItem>> =
       combine(
           registrations.observeRegisteredEventIds(ownerUid),
-          events.observeEvents(range.startInclusive, range.endExclusive),
+          events.observeEvents(queryStart(range), queryEnd(range)),
       ) { confirmedIds, eventsInRange ->
         eventsInRange
             .filter { it.id in confirmedIds }
@@ -46,8 +55,36 @@ class EventPlanningSource(
   private fun Event.toPlanningItem(range: PlanningRange) =
       PlanningItem(
           source = PlanningSource.Event(id),
-          timing = PlanningTiming.Timed(startDateTime.atZone(range.zoneId).toInstant()),
+          timing =
+              timedOccurrence(
+                  startDateTime.atZone(range.zoneId).toInstant(),
+                  endDateTime?.atZone(range.zoneId)?.toInstant(),
+              ),
           title = title,
           subtitle = place.takeIf { it.isNotBlank() },
       )
+
+  /**
+   * [LOOKBACK] before the range, so the events under way when it starts are read, but never before
+   * the earliest time Firestore can store: in Zurich, 1 January of year 1 starts before it.
+   */
+  private fun queryStart(range: PlanningRange): Instant =
+      maxOf(range.startInclusive - LOOKBACK, EARLIEST_QUERY_START)
+
+  /**
+   * The end of the range, but never after the latest time Firestore can store: west of UTC (New
+   * York), the range of December 9999 ends after it.
+   */
+  private fun queryEnd(range: PlanningRange): Instant = minOf(range.endExclusive, LATEST_QUERY_END)
+
+  private companion object {
+    /** How long before the range an event under way at its start may have started. */
+    val LOOKBACK: Duration = Duration.ofDays(1)
+
+    /** The earliest instant a Firestore timestamp can hold. */
+    val EARLIEST_QUERY_START: Instant = Instant.parse("0001-01-01T00:00:00Z")
+
+    /** The latest instant a Firestore timestamp can hold. */
+    val LATEST_QUERY_END: Instant = Instant.parse("9999-12-31T23:59:59.999999999Z")
+  }
 }

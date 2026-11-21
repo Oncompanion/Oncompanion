@@ -34,10 +34,13 @@ data class PlanningRange(
   operator fun contains(date: LocalDate): Boolean =
       date >= startDateInclusive && date < endDateExclusive
 
-  /** Filters either timing representation without inventing a medication time. */
+  /**
+   * Filters either timing representation without inventing a medication time. A timed entry is in
+   * the range from its start to its end, so one still going on when the range starts is too.
+   */
   operator fun contains(timing: PlanningTiming): Boolean =
       when (timing) {
-        is PlanningTiming.Timed -> timing.instant in this
+        is PlanningTiming.Timed -> timing.overlaps(startInclusive, endExclusive)
         is PlanningTiming.DateOnly -> timing.date in this
       }
 }

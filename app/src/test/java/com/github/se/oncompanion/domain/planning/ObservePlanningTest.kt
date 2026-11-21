@@ -118,6 +118,21 @@ class ObservePlanningTest {
   }
 
   @Test
+  fun anEntryStillGoingOnWhenTheRangeStarts_isKeptAndComesFirst() = runTest {
+    val sundayNight = monday.minusDays(1).atTime(23, 0).atZone(zone).toInstant()
+    val underWay =
+        appointment("under-way", monday.minusDays(1), 23)
+            .copy(timing = PlanningTiming.Timed(sundayNight, sundayNight.plusSeconds(7200)))
+
+    val items =
+        ObservePlanning(source(appointment("inside", monday, 0), underWay))
+            .observeItems("alice", week)
+            .first()
+
+    assertEquals(listOf("under-way", "inside"), items.map { it.id })
+  }
+
+  @Test
   fun noSources_givesAnEmptyList() = runTest {
     assertTrue(ObservePlanning(emptyList()).observeItems("alice", week).first().isEmpty())
   }
