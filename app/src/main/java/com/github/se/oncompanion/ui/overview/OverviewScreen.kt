@@ -158,9 +158,9 @@ fun OverviewScreen(
     onSwitchPatient: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  // The ViewModel outlives navigation and backgrounding: keep the date, greeting and statuses
-  // current when the Overview comes back, and move to the new day at each midnight while it is on
-  // screen
+  // The ViewModel outlives navigation and backgrounding: keep the date, greeting, Next up and
+  // statuses current when the Overview comes back, and while it is on screen each time an entry
+  // starts or ends and at midnight
   LifecycleResumeEffect(viewModel) {
     val following = viewModel.followToday()
     onPauseOrDispose { following.cancel() }

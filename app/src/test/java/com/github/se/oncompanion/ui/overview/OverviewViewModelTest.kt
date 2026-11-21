@@ -33,6 +33,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -382,7 +383,7 @@ class OverviewViewModelTest {
   // ----- Patient's day (Overview UX Refactor) -----
 
   @Test
-  fun nextUp_isTodaysNextEventOrAppointment_elseTheNextAppointment() {
+  fun nextUp_isTheNextEventOrAppointment_todayOrLater() {
     val today = now.toLocalDate()
     val tomorrow = today.plusDays(1)
     listOf(
@@ -399,12 +400,18 @@ class OverviewViewModelTest {
                 appointment("past", now.withHour(8)),
                 appointment("later", now.plusDays(1)),
             ) to "later",
-            // Nothing more today: the next appointment, even weeks away, but not a later event
+            // Nothing more today: the next appointment or registered event, even weeks away
             listOf(
                 event("tomorrow", tomorrow.atTime(10, 0)),
                 appointment("check-up", now.plusWeeks(3)),
+            ) to "tomorrow",
+            listOf(
+                appointment("check-up", tomorrow.atTime(9, 0)),
+                event("tomorrow", tomorrow.atTime(10, 0)),
             ) to "check-up",
-            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to null,
+            listOf(appointment("check-up", now.plusWeeks(3))) to "check-up",
+            listOf(event("tomorrow", tomorrow.atTime(10, 0)), medication("m")) to "tomorrow",
+            listOf(medication("m")) to null,
         )
         .forEach { (items, expected) ->
           val vm = viewModel(planning = planning(*items.toTypedArray()))
@@ -601,6 +608,179 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(now.withHour(20), vm.uiState.value.now)
+    following.cancel()
+  }
+
+  @Test
+  fun followToday_movesNextUpOnWhenItStarts_withoutLeavingTheScreen() {
+    listOf(
+            // The appointment at 10:00 is next until 10:00 exactly, then the 12:00 event
+            listOf(appointment("blood", now.withHour(10)), event("yoga", now.withHour(12))),
+            // Two entries starting together are both passed at once
+            listOf(
+                appointment("blood", now.withHour(10)),
+                event("walk", now.withHour(10)),
+                event("yoga", now.withHour(12)),
+            ),
+        )
+        .forEach { items ->
+          runTestOnVirtualMain {
+            val clock = VirtualClock(testScheduler, now.toInstant(zone), zone)
+            val vm = viewModel(planning = planning(*items.toTypedArray()), clock = clock)
+            val following = vm.followToday()
+            runCurrent()
+
+            advanceTimeBy(59.minutes)
+            runCurrent()
+            // Nothing changed yet, so it hasn't refreshed: no timer every minute
+            assertEquals(items.toString(), now, vm.uiState.value.now)
+            assertEquals(items.toString(), now.withHour(10), vm.uiState.value.nextUp?.dateTime)
+
+            advanceTimeBy(1.minutes)
+            runCurrent()
+            assertEquals(items.toString(), "yoga", vm.uiState.value.nextUp?.id)
+            following.cancel()
+          }
+        }
+  }
+
+  @Test
+  fun followToday_marksAnEntryDoneWhenItEnds() = runTestOnVirtualMain {
+    val clock = VirtualClock(testScheduler, now.toInstant(zone), zone)
+    // Started at 8:30, so happening until 9:30
+    val vm =
+        viewModel(planning = planning(appointment("blood", now.minusMinutes(30))), clock = clock)
+    val following = vm.followToday()
+    runCurrent()
+    assertEquals(TodayItemStatus.NOW, statusesOf(vm)["Appointment blood"])
+
+    advanceTimeBy(30.minutes)
+    runCurrent()
+
+    assertEquals(TodayItemStatus.DONE, statusesOf(vm)["Appointment blood"])
+    following.cancel()
+  }
+
+  @Test
+  fun followToday_plansItsNextRefreshAgain_whenTheEntriesChange() {
+    val blood = appointment("blood", now.withHour(10))
+    val yoga = event("yoga", now.withHour(15))
+    val walk = event("walk", now.withHour(11))
+    // Without planning again, it would sleep until the start it first planned and miss the new one
+    data class Case(
+        val before: List<PlanningItem>,
+        val after: List<PlanningItem>,
+        val nextUpThen: String,
+        val wait: kotlin.time.Duration,
+        val nextUpAfter: String,
+    )
+    listOf(
+            // Added before the 15:00 it was waiting for: Next up moves on at 10:00
+            Case(listOf(yoga), listOf(yoga, blood), "blood", 1.hours, "yoga"),
+            // Moved from 11:00 to 9:30, before the 10:00 it was waiting for
+            Case(
+                listOf(blood, walk),
+                listOf(blood, event("walk", now.withHour(9).withMinute(30))),
+                "walk",
+                30.minutes,
+                "blood",
+            ),
+        )
+        .forEach { case ->
+          runTestOnVirtualMain {
+            val planning = planning(*case.before.toTypedArray())
+            val clock = VirtualClock(testScheduler, now.toInstant(zone), zone)
+            val vm = viewModel(planning = planning, clock = clock)
+            val following = vm.followToday()
+            runCurrent()
+
+            planning.items.value = case.after
+            runCurrent()
+            assertEquals(case.toString(), case.nextUpThen, vm.uiState.value.nextUp?.id)
+
+            advanceTimeBy(case.wait)
+            runCurrent()
+            assertEquals(case.toString(), case.nextUpAfter, vm.uiState.value.nextUp?.id)
+            following.cancel()
+          }
+        }
+  }
+
+  /** A [VirtualClock] whose time can be set back, as when the phone's time is changed. */
+  private class ShiftableClock(private val virtual: Clock) : Clock() {
+    var shift: java.time.Duration = java.time.Duration.ZERO
+
+    override fun getZone(): ZoneId = virtual.zone
+
+    override fun withZone(zone: ZoneId?): Clock = this
+
+    override fun instant(): Instant = virtual.instant().plus(shift)
+  }
+
+  @Test
+  fun followToday_followsAClockSetBack_andPlansAgainFromIt() = runTestOnVirtualMain {
+    val clock = ShiftableClock(VirtualClock(testScheduler, now.toInstant(zone), zone))
+    val vm =
+        viewModel(
+            planning = planning(appointment("a", now.withHour(10)), event("b", now.withHour(11))),
+            clock = clock,
+        )
+    val following = vm.followToday()
+    runCurrent()
+
+    // At 9:30 the phone's time is set back to 7:30
+    advanceTimeBy(30.minutes)
+    clock.shift = java.time.Duration.ofHours(-2)
+    // The refresh planned for 10:00 still runs, and reads 8:00
+    advanceTimeBy(30.minutes)
+    runCurrent()
+    assertEquals(now.withHour(8), vm.uiState.value.now)
+    assertEquals("a", vm.uiState.value.nextUp?.id)
+
+    // It plans again from the clock: "a" starts when the clock reads 10:00
+    advanceTimeBy(2.hours)
+    runCurrent()
+    assertEquals("b", vm.uiState.value.nextUp?.id)
+    following.cancel()
+  }
+
+  @Test
+  fun followToday_movesOn_inTheHourRepeatedWhenTheClocksGoBack(): Unit = runTestOnVirtualMain {
+    val zurich = ZoneId.of("Europe/Zurich")
+    // 25 October 2026, 02:10 the second time: at 03:00 summer time the clocks went back to 02:00
+    val clock = VirtualClock(testScheduler, Instant.parse("2026-10-25T01:10:00Z"), zurich)
+    val planning =
+        planning(
+            // 02:45, also the second time
+            PlanningItem(
+                PlanningSource.Appointment("blood"),
+                PlanningTiming.Timed(Instant.parse("2026-10-25T01:45:00Z")),
+                "Appointment blood",
+            ),
+            PlanningItem(
+                PlanningSource.Event("yoga"),
+                PlanningTiming.Timed(Instant.parse("2026-10-25T09:00:00Z")),
+                "Event yoga",
+            ),
+        )
+    val vm =
+        OverviewViewModel(
+            FakeAuthRepository(),
+            FakeUserProfileRepository(),
+            ownPlanning(planning),
+            clock,
+            zurich,
+        )
+    val following = vm.followToday()
+    runCurrent()
+    assertEquals("blood", vm.uiState.value.nextUp?.id)
+
+    // Planned in local times, the wake-up at 02:45 was read in summer time, already past: it never
+    // suspended and froze the screen
+    advanceTimeBy(35.minutes)
+    runCurrent()
+
+    assertEquals("yoga", vm.uiState.value.nextUp?.id)
     following.cancel()
   }
 
