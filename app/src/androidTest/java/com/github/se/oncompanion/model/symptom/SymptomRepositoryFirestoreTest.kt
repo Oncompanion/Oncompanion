@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertReturnsOffline
+import com.github.se.oncompanion.utils.assertReturnsWithoutServer
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -92,13 +94,6 @@ class SymptomRepositoryFirestoreTest {
 
   private suspend fun observeListOnce() =
       withTimeout(10_000) { repository.observeSymptoms(aliceUid).first() }
-
-  /** Runs [block] and returns how long it took, in milliseconds. */
-  private suspend fun timed(block: suspend () -> Unit): Long {
-    val start = System.currentTimeMillis()
-    block()
-    return System.currentTimeMillis() - start
-  }
 
   // ---- add / observe ----
 
@@ -286,10 +281,9 @@ class SymptomRepositoryFirestoreTest {
     awaitServerAck()
     EmulatorTestData.signIn("alice")
 
-    val elapsed = timed {
-      withTimeout(5_000) { repository.updateSymptom(bobUid, editedToHiccups(id)) }
+    assertReturnsOffline(db, "updateSymptom") {
+      repository.updateSymptom(bobUid, editedToHiccups(id))
     }
-    assertTrue("updateSymptom took $elapsed ms", elapsed < 1_000)
     awaitServerAck()
     awaitRejectionReported()
 
@@ -307,10 +301,9 @@ class SymptomRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
     try {
-      val elapsed = timed {
-        withTimeout(5_000) { repository.updateSymptom(aliceUid, editedToHiccups(id)) }
+      assertReturnsWithoutServer("updateSymptom") {
+        repository.updateSymptom(aliceUid, editedToHiccups(id))
       }
-      assertTrue("updateSymptom took $elapsed ms", elapsed < 1_000)
 
       // Shown in the detail and the journal while still offline
       assertSameContent(hiccups(), observeOnce(id))
@@ -392,8 +385,7 @@ class SymptomRepositoryFirestoreTest {
     EmulatorTestData.signIn("alice")
 
     lateinit var id: String
-    val elapsed = timed { withTimeout(5_000) { id = repository.addSymptom(bobUid, fatigue()) } }
-    assertTrue("addSymptom took $elapsed ms", elapsed < 1_000)
+    assertReturnsOffline(db, "addSymptom") { id = repository.addSymptom(bobUid, fatigue()) }
 
     awaitServerAck()
     awaitRejectionReported()
@@ -413,8 +405,7 @@ class SymptomRepositoryFirestoreTest {
     awaitServerAck()
     EmulatorTestData.signIn("alice")
 
-    val elapsed = timed { withTimeout(5_000) { repository.deleteSymptom(bobUid, id) } }
-    assertTrue("deleteSymptom took $elapsed ms", elapsed < 1_000)
+    assertReturnsOffline(db, "deleteSymptom") { repository.deleteSymptom(bobUid, id) }
     awaitServerAck()
     awaitRejectionReported()
 
@@ -498,8 +489,7 @@ class SymptomRepositoryFirestoreTest {
           async(Dispatchers.IO) {
             withTimeout(10_000) { repository.observeSymptoms(aliceUid).first { it.isNotEmpty() } }
           }
-      val elapsed = timed { withTimeout(5_000) { id = repository.addSymptom(aliceUid, fatigue()) } }
-      assertTrue("addSymptom took $elapsed ms", elapsed < 1_000)
+      assertReturnsWithoutServer("addSymptom") { id = repository.addSymptom(aliceUid, fatigue()) }
 
       val offline = observed.await().single()
       assertSameContent(fatigue(), offline)
@@ -521,8 +511,7 @@ class SymptomRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
     try {
-      val elapsed = timed { withTimeout(5_000) { repository.deleteSymptom(aliceUid, id) } }
-      assertTrue("deleteSymptom took $elapsed ms", elapsed < 1_000)
+      assertReturnsWithoutServer("deleteSymptom") { repository.deleteSymptom(aliceUid, id) }
 
       // Gone from the journal while still offline
       assertEquals(emptyList<SymptomEntry>(), observeListOnce())

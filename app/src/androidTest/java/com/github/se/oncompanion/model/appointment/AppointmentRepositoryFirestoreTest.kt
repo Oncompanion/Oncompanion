@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
+import com.github.se.oncompanion.utils.assertReturnsWithoutServer
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -46,7 +47,7 @@ class AppointmentRepositoryFirestoreTest {
     val changed = requireNotNull(storedAppointment(id)).copy(reminder = AppointmentReminder.NONE)
     db.disableNetwork().await()
     try {
-      withTimeout(5_000) { repository.updateAppointment(uid, changed) }
+      assertReturnsWithoutServer("updateAppointment") { repository.updateAppointment(uid, changed) }
       assertEquals(AppointmentReminder.NONE, storedAppointment(id)?.reminder)
     } finally {
       db.enableNetwork().await()
@@ -185,7 +186,7 @@ class AppointmentRepositoryFirestoreTest {
     val changed = original.copy(title = "Rescheduled", location = null, notes = null)
     db.disableNetwork().await()
     try {
-      withTimeout(5_000) { repository.updateAppointment(uid, changed) }
+      assertReturnsWithoutServer("updateAppointment") { repository.updateAppointment(uid, changed) }
       val visible =
           withTimeout(10_000) {
             repository.observeAppointment(uid, id).first { it?.title == changed.title }
@@ -284,7 +285,7 @@ class AppointmentRepositoryFirestoreTest {
     requireNotNull(storedAppointment(id))
     db.disableNetwork().await()
     try {
-      withTimeout(5_000) { repository.deleteAppointment(uid, id) }
+      assertReturnsWithoutServer("deleteAppointment") { repository.deleteAppointment(uid, id) }
       withTimeout(10_000) { repository.observeAppointment(uid, id).first { it == null } }
       assertFalse(collection().document(id).get(Source.CACHE).await().exists())
       assertTrue(
@@ -527,7 +528,9 @@ class AppointmentRepositoryFirestoreTest {
     lateinit var id: String
     db.disableNetwork().await()
     try {
-      id = withTimeout(5_000) { repository.addAppointment(uid, appointment()) }
+      assertReturnsWithoutServer("addAppointment") {
+        id = repository.addAppointment(uid, appointment())
+      }
       val entries =
           withTimeout(10_000) {
             repository.observeAppointments(uid).first { it.any { entry -> entry.id == id } }
@@ -656,7 +659,9 @@ class AppointmentRepositoryFirestoreTest {
     lateinit var id: String
     db.disableNetwork().await()
     try {
-      id = withTimeout(5_000) { repository.addAppointment(otherUid, appointment()) }
+      assertReturnsWithoutServer("addAppointment") {
+        id = repository.addAppointment(otherUid, appointment())
+      }
       assertTrue(
           db.collection("users")
               .document(otherUid)

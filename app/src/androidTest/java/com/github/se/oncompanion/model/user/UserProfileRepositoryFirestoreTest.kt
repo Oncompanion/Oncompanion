@@ -8,6 +8,8 @@ import com.github.se.oncompanion.model.session.RejectedWrites
 import com.github.se.oncompanion.utils.EmulatorTestData
 import com.github.se.oncompanion.utils.FirebaseEmulator
 import com.github.se.oncompanion.utils.assertEachRejectionIsReported
+import com.github.se.oncompanion.utils.assertReturnsOffline
+import com.github.se.oncompanion.utils.assertReturnsWithoutServer
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -99,13 +101,6 @@ class UserProfileRepositoryFirestoreTest {
     withTimeout(10_000) { while (!predicate(cachedSnapshot(uid))) delay(100) }
   }
 
-  /** Runs [block] and returns how long it took, in milliseconds. */
-  private suspend fun timed(block: suspend () -> Unit): Long {
-    val start = System.currentTimeMillis()
-    block()
-    return System.currentTimeMillis() - start
-  }
-
   // ---- create / get ----
 
   @Test
@@ -194,10 +189,9 @@ class UserProfileRepositoryFirestoreTest {
 
         db.disableNetwork().await()
         try {
-          val elapsed = timed {
-            assertEquals(online, withTimeout(5_000) { repository.getCachedProfile(aliceUid) })
+          assertReturnsWithoutServer("getCachedProfile") {
+            assertEquals(online, repository.getCachedProfile(aliceUid))
           }
-          assertTrue("getCachedProfile took $elapsed ms", elapsed < 1_000)
         } finally {
           db.enableNetwork().await()
         }
@@ -476,10 +470,9 @@ class UserProfileRepositoryFirestoreTest {
     val bobUid = EmulatorTestData.createUser("bob")
     EmulatorTestData.signIn("alice")
 
-    val elapsed = timed {
-      withTimeout(5_000) { repository.createProfile(alice().copy(uid = bobUid)) }
+    assertReturnsOffline(db, "createProfile") {
+      repository.createProfile(alice().copy(uid = bobUid))
     }
-    assertTrue("createProfile took $elapsed ms", elapsed < 1_000)
 
     awaitServerAck()
     awaitCache(bobUid) { it == null } // local write rolled back
@@ -494,7 +487,9 @@ class UserProfileRepositoryFirestoreTest {
     awaitServerAck()
     EmulatorTestData.createUser("bob") // bob stays signed in
 
-    withTimeout(5_000) { repository.updateProfile(alice().copy(firstName = "Hacked")) }
+    assertReturnsOffline(db, "updateProfile") {
+      repository.updateProfile(alice().copy(firstName = "Hacked"))
+    }
     awaitServerAck()
 
     EmulatorTestData.signIn("alice")
@@ -516,10 +511,9 @@ class UserProfileRepositoryFirestoreTest {
     )
     serverSnapshot(aliceUid) // load it into the local cache
 
-    val elapsed = timed {
-      withTimeout(5_000) { repository.updateProfile(alice().copy(firstName = "Alicia")) }
+    assertReturnsOffline(db, "updateProfile") {
+      repository.updateProfile(alice().copy(firstName = "Alicia"))
     }
-    assertTrue("updateProfile took $elapsed ms", elapsed < 1_000)
 
     awaitServerAck()
     awaitCache(aliceUid) {
@@ -600,19 +594,15 @@ class UserProfileRepositoryFirestoreTest {
   fun offlineWritesReturnImmediatelyAndSyncWhenBackOnline(): Unit = runBlocking {
     db.disableNetwork().await()
     try {
-      val createMs = timed { withTimeout(5_000) { repository.createProfile(alice()) } }
-      assertTrue("createProfile took $createMs ms", createMs < 1_000)
+      assertReturnsWithoutServer("createProfile") { repository.createProfile(alice()) }
 
       val cached = repository.getProfile(aliceUid)
       assertSameContent(alice(), cached)
       assertNull("createdAt is null until the server confirms", cached!!.createdAt)
 
-      val updateMs = timed {
-        withTimeout(5_000) {
-          repository.updateProfile(alice().copy(firstName = "Ali", role = Role.CAREGIVER))
-        }
+      assertReturnsWithoutServer("updateProfile") {
+        repository.updateProfile(alice().copy(firstName = "Ali", role = Role.CAREGIVER))
       }
-      assertTrue("updateProfile took $updateMs ms", updateMs < 1_000)
       val updated = repository.getProfile(aliceUid)
       assertEquals("Ali", updated?.firstName)
       assertEquals(Role.PATIENT, updated?.role)
@@ -651,8 +641,7 @@ class UserProfileRepositoryFirestoreTest {
   fun offlineUpdateWithoutExistingProfileCreatesNothing(): Unit = runBlocking {
     db.disableNetwork().await()
     try {
-      val elapsed = timed { withTimeout(5_000) { repository.updateProfile(alice()) } }
-      assertTrue("updateProfile took $elapsed ms", elapsed < 1_000)
+      assertReturnsWithoutServer("updateProfile") { repository.updateProfile(alice()) }
       assertNull("nothing written to the local cache", cachedSnapshot(aliceUid))
     } finally {
       db.enableNetwork().await()
@@ -751,12 +740,16 @@ class UserProfileRepositoryFirestoreTest {
     awaitServerAck()
     db.disableNetwork().await()
     try {
-      withTimeout(5_000) { repository.updateProfile(original.copy(hospital = "Offline hospital")) }
+      assertReturnsWithoutServer("updateProfile") {
+        repository.updateProfile(original.copy(hospital = "Offline hospital"))
+      }
       assertSameContent(
           original.copy(hospital = "Offline hospital"),
           repository.getCachedProfile(aliceUid),
       )
-      withTimeout(5_000) { repository.updateProfile(original.copy(hospital = null)) }
+      assertReturnsWithoutServer("updateProfile") {
+        repository.updateProfile(original.copy(hospital = null))
+      }
       assertSameContent(original.copy(hospital = null), repository.getCachedProfile(aliceUid))
     } finally {
       db.enableNetwork().await()
